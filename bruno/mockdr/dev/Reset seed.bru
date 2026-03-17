@@ -1,0 +1,15 @@
+meta {
+  name: Reset to seed data
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/_dev/reset
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

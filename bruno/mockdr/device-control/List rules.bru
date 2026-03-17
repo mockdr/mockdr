@@ -1,0 +1,19 @@
+meta {
+  name: List rules
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{s1_base_url}}/device-control
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 50
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Create site
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{s1_base_url}}/sites
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "name": "New Site",
+      "siteType": "Paid",
+      "suite": "Core"
+    }
+  }
+}

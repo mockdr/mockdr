@@ -1,0 +1,20 @@
+meta {
+  name: Query alerts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{cs_base_url}}/alerts/queries/alerts/v2
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 25
+  ~filter: status:'new'
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+}

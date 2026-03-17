@@ -1,0 +1,15 @@
+meta {
+  name: Get user
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{s1_base_url}}/users/replace-with-user-id
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

@@ -1,0 +1,23 @@
+meta {
+  name: Set rate-limit config
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/_dev/rate-limit
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "enabled": true,
+    "requests_per_minute": 30
+  }
+}

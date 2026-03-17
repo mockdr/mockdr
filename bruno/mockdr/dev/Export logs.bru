@@ -1,0 +1,19 @@
+meta {
+  name: Export logs
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{s1_base_url}}/_dev/export/logs
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 100
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

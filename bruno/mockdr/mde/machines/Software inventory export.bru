@@ -1,0 +1,15 @@
+meta {
+  name: Software inventory export
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{mde_base_url}}/api/machines/SoftwareInventoryExport
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

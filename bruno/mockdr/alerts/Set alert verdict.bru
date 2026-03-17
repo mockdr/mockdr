@@ -1,0 +1,27 @@
+meta {
+  name: Set alert analyst verdict
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/cloud-detection/alerts/analyst-verdict
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "analystVerdict": "true_positive"
+    },
+    "filter": {
+      "ids": ["{{alert_id}}"]
+    }
+  }
+}

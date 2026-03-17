@@ -1,0 +1,24 @@
+meta {
+  name: Add threat to blocklist
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/threats/add-to-blacklist
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["{{threat_id}}"]
+    }
+  }
+}

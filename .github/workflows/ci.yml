@@ -1,0 +1,259 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend ──────────────────────────────────────────────────────────────────
+  backend-quality:
+    name: Backend — lint / type-check / test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type-check (mypy)
+        run: mypy --strict --allow-any-generics . --ignore-missing-imports --exclude tests/
+
+      - name: Test + coverage (85% gate)
+        run: pytest --cov --cov-fail-under=85
+
+      - name: Critical-path tests (must all pass)
+        run: pytest -m critical --no-cov
+
+      - name: Security audit (pip-audit)
+        run: pip-audit
+
+      - name: SAST (bandit)
+        run: bandit -r . -x ./tests,./.venv -ll
+
+      - name: License compliance (pip-licenses)
+        run: |
+          pip-licenses --format=table --with-license-file --no-license-path
+          pip-licenses --fail-on="GPL-3.0-only;GPL-3.0-or-later;AGPL-3.0-only;AGPL-3.0-or-later"
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  frontend-quality:
+    name: Frontend — lint / type-check / test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint — zero warnings)
+        run: npx eslint src/ --max-warnings=0
+
+      - name: Type-check (vue-tsc)
+        run: npx vue-tsc --noEmit
+
+      - name: Unit tests + coverage
+        run: npx vitest run --coverage
+
+      - name: Security audit (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: License compliance (license-checker)
+        run: npx license-checker --production --failOn "GPL-3.0;AGPL-3.0;GPL-2.0"
+
+  # ── E2E ──────────────────────────────────────────────────────────────────────
+  e2e:
+    name: E2E — Playwright critical flows
+    runs-on: ubuntu-latest
+    needs: [backend-quality, frontend-quality]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+        working-directory: backend
+
+      - name: Install Node dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Run E2E tests
+        run: npx playwright test
+        working-directory: frontend
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30
+
+  # ── Field Drift ─────────────────────────────────────────────────────────────
+  field-drift:
+    name: Field drift — swagger spec vs mock responses
+    runs-on: ubuntu-latest
+    needs: [backend-quality]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Start backend server
+        run: |
+          cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8001 &
+          # Wait for server to be ready
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8001/web/api/v2.1/system/status > /dev/null 2>&1; then
+              echo "Server ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run field-drift check
+        run: python scripts/field_drift.py --base-url http://localhost:8001/web/api/v2.1
+
+  # ── Secret Scanning ─────────────────────────────────────────────────────────
+  secret-scanning:
+    name: Secret scanning — gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Docker ───────────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker — build verification
+    runs-on: ubuntu-latest
+    needs: [backend-quality, frontend-quality]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build image
+        run: docker build -t mockdr:ci .
+
+      - name: Smoke-test container
+        run: |
+          docker run -d --name mockdr-ci -p 5001:5001 mockdr:ci
+          curl --fail --retry 20 --retry-delay 3 --retry-all-errors \
+            http://localhost:5001/web/api/v2.1/system/status
+          curl --fail http://localhost:5001/splunk/services/server/info?output_mode=json
+          curl --fail http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations
+          docker stop mockdr-ci
+
+  # ── Container Scanning ─────────────────────────────────────────────────────
+  container-scanning:
+    name: Container scanning — Trivy
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # TODO(2026-03-16): Reuse the image from docker-build job via actions/upload-artifact
+      # and actions/download-artifact (or docker save/load with actions/cache) to avoid
+      # rebuilding the Docker image. Tracked as a CI optimisation task.
+      - name: Build image
+        run: docker build -t mockdr:ci .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: mockdr:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Run Trivy (SARIF report)
+        uses: aquasecurity/trivy-action@master
+        if: always()
+        with:
+          image-ref: mockdr:ci
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-report
+          path: trivy-results.sarif
+          retention-days: 30
+
+  # ── SBOM Generation ────────────────────────────────────────────────────────
+  sbom:
+    name: SBOM — software bill of materials
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build image
+        run: docker build -t mockdr:ci .
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: mockdr:ci
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+          retention-days: 90

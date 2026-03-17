@@ -1,0 +1,24 @@
+meta {
+  name: Update exclusion
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{s1_base_url}}/exclusions/replace-with-exclusion-id
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "description": "Updated description"
+    }
+  }
+}

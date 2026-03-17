@@ -1,0 +1,34 @@
+meta {
+  name: Get tenant info
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{xdr_base_url}}/system/get_tenant_info/
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {}
+  }
+}
+
+docs {
+  XDR HMAC Auth:
+  - key_id=1, key_secret=xdr-admin-secret (admin)
+  - key_id=2, key_secret=xdr-analyst-secret (analyst)
+  - Set xdr_timestamp = current epoch ms
+  - Compute: SHA256(key_secret + nonce + timestamp) as hex string
+  - Set xdr_auth_header to that hash
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Create bookmark
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/bookmarks/replace-with-bookmark-id
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "properties": {
+      "displayName": "Suspicious Process",
+      "notes": "Requires further investigation",
+      "query": "DeviceProcessEvents | where ProcessCommandLine has 'mimikatz'",
+      "queryResult": "See alert for details",
+      "eventTime": "2025-01-01T12:00:00Z"
+    }
+  }
+}

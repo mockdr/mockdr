@@ -1,0 +1,15 @@
+meta {
+  name: Login by token (validate token + get user)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/users/login/by-token
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

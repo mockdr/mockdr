@@ -1,0 +1,23 @@
+meta {
+  name: Update quarantine
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{cs_base_url}}/quarantine/entities/quarantined-files/v1
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": ["replace-with-file-id"],
+    "action": "release"
+  }
+}

@@ -1,0 +1,53 @@
+name: Feature Request
+description: Request a new endpoint, scenario, UI capability, or architectural improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe what you need and why. The more context you provide, the easier it is to evaluate and implement.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New API endpoint
+        - Existing endpoint improvement
+        - New DEV scenario
+        - Frontend view or component
+        - Seed data change
+        - Testing / CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do that isn't possible today?
+      placeholder: "I'm building a SOAR playbook that calls POST /threats/mitigate/rollback-remediation and the mock always returns `affected: 0` regardless of the request body, which breaks my integration test."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should this work? Include API paths, request/response shapes, or UI behaviour where relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you've tried, or alternative approaches.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links to the SentinelOne API documentation, related issues, or screenshots.

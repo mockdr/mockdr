@@ -1,0 +1,15 @@
+meta {
+  name: Get agent processes
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{base_url}}/agents/{{agent_id}}/processes
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

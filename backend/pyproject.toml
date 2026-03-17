@@ -1,0 +1,157 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "mockdr"
+version = "0.1.0"
+description = "Full-fidelity multi-EDR mock server (SentinelOne, CrowdStrike, MDE, Elastic Security, Cortex XDR, Splunk) for SOAR/SIEM integration testing"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+authors = [
+    {name = "Guenter Weber", email = "contact@mockdr.io"},
+]
+keywords = ["sentinelone", "crowdstrike", "microsoft-defender", "elastic-security", "cortex-xdr", "splunk", "mock", "api", "security", "edr", "soar", "siem", "testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Mocking",
+]
+readme = "../README.md"
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "pydantic>=2.0",
+    "faker>=18.0",
+    "python-multipart>=0.0.5",
+    "aiofiles>=23.0",
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+testing = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[project.urls]
+Homepage = "https://github.com/mockdr/mockdr"
+Repository = "https://github.com/mockdr/mockdr"
+Issues = "https://github.com/mockdr/mockdr/issues"
+
+[project.scripts]
+mockdr = "main:_cli"
+
+# ── Pytest ─────────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-fail-under=85",
+    "-v",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:jsonschema",
+]
+markers = [
+    "critical: critical-path tests (coverage gate 95%)",
+    "unit: pure unit tests with no I/O",
+    "integration: tests involving multiple layers",
+]
+
+# ── Coverage ───────────────────────────────────────────────────────────────────
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "infrastructure/seed*", ".venv/*", "main.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+# ── Mypy ───────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+strict = true
+disallow_any_generics = false
+python_version = "3.11"
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = ["tests/", ".venv/", "infrastructure/seed.py"]
+
+[[tool.mypy.overrides]]
+# seed.py is a data-generation script, not production code — skip strict checks
+module = "infrastructure.seed"
+ignore_errors = true
+
+# ── Ruff ───────────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["."]
+exclude = [".venv", "__pycache__", "infrastructure/seed.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "D",   # pydocstyle
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "ANN", # flake8-annotations
+]
+ignore = [
+    "D100", # missing docstring in public module (handled at function/class level)
+    "D104", # missing docstring in public package
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Domain dataclass fields + DTO fields mirror real SentinelOne API camelCase naming.
+# N815 (mixedCase variable in class scope) is intentional throughout.
+"domain/**" = ["N815"]
+"api/dto/**" = ["N815"]
+# Router query-param names mirror real S1 API params — N803 (argument lowercase) and
+# B008 (function call in default argument) are intentional FastAPI patterns
+"api/routers/**" = ["N803", "B008"]
+"api/auth.py" = ["N803", "B008"]
+"api/cs_auth.py" = ["B008"]
+"api/es_auth.py" = ["B008"]
+"api/mde_auth.py" = ["B008"]
+"api/splunk_auth.py" = ["B008"]
+"api/xdr_auth.py" = ["B008"]
+# store and utils use Any intentionally for generic record handling
+"repository/store.py" = ["ANN401"]
+"utils/filtering.py" = ["ANN401"]
+"utils/pagination.py" = ["ANN401"]
+"utils/cs_fql.py" = ["ANN401"]
+"utils/es_query.py" = ["ANN401"]
+"utils/mde_odata.py" = ["ANN401"]
+"mockdr/testing.py" = ["ANN401"]
+# ASGI middleware __init__/__call__ patterns are standard boilerplate
+"api/middleware/**" = ["D107", "D102"]
+# Seed data files have long string literals (endpoint paths, descriptions, etc.)
+"infrastructure/seeders/**" = ["E501"]
+# test files may have long assertion lines
+"tests/**" = ["D", "ANN", "E501", "N802"]

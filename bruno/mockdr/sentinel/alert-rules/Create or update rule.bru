@@ -1,0 +1,36 @@
+meta {
+  name: Create or update rule
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/alertRules/replace-with-rule-id
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "kind": "Scheduled",
+    "properties": {
+      "displayName": "Suspicious Login",
+      "severity": "High",
+      "enabled": true,
+      "query": "SigninLogs | where ResultType != 0",
+      "queryFrequency": "PT1H",
+      "queryPeriod": "PT1H",
+      "triggerOperator": "GreaterThan",
+      "triggerThreshold": 0
+    }
+  }
+}

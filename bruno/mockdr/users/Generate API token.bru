@@ -1,0 +1,24 @@
+meta {
+  name: Generate API token
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{s1_base_url}}/users/generate-api-token
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["replace-with-user-id"]
+    }
+  }
+}

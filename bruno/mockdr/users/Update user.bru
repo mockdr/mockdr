@@ -1,0 +1,24 @@
+meta {
+  name: Update user
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{s1_base_url}}/users/replace-with-user-id
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "fullName": "Updated Name"
+    }
+  }
+}

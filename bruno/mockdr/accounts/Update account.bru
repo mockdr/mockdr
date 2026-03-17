@@ -1,0 +1,24 @@
+meta {
+  name: Update account
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{s1_base_url}}/accounts/replace-with-account-id
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "name": "Updated Account Name"
+    }
+  }
+}

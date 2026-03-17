@@ -1,0 +1,24 @@
+meta {
+  name: Delete exclusion
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{s1_base_url}}/exclusions
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["replace-with-exclusion-id"]
+    }
+  }
+}

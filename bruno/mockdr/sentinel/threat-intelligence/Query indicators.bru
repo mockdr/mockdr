@@ -1,0 +1,27 @@
+meta {
+  name: Query indicators
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/threatIntelligence/main/queryIndicators
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "keywords": "ransomware",
+    "pageSize": 25
+  }
+}

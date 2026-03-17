@@ -1,0 +1,21 @@
+meta {
+  name: List endpoints
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{kibana_base_url}}/api/endpoint/metadata
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 0
+  pageSize: 25
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+}

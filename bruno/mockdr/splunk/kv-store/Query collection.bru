@@ -1,0 +1,19 @@
+meta {
+  name: Query collection
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{splunk_base_url}}/servicesNS/nobody/search/storage/collections/data/ioc_cache
+  body: none
+  auth: none
+}
+
+params:query {
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

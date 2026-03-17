@@ -1,0 +1,37 @@
+meta {
+  name: Create indicator
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/threatIntelligence/main/createIndicator
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "kind": "indicator",
+    "properties": {
+      "displayName": "Known C2 IP",
+      "description": "Observed in APT campaign",
+      "patternType": "ipv4-addr",
+      "pattern": "[ipv4-addr:value = '10.0.0.1']",
+      "source": "internal-ti",
+      "threatTypes": ["malicious-activity"],
+      "confidence": 85,
+      "revoked": false,
+      "validFrom": "2025-01-01T00:00:00Z"
+    }
+  }
+}

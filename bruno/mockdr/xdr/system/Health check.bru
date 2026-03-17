@@ -1,0 +1,11 @@
+meta {
+  name: Health check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{xdr_base_url}}/healthcheck
+  body: none
+  auth: none
+}

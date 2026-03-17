@@ -1,0 +1,31 @@
+meta {
+  name: Host action
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{cs_base_url}}/devices/entities/devices-actions/v2
+  body: json
+  auth: none
+}
+
+params:query {
+  action_name: contain
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": ["{{cs_host_id}}"],
+    "action_parameters": []
+  }
+}
+
+docs {
+  action_name options: contain, lift_containment, hide_host, unhide_host
+}

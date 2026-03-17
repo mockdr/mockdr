@@ -1,0 +1,19 @@
+meta {
+  name: Cancel job
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{splunk_base_url}}/services/search/jobs/{{splunk_sid}}/control
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  action: cancel
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

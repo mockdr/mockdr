@@ -1,0 +1,34 @@
+meta {
+  name: Create watchlist
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/watchlists/vip-users
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "properties": {
+      "displayName": "VIP Users",
+      "provider": "Microsoft",
+      "source": "watchlist-import",
+      "description": "High value accounts",
+      "numberOfLinesToSkip": 0,
+      "rawContent": "UserPrincipalName,DisplayName\nceo@acmecorp.com,Jane Smith",
+      "contentType": "text/csv"
+    }
+  }
+}

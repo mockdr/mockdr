@@ -1,0 +1,20 @@
+meta {
+  name: List rules
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{kibana_base_url}}/api/detection_engine/rules/_find
+  body: none
+  auth: none
+}
+
+params:query {
+  per_page: 25
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+}

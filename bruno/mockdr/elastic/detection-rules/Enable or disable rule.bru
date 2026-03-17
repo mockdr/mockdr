@@ -1,0 +1,24 @@
+meta {
+  name: Enable or disable rule
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{kibana_base_url}}/api/detection_engine/rules
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id": "{{es_rule_id}}",
+    "enabled": false
+  }
+}

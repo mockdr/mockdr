@@ -1,0 +1,32 @@
+meta {
+  name: Create exclusion
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/exclusions
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "type": "white_hash",
+      "value": "aabbccddeeff00112233445566778899aabbccdd",
+      "description": "Approved internal tool",
+      "osType": "windows",
+      "pathExclusionType": "suppress",
+      "source": "user",
+      "userName": "analyst@company.com",
+      "scopeName": "Default Site",
+      "scopePath": "global"
+    }
+  }
+}

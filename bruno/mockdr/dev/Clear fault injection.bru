@@ -1,0 +1,15 @@
+meta {
+  name: Clear fault injection
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{s1_base_url}}/_dev/fault-injection
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Create account
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{s1_base_url}}/accounts
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "name": "New Account",
+      "expiration": "2026-12-31T00:00:00.000Z"
+    }
+  }
+}

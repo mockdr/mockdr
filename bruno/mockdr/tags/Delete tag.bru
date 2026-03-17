@@ -1,0 +1,15 @@
+meta {
+  name: Delete tag
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{s1_base_url}}/tag-manager/replace-with-tag-id
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

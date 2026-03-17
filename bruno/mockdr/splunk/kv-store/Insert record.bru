@@ -1,0 +1,24 @@
+meta {
+  name: Insert record
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{splunk_base_url}}/servicesNS/nobody/search/storage/collections/data/ioc_cache
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "type": "sha256",
+    "verdict": "malicious"
+  }
+}

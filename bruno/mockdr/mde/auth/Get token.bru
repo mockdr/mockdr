@@ -1,0 +1,25 @@
+meta {
+  name: Get token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{mde_base_url}}/oauth2/v2.0/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  client_id: mde-mock-admin-client
+  client_secret: mde-mock-admin-secret
+  grant_type: client_credentials
+  tenant_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+}
+
+docs {
+  Returns access_token — copy to mde_token variable.
+  Tenant: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  Roles: admin=mde-mock-admin-client/mde-mock-admin-secret
+         analyst=mde-mock-analyst-client/mde-mock-analyst-secret
+}

@@ -1,0 +1,15 @@
+meta {
+  name: System info
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/system/info
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

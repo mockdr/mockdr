@@ -1,0 +1,21 @@
+meta {
+  name: Create saved search
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{splunk_base_url}}/services/saved/searches
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  name: High Severity Threats
+  search: search index=sentinelone severity=high | table time host threat_name
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

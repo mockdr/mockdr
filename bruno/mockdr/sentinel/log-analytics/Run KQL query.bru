@@ -1,0 +1,27 @@
+meta {
+  name: Run KQL query
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{sentinel_base_url}}/v1/workspaces/{{sentinel_workspace_id}}/query
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": "SecurityIncident | where TimeGenerated > ago(24h) | summarize count() by Status",
+    "timespan": "P1D"
+  }
+}

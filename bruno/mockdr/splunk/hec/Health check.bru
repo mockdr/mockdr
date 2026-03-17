@@ -1,0 +1,11 @@
+meta {
+  name: Health check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{splunk_base_url}}/services/collector/health
+  body: none
+  auth: none
+}

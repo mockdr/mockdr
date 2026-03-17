@@ -1,0 +1,15 @@
+meta {
+  name: Get agent tags
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{s1_base_url}}/agents/tags
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

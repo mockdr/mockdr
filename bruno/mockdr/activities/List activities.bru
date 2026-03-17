@@ -1,0 +1,21 @@
+meta {
+  name: List activities
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/activities
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 50
+  ~activityTypes: 2001,2002
+  ~agentId: "{{agent_id}}"
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

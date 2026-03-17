@@ -1,0 +1,27 @@
+meta {
+  name: Set alert incident status
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{s1_base_url}}/cloud-detection/alerts/incident
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "incidentStatus": "resolved"
+    },
+    "filter": {
+      "ids": ["{{alert_id}}"]
+    }
+  }
+}

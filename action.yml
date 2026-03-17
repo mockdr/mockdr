@@ -1,0 +1,136 @@
+name: 'mockdr — Multi-EDR Mock Server'
+description: |
+  Start a multi-EDR mock API server for integration testing. Supports seven vendors:
+
+  - **SentinelOne** — API v2.1 at `/web/api/v2.1`
+    Auth: `Authorization: ApiToken <token>`
+    Default admin token: `admin-token-0000-0000-000000000001`
+
+  - **CrowdStrike Falcon** — OAuth2 at `/oauth2/token`, API at `/devices/`, `/detects/`, etc.
+    Auth: `Authorization: Bearer <access_token>` (obtain via `POST /oauth2/token`)
+    Default credentials: `cs-mock-admin-client` / `cs-mock-admin-secret`
+
+  - **Microsoft Defender for Endpoint** — OAuth2 at `/oauth2/v2.0/token`, API at `/api/`
+    Auth: `Authorization: Bearer <access_token>` (obtain via `POST /oauth2/v2.0/token`)
+    Default credentials: `mde-mock-admin-client` / `mde-mock-admin-secret`
+
+  - **Elastic Security** — Elasticsearch REST at `/elastic/`, Kibana API at `/kibana/`
+    Auth: `Authorization: Basic base64(user:pass)` or `Authorization: ApiKey base64(id:key)`
+    Default credentials: `elastic` / `mock-elastic-password`
+
+  - **Cortex XDR** — API at `/xdr/public_api/v1`
+    Auth: HMAC headers (`x-xdr-auth-id`, `x-xdr-nonce`, `x-xdr-timestamp`, `Authorization`)
+    Default credentials: key_id=1 / `xdr-admin-secret`
+
+  - **Splunk SIEM** — REST API at `/splunk/services/`, HEC at `/splunk/services/collector/`
+    Auth: Basic Auth, Bearer session key, or HEC token (`Authorization: Splunk <token>`)
+    Default credentials: `admin` / `mockdr-admin`
+
+  - **Microsoft Sentinel** — Azure ARM API at `/sentinel/`
+    Auth: OAuth2 client credentials (`POST /sentinel/oauth2/v2.0/token`)
+    Default credentials: `sentinel-mock-client-id` / `sentinel-mock-client-secret`
+
+  All vendor APIs are served from a single process. Seed data is deterministic
+  (random.seed(42) + Faker.seed(42)) and resets on each restart.
+branding:
+  icon: 'shield'
+  color: 'purple'
+
+inputs:
+  port:
+    description: 'Port to run the mock server on'
+    required: false
+    default: '5001'
+  seed-count-agents:
+    description: 'Number of SentinelOne agents to seed'
+    required: false
+    default: '60'
+  seed-count-threats:
+    description: 'Number of SentinelOne threats to seed'
+    required: false
+    default: '30'
+  seed-count-alerts:
+    description: 'Number of SentinelOne alerts to seed'
+    required: false
+    default: '20'
+  api-token:
+    description: 'Default SentinelOne admin API token'
+    required: false
+    default: 'admin-token-0000-0000-000000000001'
+
+outputs:
+  base-url:
+    description: 'Base URL of the running mock server (root — all vendor APIs branch from here)'
+    value: ${{ steps.start.outputs.base-url }}
+  s1-base-url:
+    description: 'SentinelOne API base URL'
+    value: ${{ steps.start.outputs.s1-base-url }}
+  cs-base-url:
+    description: 'CrowdStrike Falcon API base URL'
+    value: ${{ steps.start.outputs.cs-base-url }}
+  mde-base-url:
+    description: 'Microsoft Defender for Endpoint API base URL'
+    value: ${{ steps.start.outputs.mde-base-url }}
+  es-base-url:
+    description: 'Elastic Security (Elasticsearch REST) base URL'
+    value: ${{ steps.start.outputs.es-base-url }}
+  kibana-base-url:
+    description: 'Elastic Security (Kibana) base URL'
+    value: ${{ steps.start.outputs.kibana-base-url }}
+  xdr-base-url:
+    description: 'Cortex XDR API base URL'
+    value: ${{ steps.start.outputs.xdr-base-url }}
+  splunk-base-url:
+    description: 'Splunk REST API base URL'
+    value: ${{ steps.start.outputs.splunk-base-url }}
+  sentinel-base-url:
+    description: 'Microsoft Sentinel API base URL'
+    value: ${{ steps.start.outputs.sentinel-base-url }}
+  api-token:
+    description: 'SentinelOne API token for authentication'
+    value: ${{ inputs.api-token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install -r ${{ github.action_path }}/backend/requirements.txt
+
+    - name: Start mockdr
+      id: start
+      shell: bash
+      env:
+        SEED_COUNT_AGENTS: ${{ inputs.seed-count-agents }}
+        SEED_COUNT_THREATS: ${{ inputs.seed-count-threats }}
+        SEED_COUNT_ALERTS: ${{ inputs.seed-count-alerts }}
+      run: |
+        cd ${{ github.action_path }}/backend
+        PYTHONPATH=. nohup python -m uvicorn main:app --host 0.0.0.0 --port ${{ inputs.port }} &
+        echo "base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
+        echo "s1-base-url=http://localhost:${{ inputs.port }}/web/api/v2.1" >> "$GITHUB_OUTPUT"
+        echo "cs-base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
+        echo "mde-base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
+        echo "es-base-url=http://localhost:${{ inputs.port }}/elastic" >> "$GITHUB_OUTPUT"
+        echo "kibana-base-url=http://localhost:${{ inputs.port }}/kibana" >> "$GITHUB_OUTPUT"
+        echo "xdr-base-url=http://localhost:${{ inputs.port }}/xdr/public_api/v1" >> "$GITHUB_OUTPUT"
+        echo "splunk-base-url=http://localhost:${{ inputs.port }}/splunk" >> "$GITHUB_OUTPUT"
+        echo "sentinel-base-url=http://localhost:${{ inputs.port }}/sentinel" >> "$GITHUB_OUTPUT"
+
+    - name: Wait for server
+      shell: bash
+      run: |
+        for i in $(seq 1 30); do
+          if curl -sf http://localhost:${{ inputs.port }}/web/api/v2.1/system/status > /dev/null 2>&1; then
+            echo "mockdr is ready on port ${{ inputs.port }}"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "mockdr failed to start within 30 seconds"
+        exit 1

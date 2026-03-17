@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: mockdr
+    env: docker
+    repo: https://github.com/mockdr/mockdr
+    plan: free
+    healthCheckPath: /web/api/v2.1/system/status
+    envVars:
+      - key: SEED_COUNT_AGENTS
+        value: "60"
+      - key: SEED_COUNT_THREATS
+        value: "30"
+      - key: SEED_COUNT_ALERTS
+        value: "20"

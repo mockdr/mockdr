@@ -1,0 +1,19 @@
+meta {
+  name: Get index
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{splunk_base_url}}/services/data/indexes/sentinelone
+  body: none
+  auth: none
+}
+
+params:query {
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

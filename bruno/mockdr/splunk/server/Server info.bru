@@ -1,0 +1,15 @@
+meta {
+  name: Server info
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{splunk_base_url}}/services/server/info
+  body: none
+  auth: none
+}
+
+params:query {
+  output_mode: json
+}

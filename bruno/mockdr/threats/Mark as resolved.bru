@@ -1,0 +1,24 @@
+meta {
+  name: Mark as resolved
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{s1_base_url}}/threats/mark-as-resolved
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["{{threat_id}}"]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Request audit log
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/_dev/requests
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 100
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

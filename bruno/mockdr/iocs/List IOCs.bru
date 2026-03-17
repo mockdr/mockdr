@@ -1,0 +1,20 @@
+meta {
+  name: List IOCs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/threat-intelligence/iocs
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 50
+  ~type: sha256
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

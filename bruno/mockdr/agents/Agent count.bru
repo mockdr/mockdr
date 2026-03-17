@@ -1,0 +1,15 @@
+meta {
+  name: Agent count
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/agents/count
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

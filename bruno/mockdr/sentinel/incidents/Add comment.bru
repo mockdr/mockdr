@@ -1,0 +1,28 @@
+meta {
+  name: Add comment
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/incidents/{{sentinel_incident_id}}/comments/comment-001
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "properties": {
+      "message": "Triaged and escalated to Tier 2"
+    }
+  }
+}

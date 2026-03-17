@@ -1,0 +1,15 @@
+meta {
+  name: Playbooks
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{s1_base_url}}/_dev/playbooks
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

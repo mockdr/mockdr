@@ -1,0 +1,15 @@
+meta {
+  name: Store stats
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/_dev/stats
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

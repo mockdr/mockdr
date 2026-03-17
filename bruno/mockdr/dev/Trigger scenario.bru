@@ -1,0 +1,30 @@
+meta {
+  name: Trigger scenario
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/_dev/scenario
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "scenario": "mass_infection"
+  }
+}
+
+docs {
+  Available scenarios:
+  - mass_infection   → infect 20 random agents
+  - apt_campaign     → targeted attack on 10 agents
+  - agent_offline    → take 30% of agents offline
+  - quiet_day        → resolve all threats & heal agents
+}

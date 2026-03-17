@@ -1,0 +1,15 @@
+meta {
+  name: Get machine alerts
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{mde_base_url}}/api/machines/{{mde_machine_id}}/alerts
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

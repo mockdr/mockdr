@@ -1,0 +1,29 @@
+meta {
+  name: Run script
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{xdr_base_url}}/scripts/run_script/
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {
+      "script_name": "process_list",
+      "endpoint_id_list": ["{{xdr_endpoint_id}}"],
+      "parameters_values": {}
+    }
+  }
+}

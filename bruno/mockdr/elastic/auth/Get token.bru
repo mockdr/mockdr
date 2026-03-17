@@ -1,0 +1,31 @@
+meta {
+  name: Get token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{elastic_base_url}}/_security/oauth2/token
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey mock-es-admin-api-key
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "grant_type": "password",
+    "username": "elastic",
+    "password": "mock-elastic-password"
+  }
+}
+
+docs {
+  API key roles:
+  - Admin:   mock-es-admin-api-key
+  - Analyst: mock-es-analyst-api-key
+  - Viewer:  mock-es-viewer-api-key
+}

@@ -1,0 +1,30 @@
+meta {
+  name: Update alerts
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{xdr_base_url}}/alerts/update_alerts
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {
+      "alert_id_list": ["replace-with-alert-id"],
+      "update_data": {
+        "status": "reviewed"
+      }
+    }
+  }
+}

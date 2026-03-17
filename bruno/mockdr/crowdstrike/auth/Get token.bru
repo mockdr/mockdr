@@ -1,0 +1,22 @@
+meta {
+  name: Get token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{cs_base_url}}/oauth2/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  client_id: cs-mock-admin-client
+  client_secret: cs-mock-admin-secret
+}
+
+docs {
+  Returns access_token — copy to cs_token variable.
+  Roles: admin=cs-mock-admin-client/cs-mock-admin-secret,
+         viewer=cs-mock-viewer-client/cs-mock-viewer-secret
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Add threat note
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/threats/{{threat_id}}/notes
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "text": "Investigated — confirmed malicious, escalated to IR team."
+    }
+  }
+}

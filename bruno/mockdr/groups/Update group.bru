@@ -1,0 +1,24 @@
+meta {
+  name: Update group
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{s1_base_url}}/groups/{{group_id}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "name": "Updated Group Name"
+    }
+  }
+}

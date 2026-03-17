@@ -1,0 +1,15 @@
+meta {
+  name: Get alert
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{mde_base_url}}/api/alerts/{{mde_alert_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

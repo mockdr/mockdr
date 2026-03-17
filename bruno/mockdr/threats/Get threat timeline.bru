@@ -1,0 +1,15 @@
+meta {
+  name: Get threat timeline
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{s1_base_url}}/threats/{{threat_id}}/timeline
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

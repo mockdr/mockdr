@@ -1,0 +1,19 @@
+meta {
+  name: List actions
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{mde_base_url}}/api/machineactions
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

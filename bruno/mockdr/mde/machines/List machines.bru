@@ -1,0 +1,20 @@
+meta {
+  name: List machines
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{mde_base_url}}/api/machines
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+  ~$filter: osBuild eq 22000
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

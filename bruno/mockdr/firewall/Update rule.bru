@@ -1,0 +1,27 @@
+meta {
+  name: Update rule
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{s1_base_url}}/firewall-control
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["replace-with-rule-id"]
+    },
+    "data": {
+      "status": "Disabled"
+    }
+  }
+}

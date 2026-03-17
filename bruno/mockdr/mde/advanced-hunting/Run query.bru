@@ -1,0 +1,22 @@
+meta {
+  name: Run query
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{mde_base_url}}/api/advancedqueries/run
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "Query": "DeviceProcessEvents | where FileName has 'powershell' | top 10 by Timestamp"
+  }
+}

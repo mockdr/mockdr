@@ -1,0 +1,15 @@
+meta {
+  name: Get threat
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/threats/{{threat_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

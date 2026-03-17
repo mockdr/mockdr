@@ -1,0 +1,19 @@
+meta {
+  name: List users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{cs_base_url}}/user-management/queries/users/v1
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 25
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+}

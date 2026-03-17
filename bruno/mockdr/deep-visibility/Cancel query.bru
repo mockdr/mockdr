@@ -1,0 +1,22 @@
+meta {
+  name: Cancel query
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{s1_base_url}}/dv/cancel-query
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "queryId": "replace-with-query-id"
+  }
+}

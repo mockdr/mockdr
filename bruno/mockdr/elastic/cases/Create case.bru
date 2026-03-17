@@ -1,0 +1,34 @@
+meta {
+  name: Create case
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{kibana_base_url}}/api/cases
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "title": "Ransomware Investigation",
+    "description": "Potential ransomware activity detected on WORKSTATION-01",
+    "tags": ["ransomware", "p1"],
+    "connector": {
+      "id": "none",
+      "name": "none",
+      "type": ".none",
+      "fields": null
+    },
+    "settings": {
+      "syncAlerts": true
+    }
+  }
+}

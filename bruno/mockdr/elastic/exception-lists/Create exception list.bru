@@ -1,0 +1,27 @@
+meta {
+  name: Create exception list
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{kibana_base_url}}/api/exception_lists
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "list_id": "trusted-hashes",
+    "name": "Trusted Hashes",
+    "description": "Approved software hashes",
+    "namespace_type": "single",
+    "type": "detection"
+  }
+}

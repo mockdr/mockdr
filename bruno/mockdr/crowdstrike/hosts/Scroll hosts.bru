@@ -1,0 +1,19 @@
+meta {
+  name: Scroll hosts
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{cs_base_url}}/devices/queries/devices-scroll/v1
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 100
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+}

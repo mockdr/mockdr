@@ -1,0 +1,15 @@
+meta {
+  name: Delete group
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{s1_base_url}}/groups/{{group_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

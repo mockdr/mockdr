@@ -1,0 +1,28 @@
+meta {
+  name: Get incident details
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{xdr_base_url}}/incidents/get_incident_extra_data/
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {
+      "incident_id": "{{xdr_incident_id}}",
+      "alerts_limit": 10
+    }
+  }
+}

@@ -1,0 +1,20 @@
+meta {
+  name: List alerts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{mde_base_url}}/api/alerts
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+  ~$filter: severity eq 'High'
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

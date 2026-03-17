@@ -1,0 +1,19 @@
+meta {
+  name: Webhook deliveries
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{s1_base_url}}/_dev/webhooks/deliveries
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 50
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}
