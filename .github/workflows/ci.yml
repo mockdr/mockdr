@@ -119,7 +119,7 @@ jobs:
         run: npx playwright test
         working-directory: frontend
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -226,7 +226,7 @@ jobs:
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: trivy-report
@@ -252,7 +252,7 @@ jobs:
           format: spdx-json
           output-file: sbom.spdx.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom.spdx.json
