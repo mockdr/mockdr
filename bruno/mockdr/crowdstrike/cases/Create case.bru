@@ -1,0 +1,28 @@
+meta {
+  name: Create case
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{cs_base_url}}/alerts/entities/cases/v1
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "resources": [
+      {
+        "name": "New Case",
+        "description": "IR case",
+        "type": "incident"
+      }
+    ]
+  }
+}

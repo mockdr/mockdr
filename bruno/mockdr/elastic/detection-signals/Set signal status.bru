@@ -1,0 +1,24 @@
+meta {
+  name: Set signal status
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{kibana_base_url}}/api/detection_engine/signals/status
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "signal_ids": ["replace-with-signal-id"],
+    "status": "acknowledged"
+  }
+}

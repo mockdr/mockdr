@@ -1,0 +1,24 @@
+meta {
+  name: Add comment
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{kibana_base_url}}/api/cases/{{es_case_id}}/comments
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "comment": "Initial triage complete. Escalating to IR team.",
+    "type": "user"
+  }
+}

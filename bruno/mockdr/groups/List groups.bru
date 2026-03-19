@@ -1,0 +1,21 @@
+meta {
+  name: List groups
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/groups
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 50
+  ~siteId: "{{site_id}}"
+  ~type: static
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

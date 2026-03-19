@@ -1,0 +1,15 @@
+meta {
+  name: Get machine
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{mde_base_url}}/api/machines/{{mde_machine_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

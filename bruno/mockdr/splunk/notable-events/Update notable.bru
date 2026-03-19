@@ -1,0 +1,29 @@
+meta {
+  name: Update notable
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{splunk_base_url}}/services/notable_update
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  ruleUIDs: replace-with-rule-uid
+  status: 2
+  urgency: high
+  owner: admin
+  comment: Under investigation
+  disposition: true_positive
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}
+
+docs {
+  status: 0=Unassigned, 1=Assigned, 2=In Progress, 3=Pending, 4=Resolved, 5=Closed
+}

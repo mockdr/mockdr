@@ -1,0 +1,15 @@
+meta {
+  name: List activity types
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{s1_base_url}}/activities/types
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

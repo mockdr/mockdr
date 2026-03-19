@@ -1,0 +1,25 @@
+meta {
+  name: Search index
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{elastic_base_url}}/sentinelone/_search
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey mock-es-admin-api-key
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": {
+      "match_all": {}
+    },
+    "size": 10
+  }
+}

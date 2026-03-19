@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
+    environment:
+      - SEED_COUNT_AGENTS=60
+      - SEED_COUNT_THREATS=30
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/web/api/v2.1/system/status')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

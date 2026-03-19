@@ -1,0 +1,19 @@
+meta {
+  name: List Alerts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/security/alerts_v2
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

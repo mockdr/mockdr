@@ -1,0 +1,15 @@
+meta {
+  name: Get account
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{s1_base_url}}/accounts/replace-with-account-id
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

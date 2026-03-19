@@ -1,0 +1,19 @@
+meta {
+  name: List saved searches
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{splunk_base_url}}/services/saved/searches
+  body: none
+  auth: none
+}
+
+params:query {
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

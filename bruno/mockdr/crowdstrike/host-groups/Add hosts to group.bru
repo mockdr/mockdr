@@ -1,0 +1,32 @@
+meta {
+  name: Add hosts to group
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{cs_base_url}}/devices/entities/host-group-actions/v1
+  body: json
+  auth: none
+}
+
+params:query {
+  action_name: add-hosts
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ids": ["{{cs_host_group_id}}"],
+    "action_parameters": [
+      {
+        "name": "filter",
+        "value": "device_id:'{{cs_host_id}}'"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Get results
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{splunk_base_url}}/services/search/v2/jobs/{{splunk_sid}}/results
+  body: none
+  auth: none
+}
+
+params:query {
+  output_mode: json
+  count: 25
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

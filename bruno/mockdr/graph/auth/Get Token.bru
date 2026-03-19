@@ -1,0 +1,28 @@
+meta {
+  name: Get Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{graph_base_url}}/oauth2/v2.0/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  client_id: graph-mock-admin-client
+  client_secret: graph-mock-admin-secret
+  grant_type: client_credentials
+  scope: https://graph.microsoft.com/.default
+}
+
+docs {
+  Returns access_token — copy to graphToken variable.
+  Tenant: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  Roles: admin=graph-mock-admin-client/graph-mock-admin-secret
+         security=graph-mock-security-client/graph-mock-security-secret
+         smb=graph-mock-smb-client/graph-mock-smb-secret
+         intune=graph-mock-intune-client/graph-mock-intune-secret
+         mail=graph-mock-mail-client/graph-mock-mail-secret
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Set fault injection
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{s1_base_url}}/_dev/fault-injection
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "enabled": true,
+    "error_rate": 0.1,
+    "delay_ms": 500
+  }
+}

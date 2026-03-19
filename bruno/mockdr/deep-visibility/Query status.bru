@@ -1,0 +1,19 @@
+meta {
+  name: Query status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{s1_base_url}}/dv/query-status
+  body: none
+  auth: none
+}
+
+params:query {
+  queryId: replace-with-query-id
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

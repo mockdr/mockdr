@@ -1,0 +1,19 @@
+meta {
+  name: List users
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{splunk_base_url}}/services/authentication/users
+  body: none
+  auth: none
+}
+
+params:query {
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

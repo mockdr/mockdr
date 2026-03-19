@@ -1,0 +1,21 @@
+meta {
+  name: List exception lists
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{kibana_base_url}}/api/exception_lists/_find
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 1
+  per_page: 25
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+}

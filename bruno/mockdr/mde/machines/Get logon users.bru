@@ -1,0 +1,15 @@
+meta {
+  name: Get logon users
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{mde_base_url}}/api/machines/{{mde_machine_id}}/logonusers
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

@@ -1,0 +1,30 @@
+meta {
+  name: Create rule
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{s1_base_url}}/firewall-control
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "name": "Block Outbound 4444",
+      "action": "Block",
+      "direction": "OUT",
+      "protocol": "TCP",
+      "remotePort": "4444",
+      "status": "Enabled",
+      "osType": "windows"
+    }
+  }
+}

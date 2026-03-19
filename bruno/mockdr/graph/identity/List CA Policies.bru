@@ -1,0 +1,15 @@
+meta {
+  name: List CA Policies
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/identity/conditionalAccess/policies
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

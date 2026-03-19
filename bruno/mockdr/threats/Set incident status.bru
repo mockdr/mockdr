@@ -1,0 +1,27 @@
+meta {
+  name: Set incident status
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/threats/incident
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "incidentStatus": "resolved"
+    },
+    "filter": {
+      "ids": ["{{threat_id}}"]
+    }
+  }
+}

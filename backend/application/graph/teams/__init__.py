@@ -1,0 +1,1 @@
+"""Graph Teams CQRS handlers."""

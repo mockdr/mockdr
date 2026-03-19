@@ -1,0 +1,22 @@
+meta {
+  name: Fire test event
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/webhooks/fire
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "event_type": "threat.created"
+  }
+}

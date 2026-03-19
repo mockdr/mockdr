@@ -1,0 +1,15 @@
+meta {
+  name: Export store snapshot
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/_dev/export
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

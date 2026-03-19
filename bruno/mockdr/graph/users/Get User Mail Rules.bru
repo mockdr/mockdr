@@ -1,0 +1,15 @@
+meta {
+  name: Get User Mail Rules
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/users/{{userId}}/mailFolders/inbox/messageRules
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

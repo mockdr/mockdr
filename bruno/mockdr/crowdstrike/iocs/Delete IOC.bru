@@ -1,0 +1,19 @@
+meta {
+  name: Delete IOC
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{cs_base_url}}/iocs/entities/indicators/v1
+  body: none
+  auth: none
+}
+
+params:query {
+  ids: {{cs_ioc_id}}
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+}

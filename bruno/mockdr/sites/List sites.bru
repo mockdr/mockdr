@@ -1,0 +1,20 @@
+meta {
+  name: List sites
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/sites
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 50
+  ~state: active
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

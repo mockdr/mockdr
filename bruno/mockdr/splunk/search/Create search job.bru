@@ -1,0 +1,26 @@
+meta {
+  name: Create search job
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{splunk_base_url}}/services/search/jobs
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  search: search index=sentinelone | head 100
+  output_mode: json
+  earliest_time: -24h
+  latest_time: now
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}
+
+docs {
+  Returns sid — copy to splunk_sid variable.
+}

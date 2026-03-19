@@ -1,0 +1,24 @@
+meta {
+  name: Mitigate threat (kill, quarantine, remediate, rollback, un-quarantine)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/threats/mitigate/kill
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["{{threat_id}}"]
+    }
+  }
+}

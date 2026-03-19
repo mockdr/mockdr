@@ -1,0 +1,17 @@
+.git
+.github
+__pycache__
+node_modules
+.venv
+*.pyc
+.mypy_cache
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage
+.env
+.env.*
+*.md
+!README.md
+.DS_Store
+data/

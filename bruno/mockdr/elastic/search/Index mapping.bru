@@ -1,0 +1,15 @@
+meta {
+  name: Index mapping
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{elastic_base_url}}/sentinelone/_mapping
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey mock-es-admin-api-key
+}

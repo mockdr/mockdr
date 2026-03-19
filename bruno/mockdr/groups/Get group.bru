@@ -1,0 +1,15 @@
+meta {
+  name: Get group
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{s1_base_url}}/groups/{{group_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

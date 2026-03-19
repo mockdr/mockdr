@@ -1,0 +1,19 @@
+meta {
+  name: List vulnerabilities
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{mde_base_url}}/api/vulnerabilities
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+}

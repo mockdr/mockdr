@@ -1,0 +1,39 @@
+meta {
+  name: Create or update incident
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/incidents/{{sentinel_incident_id}}
+  body: json
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "properties": {
+      "title": "Suspicious PowerShell Activity",
+      "description": "Multiple suspicious PowerShell commands detected",
+      "severity": "High",
+      "status": "Active",
+      "owner": {
+        "assignedTo": "analyst@company.com"
+      },
+      "labels": [
+        {
+          "labelName": "malware"
+        }
+      ]
+    }
+  }
+}

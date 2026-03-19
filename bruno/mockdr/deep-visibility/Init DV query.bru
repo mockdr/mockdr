@@ -1,0 +1,25 @@
+meta {
+  name: Initiate Deep Visibility query
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/dv/init-query
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "query": "EventType = \"Process Creation\" AND AgentName contains \"WORKSTATION\"",
+    "fromDate": "2025-01-01T00:00:00Z",
+    "toDate": "2025-01-02T00:00:00Z",
+    "limit": 100
+  }
+}

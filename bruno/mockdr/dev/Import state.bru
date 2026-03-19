@@ -1,0 +1,31 @@
+meta {
+  name: Import store snapshot
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/_dev/import
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "agents": {},
+    "threats": {},
+    "sites": {},
+    "groups": {},
+    "users": {}
+  }
+}
+
+docs {
+  Paste a full snapshot from GET /_dev/export as the request body.
+  An empty dict {} is valid and results in an empty store.
+}

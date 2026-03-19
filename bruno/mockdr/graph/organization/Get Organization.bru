@@ -1,0 +1,15 @@
+meta {
+  name: Get Organization
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/organization
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

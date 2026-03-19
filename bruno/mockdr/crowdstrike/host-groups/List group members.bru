@@ -1,0 +1,19 @@
+meta {
+  name: List group members
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{cs_base_url}}/devices/combined/host-group-members/v1
+  body: none
+  auth: none
+}
+
+params:query {
+  id: {{cs_host_group_id}}
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+}

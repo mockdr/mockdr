@@ -1,0 +1,22 @@
+meta {
+  name: Collect investigation package
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{mde_base_url}}/api/machines/{{mde_machine_id}}/collectInvestigationPackage
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "Comment": "Collecting for IR"
+  }
+}

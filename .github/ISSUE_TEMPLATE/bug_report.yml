@@ -1,0 +1,62 @@
+name: Bug Report
+description: Something is broken or behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as possible.
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected layer
+      options:
+        - Backend API
+        - Frontend UI
+        - Docker / start.sh
+        - CI / build
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect to happen?
+      placeholder: "When I call GET /web/api/v2.1/threats, the response contains `threatName` at the top level instead of inside `threatInfo`."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal reproduction — curl command, UI steps, or test case.
+      placeholder: |
+        1. Start the server with `./start.sh`
+        2. Run: `curl -H "Authorization: ApiToken admin-token-0000-0000-000000000001" http://localhost:8001/web/api/v2.1/threats`
+        3. Observe: `data[0].threatName` exists at top level
+        4. Expected: field is inside `data[0].threatInfo.threatName`
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Node version, Docker version (if applicable).
+      placeholder: |
+        OS: macOS 14.5
+        Python: 3.12.1
+        Node: 20.14.0
+        Started via: ./start.sh
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, or anything else relevant.

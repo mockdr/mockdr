@@ -1,0 +1,31 @@
+meta {
+  name: Create IOC
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{cs_base_url}}/iocs/entities/indicators/v1
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{cs_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "indicators": [
+      {
+        "type": "sha256",
+        "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "action": "prevent",
+        "severity": "high",
+        "description": "Known ransomware",
+        "platforms": ["windows"]
+      }
+    ]
+  }
+}

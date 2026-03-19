@@ -1,0 +1,24 @@
+meta {
+  name: Agent actions (disconnect, reconnect, initiate-scan, abort-scan, shutdown, restart)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/agents/actions/disconnect
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["{{agent_id}}"]
+    }
+  }
+}

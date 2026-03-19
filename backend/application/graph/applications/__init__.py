@@ -1,0 +1,1 @@
+"""Graph Applications CQRS handlers."""

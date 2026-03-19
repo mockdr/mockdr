@@ -1,0 +1,991 @@
+{
+  "info": {
+    "name": "mockdr — SentinelOne Mock API v2.1",
+    "description": "Full-fidelity SentinelOne Management Console API v2.1 mock.\n\nBase URL: http://localhost:8001/web/api/v2.1\nAuth: ApiToken header with preset tokens.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "Authorization", "type": "string" },
+      { "key": "value", "value": "ApiToken admin-token-0000-0000-000000000001", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8001/web/api/v2.1" },
+    { "key": "adminToken", "value": "admin-token-0000-0000-000000000001" },
+    { "key": "viewerToken", "value": "viewer-token-0000-0000-000000000002" },
+    { "key": "socToken", "value": "soc-analyst-token-000-000000000003" }
+  ],
+  "item": [
+    {
+      "name": "Agents",
+      "item": [
+        {
+          "name": "List agents",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents?limit=10", "host": ["{{baseUrl}}"], "path": ["agents"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "List agents (filtered)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents?osTypes=windows&isActive=true&limit=5", "host": ["{{baseUrl}}"], "path": ["agents"], "query": [{ "key": "osTypes", "value": "windows" }, { "key": "isActive", "value": "true" }, { "key": "limit", "value": "5" }] }
+          }
+        },
+        {
+          "name": "Get agent by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/{{agentId}}", "host": ["{{baseUrl}}"], "path": ["agents", "{{agentId}}"] }
+          }
+        },
+        {
+          "name": "Count agents",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/count", "host": ["{{baseUrl}}"], "path": ["agents", "count"] }
+          }
+        },
+        {
+          "name": "Agent action — connect",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/agents/actions/connect", "host": ["{{baseUrl}}"], "path": ["agents", "actions", "connect"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{agentId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Agent action — disconnect",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/agents/actions/disconnect", "host": ["{{baseUrl}}"], "path": ["agents", "actions", "disconnect"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{agentId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Agent action — decommission",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/agents/actions/decommission", "host": ["{{baseUrl}}"], "path": ["agents", "actions", "decommission"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{agentId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Fetch files from agent",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/agents/{{agentId}}/actions/fetch-files", "host": ["{{baseUrl}}"], "path": ["agents", "{{agentId}}", "actions", "fetch-files"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"password\": \"infected\",\n    \"files\": [\"/tmp/suspicious.exe\"]\n  }\n}" }
+          }
+        },
+        {
+          "name": "List agent processes",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/{{agentId}}/processes", "host": ["{{baseUrl}}"], "path": ["agents", "{{agentId}}", "processes"] }
+          }
+        },
+        {
+          "name": "List agent applications",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/{{agentId}}/applications", "host": ["{{baseUrl}}"], "path": ["agents", "{{agentId}}", "applications"] }
+          }
+        },
+        {
+          "name": "List applications (global, multi-agent)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/applications?ids={{agentId}}", "host": ["{{baseUrl}}"], "path": ["agents", "applications"], "query": [{ "key": "ids", "value": "{{agentId}}" }] }
+          }
+        },
+        {
+          "name": "List processes (global, multi-agent)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/processes?ids={{agentId}}", "host": ["{{baseUrl}}"], "path": ["agents", "processes"], "query": [{ "key": "ids", "value": "{{agentId}}" }] }
+          }
+        },
+        {
+          "name": "List agent passphrases",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/passphrases", "host": ["{{baseUrl}}"], "path": ["agents", "passphrases"] }
+          }
+        },
+        {
+          "name": "Get agent passphrase",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/{{agentId}}/passphrase", "host": ["{{baseUrl}}"], "path": ["agents", "{{agentId}}", "passphrase"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Threats",
+      "item": [
+        {
+          "name": "List threats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/threats?limit=10", "host": ["{{baseUrl}}"], "path": ["threats"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Get threat by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/threats/{{threatId}}", "host": ["{{baseUrl}}"], "path": ["threats", "{{threatId}}"] }
+          }
+        },
+        {
+          "name": "Get threat timeline",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/threats/{{threatId}}/timeline", "host": ["{{baseUrl}}"], "path": ["threats", "{{threatId}}", "timeline"] }
+          }
+        },
+        {
+          "name": "Get threat notes",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/threats/{{threatId}}/notes", "host": ["{{baseUrl}}"], "path": ["threats", "{{threatId}}", "notes"] }
+          }
+        },
+        {
+          "name": "Set analyst verdict",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/analyst-verdict", "host": ["{{baseUrl}}"], "path": ["threats", "analyst-verdict"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": { \"analystVerdict\": \"true_positive\" }\n}" }
+          }
+        },
+        {
+          "name": "Set incident status",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/incident", "host": ["{{baseUrl}}"], "path": ["threats", "incident"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": { \"incidentStatus\": \"resolved\" }\n}" }
+          }
+        },
+        {
+          "name": "Mitigate threat — kill",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/mitigate/kill", "host": ["{{baseUrl}}"], "path": ["threats", "mitigate", "kill"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Mark as threat",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/mark-as-threat", "host": ["{{baseUrl}}"], "path": ["threats", "mark-as-threat"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Mark as resolved",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/mark-as-resolved", "host": ["{{baseUrl}}"], "path": ["threats", "mark-as-resolved"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Add note to threat",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/{{threatId}}/notes", "host": ["{{baseUrl}}"], "path": ["threats", "{{threatId}}", "notes"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"text\": \"Investigated — confirmed false positive from dev build.\"\n}" }
+          }
+        },
+        {
+          "name": "Bulk add notes",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/notes", "host": ["{{baseUrl}}"], "path": ["threats", "notes"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"text\": \"Bulk note from SOAR playbook\" },\n  \"filter\": { \"ids\": [\"{{threatId}}\"] }\n}" }
+          }
+        },
+        {
+          "name": "Add to blacklist",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/add-to-blacklist", "host": ["{{baseUrl}}"], "path": ["threats", "add-to-blacklist"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Fetch file",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threats/fetch-file", "host": ["{{baseUrl}}"], "path": ["threats", "fetch-file"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{threatId}}\"] },\n  \"data\": {}\n}" }
+          }
+        },
+        {
+          "name": "Download fetched file",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/threats/{{threatId}}/fetched-file", "host": ["{{baseUrl}}"], "path": ["threats", "{{threatId}}", "fetched-file"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alerts (Cloud Detection)",
+      "item": [
+        {
+          "name": "List alerts",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/cloud-detection/alerts?limit=10", "host": ["{{baseUrl}}"], "path": ["cloud-detection", "alerts"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Get alert by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/cloud-detection/alerts/{{alertId}}", "host": ["{{baseUrl}}"], "path": ["cloud-detection", "alerts", "{{alertId}}"] }
+          }
+        },
+        {
+          "name": "Set alert analyst verdict",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/cloud-detection/alerts/analyst-verdict", "host": ["{{baseUrl}}"], "path": ["cloud-detection", "alerts", "analyst-verdict"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{alertId}}\"] },\n  \"data\": { \"analystVerdict\": \"TRUE_POSITIVE\" }\n}" }
+          }
+        },
+        {
+          "name": "Set alert incident status",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/cloud-detection/alerts/incident", "host": ["{{baseUrl}}"], "path": ["cloud-detection", "alerts", "incident"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{alertId}}\"] },\n  \"data\": { \"incidentStatus\": \"IN_PROGRESS\" }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sites",
+      "item": [
+        {
+          "name": "List sites",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/sites?limit=10", "host": ["{{baseUrl}}"], "path": ["sites"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Get site by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/sites/{{siteId}}", "host": ["{{baseUrl}}"], "path": ["sites", "{{siteId}}"] }
+          }
+        },
+        {
+          "name": "Create site",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/sites", "host": ["{{baseUrl}}"], "path": ["sites"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Test Site\",\n    \"accountId\": \"{{accountId}}\",\n    \"siteType\": \"Paid\",\n    \"suite\": \"Complete\",\n    \"sku\": \"complete\",\n    \"totalLicenses\": 100\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update site",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/sites/{{siteId}}", "host": ["{{baseUrl}}"], "path": ["sites", "{{siteId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Updated Site Name\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Delete site",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/sites/{{siteId}}", "host": ["{{baseUrl}}"], "path": ["sites", "{{siteId}}"] }
+          }
+        },
+        {
+          "name": "Reactivate site",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/sites/{{siteId}}/reactivate", "host": ["{{baseUrl}}"], "path": ["sites", "{{siteId}}", "reactivate"] }
+          }
+        },
+        {
+          "name": "Expire site now",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/sites/{{siteId}}/expire-now", "host": ["{{baseUrl}}"], "path": ["sites", "{{siteId}}", "expire-now"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "List groups",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/groups?limit=10", "host": ["{{baseUrl}}"], "path": ["groups"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Get group by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["groups", "{{groupId}}"] }
+          }
+        },
+        {
+          "name": "Create group",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/groups", "host": ["{{baseUrl}}"], "path": ["groups"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Test Group\",\n    \"siteId\": \"{{siteId}}\",\n    \"type\": \"static\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update group",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["groups", "{{groupId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Renamed Group\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Delete group",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["groups", "{{groupId}}"] }
+          }
+        },
+        {
+          "name": "Move agents to group",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/groups/{{groupId}}/move-agents", "host": ["{{baseUrl}}"], "path": ["groups", "{{groupId}}", "move-agents"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{agentId}}\"] }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users?limit=10", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Get user by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Login by token",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users/login/by-token", "host": ["{{baseUrl}}"], "path": ["users", "login", "by-token"] }
+          }
+        },
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"email\": \"newuser@acmecorp.internal\",\n    \"fullName\": \"Test User\",\n    \"scope\": \"site\",\n    \"role\": \"viewer\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update user",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"fullName\": \"Updated Name\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Delete user",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Bulk delete users",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/users/delete-users", "host": ["{{baseUrl}}"], "path": ["users", "delete-users"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{userId}}\"] }\n}" }
+          }
+        },
+        {
+          "name": "Generate API token",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/users/generate-api-token", "host": ["{{baseUrl}}"], "path": ["users", "generate-api-token"] }
+          }
+        },
+        {
+          "name": "Get API token details",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}/api-token-details", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}", "api-token-details"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Exclusions",
+      "item": [
+        {
+          "name": "List exclusions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/exclusions?limit=10", "host": ["{{baseUrl}}"], "path": ["exclusions"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create exclusion",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/exclusions", "host": ["{{baseUrl}}"], "path": ["exclusions"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"type\": \"path\",\n    \"value\": \"C:\\\\ProgramData\\\\TestApp\\\\\",\n    \"osType\": \"windows\",\n    \"description\": \"Exclude test app path\",\n    \"mode\": \"suppress\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Delete exclusion",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/exclusions/{{exclusionId}}", "host": ["{{baseUrl}}"], "path": ["exclusions", "{{exclusionId}}"] }
+          }
+        },
+        {
+          "name": "Bulk delete exclusions",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/exclusions", "host": ["{{baseUrl}}"], "path": ["exclusions"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"ids\": [\"{{exclusionId}}\"] }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blocklist (Restrictions)",
+      "item": [
+        {
+          "name": "List blocklist entries",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/restrictions?limit=10", "host": ["{{baseUrl}}"], "path": ["restrictions"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create blocklist entry",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/restrictions", "host": ["{{baseUrl}}"], "path": ["restrictions"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"value\": \"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2\",\n    \"type\": \"black_hash\",\n    \"osType\": \"windows\",\n    \"description\": \"Blocked suspicious hash\",\n    \"source\": \"user\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Delete blocklist entry",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/restrictions/{{restrictionId}}", "host": ["{{baseUrl}}"], "path": ["restrictions", "{{restrictionId}}"] }
+          }
+        },
+        {
+          "name": "Bulk delete blocklist entries",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/restrictions", "host": ["{{baseUrl}}"], "path": ["restrictions"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"ids\": [\"{{restrictionId}}\"] }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Firewall Control",
+      "item": [
+        {
+          "name": "List firewall rules",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/firewall-control?limit=10", "host": ["{{baseUrl}}"], "path": ["firewall-control"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create firewall rule",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/firewall-control", "host": ["{{baseUrl}}"], "path": ["firewall-control"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Block Outbound 4444\",\n    \"action\": \"Block\",\n    \"direction\": \"outbound\",\n    \"protocol\": \"TCP\",\n    \"remotePort\": \"4444\",\n    \"status\": \"Enabled\",\n    \"osType\": \"windows\"\n  },\n  \"filter\": {\n    \"siteIds\": [\"{{siteId}}\"]\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update firewall rule",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/firewall-control", "host": ["{{baseUrl}}"], "path": ["firewall-control"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"status\": \"Disabled\" },\n  \"filter\": { \"ids\": [\"{{firewallRuleId}}\"] }\n}" }
+          }
+        },
+        {
+          "name": "Delete firewall rules",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/firewall-control", "host": ["{{baseUrl}}"], "path": ["firewall-control"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{firewallRuleId}}\"] }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Device Control",
+      "item": [
+        {
+          "name": "List device control rules",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/device-control?limit=10", "host": ["{{baseUrl}}"], "path": ["device-control"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create device control rule",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/device-control", "host": ["{{baseUrl}}"], "path": ["device-control"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"deviceType\": \"USB\",\n    \"action\": \"Block\",\n    \"status\": \"Enabled\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update device control rule",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/device-control/{{deviceControlRuleId}}", "host": ["{{baseUrl}}"], "path": ["device-control", "{{deviceControlRuleId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"status\": \"Disabled\" }\n}" }
+          }
+        },
+        {
+          "name": "Delete device control rules",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/device-control", "host": ["{{baseUrl}}"], "path": ["device-control"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"ids\": [\"{{deviceControlRuleId}}\"] }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Threat Intelligence (IOCs)",
+      "item": [
+        {
+          "name": "List IOCs",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/threat-intelligence/iocs?limit=10", "host": ["{{baseUrl}}"], "path": ["threat-intelligence", "iocs"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create IOC",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threat-intelligence/iocs", "host": ["{{baseUrl}}"], "path": ["threat-intelligence", "iocs"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"type\": \"DNS\",\n    \"value\": \"malware-c2.evil.test\",\n    \"source\": \"user\",\n    \"method\": \"EQUALS\",\n    \"name\": \"C2 Domain\",\n    \"description\": \"Known C2 callback domain\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Bulk create IOCs",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/threat-intelligence/iocs/bulk", "host": ["{{baseUrl}}"], "path": ["threat-intelligence", "iocs", "bulk"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": [\n    { \"type\": \"IPV4\", \"value\": \"10.99.99.1\", \"source\": \"user\", \"method\": \"EQUALS\" },\n    { \"type\": \"DNS\", \"value\": \"bad.domain.test\", \"source\": \"user\", \"method\": \"EQUALS\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Delete IOCs",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/threat-intelligence/iocs", "host": ["{{baseUrl}}"], "path": ["threat-intelligence", "iocs"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"filter\": { \"uuids\": [\"{{iocId}}\"] }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities",
+      "item": [
+        {
+          "name": "List activities",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/activities?limit=10", "host": ["{{baseUrl}}"], "path": ["activities"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "List activity types",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/activities/types", "host": ["{{baseUrl}}"], "path": ["activities", "types"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deep Visibility",
+      "item": [
+        {
+          "name": "Init query",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/dv/init-query", "host": ["{{baseUrl}}"], "path": ["dv", "init-query"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"query\": \"ObjectType = \\\"process\\\" AND ProcessName contains \\\"cmd\\\"\",\n  \"fromDate\": \"2024-01-01T00:00:00Z\",\n  \"toDate\": \"2024-12-31T23:59:59Z\"\n}" }
+          }
+        },
+        {
+          "name": "Query status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/dv/query-status?queryId={{queryId}}", "host": ["{{baseUrl}}"], "path": ["dv", "query-status"], "query": [{ "key": "queryId", "value": "{{queryId}}" }] }
+          }
+        },
+        {
+          "name": "Get events",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/dv/events?queryId={{queryId}}&limit=25", "host": ["{{baseUrl}}"], "path": ["dv", "events"], "query": [{ "key": "queryId", "value": "{{queryId}}" }, { "key": "limit", "value": "25" }] }
+          }
+        },
+        {
+          "name": "Get events by type (process)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/dv/events/process?queryId={{queryId}}", "host": ["{{baseUrl}}"], "path": ["dv", "events", "process"], "query": [{ "key": "queryId", "value": "{{queryId}}" }] }
+          }
+        },
+        {
+          "name": "Cancel query",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/dv/cancel-query", "host": ["{{baseUrl}}"], "path": ["dv", "cancel-query"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"queryId\": \"{{queryId}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "List accounts",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/accounts", "host": ["{{baseUrl}}"], "path": ["accounts"] }
+          }
+        },
+        {
+          "name": "Get account by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/accounts/{{accountId}}", "host": ["{{baseUrl}}"], "path": ["accounts", "{{accountId}}"] }
+          }
+        },
+        {
+          "name": "Create account",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/accounts", "host": ["{{baseUrl}}"], "path": ["accounts"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Test Account\",\n    \"accountType\": \"Paid\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update account",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/accounts/{{accountId}}", "host": ["{{baseUrl}}"], "path": ["accounts", "{{accountId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"name\": \"Updated Account\"\n  }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Policies",
+      "item": [
+        {
+          "name": "Get policy",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/policies?siteId={{siteId}}", "host": ["{{baseUrl}}"], "path": ["policies"], "query": [{ "key": "siteId", "value": "{{siteId}}" }] }
+          }
+        },
+        {
+          "name": "Update policy",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/policies?siteId={{siteId}}", "host": ["{{baseUrl}}"], "path": ["policies"], "query": [{ "key": "siteId", "value": "{{siteId}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"mitigationMode\": \"protect\"\n  }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tags",
+      "item": [
+        {
+          "name": "List agent tags",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/tags?limit=10", "host": ["{{baseUrl}}"], "path": ["agents", "tags"], "query": [{ "key": "limit", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Create tag",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/tag-manager", "host": ["{{baseUrl}}"], "path": ["tag-manager"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"key\": \"environment\",\n    \"value\": \"staging\",\n    \"description\": \"Staging environment tag\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Update tag",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/tag-manager/{{tagId}}", "host": ["{{baseUrl}}"], "path": ["tag-manager", "{{tagId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"value\": \"production\"\n  }\n}" }
+          }
+        },
+        {
+          "name": "Delete tag",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/tag-manager/{{tagId}}", "host": ["{{baseUrl}}"], "path": ["tag-manager", "{{tagId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hashes",
+      "item": [
+        {
+          "name": "Get hash verdict",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/hashes/{{hashValue}}/verdict", "host": ["{{baseUrl}}"], "path": ["hashes", "{{hashValue}}", "verdict"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "List webhooks",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/webhooks", "host": ["{{baseUrl}}"], "path": ["webhooks"] }
+          }
+        },
+        {
+          "name": "Get webhook by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/webhooks/{{webhookId}}", "host": ["{{baseUrl}}"], "path": ["webhooks", "{{webhookId}}"] }
+          }
+        },
+        {
+          "name": "Create webhook",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/webhooks", "host": ["{{baseUrl}}"], "path": ["webhooks"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"url\": \"https://hooks.example.com/s1\",\n  \"event_types\": [\"threat.new\", \"agent.disconnected\"],\n  \"secret\": \"my-webhook-secret\",\n  \"enabled\": true\n}" }
+          }
+        },
+        {
+          "name": "Delete webhook",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/webhooks/{{webhookId}}", "host": ["{{baseUrl}}"], "path": ["webhooks", "{{webhookId}}"] }
+          }
+        },
+        {
+          "name": "Fire test event",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/webhooks/fire", "host": ["{{baseUrl}}"], "path": ["webhooks", "fire"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"threat.new\",\n  \"payload\": { \"test\": true }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health check (no auth)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/system/status", "host": ["{{baseUrl}}"], "path": ["system", "status"] },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "System info",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/system/info", "host": ["{{baseUrl}}"], "path": ["system", "info"] }
+          }
+        },
+        {
+          "name": "System configuration",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/system/configuration", "host": ["{{baseUrl}}"], "path": ["system", "configuration"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "DEV Utilities",
+      "description": "Non-S1 endpoints for development and testing. Requires admin token.",
+      "item": [
+        {
+          "name": "Reset all data",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/_dev/reset", "host": ["{{baseUrl}}"], "path": ["_dev", "reset"] }
+          }
+        },
+        {
+          "name": "Get stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/_dev/stats", "host": ["{{baseUrl}}"], "path": ["_dev", "stats"] }
+          }
+        },
+        {
+          "name": "List tokens",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/_dev/tokens", "host": ["{{baseUrl}}"], "path": ["_dev", "tokens"] }
+          }
+        },
+        {
+          "name": "Trigger scenario",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/_dev/scenario", "host": ["{{baseUrl}}"], "path": ["_dev", "scenario"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"scenario\": \"ransomware_outbreak\"\n}" }
+          }
+        },
+        {
+          "name": "Export state",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/_dev/export", "host": ["{{baseUrl}}"], "path": ["_dev", "export"] }
+          }
+        },
+        {
+          "name": "Import state",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/_dev/import", "host": ["{{baseUrl}}"], "path": ["_dev", "import"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ }" }
+          }
+        },
+        {
+          "name": "List request log",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/_dev/requests?limit=50", "host": ["{{baseUrl}}"], "path": ["_dev", "requests"], "query": [{ "key": "limit", "value": "50" }] }
+          }
+        },
+        {
+          "name": "Clear request log",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/_dev/requests", "host": ["{{baseUrl}}"], "path": ["_dev", "requests"] }
+          }
+        },
+        {
+          "name": "Get rate limit config",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/_dev/rate-limit", "host": ["{{baseUrl}}"], "path": ["_dev", "rate-limit"] }
+          }
+        },
+        {
+          "name": "Set rate limit config",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/_dev/rate-limit", "host": ["{{baseUrl}}"], "path": ["_dev", "rate-limit"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"enabled\": true,\n  \"requestsPerMinute\": 60\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}

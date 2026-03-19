@@ -1,0 +1,28 @@
+meta {
+  name: File retrieval
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{xdr_base_url}}/endpoints/file_retrieval/
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {
+      "endpoint_id_list": ["{{xdr_endpoint_id}}"],
+      "file_path": "C:\\Windows\\Temp\\suspicious.exe"
+    }
+  }
+}

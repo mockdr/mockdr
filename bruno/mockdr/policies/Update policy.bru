@@ -1,0 +1,26 @@
+meta {
+  name: Update policy
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{s1_base_url}}/policies
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "mitigation": {
+        "mode": "protect"
+      }
+    }
+  }
+}

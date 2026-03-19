@@ -1,0 +1,19 @@
+meta {
+  name: Dispatch search
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{splunk_base_url}}/services/saved/searches/High Severity Threats/dispatch
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  output_mode: json
+}
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

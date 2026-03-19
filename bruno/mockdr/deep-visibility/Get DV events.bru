@@ -1,0 +1,20 @@
+meta {
+  name: Get Deep Visibility events
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/dv/events
+  body: none
+  auth: none
+}
+
+params:query {
+  queryId: replace-with-query-id-from-init
+  limit: 50
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

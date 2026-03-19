@@ -1,0 +1,15 @@
+meta {
+  name: Delete webhook subscription
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{base_url}}/webhooks/{{webhook_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

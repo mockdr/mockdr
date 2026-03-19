@@ -1,0 +1,24 @@
+meta {
+  name: List agents
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/agents
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 25
+  ~cursor:
+  ~networkStatus: connected
+  ~osType: windows
+  ~isInfected: true
+  ~isActive: true
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

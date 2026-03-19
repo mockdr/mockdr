@@ -1,0 +1,35 @@
+meta {
+  name: Add exception item
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{kibana_base_url}}/api/exception_lists/items
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "list_id": "trusted-hashes",
+    "name": "Approved hash",
+    "description": "Internal tool",
+    "type": "simple",
+    "entries": [
+      {
+        "field": "file.hash.sha256",
+        "operator": "included",
+        "type": "match",
+        "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "namespace_type": "single"
+  }
+}

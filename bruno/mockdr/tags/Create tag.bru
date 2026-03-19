@@ -1,0 +1,28 @@
+meta {
+  name: Create tag
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{s1_base_url}}/tag-manager
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "key": "env",
+      "value": "production"
+    },
+    "filter": {
+      "ids": ["{{agent_id}}"]
+    }
+  }
+}

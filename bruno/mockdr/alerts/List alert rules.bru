@@ -1,0 +1,19 @@
+meta {
+  name: List alert rules
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{s1_base_url}}/cloud-detection/rules
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 25
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

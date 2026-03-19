@@ -1,0 +1,1 @@
+"""Graph Mail CQRS handlers."""

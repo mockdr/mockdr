@@ -1,0 +1,19 @@
+meta {
+  name: List Messages
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/users/{{userId}}/messages
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

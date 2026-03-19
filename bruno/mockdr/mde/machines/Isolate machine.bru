@@ -1,0 +1,23 @@
+meta {
+  name: Isolate machine
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{mde_base_url}}/api/machines/{{mde_machine_id}}/isolate
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "Comment": "Isolating for investigation",
+    "IsolationType": "Full"
+  }
+}

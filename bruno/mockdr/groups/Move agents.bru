@@ -1,0 +1,24 @@
+meta {
+  name: Move agents
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{s1_base_url}}/groups/{{group_id}}/move-agents
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filter": {
+      "ids": ["{{agent_id}}"]
+    }
+  }
+}

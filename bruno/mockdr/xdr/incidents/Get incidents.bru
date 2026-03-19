@@ -1,0 +1,39 @@
+meta {
+  name: Get incidents
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{xdr_base_url}}/incidents/get_incidents/
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {
+      "filters": [
+        {
+          "field": "status",
+          "operator": "eq",
+          "value": "new"
+        }
+      ],
+      "search_from": 0,
+      "search_to": 25,
+      "sort": {
+        "field": "creation_time",
+        "keyword": "desc"
+      }
+    }
+  }
+}

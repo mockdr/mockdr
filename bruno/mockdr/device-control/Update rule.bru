@@ -1,0 +1,24 @@
+meta {
+  name: Update rule
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{s1_base_url}}/device-control/replace-with-rule-id
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "status": "Disabled"
+    }
+  }
+}

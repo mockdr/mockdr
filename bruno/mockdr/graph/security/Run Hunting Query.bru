@@ -1,0 +1,22 @@
+meta {
+  name: Run Hunting Query
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{graph_base_url}}/v1.0/security/runHuntingQuery
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "Query": "DeviceProcessEvents | where FileName == 'powershell.exe' | take 10"
+  }
+}

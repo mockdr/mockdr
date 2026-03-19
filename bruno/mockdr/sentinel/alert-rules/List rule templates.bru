@@ -1,0 +1,19 @@
+meta {
+  name: List rule templates
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/alertRuleTemplates
+  body: none
+  auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
+}
+
+headers {
+  Authorization: Bearer {{sentinel_token}}
+}

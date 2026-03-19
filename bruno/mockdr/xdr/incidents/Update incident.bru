@@ -1,0 +1,31 @@
+meta {
+  name: Update incident
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{xdr_base_url}}/incidents/update_incident/
+  body: json
+  auth: none
+}
+
+headers {
+  x-xdr-auth-id: {{xdr_auth_id}}
+  x-xdr-nonce: {{xdr_nonce}}
+  x-xdr-timestamp: {{xdr_timestamp}}
+  Authorization: {{xdr_auth_header}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "request_data": {
+      "incident_id": "{{xdr_incident_id}}",
+      "update_data": {
+        "status": "under_investigation",
+        "assigned_user_mail": "analyst@company.com"
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Isolate endpoint
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{kibana_base_url}}/api/endpoint/action/isolate
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey {{es_token}}
+  kbn-xsrf: true
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "endpoint_ids": ["{{agent_id}}"],
+    "comment": "Isolating for investigation"
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Update alert
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{mde_base_url}}/api/alerts/{{mde_alert_id}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "status": "InProgress",
+    "assignedTo": "analyst@company.com",
+    "classification": "TruePositive",
+    "determination": "Malware",
+    "comment": "Investigating"
+  }
+}

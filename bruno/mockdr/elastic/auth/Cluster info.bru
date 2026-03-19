@@ -1,0 +1,15 @@
+meta {
+  name: Cluster info
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{elastic_base_url}}/
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiKey mock-es-admin-api-key
+}

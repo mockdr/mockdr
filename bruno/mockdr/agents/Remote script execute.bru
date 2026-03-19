@@ -1,0 +1,28 @@
+meta {
+  name: Remote script execute
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{s1_base_url}}/remote-scripts/execute
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "scriptId": "script-001",
+      "outputDestination": "SentinelCloud"
+    },
+    "filter": {
+      "ids": ["{{agent_id}}"]
+    }
+  }
+}

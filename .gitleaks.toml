@@ -1,0 +1,26 @@
+# Gitleaks configuration for mockdr
+# Mock tokens are intentional test fixtures — not real secrets.
+
+[allowlist]
+  description = "Known mock/test tokens"
+  regexTarget = "match"
+  regexes = [
+    '''admin-token-0000-0000-000000000001''',
+    '''viewer-token-0000-0000-000000000002''',
+    '''soc-analyst-token-000-000000000003''',
+    '''expired-test-token-0000000000000''',
+    '''future-test-token-0000000000000''',
+    '''webhook-secret-\d+''',
+    '''hmac-test-secret''',
+    '''my-secret-key''',
+    '''splunk-mock-hec-token-\w+''',
+    '''mockdr-admin''',
+    '''mockdr-analyst''',
+    '''mockdr-viewer''',
+  ]
+  paths = [
+    '''toolkit/.*''',
+    '''postman/.*''',
+    '''bruno/.*''',
+    '''\.env.*''',
+  ]

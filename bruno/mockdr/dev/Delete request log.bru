@@ -1,0 +1,15 @@
+meta {
+  name: Delete request log
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{s1_base_url}}/_dev/requests
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+}

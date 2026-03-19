@@ -1,0 +1,21 @@
+meta {
+  name: Get token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{sentinel_base_url}}/oauth2/v2.0/token
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  client_id: sentinel-mock-client-id
+  client_secret: sentinel-mock-client-secret
+  grant_type: client_credentials
+}
+
+docs {
+  Returns access_token — copy to sentinel_token variable.
+}

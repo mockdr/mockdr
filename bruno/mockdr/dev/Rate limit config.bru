@@ -1,0 +1,15 @@
+meta {
+  name: Get rate-limit config
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/_dev/rate-limit
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

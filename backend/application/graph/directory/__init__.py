@@ -1,0 +1,1 @@
+"""Graph Directory CQRS handlers."""

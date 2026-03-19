@@ -1,0 +1,22 @@
+meta {
+  name: List alerts
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/cloud-detection/alerts
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 25
+  ~cursor:
+  ~severity: high
+  ~incidentStatus: unresolved
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}

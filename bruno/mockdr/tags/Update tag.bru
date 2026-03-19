@@ -1,0 +1,24 @@
+meta {
+  name: Update tag
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{s1_base_url}}/tag-manager/replace-with-tag-id
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{s1_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "data": {
+      "value": "staging"
+    }
+  }
+}

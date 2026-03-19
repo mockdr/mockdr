@@ -1,0 +1,19 @@
+meta {
+  name: List Secure Scores
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/security/secureScores
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 10
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

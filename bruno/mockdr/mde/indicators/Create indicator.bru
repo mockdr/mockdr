@@ -1,0 +1,27 @@
+meta {
+  name: Create indicator
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{mde_base_url}}/api/indicators
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{mde_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "indicatorValue": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "indicatorType": "FileSha256",
+    "action": "Alert",
+    "severity": "High",
+    "title": "Known malware hash",
+    "description": "Detected in Lazarus campaign"
+  }
+}

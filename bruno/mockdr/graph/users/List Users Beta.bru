@@ -1,0 +1,19 @@
+meta {
+  name: List Users Beta
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{graph_base_url}}/beta/users
+  body: none
+  auth: none
+}
+
+params:query {
+  $top: 25
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

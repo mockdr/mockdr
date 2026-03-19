@@ -1,0 +1,15 @@
+meta {
+  name: List Health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{graph_base_url}}/v1.0/admin/serviceAnnouncement/healthOverviews
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{graphToken}}
+}

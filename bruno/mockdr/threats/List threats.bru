@@ -1,0 +1,24 @@
+meta {
+  name: List threats
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/threats
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 25
+  ~cursor:
+  ~incidentStatus: unresolved
+  ~mitigationStatus: mitigated
+  ~confidenceLevel: malicious
+  ~osType: windows
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}
