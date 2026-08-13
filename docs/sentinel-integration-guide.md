@@ -31,6 +31,16 @@ The tenant segment takes the mock tenant's GUID
 [Graph integration guide](graph-integration-guide.md) for the validation rules
 and `MOCKDR_STRICT_TENANT`.
 
+## api-version
+
+Every management-plane request needs `?api-version=`, as Azure Resource Manager
+requires. A missing parameter is answered with `400 MissingApiVersionParameter`
+and an implausible one (`v1`, `2024`, a pre-2019 date) with
+`400 InvalidApiVersionParameter`; any well-formed version from 2019 onwards is
+served, `-preview` included. The Log Analytics query endpoint
+(`/sentinel/v1/workspaces/{id}/query`) belongs to api.loganalytics.io, not ARM,
+and takes no api-version.
+
 ## Default Workspace
 
 | Setting | Value |

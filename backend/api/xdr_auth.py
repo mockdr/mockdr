@@ -1,7 +1,14 @@
-"""FastAPI dependencies for Palo Alto Cortex XDR HMAC-style API key authentication.
+"""FastAPI dependencies for Palo Alto Cortex XDR API key authentication.
 
-Cortex XDR uses API key authentication with HMAC validation.  Clients include
-the following headers on every request:
+Cortex XDR offers two authentication levels, both supported here.
+
+**Standard** — the API key is sent verbatim:
+
+* ``x-xdr-auth-id`` — the numeric key ID
+* ``Authorization`` — the API key itself
+
+**Advanced** — the key is never transmitted; a per-request digest is sent
+instead, over the plain concatenation of key, nonce and timestamp:
 
 * ``x-xdr-auth-id`` — the numeric key ID
 * ``Authorization`` — ``SHA256(key_secret + nonce + timestamp)``
@@ -38,31 +45,33 @@ async def require_xdr_auth(
     x_xdr_timestamp: str = Header(None),
     authorization: str = Header(None),
 ) -> XdrApiKey:
-    """Validate XDR HMAC authentication and return the API key record.
+    """Validate XDR authentication and return the API key record.
 
     Looks up the API key by ``x-xdr-auth-id`` from the ``xdr_api_keys``
-    collection, then verifies that
-    ``SHA256(key_secret + nonce + timestamp) == authorization``.
+    collection, then accepts either authentication level: standard, where
+    ``authorization`` is the API key itself, or advanced, where it is
+    ``SHA256(key_secret + nonce + timestamp)``.
 
     Args:
         x_xdr_auth_id:   API key ID header.
-        x_xdr_nonce:     Unique nonce header.
-        x_xdr_timestamp: Unix epoch milliseconds header.
-        authorization:   HMAC hash header.
+        x_xdr_nonce:     Unique nonce header (advanced auth only).
+        x_xdr_timestamp: Unix epoch milliseconds header (advanced auth only).
+        authorization:   API key or its per-request digest.
 
     Returns:
         The stored API key record (dataclass with ``key_id``, ``role``, etc.).
 
     Raises:
-        HTTPException: 401 if any header is missing or authentication fails.
+        HTTPException: 401 if headers are missing or authentication fails.
     """
-    if not all([x_xdr_auth_id, x_xdr_nonce, x_xdr_timestamp, authorization]):
+    if not x_xdr_auth_id or not authorization:
         raise HTTPException(
             status_code=401,
             detail=build_xdr_error(
                 401,
                 "Missing required authentication headers",
-                "Provide x-xdr-auth-id, Authorization, x-xdr-nonce, and x-xdr-timestamp",
+                "Provide x-xdr-auth-id and Authorization; advanced authentication "
+                "additionally requires x-xdr-nonce and x-xdr-timestamp",
             ),
         )
 
@@ -75,12 +84,24 @@ async def require_xdr_auth(
             detail=build_xdr_error(401, "Invalid API key ID"),
         )
 
-    # Verify HMAC: HMAC-SHA256 with key_secret as the HMAC key and
-    # nonce + delimiter + timestamp as the message.
-    expected = hmac.new(
-        key_record.key_secret.encode(),
-        (x_xdr_nonce + ":" + x_xdr_timestamp).encode(),
-        hashlib.sha256,
+    # Standard authentication — the API key is sent verbatim.
+    if hmac.compare_digest(key_record.key_secret, authorization):
+        return key_record
+
+    # Advanced authentication — SHA-256 over key + nonce + timestamp, plainly
+    # concatenated in that order (Cortex XDR sends no delimiter).
+    if not x_xdr_nonce or not x_xdr_timestamp:
+        raise HTTPException(
+            status_code=401,
+            detail=build_xdr_error(
+                401,
+                "Authentication failed — invalid API key",
+                "Advanced authentication requires x-xdr-nonce and x-xdr-timestamp",
+            ),
+        )
+
+    expected = hashlib.sha256(
+        (key_record.key_secret + x_xdr_nonce + x_xdr_timestamp).encode(),
     ).hexdigest()
 
     if not hmac.compare_digest(expected, authorization):

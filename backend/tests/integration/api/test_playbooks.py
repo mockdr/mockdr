@@ -128,13 +128,14 @@ class TestRunPlaybook:
         return agent_repo.list_all()[0].id
 
     def test_run_requires_agent_id(self, client: TestClient, auth_headers: dict) -> None:
-        """Missing agentId must return 422."""
+        """Missing agentId must be rejected in the S1 error envelope."""
         resp = client.post(
             f"{BASE}/_dev/playbooks/quiet_day_reset/run",
             headers=auth_headers,
             json={},
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 400
+        assert resp.json()["errors"][0]["title"] == "Bad Request"
 
     def test_run_returns_200_with_valid_agent(
         self, client: TestClient, auth_headers: dict

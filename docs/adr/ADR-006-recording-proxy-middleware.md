@@ -51,7 +51,7 @@ Dev paths (`/_dev/`) always bypass proxy logic to prevent circular forwarding.
 | SentinelOne | `Authorization: ApiToken <token>` |
 | CrowdStrike, MDE, Sentinel, Graph | OAuth2 client credentials → Bearer token (cached) |
 | Elastic, Splunk | Basic Auth or API Key |
-| Cortex XDR | HMAC (key_id + nonce + timestamp → SHA256) |
+| Cortex XDR | API key, or key_id + nonce + timestamp → SHA256 |
 
 **OAuth2 token cache** (`application/proxy/token_cache.py`): Client-credentials vendors (CS, MDE, Sentinel, Graph) cache Bearer tokens in memory with automatic refresh 30 seconds before expiry. Async lock prevents thundering herd on concurrent requests.
 

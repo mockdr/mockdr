@@ -43,12 +43,28 @@ def get_indicator(
     return result
 
 
+_REQUIRED_INDICATOR_FIELDS = ("indicatorValue", "indicatorType", "action", "title")
+
+
 @router.post("/api/indicators")
 def create_indicator(
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
-    """Create a new threat indicator."""
+    """Create a new threat indicator.
+
+    Raises:
+        HTTPException: 400 if a field MDE requires is missing or empty.
+    """
+    missing = [f for f in _REQUIRED_INDICATOR_FIELDS if not body.get(f)]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=build_mde_error_response(
+                "BadRequest",
+                f"Missing required properties: {', '.join(missing)}.",
+            ),
+        )
     return indicator_commands.create_indicator(body)
 
 

@@ -38,7 +38,9 @@ async def get_group(
     if result is None:
         raise HTTPException(
             404,
-            detail=build_graph_error_response("NotFound", f"Group '{group_id}' not found"),
+            detail=build_graph_error_response(
+                "Request_ResourceNotFound", f"Group '{group_id}' not found",
+            ),
         )
     return result
 

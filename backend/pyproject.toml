@@ -170,5 +170,9 @@ convention = "google"
 # test files may have long assertion lines
 # test files use assert and hardcoded paths for mock data
 "tests/**" = ["D", "ANN", "E501", "N802", "S101", "S108"]
+# S314: the Splunk XML the mock itself just produced is not untrusted input.
+"tests/integration/api/splunk/test_splunk_output_mode.py" = [
+    "D", "ANN", "E501", "N802", "S101", "S108", "S314",
+]
 # Dev CLI binds 0.0.0.0 intentionally
 "main.py" = ["S104"]

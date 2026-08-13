@@ -4,7 +4,6 @@ Verifies incident listing, filtering, pagination, extra data retrieval,
 and update operations against the mock XDR API.
 """
 import hashlib
-import hmac
 import secrets
 import time
 
@@ -20,8 +19,8 @@ def _xdr_headers(
     """Build valid XDR HMAC auth headers."""
     nonce = secrets.token_hex(32)
     timestamp = str(int(time.time() * 1000))
-    # HMAC-SHA256: key_secret as HMAC key, nonce:timestamp as message
-    auth_hash = hmac.new(key_secret.encode(), (nonce + ":" + timestamp).encode(), hashlib.sha256).hexdigest()
+    # Advanced auth: SHA-256 over key + nonce + timestamp, plainly concatenated
+    auth_hash = hashlib.sha256((key_secret + nonce + timestamp).encode()).hexdigest()
     return {
         "x-xdr-auth-id": key_id,
         "x-xdr-nonce": nonce,

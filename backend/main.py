@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +16,7 @@ from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.request_logging import RequestLoggingMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
+from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
 from api.middleware.tenant_scope import TenantScopeMiddleware
 from api.routers import (
     accounts,
@@ -294,9 +296,11 @@ from api.routers.splunk import (
 from api.routers.splunk import (
     splunk_server as splunk_server_router,
 )
+from api.sentinel_auth import require_arm_api_version
 from config import API_PREFIX, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.logging import setup_logging
+from utils.vendor_errors import build_vendor_error, vendor_for_path
 
 setup_logging()
 
@@ -344,6 +348,7 @@ app.add_middleware(
 
 # Middleware registration order: last added = outermost wrapper.
 # RequestLoggingMiddleware runs first (outermost), then RateLimit, Security, Audit, Proxy innermost.
+app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the routers
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last
 app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors before proxy
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries
@@ -356,26 +361,46 @@ app.add_middleware(MetricsMiddleware)         # outermost — runs first, captur
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    """Return a SentinelOne-style JSON error response for all HTTP errors.
+    """Return a vendor-shaped JSON error response for all HTTP errors.
 
     If the handler already carries a dict detail (e.g. the auth module),
-    use it verbatim.  Otherwise synthesise an S1-shaped envelope.
+    use it verbatim.  Otherwise synthesise an envelope in the shape of
+    whichever vendor owns the request path.
     """
     if isinstance(exc.detail, dict):
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
 
-    # Map status codes to S1-style error codes: <status><domain>0
-    code = exc.status_code * 10000 + 10
-    titles = {400: "Bad Request", 401: "Unauthorized", 403: "Forbidden",
-              404: "Not Found", 422: "Unprocessable Entity", 429: "Too Many Requests"}
-    title = titles.get(exc.status_code, "Error")
-    detail_msg = exc.detail if isinstance(exc.detail, str) else title
+    vendor = vendor_for_path(request.url.path)
+    message = exc.detail if isinstance(exc.detail, str) else "Error"
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "errors": [{"code": code, "detail": detail_msg, "title": title}],
-            "data": None,
-        },
+        content=build_vendor_error(vendor, exc.status_code, message),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError,
+) -> JSONResponse:
+    """Report request-validation failures the way the mocked vendor would.
+
+    FastAPI's default is ``422`` with a pydantic ``detail`` list. None of the
+    mocked APIs use either that status or that body, so a client written
+    against the real vendor cannot parse it — the mock would mask an
+    integration bug rather than surface it. Errors are flattened into one
+    message and returned as a vendor-shaped ``400``.
+    """
+    parts = []
+    for err in exc.errors():
+        location = ".".join(str(loc) for loc in err.get("loc", ()) if loc != "body")
+        message = err.get("msg", "invalid value")
+        parts.append(f"{location}: {message}" if location else message)
+
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, "; ".join(parts) or "Invalid request",
+        ),
     )
 
 
@@ -527,9 +552,14 @@ SENTINEL_PREFIX = "/sentinel"
 
 # OAuth2 token + operations — no auth required
 app.include_router(sentinel_auth_router.router, prefix=SENTINEL_PREFIX)
-app.include_router(sentinel_operations_router.router, prefix=SENTINEL_PREFIX)
+# ARM management-plane requests must carry ?api-version=, as real Azure demands.
+_ARM = [Depends(require_arm_api_version)]
 
-# Log Analytics query endpoint (separate path, auth required)
+app.include_router(
+    sentinel_operations_router.router, prefix=SENTINEL_PREFIX, dependencies=_ARM,
+)
+
+# Log Analytics query endpoint — api.loganalytics.io, not ARM: no api-version
 app.include_router(sentinel_log_analytics_router.router, prefix=SENTINEL_PREFIX)
 
 # Authenticated Sentinel endpoints — each handler applies its own auth dependency
@@ -541,7 +571,9 @@ for _sentinel_module in [
     sentinel_bookmarks_router,
     sentinel_data_connectors_router,
 ]:
-    app.include_router(_sentinel_module.router, prefix=SENTINEL_PREFIX)
+    app.include_router(
+        _sentinel_module.router, prefix=SENTINEL_PREFIX, dependencies=_ARM,
+    )
 
 # ── Microsoft Graph API mock endpoints (mounted at /graph) ───────────────────
 GRAPH_PREFIX = "/graph"

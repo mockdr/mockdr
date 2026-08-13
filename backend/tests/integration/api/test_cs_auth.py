@@ -69,15 +69,25 @@ class TestCsTokenEndpoint:
         })
         assert resp.status_code == 401
 
-    def test_missing_form_fields_return_422(self, client: TestClient) -> None:
+    def test_missing_form_fields_return_400(self, client: TestClient) -> None:
+        """Falcon answers a malformed token request with 400, never 422."""
         resp = client.post("/cs/oauth2/token", data={})
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
-    def test_missing_client_secret_return_422(self, client: TestClient) -> None:
+    def test_missing_form_fields_use_the_falcon_envelope(
+        self, client: TestClient,
+    ) -> None:
+        """Validation errors must not leak FastAPI's ``detail`` body."""
+        body = client.post("/cs/oauth2/token", data={}).json()
+        assert set(body) == {"meta", "resources", "errors"}
+        assert body["errors"][0]["code"] == 400
+        assert "client_id" in body["errors"][0]["message"]
+
+    def test_missing_client_secret_return_400(self, client: TestClient) -> None:
         resp = client.post("/cs/oauth2/token", data={
             "client_id": "cs-mock-admin-client",
         })
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
     def test_viewer_credentials_return_200(self, client: TestClient) -> None:
         resp = client.post("/cs/oauth2/token", data={

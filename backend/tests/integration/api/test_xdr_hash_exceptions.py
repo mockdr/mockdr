@@ -4,7 +4,6 @@ Covers seeded data retrieval, blocklist/allowlist CRUD operations,
 RBAC enforcement, and XDR reply envelope invariants.
 """
 import hashlib
-import hmac
 import secrets
 import time
 
@@ -17,12 +16,10 @@ def _xdr_headers(
     key_id: str = "1",
     key_secret: str = "xdr-admin-secret",
 ) -> dict[str, str]:
-    """Build valid XDR HMAC auth headers."""
+    """Build valid XDR advanced-auth headers."""
     nonce = secrets.token_hex(32)
     timestamp = str(int(time.time() * 1000))
-    auth_hash = hmac.new(
-        key_secret.encode(), (nonce + ":" + timestamp).encode(), hashlib.sha256,
-    ).hexdigest()
+    auth_hash = hashlib.sha256((key_secret + nonce + timestamp).encode()).hexdigest()
     return {
         "x-xdr-auth-id": key_id,
         "x-xdr-nonce": nonce,

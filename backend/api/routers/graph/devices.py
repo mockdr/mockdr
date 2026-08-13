@@ -42,7 +42,7 @@ async def get_managed_device(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Resource '{device_id}' does not exist or cannot be found.",
             ),
         )
@@ -81,7 +81,7 @@ def _require_device(device_id: str) -> None:
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Resource '{device_id}' does not exist or cannot be found.",
             ),
         )

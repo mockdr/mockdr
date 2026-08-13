@@ -33,7 +33,7 @@ SOAR playbooks, SIEM connectors, and automation scripts point at mockdr without 
 | CrowdStrike Falcon               | `/cs`                  | OAuth2 client credentials                  | `{"resources": [...], "meta": {...}}`  |
 | Microsoft Defender for Endpoint  | `/mde`                 | OAuth2 client credentials                  | `{"value": [...]}` (OData)             |
 | Elastic Security                 | `/elastic` + `/kibana` | Basic Auth or API Key                      | Elasticsearch / Kibana JSON            |
-| Cortex XDR                       | `/xdr/public_api/v1`   | HMAC (`x-xdr-auth-id` + nonce + timestamp) | `{"reply": {...}}`                     |
+| Cortex XDR                       | `/xdr/public_api/v1`   | API key or SHA-256 digest (`x-xdr-auth-id`) | `{"reply": {...}}`                     |
 | Splunk SIEM                      | `/splunk`              | Basic Auth, Bearer, or HEC token           | Splunk REST JSON                       |
 | Microsoft Sentinel               | `/sentinel`            | OAuth2 client credentials                  | Azure ARM JSON                         |
 | Microsoft Graph API (Entra ID, Intune, M365, Security) | `/graph` | OAuth2 client credentials (plan-gated) | `{"value": [...]}` (OData)             |
@@ -165,7 +165,11 @@ curl -H "Authorization: ApiKey ZXMtYWRtaW4ta2V5LTAwMTptb2NrLWVzLWFkbWluLWFwaS1rZ
 
 ### Cortex XDR
 
-HMAC-based authentication. Every request must include four headers: `x-xdr-auth-id`, `x-xdr-nonce`, `x-xdr-timestamp`, and `Authorization` (SHA256 hash of key + nonce + timestamp).
+Both Cortex XDR authentication levels are supported.
+
+**Standard** — send the key itself: `x-xdr-auth-id` and `Authorization: <secret>`.
+
+**Advanced** — the key never leaves the client; send `x-xdr-auth-id`, `x-xdr-nonce`, `x-xdr-timestamp` and `Authorization`, the latter being `SHA256(key + nonce + timestamp)` over the plain concatenation (no delimiter).
 
 | Role    | API Key ID | Secret               |
 | ------- | ---------- | -------------------- |
@@ -174,16 +178,20 @@ HMAC-based authentication. Every request must include four headers: `x-xdr-auth-
 | Viewer  | `3`        | `xdr-viewer-secret`  |
 
 ```bash
-# Generate HMAC auth headers and list incidents
+# Standard auth — the key goes in the Authorization header
+curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents/ \
+  -H "x-xdr-auth-id: 1" \
+  -H "Authorization: xdr-admin-secret" \
+  -H "Content-Type: application/json" \
+  -d '{"request_data": {}}'
+
+# Advanced auth — hash key + nonce + timestamp instead
 NONCE=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 TIMESTAMP=$(date +%s%3N)
-AUTH=$(python3 -c "
-import hashlib
-key = 'xdr-admin-secret'
-print(hashlib.sha256(f'{key}{NONCE}{TIMESTAMP}'.encode()).hexdigest())
-" NONCE="$NONCE" TIMESTAMP="$TIMESTAMP")
+AUTH=$(python3 -c "import hashlib,sys; print(hashlib.sha256(''.join(sys.argv[1:]).encode()).hexdigest())" \
+  "xdr-admin-secret" "$NONCE" "$TIMESTAMP")
 
-curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents \
+curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents/ \
   -H "x-xdr-auth-id: 1" \
   -H "x-xdr-nonce: $NONCE" \
   -H "x-xdr-timestamp: $TIMESTAMP" \
@@ -194,7 +202,9 @@ curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents \
 
 ### Splunk SIEM
 
-Supports three auth methods: **Basic Auth**, **Bearer Token** (session key from login), and **HEC Token** (`Authorization: Splunk <token>`) for HTTP Event Collector endpoints.
+Supports **Basic Auth**, a **session key** from login (`Authorization: Splunk <key>`, or `Bearer <key>` in the JWT scheme), and **HEC Tokens** (`Authorization: Splunk <token>`) for HTTP Event Collector endpoints.
+
+Like splunkd, responses are Atom XML unless you ask for JSON with `output_mode=json` — the Splunk SDKs always do. HEC is exempt and always answers JSON.
 
 **Basic Auth users:**
 
@@ -205,12 +215,13 @@ Supports three auth methods: **Basic Auth**, **Bearer Token** (session key from 
 | Viewer  | `viewer`  | `mockdr-viewer`  |
 
 ```bash
-# Get session key
-SESSION=$(curl -s -X POST http://localhost:8001/splunk/services/auth/login \
+# Get session key (output_mode=json — the bare call returns XML, as splunkd does)
+SESSION=$(curl -s -X POST "http://localhost:8001/splunk/services/auth/login?output_mode=json" \
   -d "username=admin&password=mockdr-admin" | jq -r .sessionKey)
 
 # Use session key
-curl -H "Authorization: Bearer $SESSION" http://localhost:8001/splunk/services/server/info
+curl -H "Authorization: Splunk $SESSION" \
+  "http://localhost:8001/splunk/services/server/info?output_mode=json"
 ```
 
 **HEC Tokens** (use as `Authorization: Splunk <token>`):
@@ -229,13 +240,19 @@ OAuth2 client credentials flow. POST to `/sentinel/oauth2/v2.0/token` with `clie
 | ------------------------- | ----------------------------- |
 | `sentinel-mock-client-id` | `sentinel-mock-client-secret` |
 
+Management-plane requests require `?api-version=`, exactly as Azure Resource Manager does — a request without it is answered with `400 MissingApiVersionParameter`. The Log Analytics query endpoint (`/sentinel/v1/workspaces/...`) is not ARM and takes no api-version.
+
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8001/sentinel/oauth2/v2.0/token \
   -d "client_id=sentinel-mock-client-id&client_secret=sentinel-mock-client-secret" \
   | jq -r .access_token)
 
+WS=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mockdr-rg
+WS=$WS/providers/Microsoft.OperationalInsights/workspaces/mockdr-workspace
+WS=$WS/providers/Microsoft.SecurityInsights
+
 curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8001/sentinel/subscriptions/mock-sub/resourceGroups/mock-rg/providers/Microsoft.OperationalInsights/workspaces/mock-ws/providers/Microsoft.SecurityInsights/incidents
+  "http://localhost:8001/sentinel$WS/incidents?api-version=2024-03-01"
 ```
 
 ### Microsoft Graph API
@@ -360,7 +377,7 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 
 | Domain          | Endpoints                                                    |
 | --------------- | ------------------------------------------------------------ |
-| Auth            | HMAC header validation (`x-xdr-auth-id` + nonce + timestamp) |
+| Auth            | Standard API key or advanced SHA-256 digest (`x-xdr-auth-id`) |
 | Incidents       | List, get, update, extra data                                |
 | Alerts          | List, get, update, multi-events                              |
 | Endpoints       | List, get, isolate, unisolate, scan, policy                  |
@@ -712,7 +729,7 @@ The proxy supports **all eight vendors** with vendor-appropriate authentication:
 | CrowdStrike Falcon | OAuth2 client credentials | `https://api.crowdstrike.com` |
 | Microsoft Defender | OAuth2 client credentials | `https://api.securitycenter.microsoft.com` |
 | Elastic Security | Basic Auth / API Key | `https://elastic.example.com:9200` |
-| Cortex XDR | HMAC (key ID + secret) | `https://api-tenant.xdr.paloaltonetworks.com` |
+| Cortex XDR | API key (key ID + secret) | `https://api-tenant.xdr.paloaltonetworks.com` |
 | Splunk SIEM | Basic Auth / Bearer | `https://splunk.example.com:8089` |
 | Microsoft Sentinel | OAuth2 client credentials | `https://management.azure.com` |
 | Microsoft Graph | OAuth2 client credentials | `https://graph.microsoft.com` |
@@ -816,7 +833,7 @@ backend/
 │   ├── cs_auth.py             # CrowdStrike OAuth2 Bearer auth
 │   ├── mde_auth.py            # MDE OAuth2 Bearer auth
 │   ├── es_auth.py             # Elastic Basic Auth + API Key auth
-│   ├── xdr_auth.py            # Cortex XDR HMAC auth
+│   ├── xdr_auth.py            # Cortex XDR API key auth
 │   ├── splunk_auth.py         # Splunk Basic Auth + Bearer + HEC auth
 │   ├── sentinel_auth.py       # Sentinel Azure AD OAuth2 auth
 │   ├── graph_auth.py          # Graph Azure AD OAuth2 auth (plan-gated)

@@ -11,11 +11,13 @@ Pre-seeded credentials:
 """
 from __future__ import annotations
 
+import re
 import secrets
 import time
+from datetime import date
 from typing import cast
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Query
 
 from repository.store import store
 from utils.sentinel.response import build_arm_error
@@ -73,7 +75,7 @@ async def require_sentinel_auth(
     Raises:
         HTTPException: 401 if token is missing or invalid.
     """
-    if not authorization or not authorization.startswith("Bearer "):
+    if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=401,
             detail=build_arm_error("AuthenticationFailed", "Bearer token required"),
@@ -88,3 +90,81 @@ async def require_sentinel_auth(
         )
 
     return {"client_id": client_id}
+
+
+# ── ARM api-version enforcement ──────────────────────────────────────────────
+
+_API_VERSION_PATTERN = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(-preview)?$")
+
+EARLIEST_API_VERSION = date(2019, 1, 1)
+"""Floor for a plausible SecurityInsights api-version.
+
+Pinning an exact allow-list would go stale every time Azure ships a preview, so
+the mock instead accepts any well-formed date from the era in which the
+Microsoft.SecurityInsights provider has existed. That still rejects what
+clients actually get wrong: a missing parameter, a truncated date, or a
+placeholder like ``v1``.
+"""
+
+
+async def require_arm_api_version(
+    api_version: str | None = Query(default=None, alias="api-version"),
+) -> str:
+    """Require a supported ``api-version`` on ARM management-plane requests.
+
+    Azure Resource Manager rejects any management request without an
+    ``api-version`` query parameter, and rejects versions it does not serve.
+    Accepting the request regardless — as a mock easily does by giving the
+    parameter a default — hides a client bug that would surface immediately
+    against real Azure.
+
+    Args:
+        api_version: Value of the ``api-version`` query parameter.
+
+    Returns:
+        The validated API version.
+
+    Raises:
+        HTTPException: 400 if the parameter is missing or unsupported.
+    """
+    if not api_version:
+        raise HTTPException(
+            status_code=400,
+            detail=build_arm_error(
+                "MissingApiVersionParameter",
+                "The api-version query parameter (?api-version=) is required "
+                "for all requests.",
+            ),
+        )
+
+    if not _is_plausible_api_version(api_version):
+        raise HTTPException(
+            status_code=400,
+            detail=build_arm_error(
+                "InvalidApiVersionParameter",
+                f"The api-version '{api_version}' is invalid. Expected a "
+                f"Microsoft.SecurityInsights version such as '2024-03-01'.",
+            ),
+        )
+
+    return api_version
+
+
+def _is_plausible_api_version(api_version: str) -> bool:
+    """Report whether a value could be a SecurityInsights api-version.
+
+    Args:
+        api_version: Raw ``api-version`` query parameter value.
+
+    Returns:
+        True if it is a well-formed date, optionally ``-preview``, no earlier
+        than :data:`EARLIEST_API_VERSION`.
+    """
+    match = _API_VERSION_PATTERN.match(api_version)
+    if not match:
+        return False
+    try:
+        released = date(int(match[1]), int(match[2]), int(match[3]))
+    except ValueError:
+        return False
+    return released >= EARLIEST_API_VERSION

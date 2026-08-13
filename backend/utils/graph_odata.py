@@ -13,6 +13,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from fastapi import HTTPException
+
+from utils.graph_response import build_graph_error_response
 from utils.mde_odata import (
     apply_odata_filter,
     apply_odata_orderby,
@@ -156,11 +159,20 @@ def apply_odata_count(
     count_requested = str(count_param).lower() in ("true", "1")
     if not count_requested:
         return None
-    # Graph API requires ConsistencyLevel: eventual for $count
-    if consistency_level and consistency_level.lower() == "eventual":
-        return len(records)
-    # For mock purposes, also return count even without the header
-    # (some integrations forget it, and being lenient is more useful)
+
+    # Graph rejects $count on directory objects unless the caller opts into
+    # eventual consistency. Answering anyway would let an integration ship a
+    # request that real Graph refuses.
+    if not consistency_level or consistency_level.lower() != "eventual":
+        raise HTTPException(
+            status_code=400,
+            detail=build_graph_error_response(
+                "Request_UnsupportedQuery",
+                "Request with $count is only supported with "
+                "ConsistencyLevel:eventual header.",
+            ),
+        )
+
     return len(records)
 
 

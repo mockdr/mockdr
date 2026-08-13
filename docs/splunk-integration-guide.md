@@ -86,9 +86,15 @@ Time modifiers: `earliest=-24h`, `latest=now`, `earliest=-7d@d`
 
 ### Login
 ```bash
-curl -X POST http://localhost:8001/splunk/services/auth/login \
-  -d "username=admin&password=mockdr-admin&output_mode=json"
+curl -X POST "http://localhost:8001/splunk/services/auth/login?output_mode=json" \
+  -d "username=admin&password=mockdr-admin"
 ```
+
+Responses are Atom XML by default, as splunkd's are; `output_mode=json` switches
+to JSON, and the Splunk SDKs set it on every request. mockdr reads
+`output_mode` from the query string only — real splunkd also accepts it as a
+POST parameter — so pass it in the URL. HEC (`/services/collector`) always
+answers JSON and ignores the parameter, matching the real service.
 
 ### Search
 ```bash

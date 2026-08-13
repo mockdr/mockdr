@@ -21,7 +21,9 @@ async def get_me(
     """Return the current user (first user in the store as mock)."""
     users = graph_user_repo.list_all()
     if not users:
-        raise HTTPException(404, detail=build_graph_error_response("NotFound", "No users found"))
+        raise HTTPException(404, detail=build_graph_error_response(
+            "Request_ResourceNotFound", "No users found",
+        ))
     return asdict(users[0])
 
 
@@ -80,7 +82,7 @@ async def get_user(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"User '{user_id}' not found",
             ),
         )

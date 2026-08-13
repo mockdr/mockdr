@@ -50,6 +50,12 @@ in both modes, because Entra does not support them for client credentials.
 The same applies to the `/mde` and `/sentinel` token endpoints, which mock the
 same Entra flow against the same tenant.
 
+### $count
+
+`$count=true` requires the `ConsistencyLevel: eventual` header on directory
+objects, as real Graph does; without it the request is refused with
+`400 Request_UnsupportedQuery` rather than silently answered.
+
 ## Quick Start
 
 ```bash

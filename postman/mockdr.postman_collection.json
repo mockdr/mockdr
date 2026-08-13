@@ -152,7 +152,7 @@
     },
     {
       "key": "xdr_auth_header",
-      "value": "",
+      "value": "xdr-admin-secret",
       "type": "string"
     },
     {

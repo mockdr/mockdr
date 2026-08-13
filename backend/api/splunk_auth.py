@@ -1,12 +1,16 @@
 """FastAPI dependencies for Splunk REST API authentication.
 
-Splunk supports three auth schemes:
+Splunk supports these auth schemes:
 
 1. **Basic Auth** (``Authorization: Basic <b64>``).
-2. **Bearer Token** (``Authorization: Bearer <session_key>``) — obtained via
-   ``POST /services/auth/login``.
-3. **HEC Token** (``Authorization: Splunk <hec_token>``) — for HTTP Event
-   Collector endpoints only.
+2. **Session key** (``Authorization: Splunk <session_key>``) — splunkd's own
+   scheme, obtained via ``POST /services/auth/login``.
+3. **Bearer Token** (``Authorization: Bearer <session_key>``) — the same key in
+   the scheme used for JWT authentication tokens.
+4. **HEC Token** (``Authorization: Splunk <hec_token>``) — for HTTP Event
+   Collector endpoints, which authenticate against their own token store.
+
+Scheme names are matched case-insensitively, as RFC 7235 requires.
 
 Three pre-seeded credentials:
 - ``admin`` / ``mockdr-admin`` (role: ``admin``)
@@ -90,8 +94,18 @@ async def require_splunk_auth(
         HTTPException: 401 if authentication fails.
     """
     if authorization:
-        # Bearer token
-        if authorization.startswith("Bearer "):
+        # Session key — splunkd's own scheme — or a Bearer JWT.
+        if authorization.lower().startswith("splunk "):
+            username = _resolve_session(authorization[7:])
+            if username:
+                user = splunk_user_repo.get(username)
+                if user:
+                    return {"username": user.username, "roles": user.roles}
+            raise HTTPException(status_code=401, detail={"messages": [
+                {"type": "ERROR", "text": "Invalid or expired session key"},
+            ]})
+
+        if authorization.lower().startswith("bearer "):
             token = authorization[7:]
             username = _resolve_session(token)
             if username:
@@ -103,7 +117,7 @@ async def require_splunk_auth(
             ]})
 
         # Basic auth
-        if authorization.startswith("Basic "):
+        if authorization.lower().startswith("basic "):
             try:
                 decoded = base64.b64decode(authorization[6:]).decode()
                 uname, passwd = decoded.split(":", 1)
@@ -161,7 +175,7 @@ async def require_hec_auth(
     Raises:
         HTTPException: 401/403 if token is invalid or disabled.
     """
-    if not authorization or not authorization.startswith("Splunk "):
+    if not authorization or not authorization.lower().startswith("splunk "):
         raise HTTPException(status_code=401, detail={"text": "Token required", "code": 2})
 
     token_value = authorization[7:]

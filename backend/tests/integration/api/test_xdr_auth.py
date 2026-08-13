@@ -4,7 +4,6 @@ Verifies HMAC signature validation, role-based access control, and
 rejection of invalid/missing credentials.
 """
 import hashlib
-import hmac
 import secrets
 import time
 
@@ -28,8 +27,8 @@ def _xdr_headers(
     """Build valid XDR HMAC auth headers."""
     nonce = secrets.token_hex(32)
     timestamp = str(int(time.time() * 1000))
-    # HMAC-SHA256: key_secret as HMAC key, nonce:timestamp as message
-    auth_hash = hmac.new(key_secret.encode(), (nonce + ":" + timestamp).encode(), hashlib.sha256).hexdigest()
+    # Advanced auth: SHA-256 over key + nonce + timestamp, plainly concatenated
+    auth_hash = hashlib.sha256((key_secret + nonce + timestamp).encode()).hexdigest()
     return {
         "x-xdr-auth-id": key_id,
         "x-xdr-nonce": nonce,
@@ -38,8 +37,79 @@ def _xdr_headers(
     }
 
 
+class TestXdrStandardAuth:
+    """Cortex XDR standard authentication — the API key is sent verbatim."""
+
+    def test_api_key_in_authorization_header_returns_200(
+        self, client: TestClient,
+    ) -> None:
+        """Standard auth needs only x-xdr-auth-id and the key itself."""
+        resp = client.post(
+            f"{XDR_PREFIX}/incidents/get_incidents/",
+            json={"request_data": {}},
+            headers={"x-xdr-auth-id": ADMIN_KEY_ID, "Authorization": ADMIN_KEY_SECRET},
+        )
+        assert resp.status_code == 200
+
+    def test_wrong_api_key_returns_401(self, client: TestClient) -> None:
+        """A key that is neither the secret nor a valid digest is rejected."""
+        resp = client.post(
+            f"{XDR_PREFIX}/incidents/get_incidents/",
+            json={"request_data": {}},
+            headers={"x-xdr-auth-id": ADMIN_KEY_ID, "Authorization": "not-the-key"},
+        )
+        assert resp.status_code == 401
+
+    def test_key_of_another_role_is_not_accepted(self, client: TestClient) -> None:
+        """The key must belong to the key ID it is presented with."""
+        resp = client.post(
+            f"{XDR_PREFIX}/incidents/get_incidents/",
+            json={"request_data": {}},
+            headers={"x-xdr-auth-id": ADMIN_KEY_ID, "Authorization": VIEWER_KEY_SECRET},
+        )
+        assert resp.status_code == 401
+
+
 class TestXdrHmacAuth:
-    """Tests for XDR HMAC signature validation."""
+    """Tests for XDR advanced-auth signature validation."""
+
+    def test_digest_is_plain_sha256_over_key_nonce_timestamp(
+        self, client: TestClient,
+    ) -> None:
+        """The digest is SHA-256 of the concatenation, with no delimiter."""
+        nonce, timestamp = "n" * 64, "1700000000000"
+        digest = hashlib.sha256(
+            (ADMIN_KEY_SECRET + nonce + timestamp).encode(),
+        ).hexdigest()
+        resp = client.post(
+            f"{XDR_PREFIX}/incidents/get_incidents/",
+            json={"request_data": {}},
+            headers={
+                "x-xdr-auth-id": ADMIN_KEY_ID,
+                "x-xdr-nonce": nonce,
+                "x-xdr-timestamp": timestamp,
+                "Authorization": digest,
+            },
+        )
+        assert resp.status_code == 200
+
+    def test_delimited_digest_is_rejected(self, client: TestClient) -> None:
+        """A digest over 'nonce:timestamp' is not what Cortex XDR sends."""
+        nonce, timestamp = "n" * 64, "1700000000000"
+        digest = hashlib.sha256(
+            (ADMIN_KEY_SECRET + nonce + ":" + timestamp).encode(),
+        ).hexdigest()
+        resp = client.post(
+            f"{XDR_PREFIX}/incidents/get_incidents/",
+            json={"request_data": {}},
+            headers={
+                "x-xdr-auth-id": ADMIN_KEY_ID,
+                "x-xdr-nonce": nonce,
+                "x-xdr-timestamp": timestamp,
+                "Authorization": digest,
+            },
+        )
+        assert resp.status_code == 401
 
     def test_valid_admin_key_returns_200(self, client: TestClient) -> None:
         headers = _xdr_headers(ADMIN_KEY_ID, ADMIN_KEY_SECRET)

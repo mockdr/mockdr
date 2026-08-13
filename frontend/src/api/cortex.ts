@@ -19,20 +19,16 @@ function randomNonce(): string {
   return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('')
 }
 
-/** Compute HMAC-SHA256 hex digest using Web Crypto API. */
-async function hmacSha256Hex(key: string, message: string): Promise<string> {
-  const enc = new TextEncoder()
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  )
-  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message))
-  return Array.from(new Uint8Array(sig), b => b.toString(16).padStart(2, '0')).join('')
+/** Compute a SHA-256 hex digest using the Web Crypto API. */
+async function sha256Hex(message: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message))
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')
 }
 
 /**
  * Axios instance for Cortex XDR mock API.
  *
- * Uses HMAC auth with x-xdr-auth-id, x-xdr-nonce, x-xdr-timestamp, and Authorization headers.
+ * Uses advanced auth with x-xdr-auth-id, x-xdr-nonce, x-xdr-timestamp, and Authorization headers.
  * All requests are POST with { request_data: { ... } } body shape.
  * Response interceptor unwraps the Axios envelope so callers receive raw XDR response body.
  */
@@ -45,7 +41,8 @@ const xdrClient = axios.create({
 xdrClient.interceptors.request.use(async (config) => {
   const nonce = randomNonce()
   const timestamp = Date.now().toString()
-  const authHash = await hmacSha256Hex(XDR_SECRET, nonce + ':' + timestamp)
+  // Cortex XDR hashes key + nonce + timestamp, plainly concatenated.
+  const authHash = await sha256Hex(XDR_SECRET + nonce + timestamp)
 
   config.headers['x-xdr-auth-id'] = XDR_KEY_ID
   config.headers['x-xdr-nonce'] = nonce
