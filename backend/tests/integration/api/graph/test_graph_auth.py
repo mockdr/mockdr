@@ -121,6 +121,23 @@ class TestGraphTenantScopedTokenUrl:
         headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
         assert client.get("/graph/v1.0/organization", headers=headers).status_code == 200
 
+    def test_verified_domain_is_accepted(self, client: TestClient) -> None:
+        """Entra accepts a verified domain name in place of the tenant GUID."""
+        resp = client.post(
+            "/graph/acmecorp.onmicrosoft.com/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
+    def test_bare_url_ignores_a_tenant_query_parameter(
+        self, client: TestClient,
+    ) -> None:
+        """Entra ignores unknown query params — the bare path stays unguarded."""
+        resp = client.post(
+            "/graph/oauth2/v2.0/token?tenant_id=00000000-0000-0000-0000-000000000000",
+            data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
     def test_tenant_segment_is_case_insensitive(self, client: TestClient) -> None:
         """Entra treats tenant GUIDs case-insensitively."""
         resp = client.post(
@@ -148,6 +165,10 @@ class TestGraphTenantScopedTokenUrl:
             f"/graph/{alias}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
         )
         assert resp.status_code == 400
+        # These authorities resolve at Entra — "not found" would be misleading.
+        message = resp.json()["error"]["message"]
+        assert "AADSTS90002" not in message
+        assert "not supported" in message
 
     def test_unknown_tenant_accepted_when_strict_disabled(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,

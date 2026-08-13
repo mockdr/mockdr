@@ -6,7 +6,7 @@ feature gating across Graph endpoints.
 from __future__ import annotations
 
 from domain.graph.oauth_client import GraphOAuthClient
-from infrastructure.seeders.graph.graph_shared import GRAPH_TENANT_ID
+from infrastructure.seeders.graph.graph_shared import GRAPH_DOMAIN, GRAPH_TENANT_ID
 from repository.graph.oauth_client_repo import graph_oauth_client_repo
 
 _MOCK_CLIENTS: list[dict] = [
@@ -68,6 +68,7 @@ def seed_graph_oauth_clients() -> None:
             client_id=spec["client_id"],
             client_secret=spec["client_secret"],
             tenant_id=GRAPH_TENANT_ID,
+            tenant_domain=GRAPH_DOMAIN,
             name=spec["name"],
             plan=spec["plan"],
             licenses=spec["licenses"],

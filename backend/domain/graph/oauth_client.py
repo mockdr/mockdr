@@ -13,6 +13,7 @@ class GraphOAuthClient:
     client_id: str
     client_secret: str
     tenant_id: str = ""
+    tenant_domain: str = ""  # verified domain, also valid in the token URL
     name: str = ""
     plan: str = "plan1"  # plan1 | plan2 | defender_for_business | none
     licenses: list[str] = field(default_factory=list)  # e.g. ["E5", "Intune"]

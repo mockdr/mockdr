@@ -29,6 +29,8 @@ def _seed_oauth_clients() -> None:
     store.save("sentinel_oauth_clients", "sentinel-mock-client-id", {
         "client_id": "sentinel-mock-client-id",
         "client_secret": "sentinel-mock-client-secret",
+        "tenant_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "tenant_domain": "acmecorp.onmicrosoft.com",
     })
 
 

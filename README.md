@@ -118,7 +118,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/cs/devices/queries/
 
 ### Microsoft Defender for Endpoint
 
-OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, and `grant_type=client_credentials`. The tenant-scoped URL real Entra uses — `/mde/{tenant}/oauth2/v2.0/token`, tenant `a1b2c3d4-e5f6-7890-abcd-ef1234567890` — is accepted too, so MSAL-shaped clients work unchanged. The same applies to `/graph` and `/sentinel`; see the [Graph integration guide](docs/graph-integration-guide.md) for tenant validation and `MOCKDR_STRICT_TENANT`.
+OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, and `grant_type=client_credentials`. The tenant-scoped URL real Entra uses — `/mde/{tenant}/oauth2/v2.0/token`, with tenant `a1b2c3d4-e5f6-7890-abcd-ef1234567890` or the verified domain `acmecorp.onmicrosoft.com` — is accepted too, so MSAL-shaped clients work unchanged. The same applies to `/graph` and `/sentinel`; see the [Graph integration guide](docs/graph-integration-guide.md) for tenant validation and `MOCKDR_STRICT_TENANT`.
 
 | Role    | Client ID                 | Client Secret             |
 | ------- | ------------------------- | ------------------------- |
@@ -605,6 +605,7 @@ All data is **in-memory** by default -- mutations survive until server restart o
 | `SEED_COUNT_ALERTS`  | 20                                            | S1 alerts to seed                                                                                  |
 | `MOCKDR_PERSIST`     | (none)                                        | File path for JSON state persistence across restarts                                               |
 | `CORS_ORIGINS`       | `http://localhost:5173,http://localhost:8001` | Comma-separated allowed CORS origins                                                               |
+| `MOCKDR_STRICT_TENANT` | `true`                                      | Require the tenant in an Entra token URL (`/{tenant}/oauth2/v2.0/token`) to match the mock tenant; set `false` to accept any tenant |
 
 ## Middleware Stack
 

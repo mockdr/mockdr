@@ -3,31 +3,64 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Form, HTTPException
 
-from application.sentinel.commands.auth import token_exchange
-from utils.entra_tenant import tenant_not_found_message, tenant_segment_matches
+from application.sentinel.commands.auth import client_tenant, token_exchange
+from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 
 router = APIRouter(tags=["Sentinel Auth"])
 
 
-@router.post("/{tenant_id}/oauth2/v2.0/token")
 @router.post("/oauth2/v2.0/token")
 async def oauth2_token(
-    tenant_id: str | None = None,
     client_id: str = Form(default=""),
     client_secret: str = Form(default=""),
     grant_type: str = Form(default=""),
 ) -> dict:
-    """Exchange client credentials for an access token.
+    """Exchange client credentials for an access token."""
+    return _issue_token(None, client_id, client_secret)
 
-    Accepts both the bare path and the tenant-scoped
-    ``/{tenant_id}/oauth2/v2.0/token`` path real Entra uses. Sentinel's mock
-    credentials carry no tenant, so any concrete tenant is accepted — only the
-    multi-tenant aliases Entra rejects for client credentials are refused.
+
+@router.post("/{tenant_id}/oauth2/v2.0/token")
+async def oauth2_token_for_tenant(
+    tenant_id: str,
+    client_id: str = Form(default=""),
+    client_secret: str = Form(default=""),
+    grant_type: str = Form(default=""),
+) -> dict:
+    """Exchange client credentials on the tenant-scoped URL real Entra uses.
+
+    Args:
+        tenant_id:     Tenant GUID or verified domain name from the URL. Must
+                       address the credential's tenant unless
+                       ``MOCKDR_STRICT_TENANT=false``.
+        client_id:     Azure AD application client ID (form-encoded).
+        client_secret: Client secret (form-encoded).
+        grant_type:    Must be ``"client_credentials"``.
+
+    Returns:
+        Token response — see :func:`_issue_token`.
     """
-    if not tenant_segment_matches(tenant_id):
+    return _issue_token(tenant_id, client_id, client_secret)
+
+
+def _issue_token(tenant_id: str | None, client_id: str, client_secret: str) -> dict:
+    """Resolve the tenant, validate the credentials and mint a token.
+
+    Args:
+        tenant_id:     Tenant from the URL, or ``None`` on the bare path.
+        client_id:     Azure AD application client ID.
+        client_secret: Client secret.
+
+    Returns:
+        Token response dict.
+
+    Raises:
+        HTTPException: 400 if the tenant does not address this directory.
+        HTTPException: 401 if the credentials are invalid.
+    """
+    if not tenant_segment_matches(tenant_id, *client_tenant(client_id)):
         raise HTTPException(status_code=400, detail={
             "error": "invalid_request",
-            "error_description": tenant_not_found_message(tenant_id),
+            "error_description": tenant_rejection_message(tenant_id),
         })
 
     result = token_exchange(client_id, client_secret)

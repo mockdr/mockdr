@@ -25,9 +25,11 @@ MockDR includes a full-fidelity Microsoft Sentinel SIEM mock that runs on the sa
 Real Entra ID scopes the token endpoint to a tenant
 (`https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token`); both shapes
 work here, so a client built against the real service needs no special-casing.
-Sentinel's mock credentials carry no tenant, so any tenant is accepted — only
-`common`, `organizations` and `consumers` are rejected, matching Entra's refusal
-of the multi-tenant authorities for client credentials.
+The tenant segment takes the mock tenant's GUID
+(`a1b2c3d4-e5f6-7890-abcd-ef1234567890`) or its verified domain
+(`acmecorp.onmicrosoft.com`); see the
+[Graph integration guide](graph-integration-guide.md) for the validation rules
+and `MOCKDR_STRICT_TENANT`.
 
 ## Default Workspace
 

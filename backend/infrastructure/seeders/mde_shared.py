@@ -10,6 +10,9 @@ import random
 MDE_TENANT_ID: str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 """Mock Azure AD tenant ID."""
 
+MDE_TENANT_DOMAIN: str = "acmecorp.onmicrosoft.com"
+"""Primary verified domain of the mock tenant (shared with Graph)."""
+
 MDE_AGENT_VERSIONS: list[str] = [
     "10.8910.23012.1022",
     "10.8810.22621.2506",

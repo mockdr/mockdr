@@ -40,13 +40,21 @@ class TestTenantScopedTokenUrl:
         assert resp.status_code == 200
         assert resp.json()["token_type"] == "Bearer"
 
-    def test_any_tenant_accepted(self, client: TestClient) -> None:
-        """Sentinel mock credentials carry no tenant, so any tenant resolves."""
+    def test_verified_domain_is_accepted(self, client: TestClient) -> None:
+        """Entra accepts a verified domain name in place of the tenant GUID."""
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/acmecorp.onmicrosoft.com/oauth2/v2.0/token",
+            data=self._CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
+    def test_unknown_tenant_returns_400(self, client: TestClient) -> None:
+        """A tenant this mock does not host should be rejected, not served."""
         resp = client.post(
             f"{SENTINEL_PREFIX}/contoso.onmicrosoft.com/oauth2/v2.0/token",
             data=self._CREDENTIALS,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 400
 
     def test_multi_tenant_alias_is_rejected(self, client: TestClient) -> None:
         """Entra rejects the multi-tenant authorities for client credentials."""

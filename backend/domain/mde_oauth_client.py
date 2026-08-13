@@ -15,6 +15,7 @@ class MdeOAuthClient:
     tenant_id: str
     name: str
     role: str  # "admin", "analyst", "viewer"
+    tenant_domain: str = ""  # verified domain, also valid in the token URL
 
     @property
     def id(self) -> str:

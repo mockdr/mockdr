@@ -9,6 +9,22 @@ from repository.store import store
 _OAUTH_CLIENTS_COLLECTION = "sentinel_oauth_clients"
 
 
+def client_tenant(client_id: str) -> tuple[str, str]:
+    """Look up the tenant a registered client belongs to.
+
+    Args:
+        client_id: Azure AD application client ID.
+
+    Returns:
+        ``(tenant_id, tenant_domain)`` for the client, or two empty strings if
+        the client is unknown or carries no tenant.
+    """
+    for c in store.get_all(_OAUTH_CLIENTS_COLLECTION):
+        if hmac.compare_digest(c.get("client_id", ""), client_id):
+            return c.get("tenant_id", ""), c.get("tenant_domain", "")
+    return "", ""
+
+
 def token_exchange(client_id: str, client_secret: str) -> dict | None:
     """Exchange client credentials for an access token.
 

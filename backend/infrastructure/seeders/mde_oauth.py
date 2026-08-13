@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from domain.mde_oauth_client import MdeOAuthClient
-from infrastructure.seeders.mde_shared import MDE_TENANT_ID
+from infrastructure.seeders.mde_shared import MDE_TENANT_DOMAIN, MDE_TENANT_ID
 from repository.mde_oauth_client_repo import mde_oauth_client_repo
 
 _MOCK_CLIENTS: list[dict[str, str]] = [
@@ -38,6 +38,7 @@ def seed_mde_oauth_clients() -> None:
             client_id=client_def["client_id"],
             client_secret=client_def["client_secret"],
             tenant_id=MDE_TENANT_ID,
+            tenant_domain=MDE_TENANT_DOMAIN,
             name=client_def["name"],
             role=client_def["role"],
         ))

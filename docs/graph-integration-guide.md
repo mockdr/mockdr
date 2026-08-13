@@ -33,15 +33,22 @@ both shapes, so a client built against the real service works unchanged:
 
 ```
 POST /graph/oauth2/v2.0/token                                          # bare
-POST /graph/a1b2c3d4-e5f6-7890-abcd-ef1234567890/oauth2/v2.0/token     # tenant-scoped
+POST /graph/a1b2c3d4-e5f6-7890-abcd-ef1234567890/oauth2/v2.0/token     # tenant GUID
+POST /graph/acmecorp.onmicrosoft.com/oauth2/v2.0/token                 # verified domain
 ```
 
-The mock tenant is `a1b2c3d4-e5f6-7890-abcd-ef1234567890`. Any other tenant is
-rejected with `400 invalid_request` (AADSTS90002), mirroring Entra. Set
-`MOCKDR_STRICT_TENANT=false` to accept any tenant — useful when pointing a
-connector that is configured with your real tenant ID at the mock. The
-multi-tenant aliases `common`, `organizations` and `consumers` are rejected in
-both modes, because Entra does not support them for client credentials.
+Like Entra, the tenant segment accepts either the tenant GUID
+(`a1b2c3d4-e5f6-7890-abcd-ef1234567890`) or a verified domain name
+(`acmecorp.onmicrosoft.com`), case-insensitively. Any other tenant is rejected
+with `400 invalid_request` (AADSTS90002). Set `MOCKDR_STRICT_TENANT=false` to
+accept any tenant — useful when pointing a connector that is configured with
+your real tenant ID at the mock.
+
+The multi-tenant aliases `common`, `organizations` and `consumers` are rejected
+in both modes, because Entra does not support them for client credentials.
+
+The same applies to the `/mde` and `/sentinel` token endpoints, which mock the
+same Entra flow against the same tenant.
 
 ## Quick Start
 

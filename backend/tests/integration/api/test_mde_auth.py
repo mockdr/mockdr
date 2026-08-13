@@ -34,6 +34,13 @@ class TestMdeTenantScopedTokenUrl:
         headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
         assert client.get("/mde/api/machines", headers=headers).status_code == 200
 
+    def test_verified_domain_is_accepted(self, client: TestClient) -> None:
+        """Entra accepts a verified domain name in place of the tenant GUID."""
+        resp = client.post(
+            "/mde/acmecorp.onmicrosoft.com/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
     def test_unknown_tenant_returns_400(self, client: TestClient) -> None:
         """A tenant this mock does not host should be rejected, not served."""
         resp = client.post(
