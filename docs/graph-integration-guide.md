@@ -25,6 +25,24 @@ MockDR includes a comprehensive Microsoft Graph API mock covering Entra ID, Intu
 | Intune Admin | `graph-mock-intune-client` | `graph-mock-intune-secret` | Plan 2 (Intune) |
 | Mail Only | `graph-mock-mail-client` | `graph-mock-mail-secret` | None (E3) |
 
+### Token endpoint URL
+
+Real Entra ID scopes the token endpoint to a tenant —
+`https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token`. MockDR accepts
+both shapes, so a client built against the real service works unchanged:
+
+```
+POST /graph/oauth2/v2.0/token                                          # bare
+POST /graph/a1b2c3d4-e5f6-7890-abcd-ef1234567890/oauth2/v2.0/token     # tenant-scoped
+```
+
+The mock tenant is `a1b2c3d4-e5f6-7890-abcd-ef1234567890`. Any other tenant is
+rejected with `400 invalid_request` (AADSTS90002), mirroring Entra. Set
+`MOCKDR_STRICT_TENANT=false` to accept any tenant — useful when pointing a
+connector that is configured with your real tenant ID at the mock. The
+multi-tenant aliases `common`, `organizations` and `consumers` are rejected in
+both modes, because Entra does not support them for client credentials.
+
 ## Quick Start
 
 ```bash

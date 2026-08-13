@@ -22,6 +22,40 @@ def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+class TestTenantScopedTokenUrl:
+    """The token endpoint accepts real Entra's tenant-scoped URL shape."""
+
+    _CREDENTIALS = {
+        "client_id": "sentinel-mock-client-id",
+        "client_secret": "sentinel-mock-client-secret",
+        "grant_type": "client_credentials",
+    }
+
+    def test_tenant_scoped_url_returns_token(self, client: TestClient) -> None:
+        """The tenant-scoped URL real Entra uses should issue a token."""
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/a1b2c3d4-e5f6-7890-abcd-ef1234567890/oauth2/v2.0/token",
+            data=self._CREDENTIALS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["token_type"] == "Bearer"
+
+    def test_any_tenant_accepted(self, client: TestClient) -> None:
+        """Sentinel mock credentials carry no tenant, so any tenant resolves."""
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/contoso.onmicrosoft.com/oauth2/v2.0/token",
+            data=self._CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
+    def test_multi_tenant_alias_is_rejected(self, client: TestClient) -> None:
+        """Entra rejects the multi-tenant authorities for client credentials."""
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/common/oauth2/v2.0/token", data=self._CREDENTIALS,
+        )
+        assert resp.status_code == 400
+
+
 class TestOAuth2TokenExchange:
     """Tests for POST /sentinel/oauth2/v2.0/token."""
 

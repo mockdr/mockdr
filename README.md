@@ -118,7 +118,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/cs/devices/queries/
 
 ### Microsoft Defender for Endpoint
 
-OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, and `grant_type=client_credentials`.
+OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, and `grant_type=client_credentials`. The tenant-scoped URL real Entra uses — `/mde/{tenant}/oauth2/v2.0/token`, tenant `a1b2c3d4-e5f6-7890-abcd-ef1234567890` — is accepted too, so MSAL-shaped clients work unchanged. The same applies to `/graph` and `/sentinel`; see the [Graph integration guide](docs/graph-integration-guide.md) for tenant validation and `MOCKDR_STRICT_TENANT`.
 
 | Role    | Client ID                 | Client Secret             |
 | ------- | ------------------------- | ------------------------- |

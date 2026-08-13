@@ -3,7 +3,54 @@
 Verifies the Azure AD client credentials flow, token validation,
 role-based access control, and response structure match the real MDE API.
 """
+import pytest
 from fastapi.testclient import TestClient
+
+MOCK_TENANT_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+_ADMIN_CREDENTIALS = {
+    "client_id": "mde-mock-admin-client",
+    "client_secret": "mde-mock-admin-secret",
+    "grant_type": "client_credentials",
+}
+
+
+class TestMdeTenantScopedTokenUrl:
+    """The token endpoint accepts real Entra's tenant-scoped URL shape."""
+
+    def test_tenant_scoped_url_returns_token(self, client: TestClient) -> None:
+        """The tenant-scoped URL real Entra uses should issue a token."""
+        resp = client.post(
+            f"/mde/{MOCK_TENANT_ID}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["token_type"] == "Bearer"
+
+    def test_tenant_scoped_token_is_usable(self, client: TestClient) -> None:
+        """A token from the tenant-scoped URL authenticates MDE calls."""
+        resp = client.post(
+            f"/mde/{MOCK_TENANT_ID}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+        assert client.get("/mde/api/machines", headers=headers).status_code == 200
+
+    def test_unknown_tenant_returns_400(self, client: TestClient) -> None:
+        """A tenant this mock does not host should be rejected, not served."""
+        resp = client.post(
+            "/mde/00000000-0000-0000-0000-000000000000/oauth2/v2.0/token",
+            data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 400
+
+    @pytest.mark.parametrize("alias", ["common", "organizations", "consumers"])
+    def test_multi_tenant_aliases_are_rejected(
+        self, client: TestClient, alias: str,
+    ) -> None:
+        """Entra rejects the multi-tenant authorities for client credentials."""
+        resp = client.post(
+            f"/mde/{alias}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 400
 
 
 def _mde_auth(client: TestClient) -> dict[str, str]:

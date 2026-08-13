@@ -22,6 +22,7 @@ from fastapi import APIRouter, Form, HTTPException
 
 from repository.graph.oauth_client_repo import graph_oauth_client_repo
 from repository.store import store
+from utils.entra_tenant import tenant_not_found_message, tenant_segment_matches
 from utils.graph_response import build_graph_error_response
 
 router = APIRouter(tags=["Graph Auth"])
@@ -29,8 +30,10 @@ router = APIRouter(tags=["Graph Auth"])
 _TOKEN_LIFETIME_SECONDS: int = 3599
 
 
+@router.post("/{tenant_id}/oauth2/v2.0/token")
 @router.post("/oauth2/v2.0/token")
 async def create_token(
+    tenant_id: str | None = None,
     client_id: str = Form(...),
     client_secret: str = Form(...),
     grant_type: str = Form(...),
@@ -43,7 +46,13 @@ async def create_token(
     Bearer token, stores it in ``graph_oauth_tokens`` with expiration, and
     returns the token in Azure AD format.
 
+    Both the bare ``/oauth2/v2.0/token`` path and the tenant-scoped
+    ``/{tenant_id}/oauth2/v2.0/token`` path real Entra uses are accepted.
+
     Args:
+        tenant_id:     Tenant from the URL, or ``None`` on the bare path. Must
+                       address the credential's tenant unless
+                       ``MOCKDR_STRICT_TENANT=false``.
         client_id:     OAuth2 client identifier (form-encoded).
         client_secret: OAuth2 client secret (form-encoded).
         grant_type:    Must be ``"client_credentials"``.
@@ -54,7 +63,7 @@ async def create_token(
         ``ext_expires_in``.
 
     Raises:
-        HTTPException: 400 if grant_type is invalid.
+        HTTPException: 400 if grant_type is invalid or the tenant is unknown.
         HTTPException: 401 if the credentials are invalid.
     """
     if grant_type != "client_credentials":
@@ -72,6 +81,14 @@ async def create_token(
             status_code=401,
             detail=build_graph_error_response(
                 "invalid_client", "Invalid client credentials",
+            ),
+        )
+
+    if not tenant_segment_matches(tenant_id, client.tenant_id):
+        raise HTTPException(
+            status_code=400,
+            detail=build_graph_error_response(
+                "invalid_request", tenant_not_found_message(tenant_id),
             ),
         )
 

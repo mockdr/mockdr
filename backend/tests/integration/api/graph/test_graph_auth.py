@@ -1,5 +1,14 @@
 """Integration tests for Graph API OAuth2 authentication."""
+import pytest
 from fastapi.testclient import TestClient
+
+MOCK_TENANT_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+_ADMIN_CREDENTIALS = {
+    "client_id": "graph-mock-admin-client",
+    "client_secret": "graph-mock-admin-secret",
+    "grant_type": "client_credentials",
+}
 
 
 class TestGraphAuth:
@@ -89,6 +98,75 @@ class TestGraphAuth:
         resp = client.get(
             "/graph/v1.0/organization",
             headers={"Authorization": "Bearer invalid-token-xyz"},
+        )
+        assert resp.status_code == 401
+
+
+class TestGraphTenantScopedTokenUrl:
+    """The token endpoint accepts real Entra's tenant-scoped URL shape."""
+
+    def test_tenant_scoped_url_returns_token(self, client: TestClient) -> None:
+        """The tenant-scoped URL real Entra uses should issue a token."""
+        resp = client.post(
+            f"/graph/{MOCK_TENANT_ID}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["token_type"] == "Bearer"
+
+    def test_tenant_scoped_token_is_usable(self, client: TestClient) -> None:
+        """A token from the tenant-scoped URL authenticates Graph calls."""
+        resp = client.post(
+            f"/graph/{MOCK_TENANT_ID}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+        assert client.get("/graph/v1.0/organization", headers=headers).status_code == 200
+
+    def test_tenant_segment_is_case_insensitive(self, client: TestClient) -> None:
+        """Entra treats tenant GUIDs case-insensitively."""
+        resp = client.post(
+            f"/graph/{MOCK_TENANT_ID.upper()}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
+    def test_unknown_tenant_returns_400(self, client: TestClient) -> None:
+        """A tenant this mock does not host should be rejected, not served."""
+        resp = client.post(
+            "/graph/00000000-0000-0000-0000-000000000000/oauth2/v2.0/token",
+            data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["code"] == "invalid_request"
+        assert "AADSTS90002" in error["message"]
+
+    @pytest.mark.parametrize("alias", ["common", "organizations", "consumers"])
+    def test_multi_tenant_aliases_are_rejected(
+        self, client: TestClient, alias: str,
+    ) -> None:
+        """Entra rejects the multi-tenant authorities for client credentials."""
+        resp = client.post(
+            f"/graph/{alias}/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 400
+
+    def test_unknown_tenant_accepted_when_strict_disabled(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """MOCKDR_STRICT_TENANT=false lets any concrete tenant through."""
+        monkeypatch.setattr("utils.entra_tenant.STRICT_TENANT", False)
+        resp = client.post(
+            "/graph/00000000-0000-0000-0000-000000000000/oauth2/v2.0/token",
+            data=_ADMIN_CREDENTIALS,
+        )
+        assert resp.status_code == 200
+
+    def test_invalid_credentials_still_401_on_tenant_url(
+        self, client: TestClient,
+    ) -> None:
+        """A bad secret outranks nothing — it is still a 401 on the scoped URL."""
+        resp = client.post(
+            f"/graph/{MOCK_TENANT_ID}/oauth2/v2.0/token",
+            data={**_ADMIN_CREDENTIALS, "client_secret": "wrong-secret"},
         )
         assert resp.status_code == 401
 
