@@ -7,9 +7,16 @@ integration:
 - ``gt``, ``ge``, ``lt``, ``le`` — range comparisons
 - ``contains(field,'value')`` — substring match
 - ``startswith(field,'value')`` — prefix match
-- ``and``, ``or`` — logical conjunction
+- ``endswith(field,'value')`` — suffix match
+- ``and``, ``or`` — logical conjunction, with ``and`` binding tighter
 - Parenthetical grouping
-- Single-quoted string literals and unquoted numbers/booleans
+- Single-quoted string literals (``''`` escapes a quote), unquoted numbers
+  and unquoted ISO-8601 date/time literals
+
+Anything outside that subset — ``not``, ``in``, nested function calls,
+arithmetic — raises :class:`ODataFilterError`, which the app maps to the
+``400`` the real APIs return.  Nothing is skipped silently: ignoring input
+would widen the filter and hand back more records than were asked for.
 """
 from __future__ import annotations
 
@@ -42,7 +49,7 @@ class ODataClause:
     Attributes:
         field:    Target field name (e.g. ``"severity"``).
         operator: One of ``eq``, ``ne``, ``gt``, ``ge``, ``lt``, ``le``,
-                  ``contains``, ``startswith``.
+                  ``contains``, ``startswith``, ``endswith``.
         value:    Comparison value (always stored as string).
     """
 
@@ -77,7 +84,7 @@ ODataNode = ODataClause | ODataGroup
 # ---------------------------------------------------------------------------
 
 _TOKEN_RE = re.compile(
-    r"(?P<func>contains|startswith)\s*\("
+    r"(?P<func>contains|startswith|endswith)\s*\("
     r"|(?P<paren>[()])"
     # A doubled quote is OData's escape for a literal one, so it must not end
     # the token: 'O''Brien' is one string, not 'O' followed by junk.
@@ -103,9 +110,21 @@ def _tokenise(text: str) -> list[tuple[str, str]]:
 
     Returns:
         List of ``(type, value)`` token tuples.
+
+    Raises:
+        ODataFilterError: If any character cannot be lexed. Skipping them
+            would widen the filter rather than narrow it — a junk-only
+            expression would lex to nothing and match every record, and an
+            unterminated quote would silently drop its opening quote.
     """
     tokens: list[tuple[str, str]] = []
+    pos = 0
     for m in _TOKEN_RE.finditer(text):
+        if m.start() > pos:
+            msg = f"unexpected character(s) in filter: {text[pos:m.start()]!r}"
+            raise ODataFilterError(msg)
+        pos = m.end()
+
         if m.group("func"):
             tokens.append(("FUNC", m.group("func").lower()))
         elif m.group("paren"):
@@ -126,6 +145,10 @@ def _tokenise(text: str) -> list[tuple[str, str]]:
         elif m.group("comma"):
             tokens.append(("COMMA", ","))
         # whitespace is silently skipped
+
+    if pos < len(text):
+        msg = f"unexpected character(s) in filter: {text[pos:]!r}"
+        raise ODataFilterError(msg)
     return tokens
 
 
@@ -136,9 +159,15 @@ def _tokenise(text: str) -> list[tuple[str, str]]:
 class _Parser:
     """Recursive-descent parser for OData ``$filter`` expressions."""
 
+    #: Deepest parenthesis nesting accepted. Guards the recursive descent —
+    #: a RecursionError is not an ODataFilterError, so it would escape the
+    #: handler as a 500. No real caller nests anywhere near this far.
+    MAX_DEPTH = 50
+
     def __init__(self, tokens: list[tuple[str, str]]) -> None:
         self.tokens = tokens
         self.pos = 0
+        self.depth = 0
 
     def _peek(self) -> tuple[str, str] | None:
         if self.pos < len(self.tokens):
@@ -157,6 +186,18 @@ class _Parser:
         tok = self._advance()
         if tok[0] != kind:
             msg = f"expected {kind}, got {tok[1]!r}"
+            raise ODataFilterError(msg)
+        return tok[1]
+
+    def _expect_exact(self, kind: str, value: str) -> str:
+        """Require a specific token, not merely one of the right kind.
+
+        ``_expect("PAREN")`` would happily accept ``(`` where ``)`` belongs,
+        so ``contains(name,'a'(`` parsed clean.
+        """
+        tok = self._advance()
+        if tok != (kind, value):
+            msg = f"expected {value!r}, got {tok[1]!r}"
             raise ODataFilterError(msg)
         return tok[1]
 
@@ -193,7 +234,13 @@ class _Parser:
         conjunction: str,
         parse_operand: Callable[[], ODataNode | None],
     ) -> ODataNode | None:
-        """Parse ``operand (<conjunction> operand)*`` at one precedence level."""
+        """Parse ``operand (<conjunction> operand)*`` at one precedence level.
+
+        Raises:
+            ODataFilterError: If a conjunction has no right-hand operand.
+                Dropping it would leave ``x eq '1' and`` meaning ``x eq '1'``,
+                the same silent widening the trailing-input check rejects.
+        """
         children: list[ODataNode] = []
         first = parse_operand()
         if first is not None:
@@ -205,8 +252,10 @@ class _Parser:
                 break
             self._advance()
             operand = parse_operand()
-            if operand is not None:
-                children.append(operand)
+            if operand is None:
+                msg = f"{conjunction!r} has no right-hand operand"
+                raise ODataFilterError(msg)
+            children.append(operand)
 
         if not children:
             return None
@@ -222,12 +271,22 @@ class _Parser:
 
         # Parenthesised group
         if tok == ("PAREN", "("):
+            if self.depth >= self.MAX_DEPTH:
+                msg = f"filter nested deeper than {self.MAX_DEPTH} levels"
+                raise ODataFilterError(msg)
             self._advance()  # consume '('
-            inner = self._parse_or()
-            self._expect("PAREN")  # unbalanced '(' is an error, not a no-op
+            self.depth += 1
+            try:
+                inner = self._parse_or()
+            finally:
+                self.depth -= 1
+            if inner is None:
+                msg = "empty parentheses in filter"
+                raise ODataFilterError(msg)
+            self._expect_exact("PAREN", ")")
             return inner
 
-        # Function call: contains(field, 'value') / startswith(field, 'value').
+        # Function call: contains/startswith/endswith(field, 'value').
         # The tokeniser's `func` pattern matches the trailing "(" too, so the
         # opening paren is already consumed by the time we get here.
         if tok[0] == "FUNC":
@@ -235,7 +294,7 @@ class _Parser:
             field_name = self._expect("WORD")
             self._expect("COMMA")
             value = self._expect_value()
-            self._expect("PAREN")  # closing ')'
+            self._expect_exact("PAREN", ")")
             return ODataClause(field=field_name, operator=func_name, value=value)
 
         # Standard comparison: field op value
@@ -326,6 +385,9 @@ def _match_clause(record: dict, clause: ODataClause) -> bool:
 
     if clause.operator == "startswith":
         return field_str.lower().startswith(target.lower())
+
+    if clause.operator == "endswith":
+        return field_str.lower().endswith(target.lower())
 
     # Range operators — try numeric, fall back to string
     if clause.operator in ("gt", "ge", "lt", "le"):

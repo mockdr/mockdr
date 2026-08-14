@@ -79,6 +79,15 @@ class TestFunctions:
         assert _matches("contains(x,'ELL')", {"x": "hello"}) is True
         assert _matches("startswith(x,'HE')", {"x": "hello"}) is True
 
+    @pytest.mark.parametrize(("expr", "expected"), [
+        ("endswith(mail,'@contoso.com')", True),
+        ("endswith(mail,'@other.com')", False),
+        ("endswith(mail,'@CONTOSO.COM')", True),
+    ])
+    def test_endswith(self, expr: str, expected: bool) -> None:
+        """Real Graph serves endswith(); omitting it made valid filters 400."""
+        assert _matches(expr, {"mail": "a@contoso.com"}) is expected
+
     def test_nested_slash_path(self) -> None:
         assert _matches("contains(d/h,'ws')", {"d": {"h": "ws-01"}}) is True
 
@@ -203,6 +212,36 @@ class TestMalformedFilters:
     ])
     def test_unsupported_syntax_raises_typed_error(self, expr: str) -> None:
         """Unsupported-but-valid OData must surface as 400, not 500."""
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], expr)
+
+    @pytest.mark.parametrize("expr", [
+        "@@@",                  # nothing lexable at all
+        "x eq 'Active",         # unterminated string literal
+        "x eq '1' $$$",         # unlexable tail
+    ])
+    def test_unlexable_input_raises(self, expr: str) -> None:
+        """Skipping junk characters would match every record, not none."""
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], expr)
+
+    @pytest.mark.parametrize("expr", ["x eq '1' and", "x eq '1' or"])
+    def test_dangling_conjunction_raises(self, expr: str) -> None:
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], expr)
+
+    @pytest.mark.parametrize("expr", ["(x eq '1'(", "contains(x,'1'("])
+    def test_open_paren_is_not_a_closer(self, expr: str) -> None:
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], expr)
+
+    def test_empty_parentheses_raise(self) -> None:
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], "()")
+
+    def test_deep_nesting_raises_rather_than_recursing(self) -> None:
+        """A RecursionError is not an ODataFilterError, so it would be a 500."""
+        expr = "(" * 300 + "x eq '1'" + ")" * 300
         with pytest.raises(ODataFilterError):
             apply_odata_filter([{"x": "1"}], expr)
 
