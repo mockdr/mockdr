@@ -18,6 +18,9 @@ type NavItem = NavDivider | NavLink
 
 const route = useRoute()
 
+// Injected from package.json at build time — see vite.config.ts `define`.
+const appVersion = __APP_VERSION__
+
 /** Tracks which collapsible sections are open.  Vendor sections start collapsed. */
 const openSections = ref<Set<string>>(new Set(['core', 'policy', 'security', 'management', 'devtools']))
 
@@ -237,7 +240,7 @@ const sections = computed(() => {
 
     <!-- Footer -->
     <div class="p-3 border-t border-s1-border">
-      <div class="text-[10px] text-s1-muted text-center">mockdr v2.1.0</div>
+      <div class="text-[10px] text-s1-muted text-center">mockdr v{{ appVersion }}</div>
     </div>
   </aside>
 </template>

@@ -19,3 +19,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** mockdr version, injected from package.json by vite/vitest `define`. */
+declare const __APP_VERSION__: string

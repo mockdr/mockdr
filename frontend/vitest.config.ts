@@ -2,8 +2,15 @@ import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
+import pkg from './package.json' with { type: 'json' }
+
 export default defineConfig({
   plugins: [vue()],
+  // Must mirror vite.config.ts — components referencing __APP_VERSION__ fail
+  // to render under test without it.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

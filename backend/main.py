@@ -299,7 +299,7 @@ from api.routers.splunk import (
 from api.sentinel_auth import require_arm_api_version
 from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
-from config import API_PREFIX, CORS_ORIGINS, PERSIST_PATH
+from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.logging import setup_logging
 from utils.vendor_errors import build_vendor_error, vendor_for_path
@@ -335,7 +335,7 @@ register_sentinel_bridge()
 app = FastAPI(
     title="SentinelOne Mock API",
     description="Full-fidelity SentinelOne Management Console API v2.1 mock server",
-    version="2.1.0",
+    version=APP_VERSION,
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
