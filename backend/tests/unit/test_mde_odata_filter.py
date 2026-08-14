@@ -11,6 +11,7 @@ because nothing exercised them:
 """
 import pytest
 
+from utils.graph_odata import apply_graph_filter
 from utils.mde_odata import (
     ODataClause,
     ODataFilterError,
@@ -190,6 +191,65 @@ class TestDateTimeLiterals:
         assert _matches("d ge '2026-01-01T00:00:00Z'", {"d": "2026-08-14T00:00:00Z"}) is True
 
 
+class TestKeywordLiterals:
+    """Unquoted ``true``/``false``/``null`` compare against real values.
+
+    ``str(True)`` is ``"True"``, which never equals the ``"true"`` the caller
+    wrote — so ``eq true`` matched nothing and ``ne true`` matched everything.
+    """
+
+    RECORDS = [  # noqa: RUF012
+        {"enabled": True, "name": "a"},
+        {"enabled": False, "name": "b"},
+        {"enabled": None, "name": "c"},
+    ]
+
+    @pytest.mark.parametrize(("expr", "expected"), [
+        ("enabled eq true", ["a"]),
+        ("enabled eq false", ["b"]),
+        ("enabled ne true", ["b", "c"]),
+        ("enabled ne false", ["a", "c"]),
+        ("enabled eq null", ["c"]),
+        ("enabled ne null", ["a", "b"]),
+    ])
+    def test_boolean_and_null(self, expr: str, expected: list[str]) -> None:
+        got = apply_odata_filter(self.RECORDS, expr)
+        assert [r["name"] for r in got] == expected
+
+    def test_string_valued_field_still_matches(self) -> None:
+        """Seeders round-trip booleans through JSON as strings."""
+        records = [{"enabled": "true", "name": "s"}]
+        assert apply_odata_filter(records, "enabled eq true") == records
+
+    def test_quoted_true_stays_a_string_comparison(self) -> None:
+        assert parse_odata_filter("x eq 'true'") == ODataClause(
+            field="x", operator="eq", value="true", literal="string",
+        )
+
+    def test_unquoted_true_is_marked_as_a_bool(self) -> None:
+        assert parse_odata_filter("x eq true") == ODataClause(
+            field="x", operator="eq", value="true", literal="bool",
+        )
+
+
+class TestGuidLiterals:
+    """Edm.Guid values are unquoted in OData v4."""
+
+    GUID = "6fd2c87f-6de1-4dd2-b0b8-e2a26d4d4f5b"
+
+    def test_unquoted_guid_is_lexed_whole(self) -> None:
+        node = parse_odata_filter(f"skuId eq {self.GUID}")
+        assert node == ODataClause(field="skuId", operator="eq", value=self.GUID)
+
+    def test_unquoted_guid_filters(self) -> None:
+        records = [
+            {"skuId": self.GUID, "n": "g1"},
+            {"skuId": "aaaaaaaa-0000-0000-0000-000000000000", "n": "g2"},
+        ]
+        got = apply_odata_filter(records, f"skuId eq {self.GUID}")
+        assert [r["n"] for r in got] == ["g1"]
+
+
 class TestMalformedFilters:
     """Unparseable input must raise, never silently widen the result set."""
 
@@ -248,6 +308,33 @@ class TestMalformedFilters:
     def test_error_is_a_valueerror(self) -> None:
         """Subclassing keeps any existing ``except ValueError`` callers working."""
         assert issubclass(ODataFilterError, ValueError)
+
+
+class TestGraphLambdaCleanup:
+    """``apply_graph_filter`` must not leave its scratch fields behind."""
+
+    LAMBDA_FILTER = "assignedLicenses/any(l: l/skuId eq 'x')"
+
+    def _record(self) -> dict:
+        return {"assignedLicenses": [{"skuId": "x"}], "id": "u1"}
+
+    def test_synthetic_keys_removed_on_success(self) -> None:
+        records = [self._record()]
+        apply_graph_filter(records, self.LAMBDA_FILTER)
+        assert not [k for k in records[0] if k.startswith("_lambda_")]
+
+    def test_synthetic_keys_removed_when_parsing_fails(self) -> None:
+        """The raise path skipped the cleanup, mutating the caller's records."""
+        records = [self._record()]
+        with pytest.raises(ODataFilterError):
+            apply_graph_filter(records, f"{self.LAMBDA_FILTER} and @@@")
+        assert not [k for k in records[0] if k.startswith("_lambda_")]
+
+    def test_lambda_filter_still_matches(self) -> None:
+        assert len(apply_graph_filter([self._record()], self.LAMBDA_FILTER)) == 1
+        assert apply_graph_filter(
+            [self._record()], "assignedLicenses/any(l: l/skuId eq 'other')",
+        ) == []
 
 
 class TestFiltering:

@@ -51,11 +51,16 @@ class ODataClause:
         operator: One of ``eq``, ``ne``, ``gt``, ``ge``, ``lt``, ``le``,
                   ``contains``, ``startswith``, ``endswith``.
         value:    Comparison value (always stored as string).
+        literal:  How *value* was written — ``"bool"`` and ``"null"`` are
+                  compared against real ``bool``/``None`` fields rather than
+                  their ``str()`` forms, so ``enabled eq true`` matches while
+                  ``enabled eq 'true'`` stays a string comparison.
     """
 
     field: str
     operator: str
     value: str
+    literal: str = "string"
 
 
 @dataclass
@@ -91,6 +96,14 @@ _TOKEN_RE = re.compile(
     r"|(?P<string>'(?:[^']|'')*')"
     r"|(?P<op>eq|ne|ge|gt|le|lt)\b"
     r"|(?P<conj>and|or)\b"
+    # Unquoted keyword literals. Must precede `word`, which would otherwise
+    # swallow them and compare "true" against str(True) == "True" — never
+    # equal, so `eq true` matched nothing and `ne true` matched everything.
+    r"|(?P<bool>true|false)\b"
+    r"|(?P<null>null)\b"
+    # Edm.Guid literals are unquoted in OData v4. Must precede `word` and
+    # `number`, either of which would bite off a prefix and leave rubble.
+    r"|(?P<guid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b"
     # OData v4 writes date/time literals unquoted, and they must be lexed
     # whole — otherwise "2026-08-08T00:00:00Z" degrades into the number 2026
     # followed by rubble, and the comparison silently comes out coarser than
@@ -136,6 +149,12 @@ def _tokenise(text: str) -> list[tuple[str, str]]:
             tokens.append(("OP", m.group("op").lower()))
         elif m.group("conj"):
             tokens.append(("CONJ", m.group("conj").lower()))
+        elif m.group("bool"):
+            tokens.append(("BOOL", m.group("bool").lower()))
+        elif m.group("null"):
+            tokens.append(("NULL", "null"))
+        elif m.group("guid"):
+            tokens.append(("GUID", m.group("guid")))
         elif m.group("datetime"):
             tokens.append(("DATETIME", m.group("datetime")))
         elif m.group("word"):
@@ -293,32 +312,52 @@ class _Parser:
             func_name = self._advance()[1]
             field_name = self._expect("WORD")
             self._expect("COMMA")
-            value = self._expect_value()
+            value, literal = self._expect_value()
             self._expect_exact("PAREN", ")")
-            return ODataClause(field=field_name, operator=func_name, value=value)
+            return ODataClause(
+                field=field_name, operator=func_name, value=value, literal=literal,
+            )
 
         # Standard comparison: field op value
         if tok[0] == "WORD":
             field_name = self._advance()[1]
             op = self._expect("OP")
-            value = self._expect_value()
-            return ODataClause(field=field_name, operator=op, value=value)
+            value, literal = self._expect_value()
+            return ODataClause(
+                field=field_name, operator=op, value=value, literal=literal,
+            )
 
         msg = f"unexpected token: {tok[1]!r}"
         raise ODataFilterError(msg)
 
-    def _expect_value(self) -> str:
+    #: Token kinds usable as an operand, mapped to the literal kind recorded
+    #: on the clause. Only bool/null need non-string comparison.
+    _VALUE_TOKENS = {  # noqa: RUF012
+        "STRING": "string",
+        "WORD": "string",
+        "NUMBER": "string",
+        "DATETIME": "string",
+        "GUID": "string",
+        "BOOL": "bool",
+        "NULL": "null",
+    }
+
+    def _expect_value(self) -> tuple[str, str]:
         """Consume a literal operand, rejecting anything that isn't one.
 
         Accepting whatever came next used to swallow the closing paren, so
         ``contains(name,)`` silently compared against ``")"``.
+
+        Returns:
+            ``(value, literal_kind)``.
         """
         tok = self._peek()
-        if tok is None or tok[0] not in ("STRING", "WORD", "NUMBER", "DATETIME"):
+        if tok is None or tok[0] not in self._VALUE_TOKENS:
             found = tok[1] if tok else "end of expression"
             msg = f"expected a value, got {found!r}"
             raise ODataFilterError(msg)
-        return self._advance()[1]
+        kind = self._VALUE_TOKENS[tok[0]]
+        return self._advance()[1], kind
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +399,36 @@ def _get_nested(record: dict, path: str) -> Any:
     return get_nested(record, path.replace("/", "."))
 
 
+def _match_keyword_literal(field_val: Any, clause: ODataClause) -> bool:
+    """Compare a field against an unquoted ``true``/``false``/``null``.
+
+    Args:
+        field_val: Value from the record.
+        clause:    Clause whose ``literal`` is ``"bool"`` or ``"null"``.
+
+    Returns:
+        ``True`` if the record matches. Only ``eq``/``ne`` are meaningful
+        against these literals; any other operator never matches.
+    """
+    if clause.operator not in ("eq", "ne"):
+        return False
+
+    if clause.literal == "null":
+        equal = field_val is None
+    else:
+        # A string field holding "true" should still satisfy `eq true`, which
+        # is how these records come back from the JSON seeders.
+        expected = clause.value == "true"
+        if isinstance(field_val, bool):
+            equal = field_val is expected
+        elif isinstance(field_val, str) and field_val.lower() in ("true", "false"):
+            equal = (field_val.lower() == "true") is expected
+        else:
+            equal = False
+
+    return equal if clause.operator == "eq" else not equal
+
+
 def _match_clause(record: dict, clause: ODataClause) -> bool:
     """Test whether a single record satisfies one OData clause.
 
@@ -373,6 +442,12 @@ def _match_clause(record: dict, clause: ODataClause) -> bool:
     field_val = _get_nested(record, clause.field)
     field_str = str(field_val) if field_val is not None else ""
     target = clause.value
+
+    # Unquoted keyword literals compare against the real value, not its str()
+    # form — str(True) is "True", which never equals the "true" the caller
+    # wrote, so `eq true` matched nothing and `ne true` matched everything.
+    if clause.literal in ("bool", "null"):
+        return _match_keyword_literal(field_val, clause)
 
     if clause.operator == "eq":
         return field_str == target
