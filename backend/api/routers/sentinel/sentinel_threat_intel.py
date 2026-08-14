@@ -25,13 +25,18 @@ def list_indicators(
     subscription_id: str,
     resource_group: str,
     workspace: str,
+    request: Request,
     top: int = Query(default=None, alias="$top"),
     skip_token: str = Query(default=None, alias="$skipToken"),
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
     """List threat intelligence indicators."""
-    return ti_queries.list_indicators(top=min(top or 50, 1000), skip_token=skip_token or "")
+    return ti_queries.list_indicators(
+        top=min(top or 50, 1000),
+        skip_token=skip_token or "",
+        request_url=str(request.url),
+    )
 
 
 # ── Bulk operations (must be before {name} route) ────────────────────────

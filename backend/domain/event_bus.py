@@ -133,12 +133,17 @@ class EventBus:
     def subscribe(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
         """Register a handler for a specific event type.
 
+        Registration is idempotent: subscribing the same handler twice — which
+        happens if a bridge is wired both at import and at startup — delivers
+        the event once, not twice.
+
         Args:
             event_type: The event type string to subscribe to.
             handler:    Callable that receives the domain event.
         """
         with self._lock:
-            self._subscribers[event_type].append(handler)
+            if handler not in self._subscribers[event_type]:
+                self._subscribers[event_type].append(handler)
 
     def subscribe_all(self, handler: Callable[[DomainEvent], None]) -> None:
         """Register a handler that receives all events.

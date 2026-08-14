@@ -10,20 +10,20 @@ vi.mock('../../api/system', () => ({
           url: 'https://example.com/webhook',
           description: 'Primary webhook',
           secret: 'secret-abc',
-          event_types: ['threat.created', 'alert.created'],
+          eventTypes: ['threat.created', 'alert.created'],
           active: true,
-          created_at: '2025-03-01T12:00:00Z',
-          updated_at: '2025-03-01T12:00:00Z',
+          createdAt: '2025-03-01T12:00:00Z',
+          updatedAt: '2025-03-01T12:00:00Z',
         },
         {
           id: 'hook-2',
           url: 'https://backup.example.com/hook',
           description: '',
           secret: '',
-          event_types: ['agent.offline'],
+          eventTypes: ['agent.offline'],
           active: false,
-          created_at: '2025-04-10T08:00:00Z',
-          updated_at: '2025-04-10T08:00:00Z',
+          createdAt: '2025-04-10T08:00:00Z',
+          updatedAt: '2025-04-10T08:00:00Z',
         },
       ],
     }),
@@ -33,10 +33,10 @@ vi.mock('../../api/system', () => ({
         url: 'https://new.example.com/hook',
         description: 'New webhook',
         secret: '',
-        event_types: ['threat.created'],
+        eventTypes: ['threat.created'],
         active: true,
-        created_at: '2025-05-01T00:00:00Z',
-        updated_at: '2025-05-01T00:00:00Z',
+        createdAt: '2025-05-01T00:00:00Z',
+        updatedAt: '2025-05-01T00:00:00Z',
       },
     }),
     delete: vi.fn().mockResolvedValue({ data: null }),
@@ -65,20 +65,20 @@ describe('WebhooksView', () => {
           url: 'https://example.com/webhook',
           description: 'Primary webhook',
           secret: 'secret-abc',
-          event_types: ['threat.created', 'alert.created'],
+          eventTypes: ['threat.created', 'alert.created'],
           active: true,
-          created_at: '2025-03-01T12:00:00Z',
-          updated_at: '2025-03-01T12:00:00Z',
+          createdAt: '2025-03-01T12:00:00Z',
+          updatedAt: '2025-03-01T12:00:00Z',
         },
         {
           id: 'hook-2',
           url: 'https://backup.example.com/hook',
           description: '',
           secret: '',
-          event_types: ['agent.offline'],
+          eventTypes: ['agent.offline'],
           active: false,
-          created_at: '2025-04-10T08:00:00Z',
-          updated_at: '2025-04-10T08:00:00Z',
+          createdAt: '2025-04-10T08:00:00Z',
+          updatedAt: '2025-04-10T08:00:00Z',
         },
       ],
     })
@@ -88,10 +88,10 @@ describe('WebhooksView', () => {
         url: 'https://new.example.com/hook',
         description: 'New webhook',
         secret: '',
-        event_types: ['threat.created'],
+        eventTypes: ['threat.created'],
         active: true,
-        created_at: '2025-05-01T00:00:00Z',
-        updated_at: '2025-05-01T00:00:00Z',
+        createdAt: '2025-05-01T00:00:00Z',
+        updatedAt: '2025-05-01T00:00:00Z',
       },
     })
     vi.mocked(webhooksApi.delete).mockResolvedValue({ data: null })
@@ -174,10 +174,10 @@ describe('WebhooksView', () => {
           url: 'https://refreshed.example.com/hook',
           description: 'Refreshed',
           secret: '',
-          event_types: ['threat.updated'],
+          eventTypes: ['threat.updated'],
           active: true,
-          created_at: '2025-06-01T00:00:00Z',
-          updated_at: '2025-06-01T00:00:00Z',
+          createdAt: '2025-06-01T00:00:00Z',
+          updatedAt: '2025-06-01T00:00:00Z',
         },
       ],
     })
@@ -285,18 +285,18 @@ describe('WebhooksView', () => {
   it('toggleEventType adds an event type when not present', async () => {
     const w = mount(WebhooksView, { global: { stubs: GLOBAL_STUBS } })
     await flushPromises()
-    expect((w.vm as any).form.event_types).not.toContain('threat.created')
+    expect((w.vm as any).form.eventTypes).not.toContain('threat.created')
     ;(w.vm as any).toggleEventType('threat.created')
-    expect((w.vm as any).form.event_types).toContain('threat.created')
+    expect((w.vm as any).form.eventTypes).toContain('threat.created')
   })
 
   it('toggleEventType removes an event type when already present', async () => {
     const w = mount(WebhooksView, { global: { stubs: GLOBAL_STUBS } })
     await flushPromises()
     ;(w.vm as any).toggleEventType('threat.created')
-    expect((w.vm as any).form.event_types).toContain('threat.created')
+    expect((w.vm as any).form.eventTypes).toContain('threat.created')
     ;(w.vm as any).toggleEventType('threat.created')
-    expect((w.vm as any).form.event_types).not.toContain('threat.created')
+    expect((w.vm as any).form.eventTypes).not.toContain('threat.created')
   })
 
   it('toggleEventType can add multiple event types independently', async () => {
@@ -305,9 +305,9 @@ describe('WebhooksView', () => {
     ;(w.vm as any).toggleEventType('threat.created')
     ;(w.vm as any).toggleEventType('alert.created')
     ;(w.vm as any).toggleEventType('agent.offline')
-    expect((w.vm as any).form.event_types).toContain('threat.created')
-    expect((w.vm as any).form.event_types).toContain('alert.created')
-    expect((w.vm as any).form.event_types).toContain('agent.offline')
+    expect((w.vm as any).form.eventTypes).toContain('threat.created')
+    expect((w.vm as any).form.eventTypes).toContain('alert.created')
+    expect((w.vm as any).form.eventTypes).toContain('agent.offline')
   })
 
   // ── createHook ────────────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ describe('WebhooksView', () => {
     const w = mount(WebhooksView, { global: { stubs: GLOBAL_STUBS } })
     await flushPromises()
     ;(w.vm as any).form.url = 'https://example.com/hook'
-    ;(w.vm as any).form.event_types = []
+    ;(w.vm as any).form.eventTypes = []
     await (w.vm as any).createHook()
     expect((w.vm as any).createError).toBe('Select at least one event type')
   })
@@ -335,14 +335,14 @@ describe('WebhooksView', () => {
     ;(w.vm as any).form.url = 'https://new.example.com/hook'
     ;(w.vm as any).form.description = 'New webhook'
     ;(w.vm as any).form.secret = ''
-    ;(w.vm as any).form.event_types = ['threat.created']
+    ;(w.vm as any).form.eventTypes = ['threat.created']
     await (w.vm as any).createHook()
     await flushPromises()
     expect(webhooksApi.create).toHaveBeenCalledWith({
       url: 'https://new.example.com/hook',
       description: 'New webhook',
       secret: '',
-      event_types: ['threat.created'],
+      eventTypes: ['threat.created'],
     })
   })
 
@@ -350,7 +350,7 @@ describe('WebhooksView', () => {
     const w = mount(WebhooksView, { global: { stubs: GLOBAL_STUBS } })
     await flushPromises()
     ;(w.vm as any).form.url = 'https://new.example.com/hook'
-    ;(w.vm as any).form.event_types = ['threat.created']
+    ;(w.vm as any).form.eventTypes = ['threat.created']
     await (w.vm as any).createHook()
     await flushPromises()
     expect(w.text()).toContain('https://new.example.com/hook')
@@ -361,12 +361,12 @@ describe('WebhooksView', () => {
     await flushPromises()
     ;(w.vm as any).showCreate = true
     ;(w.vm as any).form.url = 'https://new.example.com/hook'
-    ;(w.vm as any).form.event_types = ['threat.created']
+    ;(w.vm as any).form.eventTypes = ['threat.created']
     await (w.vm as any).createHook()
     await flushPromises()
     expect((w.vm as any).showCreate).toBe(false)
     expect((w.vm as any).form.url).toBe('')
-    expect((w.vm as any).form.event_types).toHaveLength(0)
+    expect((w.vm as any).form.eventTypes).toHaveLength(0)
   })
 
   it('createHook sets createError on API failure (Error instance)', async () => {
@@ -374,7 +374,7 @@ describe('WebhooksView', () => {
     await flushPromises()
     vi.mocked(webhooksApi.create).mockRejectedValueOnce(new Error('Server error'))
     ;(w.vm as any).form.url = 'https://new.example.com/hook'
-    ;(w.vm as any).form.event_types = ['threat.created']
+    ;(w.vm as any).form.eventTypes = ['threat.created']
     await (w.vm as any).createHook()
     await flushPromises()
     expect((w.vm as any).createError).toBe('Server error')
@@ -385,7 +385,7 @@ describe('WebhooksView', () => {
     await flushPromises()
     vi.mocked(webhooksApi.create).mockRejectedValueOnce('unknown')
     ;(w.vm as any).form.url = 'https://new.example.com/hook'
-    ;(w.vm as any).form.event_types = ['threat.created']
+    ;(w.vm as any).form.eventTypes = ['threat.created']
     await (w.vm as any).createHook()
     await flushPromises()
     expect((w.vm as any).createError).toBe('Failed to create webhook')
@@ -413,10 +413,10 @@ describe('WebhooksView', () => {
           url: 'https://only.example.com/hook',
           description: '',
           secret: '',
-          event_types: ['threat.created'],
+          eventTypes: ['threat.created'],
           active: true,
-          created_at: '2025-01-01T00:00:00Z',
-          updated_at: '2025-01-01T00:00:00Z',
+          createdAt: '2025-01-01T00:00:00Z',
+          updatedAt: '2025-01-01T00:00:00Z',
         },
       ],
     })
@@ -460,7 +460,7 @@ describe('WebhooksView', () => {
     await flushPromises()
     ;(w.vm as any).showCreate = true
     ;(w.vm as any).form.url = 'https://dom-test.example.com/hook'
-    ;(w.vm as any).form.event_types = ['threat.created']
+    ;(w.vm as any).form.eventTypes = ['threat.created']
     await w.vm.$nextTick()
     const createBtn = w.findAll('button').find(b => b.text() === 'Create')
     await createBtn!.trigger('click')
@@ -476,7 +476,7 @@ describe('WebhooksView', () => {
     const eventTypeBtn = w.findAll('button').find(b => b.text().includes('threat.created') && b.classes().some(c => c.includes('rounded-full')))
     if (eventTypeBtn) {
       await eventTypeBtn.trigger('click')
-      expect((w.vm as any).form.event_types).toContain('threat.created')
+      expect((w.vm as any).form.eventTypes).toContain('threat.created')
     }
   })
 })

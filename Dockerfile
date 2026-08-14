@@ -4,6 +4,10 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
+# Vite inlines import.meta.env.VITE_* at build time. Without a .env the UI
+# would ship with undefined credentials and 401 against every vendor, so fall
+# back to the mock defaults when the build context carries no .env.
+RUN [ -f .env ] || cp .env.example .env
 RUN npm run build
 
 # ── Stage 2: Python runtime ───────────────────────────────────────────────────

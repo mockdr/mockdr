@@ -39,7 +39,7 @@ async def get_alert_v2(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "notFound",
                 f"Resource '{alert_id}' does not exist or cannot be found.",
             ),
         )
@@ -58,7 +58,7 @@ async def update_alert_v2(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "notFound",
                 f"Resource '{alert_id}' does not exist or cannot be found.",
             ),
         )
@@ -96,7 +96,7 @@ async def get_incident(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "notFound",
                 f"Resource '{incident_id}' does not exist or cannot be found.",
             ),
         )
@@ -161,7 +161,7 @@ async def delete_ti_indicator(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "notFound",
                 f"Resource '{indicator_id}' does not exist or cannot be found.",
             ),
         )

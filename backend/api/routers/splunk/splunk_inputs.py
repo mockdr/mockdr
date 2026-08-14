@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from api.splunk_auth import require_splunk_auth
+from api.splunk_auth import require_splunk_admin, require_splunk_auth
 from domain.splunk.hec_token import HecToken
 from repository.splunk.hec_token_repo import hec_token_repo
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope
@@ -42,7 +42,7 @@ async def create_hec_token(
     owner: str,
     request: Request,
     output_mode: str = "json",
-    current_user: dict = Depends(require_splunk_auth),
+    current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
     """Create a new HEC token."""
     content_type = request.headers.get("content-type", "")
@@ -76,7 +76,7 @@ async def create_hec_token(
 def delete_hec_token(
     owner: str,
     name: str,
-    current_user: dict = Depends(require_splunk_auth),
+    current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
     """Delete an HEC token by name."""
     token = hec_token_repo.get_by_name(name)

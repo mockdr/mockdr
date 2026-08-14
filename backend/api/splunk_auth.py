@@ -135,10 +135,18 @@ async def require_splunk_auth(
     ]})
 
 
+_ADMIN_ROLES: frozenset[str] = frozenset({"admin", "sc_admin"})
+"""Roles allowed to manage indexes, HEC tokens and KV Store collections.
+
+``sc_admin`` is Splunk Cloud's administrator role and carries the same
+management capabilities there as ``admin`` does on-premises.
+"""
+
+
 async def require_splunk_admin(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
-    """Require the ``admin`` role for management operations.
+    """Require an administrator role for management operations.
 
     This dependency should be composed with ``require_splunk_auth`` via
     ``Depends``.
@@ -150,9 +158,9 @@ async def require_splunk_admin(
         The authenticated user dict.
 
     Raises:
-        HTTPException: 403 if user lacks admin role.
+        HTTPException: 403 if the user holds no administrator role.
     """
-    if "admin" not in current_user.get("roles", []):
+    if not _ADMIN_ROLES.intersection(current_user.get("roles", [])):
         raise HTTPException(status_code=403, detail={"messages": [
             {"type": "ERROR", "text": "Insufficient privileges"},
         ]})

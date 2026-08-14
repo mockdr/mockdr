@@ -77,8 +77,13 @@ PYTHONPATH=. .venv/bin/uvicorn main:app --port 8001 --reload
 
 # Frontend (separate terminal)
 cd frontend
+cp .env.example .env   # VITE_* mock credentials, inlined at build time
 npm install && npm run dev
 ```
+
+`./start.sh` and the Docker build create `frontend/.env` from `.env.example`
+automatically; only the manual path above needs the copy. Without it every
+vendor client in the UI authenticates as `undefined`.
 
 ## Authentication
 

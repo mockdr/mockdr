@@ -43,7 +43,11 @@ class TestGraphAuth:
             },
         )
         assert resp.status_code == 401
-        assert resp.json()["error"]["code"] == "invalid_client"
+        body = resp.json()
+        # The token endpoint speaks OAuth 2.0, not OData — MSAL reads these keys.
+        assert body["error"] == "invalid_client"
+        assert "AADSTS7000215" in body["error_description"]
+        assert body["error_codes"] == [7000215]
 
     def test_invalid_client_id_returns_401(self, client: TestClient) -> None:
         """Unknown client_id should return 401."""
@@ -152,9 +156,9 @@ class TestGraphTenantScopedTokenUrl:
             data=_ADMIN_CREDENTIALS,
         )
         assert resp.status_code == 400
-        error = resp.json()["error"]
-        assert error["code"] == "invalid_request"
-        assert "AADSTS90002" in error["message"]
+        body = resp.json()
+        assert body["error"] == "invalid_request"
+        assert "AADSTS90002" in body["error_description"]
 
     @pytest.mark.parametrize("alias", ["common", "organizations", "consumers"])
     def test_multi_tenant_aliases_are_rejected(
@@ -166,9 +170,9 @@ class TestGraphTenantScopedTokenUrl:
         )
         assert resp.status_code == 400
         # These authorities resolve at Entra — "not found" would be misleading.
-        message = resp.json()["error"]["message"]
-        assert "AADSTS90002" not in message
-        assert "not supported" in message
+        description = resp.json()["error_description"]
+        assert "AADSTS90002" not in description
+        assert "not supported" in description
 
     def test_unknown_tenant_accepted_when_strict_disabled(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
@@ -218,3 +222,17 @@ class TestGraphOrganization:
         resp = client.get("/graph/v1.0/organization", headers=graph_p1_headers)
         assert resp.status_code == 200
         assert len(resp.json()["value"]) == 1
+
+
+class TestGraphAppOnlyLimits:
+    """App-only tokens have no signed-in user."""
+
+    def test_me_is_rejected_under_app_only_auth(
+        self, client: TestClient, graph_admin_headers: dict,
+    ) -> None:
+        """Real Graph refuses /me on the client-credentials flow."""
+        resp = client.get("/graph/v1.0/me", headers=graph_admin_headers)
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["code"] == "Request_BadRequest"
+        assert "delegated" in error["message"]

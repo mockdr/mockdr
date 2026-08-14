@@ -23,7 +23,7 @@ async def get_user_drive(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "itemNotFound",
                 f"Drive not found for user '{user_id}'",
             ),
         )
@@ -44,7 +44,7 @@ async def list_drive_root_children(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "itemNotFound",
                 f"Drive not found for user '{user_id}'",
             ),
         )

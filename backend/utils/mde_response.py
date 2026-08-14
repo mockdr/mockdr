@@ -15,6 +15,7 @@ def build_mde_list_response(
     value: list[dict],
     context: str = "https://api.securitycenter.microsoft.com/api/$metadata",
     next_link: str | None = None,
+    count: int | None = None,
 ) -> dict:
     """Build an OData v4 list response envelope.
 
@@ -22,11 +23,15 @@ def build_mde_list_response(
         value:     Page of resource objects.
         context:   OData context URL (cosmetic).
         next_link: Optional ``@odata.nextLink`` for pagination.
+        count:     Total record count, emitted as ``@odata.count`` when
+                   ``$count=true`` was requested.
 
     Returns:
         OData list response dict.
     """
     resp: dict = {"@odata.context": context, "value": value}
+    if count is not None:
+        resp["@odata.count"] = count
     if next_link:
         resp["@odata.nextLink"] = next_link
     return resp

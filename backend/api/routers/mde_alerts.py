@@ -22,10 +22,11 @@ def list_alerts(
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
+    count: bool = Query(False, alias="$count"),
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all alerts with optional OData query parameters."""
-    return alert_queries.list_alerts(filter_str, top, skip, orderby, select)
+    return alert_queries.list_alerts(filter_str, top, skip, orderby, select, count)
 
 
 @router.get("/api/alerts/{alert_id}")

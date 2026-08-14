@@ -15,6 +15,13 @@ if [ ! -d "$ROOT/frontend/node_modules" ]; then
   (cd "$ROOT/frontend" && npm install --silent)
 fi
 
+# The UI reads its mock credentials from VITE_* variables. Without a .env every
+# vendor client would authenticate as "undefined".
+if [ ! -f "$ROOT/frontend/.env" ]; then
+  echo "→ Creating frontend/.env from .env.example..."
+  cp "$ROOT/frontend/.env.example" "$ROOT/frontend/.env"
+fi
+
 # Cleanup on exit
 cleanup() {
   echo ""

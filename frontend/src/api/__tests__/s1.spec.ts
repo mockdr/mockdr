@@ -310,7 +310,7 @@ describe('webhooksApi', () => {
   })
 
   it('create returns promise', () => {
-    expect(isPromise(webhooksApi.create({ url: 'https://example.com', event_types: ['alert'] }))).toBe(true)
+    expect(isPromise(webhooksApi.create({ url: 'https://example.com', eventTypes: ['alert'] }))).toBe(true)
     expect(mockPost).toHaveBeenCalledWith('/webhooks', expect.any(Object))
   })
 

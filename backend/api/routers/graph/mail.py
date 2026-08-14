@@ -36,7 +36,7 @@ async def get_message(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "ErrorItemNotFound",
                 f"Message '{message_id}' not found",
             ),
         )

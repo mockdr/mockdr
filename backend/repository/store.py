@@ -205,6 +205,16 @@ class InMemoryStore:
         with self._lock:
             return list(self._collections[collection].values())
 
+    def get_all_with_keys(self, collection: str) -> dict[str, Any]:
+        """Return the named collection as a ``{key: record}`` mapping.
+
+        Needed for collections whose records carry no identifier of their own —
+        membership lists and lookup tables — where the key would otherwise be
+        lost. The same live-reference caveat as :meth:`get_all` applies.
+        """
+        with self._lock:
+            return dict(self._collections[collection])
+
     def save(self, collection: str, id: str, record: Any) -> None:
         """Persist a record under the given ID in the named collection."""
         with self._lock:
@@ -237,10 +247,23 @@ class InMemoryStore:
     # ── Activity append (newest-first) ───────────────────────────────────────
 
     def append_activity(self, id: str, record: Any) -> None:
-        """Append an activity record, maintaining newest-first ordering."""
+        """Append an activity record, maintaining newest-first ordering.
+
+        The order deque is bounded, so appending past its limit drops the
+        oldest ID. That record is deleted along with it — leaving it behind
+        would make ``count()`` and ``list_activities()`` disagree for the rest
+        of the process's life.
+        """
         with self._lock:
             self._collections["activities"][id] = record
+            evicted = (
+                self._activity_order[-1]
+                if len(self._activity_order) == self._activity_order.maxlen
+                else None
+            )
             self._activity_order.appendleft(id)
+            if evicted is not None and evicted != id:
+                self._collections["activities"].pop(evicted, None)
             self._notify()
 
     def list_activities(self) -> list[Any]:

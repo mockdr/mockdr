@@ -37,8 +37,17 @@ def create_ioc(body: dict = Body(...), _: dict = Depends(require_admin)) -> dict
 
 @router.post("/threat-intelligence/iocs/bulk")
 def bulk_create_iocs(body: IocCreateBody, _: dict = Depends(require_admin)) -> dict:
-    """Bulk-create IOC indicators from a list."""
-    items = body.data if isinstance(body.data, list) else []
+    """Bulk-create IOC indicators from a list.
+
+    A single indicator sent as an object is treated as a one-element batch
+    rather than silently dropped.
+    """
+    if isinstance(body.data, list):
+        items = body.data
+    elif isinstance(body.data, dict) and body.data:
+        items = [body.data]
+    else:
+        items = []
     return ioc_commands.bulk_create_iocs(items)
 
 

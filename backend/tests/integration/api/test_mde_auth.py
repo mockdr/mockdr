@@ -192,3 +192,31 @@ class TestMdeRbac:
             json={"Comment": "test isolation", "IsolationType": "Full"},
         )
         assert resp.status_code == 403
+
+
+class TestMdeODataCount:
+    """MDE supports $count=true on its list endpoints."""
+
+    def _headers(self, client: TestClient) -> dict[str, str]:
+        resp = client.post("/mde/oauth2/v2.0/token", data=_ADMIN_CREDENTIALS)
+        return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+    def test_count_returns_odata_count(self, client: TestClient) -> None:
+        resp = client.get("/mde/api/machines?$count=true", headers=self._headers(client))
+        assert resp.status_code == 200
+        assert resp.json()["@odata.count"] > 0
+
+    def test_count_is_the_total_not_the_page(self, client: TestClient) -> None:
+        """$count reports matches, not how many fit on this page."""
+        headers = self._headers(client)
+        body = client.get("/mde/api/machines?$count=true&$top=2", headers=headers).json()
+        assert len(body["value"]) == 2
+        assert body["@odata.count"] > 2
+
+    def test_count_omitted_when_not_requested(self, client: TestClient) -> None:
+        body = client.get("/mde/api/machines", headers=self._headers(client)).json()
+        assert "@odata.count" not in body
+
+    def test_alerts_support_count(self, client: TestClient) -> None:
+        resp = client.get("/mde/api/alerts?$count=true", headers=self._headers(client))
+        assert resp.json()["@odata.count"] > 0

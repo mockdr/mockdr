@@ -1,13 +1,10 @@
 """Microsoft Graph Users endpoints."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from api.graph_auth import require_graph_auth
 from application.graph.users import queries as user_queries
-from repository.graph.user_repo import graph_user_repo
 from utils.graph_response import build_graph_error_response
 
 router = APIRouter(tags=["Graph Users"])
@@ -18,13 +15,20 @@ async def get_me(
     select: str = Query(None, alias="$select"),
     current_client: dict = Depends(require_graph_auth),
 ) -> dict:
-    """Return the current user (first user in the store as mock)."""
-    users = graph_user_repo.list_all()
-    if not users:
-        raise HTTPException(404, detail=build_graph_error_response(
-            "Request_ResourceNotFound", "No users found",
-        ))
-    return asdict(users[0])
+    """Reject ``/me`` the way Graph does under app-only authentication.
+
+    ``/me`` resolves the signed-in user, and the client-credentials flow this
+    mock implements has none. Real Graph answers 400; returning some user
+    instead would let an integration ship a call that cannot work in
+    production.
+
+    Raises:
+        HTTPException: 400 always — there is no delegated user to resolve.
+    """
+    raise HTTPException(400, detail=build_graph_error_response(
+        "Request_BadRequest",
+        "/me request is only valid with delegated authentication flow.",
+    ))
 
 
 @router.get("/v1.0/users")

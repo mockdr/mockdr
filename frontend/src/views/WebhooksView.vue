@@ -20,7 +20,7 @@ const form = ref({
   url: '',
   description: '',
   secret: '',
-  event_types: [] as string[],
+  eventTypes: [] as string[],
 })
 const creating = ref(false)
 const createError = ref('')
@@ -38,13 +38,13 @@ async function fetchHooks(): Promise<void> {
 async function createHook(): Promise<void> {
   createError.value = ''
   if (!form.value.url) { createError.value = 'URL is required'; return }
-  if (!form.value.event_types.length) { createError.value = 'Select at least one event type'; return }
+  if (!form.value.eventTypes.length) { createError.value = 'Select at least one event type'; return }
   creating.value = true
   try {
     const res = await webhooksApi.create(form.value)
     hooks.value.push(res.data)
     showCreate.value = false
-    form.value = { url: '', description: '', secret: '', event_types: [] }
+    form.value = { url: '', description: '', secret: '', eventTypes: [] }
   } catch (e: unknown) {
     createError.value = e instanceof Error ? e.message : 'Failed to create webhook'
   } finally {
@@ -72,9 +72,9 @@ async function fireEvent(eventType: string): Promise<void> {
 }
 
 function toggleEventType(et: string): void {
-  const idx = form.value.event_types.indexOf(et)
-  if (idx === -1) form.value.event_types.push(et)
-  else form.value.event_types.splice(idx, 1)
+  const idx = form.value.eventTypes.indexOf(et)
+  if (idx === -1) form.value.eventTypes.push(et)
+  else form.value.eventTypes.splice(idx, 1)
 }
 
 onMounted(() => fetchHooks())
@@ -131,11 +131,11 @@ onMounted(() => fetchHooks())
             <div v-if="hook.description" class="text-xs text-s1-muted mb-1">{{ hook.description }}</div>
             <div class="flex flex-wrap gap-1 mt-1">
               <span
-                v-for="et in hook.event_types" :key="et"
+                v-for="et in hook.eventTypes" :key="et"
                 class="px-1.5 py-0.5 bg-s1-primary/10 text-s1-primary text-[10px] rounded font-mono"
               >{{ et }}</span>
             </div>
-            <div class="text-[11px] text-s1-muted mt-1">Created {{ hook.created_at.slice(0, 10) }}</div>
+            <div class="text-[11px] text-s1-muted mt-1">Created {{ hook.createdAt.slice(0, 10) }}</div>
           </div>
           <button @click="deleteHook(hook.id)" class="flex-shrink-0 text-s1-muted hover:text-s1-danger transition-colors">
             <Trash2 class="w-4 h-4" />
@@ -179,7 +179,7 @@ onMounted(() => fetchHooks())
                     v-for="et in ALL_EVENTS" :key="et"
                     @click="toggleEventType(et)"
                     class="px-2.5 py-1 rounded text-xs font-mono transition-colors"
-                    :class="form.event_types.includes(et)
+                    :class="form.eventTypes.includes(et)
                       ? 'bg-s1-primary text-white'
                       : 'bg-s1-bg border border-s1-border text-s1-subtle hover:border-s1-primary/50'"
                   >{{ et }}</button>

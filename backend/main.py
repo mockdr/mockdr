@@ -297,6 +297,8 @@ from api.routers.splunk import (
     splunk_server as splunk_server_router,
 )
 from api.sentinel_auth import require_arm_api_version
+from application.sentinel.commands.edr_bridge import register_sentinel_bridge
+from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.logging import setup_logging
@@ -323,6 +325,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if pm is not None:
         pm.flush()
 
+
+# EDR→SIEM bridging (ADR-009). Registered at import rather than in the lifespan
+# so the bridge is live for any consumer holding the app object, test clients
+# included; subscribe() is idempotent, so a later startup call is harmless.
+register_splunk_bridge()
+register_sentinel_bridge()
 
 app = FastAPI(
     title="SentinelOne Mock API",

@@ -87,3 +87,51 @@ class TestApiVersionRequired:
             "grant_type": "client_credentials",
         })
         assert resp.status_code == 200
+
+
+class TestSkipTokenPagination:
+    """ARM pagination: bad tokens are rejected, nextLink is followable."""
+
+    def test_garbage_skip_token_returns_400(self, raw_client: TestClient) -> None:
+        """A token this service never issued must not crash the request."""
+        resp = raw_client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents?api-version=2024-03-01&$skipToken=abc",
+            headers=_auth(raw_client),
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"]["code"] == "InvalidSkipToken"
+
+    def test_negative_skip_token_returns_400(self, raw_client: TestClient) -> None:
+        resp = raw_client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents?api-version=2024-03-01&$skipToken=-5",
+            headers=_auth(raw_client),
+        )
+        assert resp.status_code == 400
+
+    def test_next_link_is_absolute_and_followable(self, raw_client: TestClient) -> None:
+        """ARM returns a URL the client can call verbatim."""
+        headers = _auth(raw_client)
+        first = raw_client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents?api-version=2024-03-01&$top=2",
+            headers=headers,
+        )
+        next_link = first.json().get("nextLink")
+        assert next_link, "expected a nextLink for a paged result"
+        assert next_link.startswith("http")
+        assert "api-version=2024-03-01" in next_link
+
+        second = raw_client.get(next_link, headers=headers)
+        assert second.status_code == 200
+        first_ids = {i["name"] for i in first.json()["value"]}
+        second_ids = {i["name"] for i in second.json()["value"]}
+        assert not (first_ids & second_ids), "pages must not overlap"
+
+    def test_next_link_preserves_filters(self, raw_client: TestClient) -> None:
+        """Following the link must not silently drop the query."""
+        resp = raw_client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents"
+            f"?api-version=2024-03-01&$top=1&$orderby=properties/createdTimeUtc",
+            headers=_auth(raw_client),
+        )
+        next_link = resp.json().get("nextLink", "")
+        assert "%24orderby" in next_link or "$orderby" in next_link

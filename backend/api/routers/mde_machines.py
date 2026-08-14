@@ -44,10 +44,11 @@ def list_machines(
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
+    count: bool = Query(False, alias="$count"),
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all machines with optional OData query parameters."""
-    return machine_queries.list_machines(filter_str, top, skip, orderby, select)
+    return machine_queries.list_machines(filter_str, top, skip, orderby, select, count)
 
 
 @router.get("/api/machines/{machine_id}")

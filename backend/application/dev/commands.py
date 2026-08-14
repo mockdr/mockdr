@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import random
+import time
 from dataclasses import asdict
 from typing import Any
 
@@ -29,8 +30,52 @@ from domain.es_endpoint import EsEndpoint
 from domain.es_exception_item import EsExceptionItem
 from domain.es_exception_list import EsExceptionList
 from domain.es_rule import EsRule
+from domain.event_bus import AgentUpdated, ThreatCreated, event_bus
 from domain.exclusion import Exclusion
 from domain.firewall_rule import FirewallRule
+from domain.graph.administrative_unit import GraphAdministrativeUnit
+from domain.graph.app_protection_policy import GraphAppProtectionPolicy
+from domain.graph.application import GraphApplication
+from domain.graph.attack_simulation import GraphAttackSimulation
+from domain.graph.audit_log import GraphAuditLog
+from domain.graph.autopilot_device import GraphAutopilotDevice
+from domain.graph.autopilot_profile import GraphAutopilotProfile
+from domain.graph.channel import GraphChannel
+from domain.graph.channel_message import GraphChannelMessage
+from domain.graph.compliance_policy import GraphCompliancePolicy
+from domain.graph.conditional_access_policy import GraphConditionalAccessPolicy
+from domain.graph.detected_app import GraphDetectedApp
+from domain.graph.device_category import GraphDeviceCategory
+from domain.graph.device_configuration import GraphDeviceConfiguration
+from domain.graph.directory_role import GraphDirectoryRole
+from domain.graph.drive import GraphDrive
+from domain.graph.drive_item import GraphDriveItem
+from domain.graph.enrollment_restriction import GraphEnrollmentRestriction
+from domain.graph.group import GraphGroup
+from domain.graph.mail_folder import GraphMailFolder
+from domain.graph.mail_message import GraphMailMessage
+from domain.graph.mail_rule import GraphMailRule
+from domain.graph.managed_device import GraphManagedDevice
+from domain.graph.mobile_app import GraphMobileApp
+from domain.graph.named_location import GraphNamedLocation
+from domain.graph.oauth_client import GraphOAuthClient
+from domain.graph.organization import GraphOrganization
+from domain.graph.risk_detection import GraphRiskDetection
+from domain.graph.risky_user import GraphRiskyUser
+from domain.graph.secure_score import GraphSecureScore
+from domain.graph.security_alert import GraphSecurityAlert
+from domain.graph.security_incident import GraphSecurityIncident
+from domain.graph.service_health import GraphServiceHealth
+from domain.graph.service_principal import GraphServicePrincipal
+from domain.graph.sharepoint_site import GraphSharePointSite
+from domain.graph.sign_in_log import GraphSignInLog
+from domain.graph.subscribed_sku import GraphSubscribedSku
+from domain.graph.team import GraphTeam
+from domain.graph.threat_assessment import GraphThreatAssessment
+from domain.graph.ti_indicator import GraphTiIndicator
+from domain.graph.update_ring import GraphUpdateRing
+from domain.graph.user import GraphUser
+from domain.graph.user_registration_detail import GraphUserRegistrationDetail
 from domain.group import Group
 from domain.ioc import IOC
 from domain.mde_alert import MdeAlert
@@ -42,7 +87,23 @@ from domain.mde_oauth_client import MdeOAuthClient
 from domain.mde_software import MdeSoftware
 from domain.mde_vulnerability import MdeVulnerability
 from domain.policy import Policy
+from domain.sentinel.alert import SentinelAlert
+from domain.sentinel.alert_rule import SentinelAlertRule
+from domain.sentinel.bookmark import SentinelBookmark
+from domain.sentinel.data_connector import SentinelDataConnector
+from domain.sentinel.entity import SentinelEntity
+from domain.sentinel.incident import SentinelIncident
+from domain.sentinel.incident_comment import SentinelIncidentComment
+from domain.sentinel.threat_indicator import SentinelThreatIndicator
+from domain.sentinel.watchlist import SentinelWatchlist
 from domain.site import Site
+from domain.splunk.hec_token import HecToken
+from domain.splunk.kv_collection import KVCollection
+from domain.splunk.notable_event import NotableEvent
+from domain.splunk.saved_search import SavedSearch
+from domain.splunk.splunk_event import SplunkEvent
+from domain.splunk.splunk_index import SplunkIndex
+from domain.splunk.splunk_user import SplunkUser
 from domain.tag import Tag
 from domain.threat import Threat
 from domain.user import User
@@ -53,6 +114,7 @@ from domain.xdr_api_key import XdrApiKey
 from domain.xdr_audit_log import XdrAuditLog
 from domain.xdr_distribution import XdrDistribution
 from domain.xdr_endpoint import XdrEndpoint
+from domain.xdr_hash_exception import XdrHashException
 from domain.xdr_incident import XdrIncident
 from domain.xdr_ioc import XdrIoc
 from domain.xdr_script import XdrScript
@@ -121,6 +183,80 @@ _TYPED_COLLECTIONS: dict[str, type] = {
     "xdr_distributions": XdrDistribution,
     "xdr_api_keys": XdrApiKey,
     "xdr_xql_queries": XdrXqlQuery,
+    # Microsoft Graph
+    "graph_administrative_units": GraphAdministrativeUnit,
+    "graph_app_protection_policies": GraphAppProtectionPolicy,
+    "graph_applications": GraphApplication,
+    "graph_attack_simulations": GraphAttackSimulation,
+    "graph_audit_logs": GraphAuditLog,
+    "graph_autopilot_devices": GraphAutopilotDevice,
+    "graph_autopilot_profiles": GraphAutopilotProfile,
+    "graph_channel_messages": GraphChannelMessage,
+    "graph_channels": GraphChannel,
+    "graph_compliance_policies": GraphCompliancePolicy,
+    "graph_conditional_access_policies": GraphConditionalAccessPolicy,
+    "graph_detected_apps": GraphDetectedApp,
+    "graph_device_categories": GraphDeviceCategory,
+    "graph_device_configurations": GraphDeviceConfiguration,
+    "graph_directory_roles": GraphDirectoryRole,
+    "graph_drive_items": GraphDriveItem,
+    "graph_drives": GraphDrive,
+    "graph_enrollment_restrictions": GraphEnrollmentRestriction,
+    "graph_groups": GraphGroup,
+    "graph_mail_folders": GraphMailFolder,
+    "graph_mail_messages": GraphMailMessage,
+    "graph_mail_rules": GraphMailRule,
+    "graph_managed_devices": GraphManagedDevice,
+    "graph_mobile_apps": GraphMobileApp,
+    "graph_named_locations": GraphNamedLocation,
+    "graph_oauth_clients": GraphOAuthClient,
+    "graph_organization": GraphOrganization,
+    "graph_risk_detections": GraphRiskDetection,
+    "graph_risky_users": GraphRiskyUser,
+    "graph_secure_scores": GraphSecureScore,
+    "graph_security_alerts": GraphSecurityAlert,
+    "graph_security_incidents": GraphSecurityIncident,
+    "graph_service_health": GraphServiceHealth,
+    "graph_service_principals": GraphServicePrincipal,
+    "graph_sharepoint_sites": GraphSharePointSite,
+    "graph_sign_in_logs": GraphSignInLog,
+    "graph_subscribed_skus": GraphSubscribedSku,
+    "graph_teams": GraphTeam,
+    "graph_threat_assessments": GraphThreatAssessment,
+    "graph_ti_indicators": GraphTiIndicator,
+    "graph_update_rings": GraphUpdateRing,
+    "graph_user_registration_details": GraphUserRegistrationDetail,
+    "graph_users": GraphUser,
+    # Microsoft Sentinel
+    "sentinel_alert_rules": SentinelAlertRule,
+    "sentinel_alerts": SentinelAlert,
+    "sentinel_bookmarks": SentinelBookmark,
+    "sentinel_data_connectors": SentinelDataConnector,
+    "sentinel_entities": SentinelEntity,
+    "sentinel_incident_comments": SentinelIncidentComment,
+    "sentinel_incidents": SentinelIncident,
+    "sentinel_threat_indicators": SentinelThreatIndicator,
+    "sentinel_watchlists": SentinelWatchlist,
+    # Splunk
+    "splunk_events": SplunkEvent,
+    "splunk_hec_tokens": HecToken,
+    "splunk_indexes": SplunkIndex,
+    "splunk_kv_collections": KVCollection,
+    "splunk_notables": NotableEvent,
+    "splunk_saved_searches": SavedSearch,
+    "splunk_users": SplunkUser,
+    "xdr_hash_exceptions": XdrHashException,
+}
+
+# Collections whose values carry no identifier of their own — membership lists
+# and lookup tables keyed by something other than a record field. These are
+# snapshotted as ``{key: value}`` maps and restored verbatim.
+_MAPPING_COLLECTIONS = {
+    "edr_id_map",
+    "graph_detected_app_devices",
+    "graph_directory_role_members",
+    "graph_group_members",
+    "sentinel_oauth_clients",
 }
 
 # Collections whose values are already raw dicts (no domain class to reconstruct)
@@ -165,6 +301,8 @@ def export_state() -> dict:
         snapshot[collection] = [asdict(r) for r in records]
     for collection in _RAW_COLLECTIONS:
         snapshot[collection] = list(store.get_all(collection))
+    for collection in _MAPPING_COLLECTIONS:
+        snapshot[collection] = dict(store.get_all_with_keys(collection))
     snapshot["_activity_order"] = store.get_activity_order()
 
     # Persist proxy config (vendor connections survive restarts).
@@ -232,6 +370,14 @@ def import_state(snapshot: dict) -> dict:
             store.save(collection, record_id, record)
             total += 1
 
+    for collection in _MAPPING_COLLECTIONS:
+        records = snapshot.get(collection, {})
+        if not isinstance(records, dict):
+            continue
+        for key, value in records.items():
+            store.save(collection, key, value)
+            total += 1
+
     # Restore activity ordering so GET /activities returns newest-first correctly
     activity_order = snapshot.get("_activity_order", [])
     if activity_order:
@@ -263,6 +409,22 @@ def import_state(snapshot: dict) -> dict:
     return {"data": {"imported": total, "skipped": skipped}}
 
 
+def _save_agent(agent: Agent) -> None:
+    """Persist an agent and bridge the change to the SIEMs (ADR-009)."""
+    agent_repo.save(agent)
+    event_bus.publish(AgentUpdated(
+        entity_id=agent.id, payload=asdict(agent), timestamp=time.time(),
+    ))
+
+
+def _save_threat(threat: Threat) -> None:
+    """Persist a threat and bridge it to the SIEMs (ADR-009)."""
+    threat_repo.save(threat)
+    event_bus.publish(ThreatCreated(
+        entity_id=threat.id, payload=asdict(threat), timestamp=time.time(),
+    ))
+
+
 def trigger_scenario(scenario: str) -> dict:
     """Apply a named bulk mutation to the in-memory store.
 
@@ -281,7 +443,7 @@ def trigger_scenario(scenario: str) -> dict:
             agent.isInfected = True
             agent.infected = True
             agent.activeThreats = random.randint(1, 5)
-            agent_repo.save(agent)
+            _save_agent(agent)
         activity_repo.create(
             activity_type=5100,
             description=f"Scenario '{scenario}' triggered: {len(targets)} agents infected",
@@ -294,7 +456,7 @@ def trigger_scenario(scenario: str) -> dict:
         for agent in targets:
             agent.networkStatus = "disconnected"
             agent.isActive = False
-            agent_repo.save(agent)
+            _save_agent(agent)
         activity_repo.create(
             activity_type=5100,
             description=f"Scenario '{scenario}' triggered: {len(targets)} agents disconnected",
@@ -306,14 +468,14 @@ def trigger_scenario(scenario: str) -> dict:
             threat.threatInfo["incidentStatus"] = "resolved"
             threat.threatInfo["resolved"] = True
             threat.threatInfo["analystVerdict"] = "false_positive"
-            threat_repo.save(threat)
+            _save_threat(threat)
         for agent in agent_repo.list_all():
             agent.isInfected = False
             agent.infected = False
             agent.activeThreats = 0
             agent.networkStatus = "connected"
             agent.isActive = True
-            agent_repo.save(agent)
+            _save_agent(agent)
         activity_repo.create(
             activity_type=5100,
             description=f"Scenario '{scenario}' triggered: "
@@ -330,7 +492,7 @@ def trigger_scenario(scenario: str) -> dict:
             agent.infected = True
             agent.activeThreats = random.randint(3, 8)
             agent.networkStatus = "disconnected"
-            agent_repo.save(agent)
+            _save_agent(agent)
         activity_repo.create(
             activity_type=5100,
             description=f"Scenario '{scenario}' triggered: {len(targets)} agents compromised",

@@ -529,12 +529,12 @@ export interface RequestLog {
 export interface WebhookSubscription {
   id: string
   url: string
-  event_types: string[]
+  eventTypes: string[]
   secret: string
   active: boolean
   description: string
-  created_at: string
-  updated_at: string
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Rate-limit config ─────────────────────────────────────────────────────────

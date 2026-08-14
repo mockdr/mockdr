@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from api.splunk_auth import require_splunk_auth
+from api.splunk_auth import require_splunk_admin, require_splunk_auth
 from application.splunk.queries.indexes import get_index, list_indexes
 from domain.splunk.splunk_index import SplunkIndex
 from repository.splunk.splunk_index_repo import splunk_index_repo
@@ -24,7 +24,7 @@ def list_all_indexes(
 async def create_index(
     request: Request,
     output_mode: str = "json",
-    current_user: dict = Depends(require_splunk_auth),
+    current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
     """Create a new index."""
     content_type = request.headers.get("content-type", "")

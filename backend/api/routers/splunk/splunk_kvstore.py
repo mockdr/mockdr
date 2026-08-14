@@ -6,7 +6,7 @@ from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.splunk_auth import require_splunk_auth
+from api.splunk_auth import require_splunk_admin, require_splunk_auth
 from application.splunk.commands.kvstore import (
     batch_save,
     create_collection,
@@ -40,7 +40,7 @@ async def create_kv_collection(
     app: str,
     request: Request,
     output_mode: str = "json",
-    current_user: dict = Depends(require_splunk_auth),
+    current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
     """Create a KV Store collection."""
     body = await _parse_body(request)
@@ -58,7 +58,7 @@ def delete_kv_collection(
     owner: str,
     app: str,
     name: str,
-    current_user: dict = Depends(require_splunk_auth),
+    current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
     """Delete a KV Store collection."""
     if not delete_collection(name, app):

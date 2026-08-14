@@ -1,9 +1,11 @@
 """Microsoft Defender for Endpoint Alert command handlers (mutations)."""
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import asdict
 
+from domain.event_bus import MdeAlertCreated, event_bus
 from domain.mde_alert import MdeAlert
 from repository.mde_alert_repo import mde_alert_repo
 from utils.dt import utc_now
@@ -81,7 +83,15 @@ def create_alert_by_reference(body: dict) -> dict:
         threatFamilyName=body.get("threatFamilyName", ""),
     )
     mde_alert_repo.save(alert)
-    return asdict(alert)
+
+    # Bridge the alert into Splunk and Sentinel (ADR-009).
+    payload = asdict(alert)
+    event_bus.publish(MdeAlertCreated(
+        entity_id=alert.alertId,
+        payload=payload,
+        timestamp=time.time(),
+    ))
+    return payload
 
 
 def batch_update_alerts(body: dict) -> list[dict]:

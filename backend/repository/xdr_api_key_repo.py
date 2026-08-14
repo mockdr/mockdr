@@ -11,7 +11,11 @@ class XdrApiKeyRepository(Repository[XdrApiKey]):
         super().__init__("xdr_api_keys")
 
     def get_by_key_id(self, key_id: str) -> XdrApiKey | None:
-        """Look up an API key by its ``key_id`` field using a dict-based index.
+        """Look up an API key by its ``key_id`` field.
+
+        ``key_id`` is the collection's primary key, so this is a single dict
+        lookup — the previous implementation scanned every record to build a
+        throwaway index on each call.
 
         Args:
             key_id: The API key ID to search for.
@@ -19,9 +23,7 @@ class XdrApiKeyRepository(Repository[XdrApiKey]):
         Returns:
             The matching ``XdrApiKey`` or ``None``.
         """
-        all_keys = self.list_all()
-        index = {k.key_id: k for k in all_keys}
-        return index.get(key_id)
+        return self.get(key_id)
 
 
 

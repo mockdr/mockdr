@@ -5,6 +5,11 @@ from fastapi import APIRouter, Form, HTTPException
 
 from application.sentinel.commands.auth import client_tenant, token_exchange
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
+from utils.entra_token_errors import (
+    AADSTS_INVALID_CLIENT,
+    AADSTS_TENANT_NOT_FOUND,
+    build_token_error,
+)
 
 router = APIRouter(tags=["Sentinel Auth"])
 
@@ -58,15 +63,17 @@ def _issue_token(tenant_id: str | None, client_id: str, client_secret: str) -> d
         HTTPException: 401 if the credentials are invalid.
     """
     if not tenant_segment_matches(tenant_id, *client_tenant(client_id)):
-        raise HTTPException(status_code=400, detail={
-            "error": "invalid_request",
-            "error_description": tenant_rejection_message(tenant_id),
-        })
+        raise HTTPException(status_code=400, detail=build_token_error(
+            "invalid_request",
+            tenant_rejection_message(tenant_id),
+            AADSTS_TENANT_NOT_FOUND,
+        ))
 
     result = token_exchange(client_id, client_secret)
     if not result:
-        raise HTTPException(status_code=401, detail={
-            "error": "invalid_client",
-            "error_description": "Invalid client credentials",
-        })
+        raise HTTPException(status_code=401, detail=build_token_error(
+            "invalid_client",
+            "AADSTS7000215: Invalid client secret provided.",
+            AADSTS_INVALID_CLIENT,
+        ))
     return result

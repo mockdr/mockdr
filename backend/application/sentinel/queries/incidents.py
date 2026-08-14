@@ -9,6 +9,7 @@ from repository.sentinel.bookmark_repo import sentinel_bookmark_repo
 from repository.sentinel.entity_repo import sentinel_entity_repo
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
+from utils.sentinel.pagination import build_next_link, parse_skip_token
 from utils.sentinel.response import build_arm_list, build_arm_resource
 
 
@@ -57,6 +58,7 @@ def list_incidents(
     orderby: str = "",
     top: int = 50,
     skip_token: str = "",
+    request_url: str = "",
 ) -> dict:
     """List incidents with optional OData-style filtering.
 
@@ -65,9 +67,13 @@ def list_incidents(
         orderby:     OData $orderby expression.
         top:         Maximum results.
         skip_token:  Pagination token (offset-based).
+        request_url: Full request URL, used to build an absolute ``nextLink``.
 
     Returns:
         ARM list response dict.
+
+    Raises:
+        HTTPException: 400 if the skip token was not issued by this service.
     """
     all_incidents = sentinel_incident_repo.list_all()
 
@@ -85,13 +91,13 @@ def list_incidents(
         all_incidents.sort(key=lambda i: i.created_time_utc, reverse=True)
 
     # Pagination
-    offset = int(skip_token) if skip_token else 0
+    offset = parse_skip_token(skip_token)
     page = all_incidents[offset:offset + top]
 
     items = [_incident_to_arm(inc) for inc in page]
     next_link = ""
     if offset + top < len(all_incidents):
-        next_link = f"?$skipToken={offset + top}"
+        next_link = build_next_link(request_url, offset + top)
 
     return build_arm_list(items, next_link=next_link)
 

@@ -20,7 +20,12 @@ from fastapi import APIRouter, Form, HTTPException
 from repository.mde_oauth_client_repo import mde_oauth_client_repo
 from repository.store import store
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
-from utils.mde_response import build_mde_error_response
+from utils.entra_token_errors import (
+    AADSTS_INVALID_CLIENT,
+    AADSTS_TENANT_NOT_FOUND,
+    AADSTS_UNSUPPORTED_GRANT,
+    build_token_error,
+)
 
 router = APIRouter(tags=["MDE Auth"])
 
@@ -103,8 +108,11 @@ def _issue_token(
     if grant_type != "client_credentials":
         raise HTTPException(
             status_code=400,
-            detail=build_mde_error_response(
-                "invalid_grant", "Unsupported grant_type. Only client_credentials is supported.",
+            detail=build_token_error(
+                "unsupported_grant_type",
+                "AADSTS70003: The app requested an unsupported grant type. "
+                "Only client_credentials is supported.",
+                AADSTS_UNSUPPORTED_GRANT,
             ),
         )
 
@@ -112,16 +120,20 @@ def _issue_token(
     if client is None or client.client_secret != client_secret:
         raise HTTPException(
             status_code=401,
-            detail=build_mde_error_response(
-                "invalid_client", "Invalid client credentials",
+            detail=build_token_error(
+                "invalid_client",
+                "AADSTS7000215: Invalid client secret provided.",
+                AADSTS_INVALID_CLIENT,
             ),
         )
 
     if not tenant_segment_matches(tenant_id, client.tenant_id, client.tenant_domain):
         raise HTTPException(
             status_code=400,
-            detail=build_mde_error_response(
-                "invalid_request", tenant_rejection_message(tenant_id),
+            detail=build_token_error(
+                "invalid_request",
+                tenant_rejection_message(tenant_id),
+                AADSTS_TENANT_NOT_FOUND,
             ),
         )
 

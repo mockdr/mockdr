@@ -28,6 +28,7 @@ def list_incidents(
     subscription_id: str,
     resource_group: str,
     workspace: str,
+    request: Request,
     filter: str = Query(default=None, alias="$filter"),
     orderby: str = Query(default=None, alias="$orderby"),
     top: int = Query(default=None, alias="$top"),
@@ -41,6 +42,7 @@ def list_incidents(
         orderby=orderby or "",
         top=min(top or 50, 1000),
         skip_token=skip_token or "",
+        request_url=str(request.url),
     )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from domain.sentinel.threat_indicator import SentinelThreatIndicator
 from repository.sentinel.threat_indicator_repo import sentinel_threat_indicator_repo
+from utils.sentinel.pagination import build_next_link, parse_skip_token
 from utils.sentinel.response import build_arm_list, build_arm_resource
 
 
@@ -27,13 +28,27 @@ def _indicator_to_arm(ind: SentinelThreatIndicator) -> dict:
     }, etag=ind.etag)
 
 
-def list_indicators(top: int = 50, skip_token: str = "") -> dict:
-    """List all TI indicators."""
+def list_indicators(top: int = 50, skip_token: str = "", request_url: str = "") -> dict:
+    """List all TI indicators.
+
+    Args:
+        top:         Maximum results.
+        skip_token:  Pagination token (offset-based).
+        request_url: Full request URL, used to build an absolute ``nextLink``.
+
+    Returns:
+        ARM list response dict.
+
+    Raises:
+        HTTPException: 400 if the skip token was not issued by this service.
+    """
     all_inds = sentinel_threat_indicator_repo.list_all()
-    offset = int(skip_token) if skip_token else 0
+    offset = parse_skip_token(skip_token)
     page = all_inds[offset:offset + top]
     items = [_indicator_to_arm(i) for i in page]
-    next_link = f"?$skipToken={offset + top}" if offset + top < len(all_inds) else ""
+    next_link = (
+        build_next_link(request_url, offset + top) if offset + top < len(all_inds) else ""
+    )
     return build_arm_list(items, next_link=next_link)
 
 

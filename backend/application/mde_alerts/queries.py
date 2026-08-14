@@ -14,6 +14,7 @@ def list_alerts(
     skip: int,
     orderby: str | None,
     select: str | None,
+    count: bool = False,
 ) -> dict:
     """List alerts with OData filtering, ordering, selection, and pagination.
 
@@ -23,6 +24,7 @@ def list_alerts(
         skip:       Number of records to skip (``$skip``).
         orderby:    OData ``$orderby`` expression, or None.
         select:     Comma-separated field names (``$select``), or None.
+        count:      Whether ``$count=true`` was requested.
 
     Returns:
         OData list response with paginated alert records.
@@ -40,7 +42,9 @@ def list_alerts(
             f"https://api.securitycenter.microsoft.com/api/alerts"
             f"?$top={top}&$skip={skip + top}"
         )
-    return build_mde_list_response(page, next_link=next_link)
+    return build_mde_list_response(
+        page, next_link=next_link, count=total if count else None,
+    )
 
 
 def get_alert(alert_id: str) -> dict | None:
