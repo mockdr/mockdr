@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">56.81% </span>
+                <span class="strong">59.52% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>25/44</span>
+                <span class='fraction'>25/42</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">59.52% </span>
+                <span class="strong">62.5% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>25/42</span>
+                <span class='fraction'>25/40</span>
             </div>
         
             
@@ -233,10 +233,7 @@
 <a name='L168'></a><a href='#L168'>168</a>
 <a name='L169'></a><a href='#L169'>169</a>
 <a name='L170'></a><a href='#L170'>170</a>
-<a name='L171'></a><a href='#L171'>171</a>
-<a name='L172'></a><a href='#L172'>172</a>
-<a name='L173'></a><a href='#L173'>173</a>
-<a name='L174'></a><a href='#L174'>174</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L171'></a><a href='#L171'>171</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -263,10 +260,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -283,6 +276,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -430,20 +424,16 @@ function <span class="fstat-no" title="function not covered" >randomNonce(): str
 <span class="cstat-no" title="statement not covered" >  return Array.from(arr, <span class="fstat-no" title="function not covered" >b =&gt; <span class="cstat-no" title="statement not covered" >b</span>.toString(16).padStart(2, '0'))</span>.join('')</span>
 }
 &nbsp;
-/** Compute HMAC-SHA256 hex digest using Web Crypto API. */
-async function <span class="fstat-no" title="function not covered" >hmacSha256Hex(k</span>ey: string, message: string): Promise&lt;string&gt; {
-  const enc = <span class="cstat-no" title="statement not covered" >new TextEncoder()</span>
-  const cryptoKey = <span class="cstat-no" title="statement not covered" >await crypto.subtle.importKey(</span>
-    'raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  )
-  const sig = <span class="cstat-no" title="statement not covered" >await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message))</span>
-<span class="cstat-no" title="statement not covered" >  return Array.from(new Uint8Array(sig), <span class="fstat-no" title="function not covered" >b =&gt; <span class="cstat-no" title="statement not covered" >b</span>.toString(16).padStart(2, '0'))</span>.join('')</span>
+/** Compute a SHA-256 hex digest using the Web Crypto API. */
+async function <span class="fstat-no" title="function not covered" >sha256Hex(m</span>essage: string): Promise&lt;string&gt; {
+  const digest = <span class="cstat-no" title="statement not covered" >await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message))</span>
+<span class="cstat-no" title="statement not covered" >  return Array.from(new Uint8Array(digest), <span class="fstat-no" title="function not covered" >b =&gt; <span class="cstat-no" title="statement not covered" >b</span>.toString(16).padStart(2, '0'))</span>.join('')</span>
 }
 &nbsp;
 /**
  * Axios instance for Cortex XDR mock API.
  *
- * Uses HMAC auth with x-xdr-auth-id, x-xdr-nonce, x-xdr-timestamp, and Authorization headers.
+ * Uses advanced auth with x-xdr-auth-id, x-xdr-nonce, x-xdr-timestamp, and Authorization headers.
  * All requests are POST with { request_data: { ... } } body shape.
  * Response interceptor unwraps the Axios envelope so callers receive raw XDR response body.
  */
@@ -456,7 +446,8 @@ const xdrClient = axios.create({
 xdrClient.interceptors.request.use(<span class="fstat-no" title="function not covered" >async (c</span>onfig) =&gt; {
   const nonce = <span class="cstat-no" title="statement not covered" >randomNonce()</span>
   const timestamp = <span class="cstat-no" title="statement not covered" >Date.now().toString()</span>
-  const authHash = <span class="cstat-no" title="statement not covered" >await hmacSha256Hex(XDR_SECRET, nonce + ':' + timestamp)</span>
+  // Cortex XDR hashes key + nonce + timestamp, plainly concatenated.
+  const authHash = <span class="cstat-no" title="statement not covered" >await sha256Hex(XDR_SECRET + nonce + timestamp)</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  config.headers['x-xdr-auth-id'] = XDR_KEY_ID</span>
 <span class="cstat-no" title="statement not covered" >  config.headers['x-xdr-nonce'] = nonce</span>
@@ -589,7 +580,7 @@ export const xdrScriptsApi = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-19T20:44:25.205Z
+                at 2026-08-14T09:11:59.024Z
             </div>
         <script src="../prettify.js"></script>
         <script>

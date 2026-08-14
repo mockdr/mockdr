@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/39</span>
+                <span class='fraction'>0/38</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/18</span>
+                <span class='fraction'>0/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/7</span>
+                <span class='fraction'>0/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/35</span>
+                <span class='fraction'>0/34</span>
             </div>
         
             
@@ -237,9 +237,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -258,17 +263,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -341,40 +341,40 @@ async function <span class="fstat-no" title="function not covered" >fetchAll(): 
 &lt;/script&gt;
 &nbsp;
 &lt;template&gt;
-  &lt;div <span class="cstat-no" title="statement not covered" >class="space-y-6"&gt;</span>
+<span class="cstat-no" title="statement not covered" >  &lt;div <span class="cstat-no" title="statement not covered" >class="space-y-6"&gt;</span></span>
     &lt;!-- Header --&gt;
-    &lt;div class="flex items-center justify-between"&gt;
+    &lt;div <span class="cstat-no" title="statement not covered" >class="flex items-center justify-between"&gt;</span>
       &lt;div&gt;
         &lt;h1 class="text-xl font-semibold text-s1-text flex items-center gap-2"&gt;
           &lt;span class="font-bold" style="color: #0078D4"&gt;Graph&lt;/span&gt; Dashboard
         &lt;/h1&gt;
         &lt;p class="text-s1-muted text-sm"&gt;Microsoft Graph API overview&lt;/p&gt;
       &lt;/div&gt;
-      &lt;button @click="fetchAll()" class="btn-ghost flex items-center gap-2"&gt;
+      &lt;button @click<span class="fstat-no" title="function not covered" >="<span class="cstat-no" title="statement not covered" >f</span>etchAll()" c</span>lass="btn-ghost flex items-center gap-2"&gt;
         &lt;RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" /&gt;
         Refresh
       &lt;/button&gt;
     &lt;/div&gt;
 &nbsp;
     &lt;!-- Error banner --&gt;
-    &lt;div v-if="<span class="cstat-no" title="statement not covered" >error" class="card p-4 border-red-500/40 bg-red-500/10 text-red-400 text-sm"&gt;</span>
-      {{ <span class="cstat-no" title="statement not covered" >error }}</span>
+    &lt;div v-if="error" class="card p-4 border-red-500/40 bg-red-500/10 text-red-400 text-sm"&gt;
+      {{ error }}
     &lt;/div&gt;
 &nbsp;
     &lt;!-- Summary cards --&gt;
-    &lt;div class="grid grid-cols-4 gap-4"&gt;
-      &lt;div
-        v-for="card in <span class="cstat-no" title="statement not covered" >summaryCards<span class="fstat-no" title="function not covered" >" :key="card.label"</span></span>
-        class="card p-5" <span class="cstat-no" title="statement not covered" >style="border-left: 2px solid rgba(0, 120, 212, 0.5)"</span>
+    &lt;div <span class="cstat-no" title="statement not covered" >class="grid grid-cols-4 gap-4"&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;div</span>
+        v-for="card in summaryCards<span class="fstat-no" title="function not covered" >" :k</span>ey="card.label"
+        class="card p-5" style="border-left: 2px solid rgba(0, 120, 212, 0.5)"
       &gt;
-        &lt;LoadingSkeleton v-if="<span class="cstat-no" title="statement not covered" >loading" :<span class="cstat-no" title="statement not covered" >rows="2" /&gt;</span></span>
+        &lt;LoadingSkeleton v-if="loading" :rows="2" /&gt;
         &lt;div v-else class="flex items-start justify-between"&gt;
           &lt;div&gt;
-            &lt;div class="text-3xl font-bold text-s1-text"&gt;{{ <span class="cstat-no" title="statement not covered" >card.value }}&lt;/div&gt;</span>
-            &lt;div class="text-sm text-s1-muted mt-1"&gt;{{ card.label }}&lt;/div&gt;
+            &lt;div <span class="cstat-no" title="statement not covered" >class="text-3xl font-bold text-s1-text"&gt;{{ c</span>ard.value }}&lt;/div&gt;
+            &lt;div <span class="cstat-no" title="statement not covered" >class="text-sm text-s1-muted mt-1"&gt;{{ c</span>ard.label }}&lt;/div&gt;
           &lt;/div&gt;
           &lt;div class="p-2.5 rounded-xl" :class="card.bg"&gt;
-            &lt;component :is="<span class="cstat-no" title="statement not covered" >card.icon" class="w-5 h-5" :class="card.color" /&gt;</span>
+            &lt;component :is="card.icon" class="w-5 h-5" :class="card.color" /&gt;
           &lt;/div&gt;
         &lt;/div&gt;
       &lt;/div&gt;
@@ -388,7 +388,7 @@ async function <span class="fstat-no" title="function not covered" >fetchAll(): 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-19T20:44:25.205Z
+                at 2026-08-14T09:11:59.024Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

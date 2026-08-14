@@ -25,21 +25,21 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/21</span>
+                <span class='fraction'>0/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>0/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
@@ -181,6 +181,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -196,24 +210,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -222,7 +222,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -261,42 +261,42 @@ async function <span class="fstat-no" title="function not covered" >fetchTeams()
 &lt;/script&gt;
 &nbsp;
 &lt;template&gt;
-  &lt;div <span class="cstat-no" title="statement not covered" >class="space-y-4"&gt;</span>
+<span class="cstat-no" title="statement not covered" >  &lt;div <span class="cstat-no" title="statement not covered" >class="space-y-4"&gt;</span></span>
     &lt;!-- Header --&gt;
-    &lt;div class="flex items-center justify-between"&gt;
+    &lt;div <span class="cstat-no" title="statement not covered" >class="flex items-center justify-between"&gt;</span>
       &lt;div&gt;
         &lt;h1 class="text-xl font-semibold text-s1-text flex items-center gap-2"&gt;
           &lt;span class="font-bold" style="color: #0078D4"&gt;Graph&lt;/span&gt; Teams
         &lt;/h1&gt;
         &lt;p class="text-s1-muted text-sm"&gt;Microsoft Teams&lt;/p&gt;
       &lt;/div&gt;
-      &lt;button @click="fetchTeams()" class="btn-ghost flex items-center gap-2"&gt;
+      &lt;button @click<span class="fstat-no" title="function not covered" >="<span class="cstat-no" title="statement not covered" >f</span>etchTeams()" c</span>lass="btn-ghost flex items-center gap-2"&gt;
         &lt;RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" /&gt;
         Refresh
       &lt;/button&gt;
     &lt;/div&gt;
 &nbsp;
     &lt;!-- Loading --&gt;
-    &lt;div v-if="<span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="if path not taken" >I</span>loading &amp;&amp; !teams.length" class="card p-5"&gt;</span>
-      &lt;LoadingSkeleton :<span class="cstat-no" title="statement not covered" >rows="4" /&gt;</span>
+    &lt;div v-if="loading &amp;&amp; !teams.length" class="card p-5"&gt;
+      &lt;LoadingSkeleton :rows="4" /&gt;
     &lt;/div&gt;
 &nbsp;
     &lt;!-- Empty --&gt;
     &lt;EmptyState
-      v-if="!<span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="if path not taken" >I</span>loading &amp;&amp; !teams.length"</span>
+      v-if="!loading &amp;&amp; !teams.length"
       icon="--"
       title="No teams found"
       description="No Microsoft Teams available."
     /&gt;
 &nbsp;
     &lt;!-- Card grid --&gt;
-    &lt;div v-if="<span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="if path not taken" >I</span>teams.length" class="grid grid-cols-3 gap-4"&gt;</span>
-      &lt;div
-        v-for="team in <span class="cstat-no" title="statement not covered" >teams<span class="fstat-no" title="function not covered" >" :key="team.id"</span></span>
+    &lt;div v-if="teams.<span class="branch-0 cbranch-no" title="branch not covered" >length" class="grid grid-cols-3 gap-4"&gt;</span>
+<span class="cstat-no" title="statement not covered" >      &lt;div</span>
+        v-for="team in teams<span class="fstat-no" title="function not covered" >" :k</span>ey="team.id"
         class="card p-5"
       &gt;
-        &lt;div class="flex items-start justify-between mb-2"&gt;
-          &lt;h3 class="text-sm font-semibold text-s1-text truncate max-w-[70%]"&gt;{{ <span class="cstat-no" title="statement not covered" >team.displayName }}&lt;/h3&gt;</span>
+        &lt;div <span class="cstat-no" title="statement not covered" >class="flex items-start justify-between mb-2"&gt;</span>
+          &lt;h3 <span class="cstat-no" title="statement not covered" >class="text-sm font-semibold text-s1-text truncate max-w-[70%]"&gt;{{ t</span>eam.displayName }}&lt;/h3&gt;
           &lt;span
             class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
             :class="visibilityBadgeClass(team.visibility)"
@@ -304,7 +304,7 @@ async function <span class="fstat-no" title="function not covered" >fetchTeams()
             {{ team.visibility }}
           &lt;/span&gt;
         &lt;/div&gt;
-        &lt;p class="text-xs text-s1-muted line-clamp-2"&gt;{{ team.description || 'No description' }}&lt;/p&gt;
+        &lt;p <span class="cstat-no" title="statement not covered" >class="text-xs text-s1-muted line-clamp-2"&gt;{{ t</span>eam.description || 'No description' }}&lt;/p&gt;
       &lt;/div&gt;
     &lt;/div&gt;
   &lt;/div&gt;
@@ -316,7 +316,7 @@ async function <span class="fstat-no" title="function not covered" >fetchTeams()
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-19T20:44:25.205Z
+                at 2026-08-14T09:11:59.024Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
