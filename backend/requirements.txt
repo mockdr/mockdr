@@ -1,7 +1,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.41.0
 pydantic==2.12.5
-faker==40.8.0
+faker==40.36.0
 python-multipart==0.0.32
 aiofiles==25.1.0
 httpx==0.28.1
