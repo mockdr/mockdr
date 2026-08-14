@@ -79,6 +79,61 @@ class TestListMachines:
         for machine in body["value"]:
             assert machine["healthStatus"] == "Active"
 
+    def test_filter_contains_function(self, client: TestClient) -> None:
+        """$filter=contains(...) is served, not a 500.
+
+        The parser used to ask for an opening paren the tokeniser had already
+        consumed, so every contains()/startswith() filter raised and surfaced
+        as a 500 — on the exact syntax the XSOAR MDE integration sends.
+        """
+        headers = _mde_auth(client)
+        resp = client.get(
+            "/mde/api/machines",
+            headers=headers,
+            params={"$filter": "contains(computerDnsName,'WS')", "$top": 100},
+        )
+        assert resp.status_code == 200
+        for machine in resp.json()["value"]:
+            assert "ws" in machine["computerDnsName"].lower()
+
+    def test_filter_startswith_function(self, client: TestClient) -> None:
+        """$filter=startswith(...) anchors at the start of the value."""
+        headers = _mde_auth(client)
+        resp = client.get(
+            "/mde/api/machines",
+            headers=headers,
+            params={"$filter": "startswith(computerDnsName,'MAC')", "$top": 100},
+        )
+        assert resp.status_code == 200
+        machines = resp.json()["value"]
+        assert machines, "expected at least one MAC-* machine in the seed"
+        for machine in machines:
+            assert machine["computerDnsName"].lower().startswith("mac")
+
+    def test_filter_and_binds_tighter_than_or(self, client: TestClient) -> None:
+        """``x and y or z`` must parse as ``(x and y) or z``.
+
+        Records matching only the trailing ``or`` arm have to survive; the old
+        flat grouping evaluated ``x and (y or z)`` and dropped them.
+        """
+        headers = _mde_auth(client)
+        resp = client.get(
+            "/mde/api/machines",
+            headers=headers,
+            params={
+                "$filter": (
+                    "healthStatus eq 'NoSensorData' and osPlatform eq 'Nonexistent' "
+                    "or startswith(computerDnsName,'MAC')"
+                ),
+                "$top": 100,
+            },
+        )
+        assert resp.status_code == 200
+        machines = resp.json()["value"]
+        assert machines, "the or-arm alone should still match MAC-* machines"
+        for machine in machines:
+            assert machine["computerDnsName"].lower().startswith("mac")
+
     def test_orderby_sorting(self, client: TestClient) -> None:
         """$orderby sorts the results."""
         headers = _mde_auth(client)

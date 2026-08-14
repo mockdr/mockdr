@@ -14,6 +14,7 @@ integration:
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,21 +26,39 @@ from utils.nested import get_nested
 
 @dataclass
 class ODataClause:
-    """A single parsed OData filter clause.
+    """A single comparison in an OData filter expression.
 
     Attributes:
-        field:       Target field name (e.g. ``"severity"``).
-        operator:    One of ``eq``, ``ne``, ``gt``, ``ge``, ``lt``, ``le``,
-                     ``contains``, ``startswith``.
-        value:       Comparison value (always stored as string).
-        conjunction: How this clause joins with the preceding clause
-                     (``"and"`` or ``"or"``).
+        field:    Target field name (e.g. ``"severity"``).
+        operator: One of ``eq``, ``ne``, ``gt``, ``ge``, ``lt``, ``le``,
+                  ``contains``, ``startswith``.
+        value:    Comparison value (always stored as string).
     """
 
     field: str
     operator: str
     value: str
-    conjunction: str = "and"
+
+
+@dataclass
+class ODataGroup:
+    """A boolean combination of nested filter nodes.
+
+    OData binds ``and`` tighter than ``or``, and parentheses override both.
+    Neither can be represented by a flat clause list, so the parser builds a
+    tree instead.
+
+    Attributes:
+        operator: ``"and"`` or ``"or"``.
+        children: Operands, evaluated left to right.
+    """
+
+    operator: str
+    children: list[ODataNode]
+
+
+#: Either a leaf comparison or a boolean group of further nodes.
+ODataNode = ODataClause | ODataGroup
 
 
 # ---------------------------------------------------------------------------
@@ -117,57 +136,72 @@ class _Parser:
             raise ValueError(msg)
         return tok[1]
 
-    def parse(self) -> list[ODataClause]:
-        """Parse the full filter expression into a flat clause list."""
-        clauses = self._parse_expr("and")
-        return clauses
+    def parse(self) -> ODataNode | None:
+        """Parse the full filter expression into a node tree.
 
-    def _parse_expr(self, default_conj: str) -> list[ODataClause]:
-        """Parse a sequence of clauses joined by ``and`` / ``or``."""
-        clauses = self._parse_atom(default_conj)
+        Returns:
+            Root node, or ``None`` when nothing parseable was found.
+        """
+        return self._parse_or()
+
+    def _parse_or(self) -> ODataNode | None:
+        """Parse ``and``-groups joined by ``or`` — the loosest binding."""
+        return self._parse_binary("or", self._parse_and)
+
+    def _parse_and(self) -> ODataNode | None:
+        """Parse atoms joined by ``and``, which binds tighter than ``or``."""
+        return self._parse_binary("and", self._parse_atom)
+
+    def _parse_binary(
+        self,
+        conjunction: str,
+        parse_operand: Callable[[], ODataNode | None],
+    ) -> ODataNode | None:
+        """Parse ``operand (<conjunction> operand)*`` at one precedence level."""
+        children: list[ODataNode] = []
+        first = parse_operand()
+        if first is not None:
+            children.append(first)
 
         while True:
             tok = self._peek()
-            if tok is None or tok[0] != "CONJ":
+            if tok is None or tok[0] != "CONJ" or tok[1] != conjunction:
                 break
-            conj = self._advance()[1]
-            right = self._parse_atom(conj)
-            clauses.extend(right)
+            self._advance()
+            operand = parse_operand()
+            if operand is not None:
+                children.append(operand)
 
-        return clauses
+        if not children:
+            return None
+        if len(children) == 1:
+            return children[0]
+        return ODataGroup(operator=conjunction, children=children)
 
-    def _parse_atom(self, conjunction: str) -> list[ODataClause]:
-        """Parse a single clause or parenthesised group."""
+    def _parse_atom(self) -> ODataNode | None:
+        """Parse a single comparison or parenthesised group."""
         tok = self._peek()
         if tok is None:
-            return []
+            return None
 
         # Parenthesised group
         if tok == ("PAREN", "("):
             self._advance()  # consume '('
-            inner = self._parse_expr(conjunction)
-            # Set the conjunction of the first inner clause
-            if inner:
-                inner[0].conjunction = conjunction
+            inner = self._parse_or()
             nxt = self._peek()
             if nxt and nxt == ("PAREN", ")"):
                 self._advance()  # consume ')'
             return inner
 
-        # Function call: contains(field, 'value') / startswith(field, 'value')
+        # Function call: contains(field, 'value') / startswith(field, 'value').
+        # The tokeniser's `func` pattern matches the trailing "(" too, so the
+        # opening paren is already consumed by the time we get here.
         if tok[0] == "FUNC":
             func_name = self._advance()[1]
-            self._expect("PAREN")  # '(' consumed by tokeniser
-            # Actually the tokeniser emits FUNC for "contains(" but without the paren.
-            # Let me re-check... The regex captures the func name but the '(' is separate.
-            # Wait — the regex is: r"(?P<func>contains|startswith)\s*\("
-            # This *includes* the paren in the match, so the paren is consumed.
             field_name = self._expect("WORD")
             self._expect("COMMA")
             val_tok = self._peek()
-            if val_tok and val_tok[0] == "STRING":
-                value = self._advance()[1]
-            elif val_tok and val_tok[0] == "WORD":
+            if val_tok and val_tok[0] in ("STRING", "WORD", "NUMBER"):
                 value = self._advance()[1]
             else:
                 value = self._advance()[1] if val_tok else ""
@@ -175,10 +209,7 @@ class _Parser:
             nxt = self._peek()
             if nxt and nxt == ("PAREN", ")"):
                 self._advance()
-            return [ODataClause(
-                field=field_name, operator=func_name,
-                value=value, conjunction=conjunction,
-            )]
+            return ODataClause(field=field_name, operator=func_name, value=value)
 
         # Standard comparison: field op value
         if tok[0] == "WORD":
@@ -193,32 +224,30 @@ class _Parser:
                 value = self._advance()[1]
             else:
                 value = ""
-            return [ODataClause(
-                field=field_name, operator=op,
-                value=value, conjunction=conjunction,
-            )]
+            return ODataClause(field=field_name, operator=op, value=value)
 
         # Skip unrecognised token
         self._advance()
-        return []
+        return None
 
 
 # ---------------------------------------------------------------------------
 # Public API — parsing
 # ---------------------------------------------------------------------------
 
-def parse_odata_filter(filter_str: str) -> list[ODataClause]:
-    """Parse an OData ``$filter`` string into structured clauses.
+def parse_odata_filter(filter_str: str) -> ODataNode | None:
+    """Parse an OData ``$filter`` string into a node tree.
 
     Args:
         filter_str: OData filter expression, e.g.
                     ``"severity eq 'High' and status ne 'Resolved'"``.
 
     Returns:
-        Ordered list of :class:`ODataClause` objects.
+        Root :class:`ODataClause` or :class:`ODataGroup`, or ``None`` when the
+        filter is empty or contains nothing parseable.
     """
     if not filter_str or not filter_str.strip():
-        return []
+        return None
     tokens = _tokenise(filter_str)
     parser = _Parser(tokens)
     return parser.parse()
@@ -274,6 +303,23 @@ def _match_clause(record: dict, clause: ODataClause) -> bool:
     return False
 
 
+def _match_node(record: dict, node: ODataNode) -> bool:
+    """Test a record against a filter node, honouring ``and``/``or`` nesting.
+
+    Args:
+        record: Dict record to test.
+        node:   Parsed filter node.
+
+    Returns:
+        ``True`` if the record matches.
+    """
+    if isinstance(node, ODataGroup):
+        if node.operator == "or":
+            return any(_match_node(record, child) for child in node.children)
+        return all(_match_node(record, child) for child in node.children)
+    return _match_clause(record, node)
+
+
 def _compare_range(field_val: Any, target: str, op: str) -> bool:
     """Compare a field value against a target using a range operator.
 
@@ -320,29 +366,10 @@ def apply_odata_filter(records: list[dict], filter_str: str) -> list[dict]:
     Returns:
         Filtered subset matching all conditions.
     """
-    clauses = parse_odata_filter(filter_str)
-    if not clauses:
+    root = parse_odata_filter(filter_str)
+    if root is None:
         return list(records)
-
-    # Group into AND-groups (consecutive OR clauses belong to same group)
-    groups: list[list[ODataClause]] = []
-    for clause in clauses:
-        if clause.conjunction == "and" or not groups:
-            groups.append([clause])
-        else:
-            groups[-1].append(clause)
-
-    result: list[dict] = []
-    for record in records:
-        match = True
-        for group in groups:
-            group_match = any(_match_clause(record, c) for c in group)
-            if not group_match:
-                match = False
-                break
-        if match:
-            result.append(record)
-    return result
+    return [record for record in records if _match_node(record, root)]
 
 
 def apply_odata_orderby(records: list[dict], orderby: str | None) -> list[dict]:
