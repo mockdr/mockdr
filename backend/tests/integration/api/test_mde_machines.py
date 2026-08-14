@@ -93,7 +93,9 @@ class TestListMachines:
             params={"$filter": "contains(computerDnsName,'WS')", "$top": 100},
         )
         assert resp.status_code == 200
-        for machine in resp.json()["value"]:
+        machines = resp.json()["value"]
+        assert machines, "expected at least one machine whose name contains 'WS'"
+        for machine in machines:
             assert "ws" in machine["computerDnsName"].lower()
 
     def test_filter_startswith_function(self, client: TestClient) -> None:
@@ -133,6 +135,31 @@ class TestListMachines:
         assert machines, "the or-arm alone should still match MAC-* machines"
         for machine in machines:
             assert machine["computerDnsName"].lower().startswith("mac")
+
+    def test_malformed_filter_returns_400_not_500(self, client: TestClient) -> None:
+        """A filter the parser cannot handle is a bad request, not a crash.
+
+        Real Defender answers 400. Letting the parse error escape produced a
+        500, which tells a client written against the vendor nothing.
+        """
+        headers = _mde_auth(client)
+        resp = client.get(
+            "/mde/api/machines",
+            headers=headers,
+            params={"$filter": "not (healthStatus eq 'Active')"},
+        )
+        assert resp.status_code == 400
+        assert "error" in resp.json()
+
+    def test_filter_tail_is_not_silently_dropped(self, client: TestClient) -> None:
+        """Unparsed trailing input must not widen the result set."""
+        headers = _mde_auth(client)
+        resp = client.get(
+            "/mde/api/machines",
+            headers=headers,
+            params={"$filter": "healthStatus eq 'Active') and osPlatform eq 'Windows10'"},
+        )
+        assert resp.status_code == 400
 
     def test_orderby_sorting(self, client: TestClient) -> None:
         """$orderby sorts the results."""

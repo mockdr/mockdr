@@ -20,6 +20,17 @@ from typing import Any
 
 from utils.nested import get_nested
 
+
+class ODataFilterError(ValueError):
+    """Raised when a ``$filter`` expression cannot be parsed.
+
+    The real Defender and Graph APIs answer a malformed or unsupported
+    ``$filter`` with ``400``, so this is translated into a vendor-shaped bad
+    request rather than surfacing as a ``500``.  It subclasses ``ValueError``
+    so existing ``except ValueError`` callers keep working.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -68,9 +79,17 @@ ODataNode = ODataClause | ODataGroup
 _TOKEN_RE = re.compile(
     r"(?P<func>contains|startswith)\s*\("
     r"|(?P<paren>[()])"
-    r"|(?P<string>'[^']*')"
+    # A doubled quote is OData's escape for a literal one, so it must not end
+    # the token: 'O''Brien' is one string, not 'O' followed by junk.
+    r"|(?P<string>'(?:[^']|'')*')"
     r"|(?P<op>eq|ne|ge|gt|le|lt)\b"
     r"|(?P<conj>and|or)\b"
+    # OData v4 writes date/time literals unquoted, and they must be lexed
+    # whole — otherwise "2026-08-08T00:00:00Z" degrades into the number 2026
+    # followed by rubble, and the comparison silently comes out coarser than
+    # the caller asked for. Must precede `number` for the same reason.
+    r"|(?P<datetime>\d{4}-\d{2}-\d{2}"
+    r"(?:[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?)"
     r"|(?P<word>[A-Za-z_][A-Za-z0-9_./]*)"
     r"|(?P<number>-?\d+(?:\.\d+)?)"
     r"|(?P<comma>,)"
@@ -92,12 +111,14 @@ def _tokenise(text: str) -> list[tuple[str, str]]:
         elif m.group("paren"):
             tokens.append(("PAREN", m.group("paren")))
         elif m.group("string"):
-            # Strip surrounding quotes
-            tokens.append(("STRING", m.group("string")[1:-1]))
+            # Strip surrounding quotes, then unescape doubled quotes
+            tokens.append(("STRING", m.group("string")[1:-1].replace("''", "'")))
         elif m.group("op"):
             tokens.append(("OP", m.group("op").lower()))
         elif m.group("conj"):
             tokens.append(("CONJ", m.group("conj").lower()))
+        elif m.group("datetime"):
+            tokens.append(("DATETIME", m.group("datetime")))
         elif m.group("word"):
             tokens.append(("WORD", m.group("word")))
         elif m.group("number"):
@@ -125,6 +146,9 @@ class _Parser:
         return None
 
     def _advance(self) -> tuple[str, str]:
+        if self.pos >= len(self.tokens):
+            msg = "unexpected end of filter expression"
+            raise ODataFilterError(msg)
         tok = self.tokens[self.pos]
         self.pos += 1
         return tok
@@ -132,17 +156,29 @@ class _Parser:
     def _expect(self, kind: str) -> str:
         tok = self._advance()
         if tok[0] != kind:
-            msg = f"expected {kind}, got {tok}"
-            raise ValueError(msg)
+            msg = f"expected {kind}, got {tok[1]!r}"
+            raise ODataFilterError(msg)
         return tok[1]
 
     def parse(self) -> ODataNode | None:
         """Parse the full filter expression into a node tree.
 
         Returns:
-            Root node, or ``None`` when nothing parseable was found.
+            Root node, or ``None`` when the expression is empty.
+
+        Raises:
+            ODataFilterError: If the expression is malformed, or if anything
+                is left over after the root node. Ignoring a trailing tail
+                would silently *widen* the filter — dropping ``and n gt 3``
+                returns more records than the caller asked for, which is far
+                worse than refusing the query.
         """
-        return self._parse_or()
+        node = self._parse_or()
+        if self.pos < len(self.tokens):
+            leftover = " ".join(tok[1] for tok in self.tokens[self.pos:])
+            msg = f"unparsed trailing input: {leftover!r}"
+            raise ODataFilterError(msg)
+        return node
 
     def _parse_or(self) -> ODataNode | None:
         """Parse ``and``-groups joined by ``or`` — the loosest binding."""
@@ -188,9 +224,7 @@ class _Parser:
         if tok == ("PAREN", "("):
             self._advance()  # consume '('
             inner = self._parse_or()
-            nxt = self._peek()
-            if nxt and nxt == ("PAREN", ")"):
-                self._advance()  # consume ')'
+            self._expect("PAREN")  # unbalanced '(' is an error, not a no-op
             return inner
 
         # Function call: contains(field, 'value') / startswith(field, 'value').
@@ -200,35 +234,32 @@ class _Parser:
             func_name = self._advance()[1]
             field_name = self._expect("WORD")
             self._expect("COMMA")
-            val_tok = self._peek()
-            if val_tok and val_tok[0] in ("STRING", "WORD", "NUMBER"):
-                value = self._advance()[1]
-            else:
-                value = self._advance()[1] if val_tok else ""
-            # Consume closing paren
-            nxt = self._peek()
-            if nxt and nxt == ("PAREN", ")"):
-                self._advance()
+            value = self._expect_value()
+            self._expect("PAREN")  # closing ')'
             return ODataClause(field=field_name, operator=func_name, value=value)
 
         # Standard comparison: field op value
         if tok[0] == "WORD":
             field_name = self._advance()[1]
             op = self._expect("OP")
-            val_tok = self._peek()
-            if val_tok and val_tok[0] == "STRING":
-                value = self._advance()[1]
-            elif val_tok and val_tok[0] == "NUMBER":
-                value = self._advance()[1]
-            elif val_tok and val_tok[0] == "WORD":
-                value = self._advance()[1]
-            else:
-                value = ""
+            value = self._expect_value()
             return ODataClause(field=field_name, operator=op, value=value)
 
-        # Skip unrecognised token
-        self._advance()
-        return None
+        msg = f"unexpected token: {tok[1]!r}"
+        raise ODataFilterError(msg)
+
+    def _expect_value(self) -> str:
+        """Consume a literal operand, rejecting anything that isn't one.
+
+        Accepting whatever came next used to swallow the closing paren, so
+        ``contains(name,)`` silently compared against ``")"``.
+        """
+        tok = self._peek()
+        if tok is None or tok[0] not in ("STRING", "WORD", "NUMBER", "DATETIME"):
+            found = tok[1] if tok else "end of expression"
+            msg = f"expected a value, got {found!r}"
+            raise ODataFilterError(msg)
+        return self._advance()[1]
 
 
 # ---------------------------------------------------------------------------

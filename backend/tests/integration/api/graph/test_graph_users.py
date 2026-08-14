@@ -102,7 +102,9 @@ class TestGraphUsers:
             headers=graph_admin_headers,
         )
         assert resp.status_code == 200
-        for user in resp.json()["value"]:
+        matched = resp.json()["value"]
+        assert matched, "seeded display names should contain an 'a'"
+        for user in matched:
             assert "a" in user["displayName"].lower()
 
     def test_list_users_with_search_by_display_name(

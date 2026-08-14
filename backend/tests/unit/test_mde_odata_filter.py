@@ -13,6 +13,7 @@ import pytest
 
 from utils.mde_odata import (
     ODataClause,
+    ODataFilterError,
     ODataGroup,
     apply_odata_filter,
     parse_odata_filter,
@@ -129,6 +130,85 @@ class TestPrecedence:
         assert parse_odata_filter("x eq '1'") == ODataClause(
             field="x", operator="eq", value="1",
         )
+
+
+class TestStringLiterals:
+    """Quoting rules — OData escapes a literal quote by doubling it."""
+
+    def test_doubled_quote_is_one_literal(self) -> None:
+        node = parse_odata_filter("startswith(displayName,'O''Brien')")
+        assert node == ODataClause(
+            field="displayName", operator="startswith", value="O'Brien",
+        )
+
+    def test_doubled_quote_filters_correctly(self) -> None:
+        records = [{"displayName": "O'Brien Ltd"}, {"displayName": "Olsen"}]
+        got = apply_odata_filter(records, "startswith(displayName,'O''Brien')")
+        assert [r["displayName"] for r in got] == ["O'Brien Ltd"]
+
+    def test_empty_string_literal(self) -> None:
+        assert _matches("x eq ''", {"x": ""}) is True
+        assert _matches("x eq ''", {"x": "y"}) is False
+
+
+class TestDateTimeLiterals:
+    """OData v4 writes date/time literals unquoted."""
+
+    def test_unquoted_timestamp_is_lexed_whole(self) -> None:
+        node = parse_odata_filter("createdDateTime ge 2026-08-08T00:00:00Z")
+        assert node == ODataClause(
+            field="createdDateTime", operator="ge", value="2026-08-08T00:00:00Z",
+        )
+
+    def test_day_granularity_is_respected(self) -> None:
+        """Lexing only the year made ``ge`` far coarser than requested."""
+        records = [{"d": "2026-01-01T00:00:00Z"}, {"d": "2026-08-14T00:00:00Z"}]
+        got = apply_odata_filter(records, "d ge 2026-08-08T00:00:00Z")
+        assert [r["d"] for r in got] == ["2026-08-14T00:00:00Z"]
+
+    @pytest.mark.parametrize("literal", [
+        "2026-08-08",
+        "2026-08-08T00:00:00Z",
+        "2026-08-08T00:00:00.123Z",
+        "2026-08-08T00:00:00+02:00",
+    ])
+    def test_accepted_shapes(self, literal: str) -> None:
+        node = parse_odata_filter(f"d ge {literal}")
+        assert isinstance(node, ODataClause)
+        assert node.value == literal
+
+    def test_quoted_timestamp_still_works(self) -> None:
+        assert _matches("d ge '2026-01-01T00:00:00Z'", {"d": "2026-08-14T00:00:00Z"}) is True
+
+
+class TestMalformedFilters:
+    """Unparseable input must raise, never silently widen the result set."""
+
+    @pytest.mark.parametrize("expr", [
+        "os eq 'Windows') and n gt 3",   # stray ')' — tail would be dropped
+        "x eq '1' garbage here",         # trailing rubble
+        "(x eq '1'",                     # unbalanced '('
+        "contains(name,)",               # missing argument
+        "x eq",                          # missing value
+        "and x eq '1'",                  # leading conjunction
+    ])
+    def test_malformed_raises(self, expr: str) -> None:
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], expr)
+
+    @pytest.mark.parametrize("expr", [
+        "contains(tolower(displayName),'jo')",  # nested function
+        "not (x eq '1')",                       # not operator
+        "x in ('a','b')",                       # in operator
+    ])
+    def test_unsupported_syntax_raises_typed_error(self, expr: str) -> None:
+        """Unsupported-but-valid OData must surface as 400, not 500."""
+        with pytest.raises(ODataFilterError):
+            apply_odata_filter([{"x": "1"}], expr)
+
+    def test_error_is_a_valueerror(self) -> None:
+        """Subclassing keeps any existing ``except ValueError`` callers working."""
+        assert issubclass(ODataFilterError, ValueError)
 
 
 class TestFiltering:
