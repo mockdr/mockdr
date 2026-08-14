@@ -1,5 +1,15 @@
 import os
 
+#: Single source of truth for the mockdr release version.
+#:
+#: Mirrored by ``backend/pyproject.toml`` and ``frontend/package.json``; the UI
+#: footer reads the latter at build time rather than hardcoding a string. Kept
+#: in step by ``tests/unit/test_version.py``.
+#:
+#: Note this is *mockdr's* version, not the version of any API it mocks — the
+#: SentinelOne surface stays pinned at v2.1 via ``API_PREFIX``.
+APP_VERSION = "2.0.0"
+
 API_PREFIX = "/web/api/v2.1"
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 1000
