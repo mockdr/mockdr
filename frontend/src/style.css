@@ -1,7 +1,92 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
+@theme {
+  --color-s1-sidebar: #0a0e1a;
+  --color-s1-bg: #0f1320;
+  --color-s1-card: #161b2e;
+  --color-s1-border: #1e2640;
+  --color-s1-hover: #1a2035;
+  --color-s1-primary: #6e45e2;
+  --color-s1-primary-dark: #5533bb;
+  --color-s1-cyan: #00c2ff;
+  --color-s1-danger: #ff4b4b;
+  --color-s1-warning: #ffb547;
+  --color-s1-success: #00d8a0;
+  --color-s1-accent: #6e45e2;
+  --color-s1-input: #0f1320;
+  --color-s1-text: #e2e8f0;
+  --color-s1-muted: #64748b;
+  --color-s1-subtle: #94a3b8;
+
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: JetBrains Mono, Fira Code, monospace;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility btn-primary {
+  @apply bg-s1-primary hover:bg-s1-primary-dark text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+@utility btn-ghost {
+  @apply bg-transparent hover:bg-s1-hover text-s1-subtle hover:text-s1-text text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150;
+}
+
+@utility btn-secondary {
+  @apply bg-s1-border hover:bg-s1-hover text-s1-text text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150;
+}
+
+@utility btn-danger {
+  @apply bg-s1-danger/20 hover:bg-s1-danger/30 text-s1-danger text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150;
+}
+
+@utility card {
+  @apply bg-s1-card border border-s1-border rounded-xl;
+}
+
+@utility input {
+  @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm placeholder-s1-muted focus:outline-hidden focus:border-s1-primary transition-colors;
+}
+
+@utility select {
+  @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm focus:outline-hidden focus:border-s1-primary transition-colors;
+}
+
+@utility table-row {
+  @apply border-b border-s1-border hover:bg-s1-hover transition-colors cursor-pointer;
+}
+
+@utility table-header {
+  @apply text-xs font-semibold text-s1-muted uppercase tracking-wider py-3 px-4;
+}
+
+@utility table-cell {
+  @apply text-sm text-s1-text py-3 px-4;
+}
+
+@utility hash {
+  @apply font-mono text-xs text-s1-muted;
+}
+
+@utility error-banner {
+  @apply bg-s1-danger/10 text-s1-danger px-4 py-2 rounded-md mb-4 text-sm;
+}
 
 @layer base {
   body {
@@ -20,45 +105,6 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-s1-muted;
-  }
-}
-
-@layer components {
-  .btn-primary {
-    @apply bg-s1-primary hover:bg-s1-primary-dark text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  .btn-ghost {
-    @apply bg-transparent hover:bg-s1-hover text-s1-subtle hover:text-s1-text text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150;
-  }
-  .btn-secondary {
-    @apply bg-s1-border hover:bg-s1-hover text-s1-text text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150;
-  }
-  .btn-danger {
-    @apply bg-s1-danger/20 hover:bg-s1-danger/30 text-s1-danger text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150;
-  }
-  .card {
-    @apply bg-s1-card border border-s1-border rounded-xl;
-  }
-  .input {
-    @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm placeholder-s1-muted focus:outline-none focus:border-s1-primary transition-colors;
-  }
-  .select {
-    @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm focus:outline-none focus:border-s1-primary transition-colors;
-  }
-  .table-row {
-    @apply border-b border-s1-border hover:bg-s1-hover transition-colors cursor-pointer;
-  }
-  .table-header {
-    @apply text-xs font-semibold text-s1-muted uppercase tracking-wider py-3 px-4;
-  }
-  .table-cell {
-    @apply text-sm text-s1-text py-3 px-4;
-  }
-  .hash {
-    @apply font-mono text-xs text-s1-muted;
-  }
-  .error-banner {
-    @apply bg-s1-danger/10 text-s1-danger px-4 py-2 rounded-md mb-4 text-sm;
   }
 }
 

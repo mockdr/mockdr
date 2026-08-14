@@ -171,7 +171,7 @@ onMounted(() => fetchHosts())
           <tr>
             <th class="table-header w-10">
               <input type="checkbox" :checked="allSelected" @change="toggleAll"
-                class="rounded border-s1-border bg-s1-bg accent-red-500" />
+                class="rounded-sm border-s1-border bg-s1-bg accent-red-500" />
             </th>
             <th class="table-header text-left">Hostname</th>
             <th class="table-header text-left">Platform</th>
@@ -194,12 +194,12 @@ onMounted(() => fetchHosts())
               <td class="table-cell" @click.stop>
                 <input type="checkbox" :checked="selected.has(host.device_id)"
                   @change="toggleSelect(host.device_id)"
-                  class="rounded border-s1-border bg-s1-bg accent-red-500" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-red-500" />
               </td>
               <td class="table-cell">
                 <div class="flex items-center gap-2">
                   <span
-                    class="w-6 h-6 rounded flex items-center justify-center text-xs font-bold"
+                    class="w-6 h-6 rounded-sm flex items-center justify-center text-xs font-bold"
                     :class="platformColor(host.platform_name)"
                   >{{ platformIcon(host.platform_name) }}</span>
                   <div>

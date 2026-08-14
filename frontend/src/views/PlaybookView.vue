@@ -333,7 +333,7 @@ onUnmounted(stopPolling)
   <div class="flex h-full bg-s1-bg text-s1-text overflow-hidden">
 
     <!-- ── Left: Playbook Library ──────────────────────────────────────────── -->
-    <div class="w-80 flex-shrink-0 border-r border-s1-border flex flex-col">
+    <div class="w-80 shrink-0 border-r border-s1-border flex flex-col">
       <div class="p-4 border-b border-s1-border flex items-center justify-between">
         <div>
           <h2 class="text-sm font-semibold text-s1-muted uppercase tracking-wider">Playbook Library</h2>
@@ -360,14 +360,14 @@ onUnmounted(stopPolling)
             ]"
           >
             <div class="flex items-start gap-3">
-              <component :is="categoryIcon(p.category)" class="w-4 h-4 mt-0.5 flex-shrink-0" :class="categoryColor(p.category)" />
+              <component :is="categoryIcon(p.category)" class="w-4 h-4 mt-0.5 shrink-0" :class="categoryColor(p.category)" />
               <div class="min-w-0 flex-1 pr-10">
                 <div class="font-medium text-sm text-s1-text leading-tight truncate">{{ p.title }}</div>
                 <div class="text-xs text-s1-muted mt-1 line-clamp-2 leading-relaxed">{{ p.description }}</div>
                 <div class="flex items-center gap-2 mt-2 flex-wrap">
-                  <span :class="['text-xs px-1.5 py-0.5 rounded border font-medium', severityBadge(p.severity)]">{{ p.severity }}</span>
+                  <span :class="['text-xs px-1.5 py-0.5 rounded-sm border font-medium', severityBadge(p.severity)]">{{ p.severity }}</span>
                   <span class="text-xs text-s1-muted">{{ p.stepCount }} steps</span>
-                  <span v-if="!p.builtin" class="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">custom</span>
+                  <span v-if="!p.builtin" class="text-xs px-1.5 py-0.5 rounded-sm bg-purple-500/20 text-purple-400 border border-purple-500/30">custom</span>
                 </div>
               </div>
             </div>
@@ -377,7 +377,7 @@ onUnmounted(stopPolling)
           <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               @click="openEdit(p, $event)"
-              class="p-1 rounded bg-s1-bg hover:bg-s1-hover text-s1-muted hover:text-s1-text transition-colors"
+              class="p-1 rounded-sm bg-s1-bg hover:bg-s1-hover text-s1-muted hover:text-s1-text transition-colors"
               title="Edit playbook"
             >
               <Pencil class="w-3 h-3" />
@@ -385,7 +385,7 @@ onUnmounted(stopPolling)
             <button
               @click="requestDelete(p.id, $event)"
               :class="[
-                'p-1 rounded transition-colors',
+                'p-1 rounded-sm transition-colors',
                 deleteConfirmId === p.id
                   ? 'bg-s1-danger text-white'
                   : 'bg-s1-bg hover:bg-s1-danger/50 text-s1-muted hover:text-s1-danger',
@@ -401,7 +401,7 @@ onUnmounted(stopPolling)
 
     <!-- ── Right: Editor Panel ─────────────────────────────────────────────── -->
     <div v-if="editing" class="flex-1 flex flex-col overflow-hidden">
-      <div class="p-6 border-b border-s1-border flex items-center justify-between flex-shrink-0">
+      <div class="p-6 border-b border-s1-border flex items-center justify-between shrink-0">
         <h1 class="text-xl font-semibold text-s1-text">
           {{ editing.id ? 'Edit Playbook' : 'New Playbook' }}
         </h1>
@@ -430,7 +430,7 @@ onUnmounted(stopPolling)
             <input
               v-model="editing.title"
               placeholder="Playbook title"
-              class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary"
+              class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary"
             />
           </div>
           <div class="col-span-2">
@@ -439,12 +439,12 @@ onUnmounted(stopPolling)
               v-model="editing.description"
               rows="2"
               placeholder="What does this playbook simulate?"
-              class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary resize-none"
+              class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary resize-none"
             />
           </div>
           <div>
             <label class="block text-xs font-medium text-s1-muted mb-1.5">Category</label>
-            <select v-model="editing.category" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary">
+            <select v-model="editing.category" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary">
               <option value="malware">malware</option>
               <option value="ransomware">ransomware</option>
               <option value="lateral">lateral</option>
@@ -454,7 +454,7 @@ onUnmounted(stopPolling)
           </div>
           <div>
             <label class="block text-xs font-medium text-s1-muted mb-1.5">Severity</label>
-            <select v-model="editing.severity" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary">
+            <select v-model="editing.severity" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary">
               <option>CRITICAL</option>
               <option>HIGH</option>
               <option>MEDIUM</option>
@@ -466,7 +466,7 @@ onUnmounted(stopPolling)
             <input
               v-model.number="editing.estimatedDurationMs"
               type="number" min="0" step="1000"
-              class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary"
+              class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary"
             />
           </div>
         </div>
@@ -495,28 +495,28 @@ onUnmounted(stopPolling)
             >
               <!-- Step row -->
               <div class="flex items-center gap-2 p-2.5">
-                <GripVertical class="w-4 h-4 text-s1-muted cursor-grab flex-shrink-0" />
-                <span class="text-xs text-s1-muted w-4 text-center flex-shrink-0">{{ idx + 1 }}</span>
+                <GripVertical class="w-4 h-4 text-s1-muted cursor-grab shrink-0" />
+                <span class="text-xs text-s1-muted w-4 text-center shrink-0">{{ idx + 1 }}</span>
                 <input
                   v-model="step.stepId"
                   placeholder="stepId"
-                  class="w-28 bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle font-mono focus:outline-none focus:border-s1-primary"
+                  class="w-28 bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle font-mono focus:outline-hidden focus:border-s1-primary"
                 />
                 <input
                   v-model="step.label"
                   placeholder="Label"
-                  class="flex-1 bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary min-w-0"
+                  class="flex-1 bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary min-w-0"
                 />
                 <input
                   v-model.number="step.delayMs"
                   type="number" min="0" step="500"
                   placeholder="ms"
-                  class="w-20 bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary"
+                  class="w-20 bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary"
                 />
                 <select
                   :value="step.action"
                   @change="onStepActionChange(idx, ($event.target as HTMLSelectElement).value)"
-                  class="bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary"
+                  class="bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary"
                 >
                   <option value="activity">activity</option>
                   <option value="threat">threat</option>
@@ -526,7 +526,7 @@ onUnmounted(stopPolling)
                   <option value="resolve_all_threats">resolve_all_threats</option>
                   <option value="heal_all_agents">heal_all_agents</option>
                 </select>
-                <button @click="removeStep(idx)" class="p-1 text-s1-muted hover:text-s1-danger transition-colors flex-shrink-0">
+                <button @click="removeStep(idx)" class="p-1 text-s1-muted hover:text-s1-danger transition-colors shrink-0">
                   <X class="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -536,7 +536,7 @@ onUnmounted(stopPolling)
                 <template v-if="step.action === 'activity'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">activityType</label>
-                    <select v-model.number="step.activityType" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary">
+                    <select v-model.number="step.activityType" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
                       <option :value="2">PROCESS_EVENT (2)</option>
                       <option :value="6">USER_SESSION (6)</option>
                       <option :value="10">ADMIN_NOTE (10)</option>
@@ -551,81 +551,81 @@ onUnmounted(stopPolling)
                   </div>
                   <div class="col-span-2">
                     <label class="block text-xs text-s1-muted mb-1">description <span class="text-s1-border">(supports {agentName})</span></label>
-                    <input v-model="step.description" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.description" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                 </template>
 
                 <template v-else-if="step.action === 'threat'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">threatName</label>
-                    <input v-model="step.threatName" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.threatName" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">fileName</label>
-                    <input v-model="step.fileName" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.fileName" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">classification</label>
-                    <select v-model="step.classification" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary">
+                    <select v-model="step.classification" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
                       <option>Trojan</option><option>Ransomware</option><option>PUA</option><option>Malware</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">confidenceLevel</label>
-                    <select v-model="step.confidenceLevel" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary">
+                    <select v-model="step.confidenceLevel" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
                       <option>malicious</option><option>suspicious</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">mitreTactic</label>
-                    <input v-model="step.mitreTactic" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.mitreTactic" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">mitreTechnique</label>
-                    <input v-model="step.mitreTechnique" placeholder="T1566.001" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.mitreTechnique" placeholder="T1566.001" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                 </template>
 
                 <template v-else-if="step.action === 'alert'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">severity</label>
-                    <select v-model="step.severity" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary">
+                    <select v-model="step.severity" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
                       <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">category</label>
-                    <input v-model="step.category" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.category" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">mitreTactic</label>
-                    <input v-model="step.mitreTactic" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.mitreTactic" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">mitreTechnique</label>
-                    <input v-model="step.mitreTechnique" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.mitreTechnique" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div class="col-span-2">
                     <label class="block text-xs text-s1-muted mb-1">description <span class="text-s1-border">(supports {agentName})</span></label>
-                    <input v-model="step.description" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model="step.description" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                 </template>
 
                 <template v-else-if="step.action === 'agent_state'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">infected</label>
-                    <select v-model="step.infected" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary">
+                    <select v-model="step.infected" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
                       <option :value="true">true</option>
                       <option :value="false">false</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">activeThreats</label>
-                    <input v-model.number="step.activeThreats" type="number" min="0" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary" />
+                    <input v-model.number="step.activeThreats" type="number" min="0" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" />
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">networkStatus</label>
-                    <select v-model="step.networkStatus" class="w-full bg-s1-bg border border-s1-border rounded px-2 py-1 text-xs text-s1-subtle focus:outline-none focus:border-s1-primary">
+                    <select v-model="step.networkStatus" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
                       <option>connected</option><option>disconnected</option>
                     </select>
                   </div>
@@ -659,7 +659,7 @@ onUnmounted(stopPolling)
         <div v-if="selected" class="flex items-center gap-3">
           <select
             v-model="selectedAgentId"
-            class="bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary focus:ring-1 focus:ring-s1-primary"
+            class="bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary focus:ring-1 focus:ring-s1-primary"
           >
             <option v-for="a in agents" :key="a.id" :value="a.id">{{ a.computerName }}</option>
           </select>
@@ -696,7 +696,7 @@ onUnmounted(stopPolling)
               class="flex items-start gap-4 p-3 rounded-lg bg-s1-card border border-s1-border"
             >
               <div
-                class="flex-shrink-0 w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold"
+                class="shrink-0 w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold"
                 :class="runStatus.steps?.[idx]?.status === 'done' ? 'bg-green-500/20 border-green-500/40 text-green-400'
                        : runStatus.steps?.[idx]?.status === 'running' ? 'bg-blue-500/20 border-blue-500/40 text-blue-400 animate-pulse'
                        : runStatus.steps?.[idx]?.status === 'error' ? 'bg-red-500/20 border-red-500/40 text-red-400'
@@ -714,7 +714,7 @@ onUnmounted(stopPolling)
                 </div>
                 <div class="text-xs text-s1-muted mt-0.5">{{ step.action }}</div>
               </div>
-              <div v-if="runStatus.steps?.[idx]?.completedAt" class="text-xs text-s1-muted flex-shrink-0">
+              <div v-if="runStatus.steps?.[idx]?.completedAt" class="text-xs text-s1-muted shrink-0">
                 {{ elapsedSeconds(runStatus.steps![idx].startedAt) }}
               </div>
             </div>
@@ -756,7 +756,7 @@ onUnmounted(stopPolling)
 
           <div class="space-y-1.5">
             <div v-for="step in runStatus.steps" :key="step.stepId" class="flex items-center gap-2 text-xs">
-              <span :class="stepStatusColor(step.status)" class="font-mono w-3 text-center flex-shrink-0">
+              <span :class="stepStatusColor(step.status)" class="font-mono w-3 text-center shrink-0">
                 {{ stepStatusIcon(step.status) }}
               </span>
               <span :class="step.status === 'done' ? 'text-s1-muted' : step.status === 'running' ? 'text-s1-text' : 'text-s1-muted'">

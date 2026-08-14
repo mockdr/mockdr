@@ -219,7 +219,7 @@ onUnmounted(() => clearInterval(timer))
               >
                 {{ inc.properties.severity }}
               </span>
-              <span class="text-xs text-s1-muted bg-s1-hover px-2 py-0.5 rounded">
+              <span class="text-xs text-s1-muted bg-s1-hover px-2 py-0.5 rounded-sm">
                 {{ inc.properties.status }}
               </span>
             </div>

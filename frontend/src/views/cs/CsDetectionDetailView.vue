@@ -123,7 +123,7 @@ onMounted(async () => {
               v-for="st in ['new', 'in_progress', 'true_positive', 'false_positive', 'closed']" :key="st"
               @click="updateStatus(st)"
               :disabled="updating || detection.status === st"
-              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-30"
+              class="px-3 py-1.5 rounded-sm text-xs font-medium transition-colors disabled:opacity-30"
               :class="statusBadgeClass(st)"
             >
               {{ st }}
@@ -213,7 +213,7 @@ onMounted(async () => {
                 </div>
 
                 <!-- MITRE ATT&CK -->
-                <div class="bg-s1-bg rounded p-3">
+                <div class="bg-s1-bg rounded-sm p-3">
                   <div class="text-xs font-semibold text-s1-muted uppercase tracking-wider mb-2">MITRE ATT&CK</div>
                   <div class="grid grid-cols-2 gap-2 text-sm">
                     <div>
@@ -230,7 +230,7 @@ onMounted(async () => {
                 <!-- Command line -->
                 <div v-if="b.cmdline">
                   <div class="text-xs font-semibold text-s1-muted uppercase tracking-wider mb-1">Command Line</div>
-                  <pre class="text-xs font-mono text-s1-text bg-s1-bg rounded p-2 overflow-x-auto">{{ b.cmdline }}</pre>
+                  <pre class="text-xs font-mono text-s1-text bg-s1-bg rounded-sm p-2 overflow-x-auto">{{ b.cmdline }}</pre>
                 </div>
 
                 <!-- Hashes -->

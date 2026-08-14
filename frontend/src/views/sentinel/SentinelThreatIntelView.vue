@@ -108,7 +108,7 @@ onUnmounted(() => clearInterval(timer))
               <td class="table-cell">
                 <div class="flex flex-wrap gap-1">
                   <span v-for="label in (ind.properties.labels ?? []).slice(0, 3)" :key="label"
-                    class="text-xs px-1.5 py-0.5 rounded bg-s1-hover text-s1-subtle">
+                    class="text-xs px-1.5 py-0.5 rounded-sm bg-s1-hover text-s1-subtle">
                     {{ label }}
                   </span>
                   <span v-if="(ind.properties.labels ?? []).length > 3"

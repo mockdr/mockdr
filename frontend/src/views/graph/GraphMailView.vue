@@ -59,7 +59,7 @@ onMounted(() => fetchData())
 
     <div class="flex gap-4">
       <!-- Folders Sidebar -->
-      <div class="card w-64 flex-shrink-0 overflow-hidden">
+      <div class="card w-64 shrink-0 overflow-hidden">
         <div class="px-4 py-3 border-b border-s1-border">
           <h2 class="text-sm font-semibold text-s1-text">Folders</h2>
         </div>

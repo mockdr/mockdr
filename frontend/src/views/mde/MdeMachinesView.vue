@@ -190,7 +190,7 @@ onMounted(() => fetchMachines())
           <tr>
             <th class="table-header w-10">
               <input type="checkbox" :checked="allSelected" @change="toggleAll"
-                class="rounded border-s1-border bg-s1-bg accent-green-500" />
+                class="rounded-sm border-s1-border bg-s1-bg accent-green-500" />
             </th>
             <th class="table-header text-left">Computer Name</th>
             <th class="table-header text-left">OS Platform</th>
@@ -211,7 +211,7 @@ onMounted(() => fetchMachines())
               <td class="table-cell" @click.stop>
                 <input type="checkbox" :checked="selected.has(machine.machineId)"
                   @change="toggleSelect(machine.machineId)"
-                  class="rounded border-s1-border bg-s1-bg accent-green-500" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-green-500" />
               </td>
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm">{{ machine.computerDnsName }}</div>

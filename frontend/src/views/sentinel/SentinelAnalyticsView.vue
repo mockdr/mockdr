@@ -123,7 +123,7 @@ onUnmounted(() => clearInterval(timer))
               <td class="table-cell">
                 <div class="flex flex-wrap gap-1">
                   <span v-for="tactic in (rule.properties.tactics ?? []).slice(0, 3)" :key="tactic"
-                    class="text-xs px-1.5 py-0.5 rounded bg-s1-hover text-s1-subtle">
+                    class="text-xs px-1.5 py-0.5 rounded-sm bg-s1-hover text-s1-subtle">
                     {{ tactic }}
                   </span>
                   <span v-if="(rule.properties.tactics ?? []).length > 3"

@@ -122,8 +122,8 @@ async function onFileSelected(event: Event): Promise<void> {
             class="flex items-start gap-2 p-3 rounded-lg text-sm"
             :class="importStatus === 'success' ? 'bg-s1-success/10 text-s1-success' : 'bg-s1-danger/10 text-s1-danger'"
           >
-            <CheckCircle v-if="importStatus === 'success'" class="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <AlertCircle v-else class="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <CheckCircle v-if="importStatus === 'success'" class="w-4 h-4 shrink-0 mt-0.5" />
+            <AlertCircle v-else class="w-4 h-4 shrink-0 mt-0.5" />
             <span>{{ importMessage }}</span>
           </div>
         </Transition>

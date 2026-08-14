@@ -327,7 +327,7 @@ onMounted(async () => {
                 v-model="newComment"
                 rows="3"
                 placeholder="Add a comment..."
-                class="w-full rounded-lg border border-s1-border bg-transparent text-s1-text text-sm p-3 focus:outline-none focus:border-green-600"
+                class="w-full rounded-lg border border-s1-border bg-transparent text-s1-text text-sm p-3 focus:outline-hidden focus:border-green-600"
               ></textarea>
               <div class="flex justify-end mt-2">
                 <button @click="addComment()" :disabled="actionLoading || !newComment.trim()"

@@ -429,7 +429,7 @@ describe('WebhooksView', () => {
   it('delete button calls deleteHook via DOM click', async () => {
     const w = mount(WebhooksView, { global: { stubs: GLOBAL_STUBS } })
     await flushPromises()
-    const deleteBtn = w.find('button.flex-shrink-0')
+    const deleteBtn = w.find('button.shrink-0')
     await deleteBtn.trigger('click')
     await flushPromises()
     expect(webhooksApi.delete).toHaveBeenCalled()

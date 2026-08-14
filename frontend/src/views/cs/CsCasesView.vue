@@ -104,7 +104,7 @@ onMounted(() => fetchCases())
               <td class="table-cell">
                 <div class="flex flex-wrap gap-1">
                   <span v-for="tag in (cs.tags ?? []).slice(0, 3)" :key="tag"
-                    class="px-1.5 py-0.5 rounded text-[10px] bg-s1-hover text-s1-subtle">
+                    class="px-1.5 py-0.5 rounded-sm text-[10px] bg-s1-hover text-s1-subtle">
                     {{ tag }}
                   </span>
                 </div>

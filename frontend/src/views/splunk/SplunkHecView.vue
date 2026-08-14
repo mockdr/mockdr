@@ -59,7 +59,7 @@ onMounted(fetchTokens)
         <p class="text-s1-muted text-sm">HEC token management and event submission</p>
       </div>
       <div class="flex items-center gap-3">
-        <span class="text-xs px-2 py-1 rounded" :class="healthStatus === 'HEC is healthy' ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'">
+        <span class="text-xs px-2 py-1 rounded-sm" :class="healthStatus === 'HEC is healthy' ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'">
           {{ healthStatus }}
         </span>
         <button @click="fetchTokens()" class="btn-ghost flex items-center gap-2">

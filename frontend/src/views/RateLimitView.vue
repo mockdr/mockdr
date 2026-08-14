@@ -54,8 +54,8 @@ onMounted(() => fetchConfig())
     </div>
 
     <div v-if="loading" class="card p-6 animate-pulse">
-      <div class="h-4 bg-s1-hover rounded w-1/3 mb-4" />
-      <div class="h-4 bg-s1-hover rounded w-2/3" />
+      <div class="h-4 bg-s1-hover rounded-sm w-1/3 mb-4" />
+      <div class="h-4 bg-s1-hover rounded-sm w-2/3" />
     </div>
 
     <div v-else-if="config" class="grid md:grid-cols-2 gap-6">
@@ -83,7 +83,7 @@ onMounted(() => fetchConfig())
             :class="draftEnabled ? 'bg-s1-primary' : 'bg-s1-hover'"
           >
             <span
-              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow"
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
               :class="draftEnabled ? 'translate-x-6' : 'translate-x-1'"
             />
           </button>
@@ -106,7 +106,7 @@ onMounted(() => fetchConfig())
               v-for="preset in RPM_PRESETS" :key="preset"
               @click="draftRpm = preset"
               :disabled="!draftEnabled"
-              class="px-2.5 py-1 rounded text-xs transition-colors disabled:opacity-40"
+              class="px-2.5 py-1 rounded-sm text-xs transition-colors disabled:opacity-40"
               :class="draftRpm === preset
                 ? 'bg-s1-primary text-white'
                 : 'bg-s1-bg border border-s1-border text-s1-subtle hover:border-s1-primary/50'"

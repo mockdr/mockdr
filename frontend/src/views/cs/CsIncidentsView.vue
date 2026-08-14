@@ -161,7 +161,7 @@ onMounted(() => fetchIncidents())
                 <div class="flex flex-wrap gap-1">
                   <span
                     v-for="tactic in (inc.tactics ?? []).slice(0, 3)" :key="tactic"
-                    class="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-mono"
+                    class="text-xs px-1.5 py-0.5 rounded-sm bg-red-500/10 text-red-400 font-mono"
                   >
                     {{ tactic }}
                   </span>

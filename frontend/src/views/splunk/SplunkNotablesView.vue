@@ -134,7 +134,7 @@ onMounted(fetchNotables)
                 <select
                   :value="n.status"
                   @change="updateStatus(n.event_id, ($event.target as HTMLSelectElement).value)"
-                  class="bg-s1-input border border-s1-border rounded px-2 py-1 text-xs text-s1-text"
+                  class="bg-s1-input border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-text"
                 >
                   <option value="1">New</option>
                   <option value="2">In Progress</option>

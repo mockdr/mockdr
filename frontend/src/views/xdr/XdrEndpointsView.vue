@@ -163,7 +163,7 @@ onMounted(() => fetchEndpoints())
           <tr>
             <th class="table-header w-10">
               <input type="checkbox" :checked="allSelected" @change="toggleAll"
-                class="rounded border-s1-border bg-s1-bg accent-orange-500" />
+                class="rounded-sm border-s1-border bg-s1-bg accent-orange-500" />
             </th>
             <th class="table-header text-left">Endpoint Name</th>
             <th class="table-header text-left">OS Type</th>
@@ -185,7 +185,7 @@ onMounted(() => fetchEndpoints())
               <td class="table-cell" @click.stop>
                 <input type="checkbox" :checked="selected.has(ep.endpoint_id)"
                   @change="toggleSelect(ep.endpoint_id)"
-                  class="rounded border-s1-border bg-s1-bg accent-orange-500" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-orange-500" />
               </td>
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm">{{ ep.endpoint_name }}</div>

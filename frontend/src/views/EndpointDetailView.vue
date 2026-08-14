@@ -256,7 +256,7 @@ const ACTIONS: ActionItem[] = [
             </div>
           </div>
 
-          <div v-if="passphrase" class="mt-3 p-2 bg-s1-bg rounded border border-s1-border">
+          <div v-if="passphrase" class="mt-3 p-2 bg-s1-bg rounded-sm border border-s1-border">
             <div class="text-xs text-s1-muted mb-1">Passphrase</div>
             <code class="text-s1-warning font-mono text-sm">{{ passphrase }}</code>
           </div>
@@ -393,7 +393,7 @@ const ACTIONS: ActionItem[] = [
                 </div>
                 <div class="space-y-1">
                   <div v-for="dn in agent.activeDirectory!.computerMemberOf" :key="dn"
-                    class="text-xs font-mono text-s1-text bg-s1-bg rounded px-2 py-1 break-all">
+                    class="text-xs font-mono text-s1-text bg-s1-bg rounded-sm px-2 py-1 break-all">
                     {{ dn }}
                   </div>
                 </div>
@@ -406,7 +406,7 @@ const ACTIONS: ActionItem[] = [
                 </div>
                 <div class="space-y-1">
                   <div v-for="dn in agent.activeDirectory!.lastUserMemberOf" :key="dn"
-                    class="text-xs font-mono text-s1-text bg-s1-bg rounded px-2 py-1 break-all">
+                    class="text-xs font-mono text-s1-text bg-s1-bg rounded-sm px-2 py-1 break-all">
                     {{ dn }}
                   </div>
                 </div>
@@ -435,7 +435,7 @@ const ACTIONS: ActionItem[] = [
             <div v-if="!apps.length" class="text-center py-8 text-s1-muted text-sm">No application data</div>
             <div v-else class="space-y-1.5">
               <div v-for="app in apps" :key="app.id"
-                class="flex items-center justify-between p-2.5 rounded bg-s1-bg text-sm">
+                class="flex items-center justify-between p-2.5 rounded-sm bg-s1-bg text-sm">
                 <div>
                   <span class="text-s1-text">{{ app.name }}</span>
                   <span class="text-s1-muted ml-2 text-xs">{{ app.version }}</span>
@@ -449,7 +449,7 @@ const ACTIONS: ActionItem[] = [
           <div v-else-if="activeTab === 'processes'">
             <div class="space-y-1">
               <div v-for="p in processes" :key="p.pid"
-                class="flex items-center justify-between p-2.5 rounded bg-s1-bg text-sm font-mono">
+                class="flex items-center justify-between p-2.5 rounded-sm bg-s1-bg text-sm font-mono">
                 <span class="text-s1-text">{{ p.name }}</span>
                 <div class="flex gap-4 text-xs text-s1-muted">
                   <span>PID {{ p.pid }}</span>

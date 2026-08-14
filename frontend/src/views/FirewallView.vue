@@ -349,7 +349,7 @@ function toggleOsType(os: string): void {
                 v-for="os in ['windows', 'macos', 'linux']" :key="os"
                 @click="toggleOsType(os)"
                 :class="form.osTypes.includes(os) ? 'bg-s1-primary/15 text-s1-primary border-s1-primary/40' : 'border-s1-border text-s1-muted'"
-                class="text-xs px-2.5 py-1 rounded border transition-colors capitalize"
+                class="text-xs px-2.5 py-1 rounded-sm border transition-colors capitalize"
               >{{ os }}</button>
             </div>
           </div>

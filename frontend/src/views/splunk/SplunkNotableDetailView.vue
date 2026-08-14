@@ -57,7 +57,7 @@ onMounted(fetchNotable)
 <template>
   <div class="space-y-6">
     <div class="flex items-center gap-3">
-      <RouterLink to="/splunk/notables" class="p-1.5 rounded hover:bg-s1-hover">
+      <RouterLink to="/splunk/notables" class="p-1.5 rounded-sm hover:bg-s1-hover">
         <ArrowLeft class="w-4 h-4 text-s1-muted" />
       </RouterLink>
       <div>
@@ -93,7 +93,7 @@ onMounted(fetchNotable)
             <select
               :value="notable.status"
               @change="updateNotable('status', ($event.target as HTMLSelectElement).value)"
-              class="bg-s1-input border border-s1-border rounded px-2 py-1 text-sm text-s1-text mt-1"
+              class="bg-s1-input border border-s1-border rounded-sm px-2 py-1 text-sm text-s1-text mt-1"
             >
               <option value="1">New</option>
               <option value="2">In Progress</option>
@@ -125,7 +125,7 @@ onMounted(fetchNotable)
         </div>
         <div>
           <div class="text-xs text-s1-muted uppercase">Drilldown Search</div>
-          <div class="text-s1-text font-mono text-xs mt-1 bg-s1-hover p-2 rounded">{{ notable.drilldown_search }}</div>
+          <div class="text-s1-text font-mono text-xs mt-1 bg-s1-hover p-2 rounded-sm">{{ notable.drilldown_search }}</div>
         </div>
       </div>
 
