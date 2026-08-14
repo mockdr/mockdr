@@ -12,13 +12,17 @@ import type {
 const SENTINEL_CLIENT_ID = 'sentinel-mock-client-id'
 const SENTINEL_CLIENT_SECRET = 'sentinel-mock-client-secret'
 
+// ARM rejects any management-plane request without this, so every caller below
+// has to send it — including the ones that bypass `sentinelClient`.
+const API_VERSION = '2024-03-01'
+
 let accessToken = ''
 
 const sentinelClient = axios.create({
   baseURL: '/sentinel',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
-  params: { 'api-version': '2024-03-01' },
+  params: { 'api-version': API_VERSION },
 })
 
 // Request interceptor: add Bearer token, auto-fetch if missing
@@ -81,5 +85,9 @@ export const sentinelAlertRuleApi = {
 
 export const sentinelOperationsApi = {
   info: (): Promise<unknown> =>
-    axios.get('/sentinel/providers/Microsoft.SecurityInsights/operations').then(r => r.data),
+    axios
+      .get('/sentinel/providers/Microsoft.SecurityInsights/operations', {
+        params: { 'api-version': API_VERSION },
+      })
+      .then(r => r.data),
 }

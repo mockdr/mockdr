@@ -240,7 +240,7 @@ if [ -n "$DOCKER" ]; then
         for endpoint in \
             "http://localhost:5001/web/api/v2.1/system/status" \
             "http://localhost:5001/splunk/services/server/info?output_mode=json" \
-            "http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations"; do
+            "http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01"; do
             if ! curl --fail --retry 20 --retry-delay 3 --retry-all-errors -s "$endpoint" >/dev/null; then
                 DOCKER_OK=false
                 break

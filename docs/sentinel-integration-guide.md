@@ -112,5 +112,5 @@ curl -X POST http://localhost:8001/sentinel/v1/workspaces/mockdr-workspace/query
 
 ### Health Check
 ```bash
-curl http://localhost:8001/sentinel/providers/Microsoft.SecurityInsights/operations
+curl "http://localhost:8001/sentinel/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01"
 ```

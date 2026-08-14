@@ -8457,11 +8457,17 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{sentinel_base_url}}/providers/Microsoft.SecurityInsights/operations",
+                  "raw": "{{sentinel_base_url}}/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01",
                   "host": [
                     "{{sentinel_base_url}}/providers/Microsoft.SecurityInsights/operations"
                   ],
-                  "path": []
+                  "path": [],
+                  "query": [
+                    {
+                      "key": "api-version",
+                      "value": "2024-03-01"
+                    }
+                  ]
                 }
               }
             }

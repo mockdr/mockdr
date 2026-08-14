@@ -18,6 +18,8 @@ vi.mock('axios', () => {
   }
 })
 
+import axios from 'axios'
+
 import {
   sentinelIncidentApi,
   sentinelWatchlistApi,
@@ -81,5 +83,15 @@ describe('sentinel API', () => {
 
   it('sentinelOperationsApi.info returns promise', async () => {
     expect(sentinelOperationsApi.info()).toBeInstanceOf(Promise)
+  })
+
+  // This call bypasses `sentinelClient`, so it does not inherit the default
+  // api-version param. ARM answers 400 MissingApiVersionParameter without it.
+  it('sentinelOperationsApi.info sends api-version', async () => {
+    await sentinelOperationsApi.info()
+    expect(axios.get).toHaveBeenCalledWith(
+      '/sentinel/providers/Microsoft.SecurityInsights/operations',
+      { params: { 'api-version': '2024-03-01' } },
+    )
   })
 })

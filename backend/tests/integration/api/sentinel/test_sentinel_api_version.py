@@ -42,6 +42,17 @@ class TestApiVersionRequired:
         assert resp.status_code == 400
         assert resp.json()["error"]["code"] == "MissingApiVersionParameter"
 
+    def test_operations_also_requires_api_version(self, raw_client: TestClient) -> None:
+        """The unauthenticated operations route is management-plane too.
+
+        Every in-repo caller of it (frontend, CI smoke test, Bruno, Postman,
+        docs) once omitted the parameter, because the ARM client fixture adds
+        it for the rest of the suite and hid the breakage.
+        """
+        path = f"{SENTINEL_PREFIX}/providers/Microsoft.SecurityInsights/operations"
+        assert raw_client.get(path).status_code == 400
+        assert raw_client.get(f"{path}?api-version=2024-03-01").status_code == 200
+
     def test_valid_api_version_is_served(self, raw_client: TestClient) -> None:
         resp = raw_client.get(
             f"{SENTINEL_PREFIX}{_WS}/incidents?api-version=2024-03-01",

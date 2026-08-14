@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: {{sentinel_base_url}}/providers/Microsoft.SecurityInsights/operations
+  url: {{sentinel_base_url}}/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01
   body: none
   auth: none
+}
+
+params:query {
+  api-version: 2024-03-01
 }

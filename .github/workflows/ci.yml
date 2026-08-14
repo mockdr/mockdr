@@ -200,7 +200,7 @@ jobs:
           curl --fail --retry 20 --retry-delay 3 --retry-all-errors \
             http://localhost:5001/web/api/v2.1/system/status
           curl --fail http://localhost:5001/splunk/services/server/info?output_mode=json
-          curl --fail http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations
+          curl --fail "http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01"
           docker stop mockdr-ci
 
   # ── Container Scanning ─────────────────────────────────────────────────────
