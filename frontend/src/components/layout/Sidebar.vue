@@ -177,11 +177,11 @@ const sections = computed(() => {
 </script>
 
 <template>
-  <aside class="w-56 bg-s1-sidebar flex flex-col flex-shrink-0 border-r border-s1-border">
+  <aside class="w-56 bg-s1-sidebar flex flex-col shrink-0 border-r border-s1-border">
     <!-- Logo -->
     <div class="px-4 py-5 border-b border-s1-border">
       <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded bg-s1-primary flex items-center justify-center">
+        <div class="w-7 h-7 rounded-sm bg-s1-primary flex items-center justify-center">
           <Shield class="w-4 h-4 text-white" />
         </div>
         <div>
@@ -228,7 +228,7 @@ const sections = computed(() => {
               ? 'bg-s1-primary/15 text-s1-primary font-medium'
               : 'text-s1-subtle hover:text-s1-text hover:bg-s1-hover'"
           >
-            <component :is="item.icon" class="w-3.5 h-3.5 flex-shrink-0" />
+            <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
             {{ item.label }}
           </RouterLink>
         </div>

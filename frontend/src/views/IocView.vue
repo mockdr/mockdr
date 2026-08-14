@@ -139,7 +139,7 @@ onMounted(fetchList)
                 type="checkbox"
                 :checked="selected.size === items.length && items.length > 0"
                 @change="toggleAll"
-                class="rounded"
+                class="rounded-sm"
               />
             </th>
             <th class="px-5 py-3">Type</th>
@@ -156,10 +156,10 @@ onMounted(fetchList)
             :class="selected.has(ioc.uuid) ? 'bg-s1-primary/5' : ''"
           >
             <td class="px-4 py-3">
-              <input type="checkbox" :checked="selected.has(ioc.uuid)" @change="toggleSelect(ioc.uuid)" class="rounded" />
+              <input type="checkbox" :checked="selected.has(ioc.uuid)" @change="toggleSelect(ioc.uuid)" class="rounded-sm" />
             </td>
             <td class="px-5 py-3">
-              <span class="text-xs font-mono px-2 py-0.5 rounded bg-s1-border text-s1-text uppercase">{{ ioc.type }}</span>
+              <span class="text-xs font-mono px-2 py-0.5 rounded-sm bg-s1-border text-s1-text uppercase">{{ ioc.type }}</span>
             </td>
             <td class="px-5 py-3 font-mono text-xs text-s1-text max-w-[200px] truncate">{{ ioc.value }}</td>
             <td class="px-5 py-3 text-s1-text text-xs">{{ ioc.name || '—' }}</td>

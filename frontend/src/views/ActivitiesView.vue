@@ -57,7 +57,7 @@ function typeColor(activityType: number): string {
           v-for="act in items" :key="act.id"
           class="px-5 py-3.5 flex items-start gap-4 hover:bg-s1-hover transition-colors"
         >
-          <div class="flex-shrink-0 mt-0.5">
+          <div class="shrink-0 mt-0.5">
             <div class="w-1.5 h-1.5 rounded-full mt-2" :class="typeColor(act.activityType).replace('text-', 'bg-')" />
           </div>
           <div class="flex-1 min-w-0">
@@ -67,7 +67,7 @@ function typeColor(activityType: number): string {
               <span v-if="act.primaryDescription" class="text-xs text-s1-cyan">{{ act.primaryDescription }}</span>
             </div>
           </div>
-          <div class="flex-shrink-0 text-right">
+          <div class="shrink-0 text-right">
             <div class="text-xs text-s1-muted whitespace-nowrap">{{ act.createdAt?.slice(0, 19).replace('T', ' ') }}</div>
             <div :class="typeColor(act.activityType)" class="text-[10px] mt-0.5">type {{ act.activityType }}</div>
           </div>

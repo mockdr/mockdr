@@ -162,7 +162,7 @@ onMounted(async () => {
               <div class="text-xs font-semibold text-s1-muted uppercase tracking-wider mb-2">Host Groups</div>
               <div class="flex flex-wrap gap-1.5">
                 <span v-for="g in host.groups" :key="g"
-                  class="text-xs font-mono px-2 py-1 rounded bg-s1-bg text-s1-text">
+                  class="text-xs font-mono px-2 py-1 rounded-sm bg-s1-bg text-s1-text">
                   {{ g }}
                 </span>
               </div>

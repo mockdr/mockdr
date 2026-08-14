@@ -216,7 +216,7 @@ onMounted(() => fetchRules())
               <input type="checkbox"
                 :checked="rules.length > 0 && rules.every(r => selected.has(r.id))"
                 @change="rules.every(r => selected.has(r.id)) ? selected.clear() : rules.forEach(r => selected.add(r.id))"
-                class="rounded border-s1-border bg-s1-bg accent-purple-500" />
+                class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
             </th>
             <th class="table-header text-left">Name</th>
             <th class="table-header text-left">Severity</th>
@@ -235,7 +235,7 @@ onMounted(() => fetchRules())
               <td class="table-cell" @click.stop>
                 <input type="checkbox" :checked="selected.has(rule.id)"
                   @change="selected.has(rule.id) ? selected.delete(rule.id) : selected.add(rule.id)"
-                  class="rounded border-s1-border bg-s1-bg accent-purple-500" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
               </td>
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[200px]">{{ rule.name }}</div>
@@ -263,7 +263,7 @@ onMounted(() => fetchRules())
               <td class="table-cell">
                 <div class="flex flex-wrap gap-1">
                   <span v-for="tag in (rule.tags ?? []).slice(0, 3)" :key="tag"
-                    class="text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+                    class="text-xs px-1.5 py-0.5 rounded-sm bg-purple-500/10 text-purple-400">
                     {{ tag }}
                   </span>
                 </div>

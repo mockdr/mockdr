@@ -175,9 +175,9 @@ onMounted(() => fetchAll())
 
     <!-- Loading skeleton -->
     <div v-if="loading" class="card p-6 animate-pulse space-y-3">
-      <div class="h-4 bg-s1-hover rounded w-1/4" />
-      <div class="h-4 bg-s1-hover rounded w-1/2" />
-      <div class="h-4 bg-s1-hover rounded w-1/3" />
+      <div class="h-4 bg-s1-hover rounded-sm w-1/4" />
+      <div class="h-4 bg-s1-hover rounded-sm w-1/2" />
+      <div class="h-4 bg-s1-hover rounded-sm w-1/3" />
     </div>
 
     <template v-else>
@@ -278,11 +278,11 @@ onMounted(() => fetchAll())
                   type="checkbox"
                   :checked="vendorDrafts[v.vendor]?.enabled"
                   @click.stop="vendorDrafts[v.vendor].enabled = !vendorDrafts[v.vendor].enabled"
-                  class="rounded border-s1-border text-s1-primary focus:ring-s1-primary"
+                  class="rounded-sm border-s1-border text-s1-primary focus:ring-s1-primary"
                 />
                 <span class="text-s1-text text-sm font-medium">{{ v.label }}</span>
                 <span
-                  class="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-semibold"
+                  class="inline-block px-2 py-0.5 rounded-sm text-[10px] font-mono font-semibold"
                   :class="vendorBadgeClass(v.vendor)"
                 >{{ v.vendor }}</span>
                 <span v-if="vendorDrafts[v.vendor]?.base_url" class="text-s1-muted text-xs font-mono truncate max-w-[200px]">
@@ -300,7 +300,7 @@ onMounted(() => fetchAll())
                   v-model="vendorDrafts[v.vendor].base_url"
                   type="text"
                   :placeholder="v.vendor === 's1' ? 'https://tenant.sentinelone.net' : `https://api.${v.vendor}.example.com`"
-                  class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                  class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                 />
               </div>
 
@@ -318,7 +318,7 @@ onMounted(() => fetchAll())
                     v-model="vendorDrafts[v.vendor].auth.token"
                     type="password"
                     placeholder="Leave blank to keep existing"
-                    class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                    class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                   />
                 </div>
               </template>
@@ -331,7 +331,7 @@ onMounted(() => fetchAll())
                     v-model="vendorDrafts[v.vendor].auth.token_url"
                     type="text"
                     placeholder="https://api.crowdstrike.com/oauth2/token"
-                    class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                    class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                   />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -341,7 +341,7 @@ onMounted(() => fetchAll())
                       v-model="vendorDrafts[v.vendor].auth.client_id"
                       type="text"
                       placeholder="Client ID"
-                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                     />
                   </div>
                   <div>
@@ -350,7 +350,7 @@ onMounted(() => fetchAll())
                       v-model="vendorDrafts[v.vendor].auth.client_secret"
                       type="password"
                       placeholder="Leave blank to keep existing"
-                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                     />
                   </div>
                 </div>
@@ -365,7 +365,7 @@ onMounted(() => fetchAll())
                       v-model="vendorDrafts[v.vendor].auth.username"
                       type="text"
                       placeholder="Username"
-                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                     />
                   </div>
                   <div>
@@ -374,7 +374,7 @@ onMounted(() => fetchAll())
                       v-model="vendorDrafts[v.vendor].auth.password"
                       type="password"
                       placeholder="Leave blank to keep existing"
-                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                     />
                   </div>
                 </div>
@@ -384,7 +384,7 @@ onMounted(() => fetchAll())
                     v-model="vendorDrafts[v.vendor].auth.api_key"
                     type="password"
                     placeholder="If set, uses ApiKey auth instead of Basic"
-                    class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                    class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                   />
                 </div>
               </template>
@@ -398,7 +398,7 @@ onMounted(() => fetchAll())
                       v-model="vendorDrafts[v.vendor].auth.key_id"
                       type="text"
                       placeholder="Key ID"
-                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                     />
                   </div>
                   <div>
@@ -407,7 +407,7 @@ onMounted(() => fetchAll())
                       v-model="vendorDrafts[v.vendor].auth.key_secret"
                       type="password"
                       placeholder="Leave blank to keep existing"
-                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-none focus:border-s1-primary"
+                      class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text placeholder-s1-muted focus:outline-hidden focus:border-s1-primary"
                     />
                   </div>
                 </div>
@@ -428,7 +428,7 @@ onMounted(() => fetchAll())
             <!-- Vendor filter -->
             <select
               v-model="recordingFilter"
-              class="bg-s1-bg border border-s1-border rounded-lg px-2 py-1 text-xs text-s1-text focus:outline-none focus:border-s1-primary"
+              class="bg-s1-bg border border-s1-border rounded-lg px-2 py-1 text-xs text-s1-text focus:outline-hidden focus:border-s1-primary"
             >
               <option value="all">All vendors</option>
               <option v-for="v in vendorList" :key="v.vendor" :value="v.vendor">{{ v.label }}</option>
@@ -469,19 +469,19 @@ onMounted(() => fetchAll())
               >
                 <td class="px-6 py-3">
                   <span
-                    class="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-semibold"
+                    class="inline-block px-2 py-0.5 rounded-sm text-[10px] font-mono font-semibold"
                     :class="vendorBadgeClass(rec.vendor)"
                   >{{ rec.vendor }}</span>
                 </td>
                 <td class="px-6 py-3">
                   <span
-                    class="inline-block px-2 py-0.5 rounded text-xs font-mono font-semibold"
+                    class="inline-block px-2 py-0.5 rounded-sm text-xs font-mono font-semibold"
                     :class="methodClass(rec.method)"
                   >{{ rec.method }}</span>
                 </td>
                 <td class="px-6 py-3">
                   <span
-                    class="inline-block px-2 py-0.5 rounded text-xs font-mono font-semibold"
+                    class="inline-block px-2 py-0.5 rounded-sm text-xs font-mono font-semibold"
                     :class="statusClass(rec.response_status)"
                   >{{ rec.response_status }}</span>
                 </td>

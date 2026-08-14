@@ -153,7 +153,7 @@ onMounted(() => fetchData())
               <td class="table-cell text-right">
                 <button
                   @click="removeHash(entry.hash)"
-                  class="p-1.5 rounded hover:bg-red-500/10 text-s1-muted hover:text-red-400 transition-colors"
+                  class="p-1.5 rounded-sm hover:bg-red-500/10 text-s1-muted hover:text-red-400 transition-colors"
                   title="Remove hash"
                 >
                   <Trash2 class="w-3.5 h-3.5" />

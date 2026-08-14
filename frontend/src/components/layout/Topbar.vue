@@ -66,7 +66,7 @@ function logout(): void {
 </script>
 
 <template>
-  <header class="h-14 bg-s1-card border-b border-s1-border flex items-center px-6 gap-4 flex-shrink-0">
+  <header class="h-14 bg-s1-card border-b border-s1-border flex items-center px-6 gap-4 shrink-0">
     <!-- Breadcrumb -->
     <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-sm flex-1">
       <span class="text-s1-muted">Hypervisor</span>
@@ -107,12 +107,12 @@ function logout(): void {
             @click="router.push('/alerts'); showAlerts = false"
             class="px-4 py-3 hover:bg-s1-hover cursor-pointer transition-colors flex items-start gap-3"
           >
-            <div class="flex-shrink-0 mt-1.5 w-2 h-2 rounded-full" :class="SEVERITY_DOT[alert.ruleInfo.severity] ?? 'bg-s1-muted'" />
+            <div class="shrink-0 mt-1.5 w-2 h-2 rounded-full" :class="SEVERITY_DOT[alert.ruleInfo.severity] ?? 'bg-s1-muted'" />
             <div class="flex-1 min-w-0">
               <div class="text-sm text-s1-text font-medium truncate">{{ alert.ruleInfo.name }}</div>
               <div class="text-xs text-s1-muted">{{ alert.agentRealtimeInfo.agentComputerName }} · {{ alert.alertInfo.createdAt?.slice(0, 10) }}</div>
             </div>
-            <span class="text-[10px] text-s1-muted flex-shrink-0 mt-0.5">{{ alert.ruleInfo.severity }}</span>
+            <span class="text-[10px] text-s1-muted shrink-0 mt-0.5">{{ alert.ruleInfo.severity }}</span>
           </div>
         </div>
         <div class="px-4 py-2.5 border-t border-s1-border">
@@ -150,7 +150,7 @@ function logout(): void {
             v-for="t in PRESET_TOKENS"
             :key="t.token"
             @click="switchToken(t.token)"
-            class="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-s1-hover transition-colors flex items-center justify-between"
+            class="w-full text-left px-2 py-1.5 rounded-sm text-sm hover:bg-s1-hover transition-colors flex items-center justify-between"
             :class="t.token === auth.token ? 'text-s1-primary' : 'text-s1-subtle'"
           >
             {{ t.label }}

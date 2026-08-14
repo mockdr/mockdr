@@ -82,8 +82,8 @@ onMounted(() => fetchData())
             <tr v-for="item in items" :key="item.id" class="table-row">
               <td class="table-cell">
                 <div class="flex items-center gap-2">
-                  <Folder v-if="item.folder" class="w-4 h-4 text-yellow-400 flex-shrink-0" />
-                  <FileText v-else class="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <Folder v-if="item.folder" class="w-4 h-4 text-yellow-400 shrink-0" />
+                  <FileText v-else class="w-4 h-4 text-blue-400 shrink-0" />
                   <span class="font-medium text-s1-text text-sm">{{ item.name }}</span>
                 </div>
               </td>

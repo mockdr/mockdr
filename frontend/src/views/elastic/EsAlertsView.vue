@@ -147,7 +147,7 @@ onMounted(() => fetchAlerts())
               <input type="checkbox"
                 :checked="alerts.length > 0 && alerts.every(a => selected.has(a.id))"
                 @change="alerts.every(a => selected.has(a.id)) ? selected.clear() : alerts.forEach(a => selected.add(a.id))"
-                class="rounded border-s1-border bg-s1-bg accent-purple-500" />
+                class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
             </th>
             <th class="table-header text-left">Rule Name</th>
             <th class="table-header text-left">Severity</th>
@@ -164,7 +164,7 @@ onMounted(() => fetchAlerts())
               <td class="table-cell" @click.stop>
                 <input type="checkbox" :checked="selected.has(alert.id)"
                   @change="selected.has(alert.id) ? selected.delete(alert.id) : selected.add(alert.id)"
-                  class="rounded border-s1-border bg-s1-bg accent-purple-500" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
               </td>
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[250px]">{{ alert.rule_name }}</div>

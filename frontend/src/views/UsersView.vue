@@ -217,14 +217,14 @@ async function copyToken(): Promise<void> {
               <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   @click="generateToken(user.id)"
-                  class="p-1.5 rounded hover:bg-s1-hover text-s1-muted hover:text-s1-cyan transition-colors"
+                  class="p-1.5 rounded-sm hover:bg-s1-hover text-s1-muted hover:text-s1-cyan transition-colors"
                   title="View / generate API token"
                 >
                   <RefreshCw class="w-3.5 h-3.5" />
                 </button>
                 <button
                   @click="openEdit(user)"
-                  class="p-1.5 rounded hover:bg-s1-hover text-s1-muted hover:text-s1-text transition-colors"
+                  class="p-1.5 rounded-sm hover:bg-s1-hover text-s1-muted hover:text-s1-text transition-colors"
                   title="Edit user"
                 >
                   <Pencil class="w-3.5 h-3.5" />
@@ -232,7 +232,7 @@ async function copyToken(): Promise<void> {
                 <button
                   @click="requestDelete(user.id)"
                   :class="[
-                    'p-1.5 rounded transition-colors',
+                    'p-1.5 rounded-sm transition-colors',
                     deleteConfirmId === user.id
                       ? 'bg-red-600 text-white'
                       : 'hover:bg-s1-hover text-s1-muted hover:text-s1-danger',
@@ -266,7 +266,7 @@ async function copyToken(): Promise<void> {
               <input
                 v-model="modal.fullName"
                 placeholder="Jane Doe"
-                class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary"
+                class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary"
               />
             </div>
             <div>
@@ -276,19 +276,19 @@ async function copyToken(): Promise<void> {
                 type="email"
                 placeholder="jane@acmecorp.com"
                 :disabled="!!modal.id"
-                class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary disabled:opacity-50"
+                class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary disabled:opacity-50"
               />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs text-s1-muted mb-1">Role</label>
-                <select v-model="modal.role" class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary">
+                <select v-model="modal.role" class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary">
                   <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs text-s1-muted mb-1">Scope</label>
-                <select v-model="modal.scope" class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-none focus:border-s1-primary">
+                <select v-model="modal.scope" class="w-full bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary">
                   <option v-for="s in SCOPES" :key="s" :value="s">{{ s }}</option>
                 </select>
               </div>
@@ -328,7 +328,7 @@ async function copyToken(): Promise<void> {
             </code>
             <button
               @click="copyToken"
-              class="p-2 rounded-lg bg-s1-bg hover:bg-s1-hover text-s1-muted hover:text-s1-text transition-colors flex-shrink-0"
+              class="p-2 rounded-lg bg-s1-bg hover:bg-s1-hover text-s1-muted hover:text-s1-text transition-colors shrink-0"
               title="Copy to clipboard"
             >
               <Check v-if="tokenCopied" class="w-4 h-4 text-s1-success" />

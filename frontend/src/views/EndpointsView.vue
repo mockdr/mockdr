@@ -87,7 +87,7 @@ function toggleAll(): void {
           <tr>
             <th class="table-header w-10">
               <input type="checkbox" :checked="allSelected" @change="toggleAll"
-                class="rounded border-s1-border bg-s1-bg accent-s1-primary" />
+                class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
             </th>
             <th class="table-header text-left">Computer</th>
             <th class="table-header text-left">IP Address</th>
@@ -110,7 +110,7 @@ function toggleAll(): void {
               <td class="table-cell" @click.stop>
                 <input type="checkbox" :checked="store.isSelected(agent)"
                   @change="store.toggleSelect(agent)"
-                  class="rounded border-s1-border bg-s1-bg accent-s1-primary" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
               </td>
               <td class="table-cell">
                 <div class="flex items-center gap-2">

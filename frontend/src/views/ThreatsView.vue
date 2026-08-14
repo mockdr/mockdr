@@ -103,7 +103,7 @@ function formatDate(ts: string): string {
         <thead class="border-b border-s1-border">
           <tr>
             <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded border-s1-border bg-s1-bg accent-s1-primary" />
+              <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
             </th>
             <th class="table-header text-left">Threat Name</th>
             <th class="table-header text-left">Classification</th>
@@ -126,7 +126,7 @@ function formatDate(ts: string): string {
                 <input type="checkbox"
                   :checked="selected.has(threat.id)"
                   @change="toggleSelect(threat.id)"
-                  class="rounded border-s1-border bg-s1-bg accent-s1-primary" />
+                  class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
               </td>
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm">{{ threat.threatInfo.threatName }}</div>

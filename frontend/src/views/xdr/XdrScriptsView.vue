@@ -117,7 +117,7 @@ onMounted(() => fetchScripts())
               </td>
               <td class="table-cell text-right">
                 <button
-                  class="p-1.5 rounded hover:bg-orange-500/10 text-s1-muted hover:text-orange-400 transition-colors"
+                  class="p-1.5 rounded-sm hover:bg-orange-500/10 text-s1-muted hover:text-orange-400 transition-colors"
                   title="Execute script"
                 >
                   <Play class="w-3.5 h-3.5" />

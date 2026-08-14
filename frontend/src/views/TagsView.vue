@@ -234,7 +234,7 @@ onMounted(async () => {
                 <input v-model="editValue" class="input w-full text-xs" />
               </td>
               <td class="px-5 py-3">
-                <span class="px-2 py-0.5 rounded text-[10px] font-medium" :class="scopeBadge(tag.scopeLevel)">
+                <span class="px-2 py-0.5 rounded-sm text-[10px] font-medium" :class="scopeBadge(tag.scopeLevel)">
                   {{ tag.scopeLevel }}
                 </span>
               </td>
@@ -257,7 +257,7 @@ onMounted(async () => {
               <td class="px-5 py-3 font-medium text-s1-text">{{ tag.key }}</td>
               <td class="px-5 py-3 text-s1-muted">{{ tag.value }}</td>
               <td class="px-5 py-3">
-                <span class="px-2 py-0.5 rounded text-[10px] font-medium" :class="scopeBadge(tag.scopeLevel)">
+                <span class="px-2 py-0.5 rounded-sm text-[10px] font-medium" :class="scopeBadge(tag.scopeLevel)">
                   {{ tag.scopeLevel }}
                 </span>
               </td>

@@ -125,19 +125,19 @@ onMounted(() => fetchHooks())
         <div v-for="hook in hooks" :key="hook.id" class="px-5 py-4 flex items-start gap-4">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <span class="w-2 h-2 rounded-full flex-shrink-0" :class="hook.active ? 'bg-s1-success' : 'bg-s1-muted'" />
+              <span class="w-2 h-2 rounded-full shrink-0" :class="hook.active ? 'bg-s1-success' : 'bg-s1-muted'" />
               <span class="text-s1-text text-sm font-medium truncate">{{ hook.url }}</span>
             </div>
             <div v-if="hook.description" class="text-xs text-s1-muted mb-1">{{ hook.description }}</div>
             <div class="flex flex-wrap gap-1 mt-1">
               <span
                 v-for="et in hook.eventTypes" :key="et"
-                class="px-1.5 py-0.5 bg-s1-primary/10 text-s1-primary text-[10px] rounded font-mono"
+                class="px-1.5 py-0.5 bg-s1-primary/10 text-s1-primary text-[10px] rounded-sm font-mono"
               >{{ et }}</span>
             </div>
             <div class="text-[11px] text-s1-muted mt-1">Created {{ hook.createdAt.slice(0, 10) }}</div>
           </div>
-          <button @click="deleteHook(hook.id)" class="flex-shrink-0 text-s1-muted hover:text-s1-danger transition-colors">
+          <button @click="deleteHook(hook.id)" class="shrink-0 text-s1-muted hover:text-s1-danger transition-colors">
             <Trash2 class="w-4 h-4" />
           </button>
         </div>
@@ -147,7 +147,7 @@ onMounted(() => fetchHooks())
     <!-- Create modal -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showCreate" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="showCreate = false">
+        <div v-if="showCreate" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs" @click.self="showCreate = false">
           <div class="card w-full max-w-md mx-4 p-6 space-y-4">
             <div class="flex items-center justify-between">
               <h2 class="text-s1-text font-semibold">New Webhook</h2>
@@ -160,17 +160,17 @@ onMounted(() => fetchHooks())
               <div>
                 <label class="text-xs text-s1-muted uppercase tracking-wide">Endpoint URL *</label>
                 <input v-model="form.url" type="url" placeholder="https://your-server.example.com/hook"
-                  class="mt-1 w-full px-3 py-2 bg-s1-bg border border-s1-border rounded-lg text-s1-text text-sm focus:outline-none focus:border-s1-primary/60" />
+                  class="mt-1 w-full px-3 py-2 bg-s1-bg border border-s1-border rounded-lg text-s1-text text-sm focus:outline-hidden focus:border-s1-primary/60" />
               </div>
               <div>
                 <label class="text-xs text-s1-muted uppercase tracking-wide">Description</label>
                 <input v-model="form.description" type="text" placeholder="Optional label"
-                  class="mt-1 w-full px-3 py-2 bg-s1-bg border border-s1-border rounded-lg text-s1-text text-sm focus:outline-none focus:border-s1-primary/60" />
+                  class="mt-1 w-full px-3 py-2 bg-s1-bg border border-s1-border rounded-lg text-s1-text text-sm focus:outline-hidden focus:border-s1-primary/60" />
               </div>
               <div>
                 <label class="text-xs text-s1-muted uppercase tracking-wide">Signing Secret (HMAC-SHA256)</label>
                 <input v-model="form.secret" type="text" placeholder="Leave blank to auto-generate"
-                  class="mt-1 w-full px-3 py-2 bg-s1-bg border border-s1-border rounded-lg text-s1-text text-sm font-mono focus:outline-none focus:border-s1-primary/60" />
+                  class="mt-1 w-full px-3 py-2 bg-s1-bg border border-s1-border rounded-lg text-s1-text text-sm font-mono focus:outline-hidden focus:border-s1-primary/60" />
               </div>
               <div>
                 <label class="text-xs text-s1-muted uppercase tracking-wide">Event Types *</label>
@@ -178,7 +178,7 @@ onMounted(() => fetchHooks())
                   <button
                     v-for="et in ALL_EVENTS" :key="et"
                     @click="toggleEventType(et)"
-                    class="px-2.5 py-1 rounded text-xs font-mono transition-colors"
+                    class="px-2.5 py-1 rounded-sm text-xs font-mono transition-colors"
                     :class="form.eventTypes.includes(et)
                       ? 'bg-s1-primary text-white'
                       : 'bg-s1-bg border border-s1-border text-s1-subtle hover:border-s1-primary/50'"

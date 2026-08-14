@@ -86,7 +86,7 @@ function statusColor(code: number): string {
         v-model="search"
         type="text"
         placeholder="Filter by path, method, or token…"
-        class="w-full pl-9 pr-4 py-2 bg-s1-card border border-s1-border rounded-lg text-s1-text text-sm placeholder-s1-muted focus:outline-none focus:border-s1-primary/60"
+        class="w-full pl-9 pr-4 py-2 bg-s1-card border border-s1-border rounded-lg text-s1-text text-sm placeholder-s1-muted focus:outline-hidden focus:border-s1-primary/60"
       />
     </div>
 
@@ -100,12 +100,12 @@ function statusColor(code: number): string {
           class="px-4 py-3 flex items-center gap-3 hover:bg-s1-hover transition-colors text-sm font-mono"
         >
           <!-- Method -->
-          <span class="px-2 py-0.5 rounded text-[11px] font-bold flex-shrink-0" :class="methodColor(log.method)">
+          <span class="px-2 py-0.5 rounded-sm text-[11px] font-bold shrink-0" :class="methodColor(log.method)">
             {{ log.method }}
           </span>
 
           <!-- Status -->
-          <span class="w-10 text-right font-bold flex-shrink-0" :class="statusColor(log.status_code)">
+          <span class="w-10 text-right font-bold shrink-0" :class="statusColor(log.status_code)">
             {{ log.status_code }}
           </span>
 
@@ -115,15 +115,15 @@ function statusColor(code: number): string {
           </span>
 
           <!-- Duration -->
-          <span class="text-s1-muted text-xs flex-shrink-0 w-16 text-right">{{ log.duration_ms }}ms</span>
+          <span class="text-s1-muted text-xs shrink-0 w-16 text-right">{{ log.duration_ms }}ms</span>
 
           <!-- Token -->
-          <span class="text-s1-muted text-[11px] flex-shrink-0 w-24 truncate text-right" :title="log.token_hint">
+          <span class="text-s1-muted text-[11px] shrink-0 w-24 truncate text-right" :title="log.token_hint">
             {{ log.token_hint || '—' }}
           </span>
 
           <!-- Timestamp -->
-          <span class="text-s1-muted text-[11px] flex-shrink-0 w-44 text-right">
+          <span class="text-s1-muted text-[11px] shrink-0 w-44 text-right">
             {{ log.timestamp.slice(0, 19).replace('T', ' ') }}
           </span>
         </div>

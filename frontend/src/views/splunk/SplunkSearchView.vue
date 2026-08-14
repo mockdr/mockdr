@@ -55,7 +55,7 @@ async function runSearch(): Promise<void> {
           v-model="query"
           type="text"
           class="flex-1 bg-s1-input border border-s1-border rounded-lg px-4 py-2.5 text-sm text-s1-text font-mono
-                 focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/40"
+                 focus:outline-hidden focus:ring-2 focus:ring-green-500/40 focus:border-green-500/40"
           placeholder="search index=... sourcetype=..."
           @keyup.enter="runSearch"
         />
