@@ -122,14 +122,16 @@ def apply_graph_filter(records: list[dict], filter_str: str) -> list[dict]:
                 lf = m.group(0)
                 record[lf] = _match_lambda_field(record, lf)
 
-    result = apply_odata_filter(records, processed)
-
-    # Clean up injected fields
-    if has_lambda:
-        for record in records:
-            for key in list(record.keys()):
-                if key.startswith("_lambda_"):
-                    del record[key]
+    # try/finally: a malformed filter now raises, and leaking the synthetic
+    # _lambda_* keys back to the caller would corrupt the records themselves.
+    try:
+        result = apply_odata_filter(records, processed)
+    finally:
+        if has_lambda:
+            for record in records:
+                for key in list(record.keys()):
+                    if key.startswith("_lambda_"):
+                        del record[key]
 
     return result
 

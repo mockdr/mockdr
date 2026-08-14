@@ -302,6 +302,7 @@ from application.splunk.commands.edr_bridge import register_bridge as register_s
 from config import API_PREFIX, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.logging import setup_logging
+from utils.mde_odata import ODataFilterError
 from utils.vendor_errors import build_vendor_error, vendor_for_path
 
 setup_logging()
@@ -408,6 +409,24 @@ async def validation_exception_handler(
         status_code=400,
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, "; ".join(parts) or "Invalid request",
+        ),
+    )
+
+
+@app.exception_handler(ODataFilterError)
+async def odata_filter_exception_handler(
+    request: Request, exc: ODataFilterError,
+) -> JSONResponse:
+    """Answer an unparseable ``$filter`` with a vendor-shaped ``400``.
+
+    Defender and Graph reject a malformed or unsupported filter with ``400``.
+    Letting the parse error escape would surface as ``500``, which tells a
+    client written against the real vendor nothing about what it got wrong.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
         ),
     )
 

@@ -67,6 +67,46 @@ class TestGraphUsers:
         for user in body["value"]:
             assert user["department"] == "IT"
 
+    def test_list_users_with_startswith_filter(
+        self, client: TestClient, graph_admin_headers: dict,
+    ) -> None:
+        """$filter=startswith(displayName,…) is served, not a 500.
+
+        Graph reuses the MDE OData parser, so it inherited the bug that made
+        every contains()/startswith() filter raise — despite startswith on
+        displayName being the filter Microsoft's own docs lead with.
+        """
+        all_users = client.get(
+            "/graph/v1.0/users", params={"$top": 100}, headers=graph_admin_headers,
+        ).json()["value"]
+        prefix = all_users[0]["displayName"][:2]
+
+        resp = client.get(
+            "/graph/v1.0/users",
+            params={"$filter": f"startswith(displayName,'{prefix}')", "$top": 100},
+            headers=graph_admin_headers,
+        )
+        assert resp.status_code == 200
+        matched = resp.json()["value"]
+        assert matched, f"expected at least one user starting with {prefix!r}"
+        for user in matched:
+            assert user["displayName"].lower().startswith(prefix.lower())
+
+    def test_list_users_with_contains_filter(
+        self, client: TestClient, graph_admin_headers: dict,
+    ) -> None:
+        """$filter=contains(displayName,…) matches anywhere in the value."""
+        resp = client.get(
+            "/graph/v1.0/users",
+            params={"$filter": "contains(displayName,'a')", "$top": 100},
+            headers=graph_admin_headers,
+        )
+        assert resp.status_code == 200
+        matched = resp.json()["value"]
+        assert matched, "seeded display names should contain an 'a'"
+        for user in matched:
+            assert "a" in user["displayName"].lower()
+
     def test_list_users_with_search_by_display_name(
         self, client: TestClient, graph_admin_headers: dict,
     ) -> None:
