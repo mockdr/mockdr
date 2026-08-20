@@ -600,6 +600,64 @@ def _hit_id(rec: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# _source filtering
+# ---------------------------------------------------------------------------
+
+def _as_patterns(spec: object) -> list[str]:
+    """Normalise a ``_source`` include/exclude spec to a list of patterns."""
+    if isinstance(spec, str):
+        return [spec]
+    if isinstance(spec, (list, tuple)):
+        return [str(p) for p in spec]
+    return []
+
+
+def _project(record: dict, includes: list[str], excludes: list[str]) -> dict:
+    """Keep the fields matching *includes* and drop those matching *excludes*.
+
+    Patterns may use ``*`` and may name a dotted path, matching Elasticsearch's
+    source-filtering syntax.
+    """
+    def keep(field: str) -> bool:
+        if includes and not any(fnmatch(field, p) for p in includes):
+            return False
+        return not any(fnmatch(field, p) for p in excludes)
+
+    return {field: value for field, value in record.items() if keep(field)}
+
+
+def apply_source_filter(hits: list[dict], spec: object) -> list[dict]:
+    """Apply a ``_search`` body's ``_source`` directive to built hits.
+
+    ``_source`` was read and ignored, so a client asking for two fields got
+    every field — the response was larger than it asked for and matched
+    nothing a real cluster would send.
+
+    ``false`` drops ``_source`` entirely; a list or string keeps only the
+    matching fields; a dict takes ``includes``/``excludes``.
+    """
+    if spec is None or spec is True:
+        return hits
+
+    if spec is False:
+        return [{k: v for k, v in hit.items() if k != "_source"} for hit in hits]
+
+    if isinstance(spec, dict):
+        includes = _as_patterns(spec.get("includes") or spec.get("include"))
+        excludes = _as_patterns(spec.get("excludes") or spec.get("exclude"))
+    else:
+        includes, excludes = _as_patterns(spec), []
+
+    if not includes and not excludes:
+        return hits
+
+    return [
+        {**hit, "_source": _project(hit.get("_source", {}), includes, excludes)}
+        for hit in hits
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 

@@ -6,7 +6,12 @@ fresh ``_id`` per response, a plain-text 500, or a silently dropped clause.
 """
 import pytest
 
-from utils.es_query import ESQueryError, apply_es_query, wrap_as_hits
+from utils.es_query import (
+    ESQueryError,
+    apply_es_query,
+    apply_source_filter,
+    wrap_as_hits,
+)
 
 
 class TestHitIdStability:
@@ -106,3 +111,42 @@ class TestDefaultSize:
     def test_explicit_size_overrides_the_default(self) -> None:
         records = [{"id": str(n)} for n in range(50)]
         assert len(apply_es_query(records, {"size": 25})) == 25
+
+
+class TestSourceFiltering:
+    """``_source`` selects which fields come back, and was ignored."""
+
+    HITS = [
+        {"_index": "i", "_id": "1", "_score": 1.0,
+         "_source": {"host": "a", "port": 1, "user_name": "u", "user_id": 7}},
+    ]
+
+    def test_none_returns_hits_unchanged(self) -> None:
+        assert apply_source_filter(self.HITS, None) == self.HITS
+
+    def test_false_drops_the_source_entirely(self) -> None:
+        hit = apply_source_filter(self.HITS, False)[0]
+        assert "_source" not in hit
+        assert hit["_id"] == "1"
+
+    def test_list_keeps_only_named_fields(self) -> None:
+        hit = apply_source_filter(self.HITS, ["host", "port"])[0]
+        assert hit["_source"] == {"host": "a", "port": 1}
+
+    def test_bare_string_is_treated_as_one_field(self) -> None:
+        assert apply_source_filter(self.HITS, "host")[0]["_source"] == {"host": "a"}
+
+    def test_wildcards_are_honoured(self) -> None:
+        hit = apply_source_filter(self.HITS, ["user_*"])[0]
+        assert hit["_source"] == {"user_name": "u", "user_id": 7}
+
+    def test_includes_and_excludes_combine(self) -> None:
+        hit = apply_source_filter(
+            self.HITS, {"includes": ["user_*"], "excludes": ["user_id"]},
+        )[0]
+        assert hit["_source"] == {"user_name": "u"}
+
+    def test_metadata_fields_are_preserved(self) -> None:
+        hit = apply_source_filter(self.HITS, ["host"])[0]
+        assert hit["_index"] == "i"
+        assert hit["_score"] == 1.0

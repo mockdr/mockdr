@@ -11,7 +11,12 @@ from fnmatch import fnmatch
 
 from repository.es_alert_repo import es_alert_repo
 from repository.es_endpoint_repo import es_endpoint_repo
-from utils.es_query import _build_predicate, apply_es_query, wrap_as_hits
+from utils.es_query import (
+    _build_predicate,
+    apply_es_query,
+    apply_source_filter,
+    wrap_as_hits,
+)
 from utils.es_response import build_es_search_response
 
 # ── Index pattern routing ────────────────────────────────────────────────────
@@ -155,7 +160,9 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     else:
         total = total_before
 
-    hits = wrap_as_hits(filtered, index=canonical_index)
+    hits = apply_source_filter(
+        wrap_as_hits(filtered, index=canonical_index), body.get("_source"),
+    )
     return build_es_search_response(hits, total)
 
 
