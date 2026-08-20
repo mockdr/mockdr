@@ -360,7 +360,7 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | Indicators       | List, get, create, update, delete                   |
 | Machine Actions  | List, get, submit actions                           |
 | Investigations   | List, get, start, collect                           |
-| Advanced Hunting | Run KQL queries                                     |
+| Advanced Hunting | Run KQL queries — evaluated, not canned              |
 | Software         | List, get (TVM)                                     |
 | Vulnerabilities  | List, get (TVM CVEs)                                |
 | File Info        | File information lookup                             |
@@ -415,19 +415,27 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 
 mockdr includes a **real SPL parser and execution engine** that runs queries against the in-memory event store. Supported pipeline commands:
 
-| Command  | Example                                                           | Description                                    |
-| -------- | ----------------------------------------------------------------- | ---------------------------------------------- |
-| `search` | `search index=sentinelone sourcetype=sentinelone:channel:threats` | Filter by index, sourcetype, host, field=value |
-| `where`  | `where severity="critical"`                                       | Field value filtering                          |
-| `head`   | `head 20`                                                         | Limit to first N results                       |
-| `tail`   | `tail 10`                                                         | Limit to last N results                        |
-| `table`  | `table _time host classification`                                 | Project specific fields                        |
-| `stats`  | `stats count by classification`                                   | Aggregate by field                             |
-| `sort`   | `sort -count`                                                     | Sort ascending/descending                      |
-| `rename` | `rename computerName as hostname`                                 | Rename fields                                  |
-| `eval`   | `eval risk=severity*10`                                           | Evaluate expressions                           |
+Commands run in the order you write them, so `| head 1 | sort _time` and `| sort _time | head 1` differ as they do in Splunk.
 
-Time modifiers (`earliest=-24h@h latest=now`) and the `` `notable` `` macro are also supported.
+| Command        | Example                                                           | Description                                       |
+| -------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
+| `search`       | `search index=sentinelone NOT sourcetype=stash`                   | Filter by index, sourcetype, host, field=value; supports `AND`/`OR`/`NOT`, parentheses and `*` wildcards |
+| `where`        | `where severity="critical" AND count > 5`                         | Real comparison operators, not just equality      |
+| `eval`         | `eval risk=severity*10, tier=if(risk>50,"high","low")`            | Arithmetic, `.` concatenation, `if`/`case`/`coalesce`/`upper` and friends |
+| `stats`        | `stats count, avg(risk) as mean by classification`                | `count`/`sum`/`avg`/`min`/`max`/`dc`/`values`/`list`/`median`, with aliases |
+| `timechart`    | `timechart span=1h count by sourcetype`                           | Bucket over time                                  |
+| `top` / `rare` | `top 5 sourcetype`                                                | Ranked tables with `count` and `percent`          |
+| `dedup`        | `dedup host sourcetype`                                           | First row per distinct key                        |
+| `table`        | `table _time host classification`                                 | Project specific fields                           |
+| `fields`       | `fields - _raw`                                                   | Include or exclude fields                         |
+| `rex`          | `rex field=host "(?<site>^[a-z]+)"`                               | Extract named capture groups                      |
+| `regex`        | `regex host="^wkstn"`                                             | Filter by regular expression                      |
+| `sort`         | `sort sourcetype, -count`                                         | Several keys; numeric where the values are numbers |
+| `head` / `tail`| `head 20`                                                         | First or last N results                           |
+| `rename`       | `rename computerName as hostname`                                 | Rename fields                                     |
+| `fillnull`     | `fillnull value=0 count`                                          | Replace empty values                              |
+
+Time modifiers (`earliest=-24h@h latest=now`) and the `` `notable` `` macro are also supported. A command the engine does not implement is reported in the job's `messages` rather than silently ignored, so a query that cannot run does not look like one that returned nothing.
 
 ```bash
 # Run a one-shot search
@@ -436,6 +444,22 @@ curl -u admin:mockdr-admin -X POST \
   -d 'search=search index=sentinelone sourcetype=sentinelone:channel:threats | stats count by classification | sort -count' \
   -d 'output_mode=json'
 ```
+
+#### Advanced Hunting (KQL)
+
+`POST /mde/api/advancedqueries/run` evaluates the query against tables projected from the same seeded data the REST endpoints serve, so a hunting result cannot contradict `/api/machines` or `/api/alerts`.
+
+Tables: `DeviceInfo`, `AlertInfo`, `AlertEvidence`, `DeviceTvmSoftwareInventory`, `DeviceTvmSoftwareVulnerabilities`.
+
+Operators: `where`, `project`, `project-away`, `extend`, `summarize ... by`, `order by`, `take`/`limit`, `top`, `distinct`, `count` — with `==`, `!=`, `<`, `>`, `contains`, `startswith`, `endswith`, `has`, `in`, `matches regex`, combined with `and`/`or`/`not`.
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" -X POST \
+  "http://localhost:8001/mde/api/advancedqueries/run" \
+  -d '{"Query":"DeviceInfo | where OSPlatform == \"Windows10\" | summarize Devices=count() by HealthStatus | order by Devices desc"}'
+```
+
+A query naming a table that does not exist, or an operator the engine does not implement, is answered with `400` rather than rows that were never asked for.
 
 ### Microsoft Sentinel (prefix: `/sentinel`)
 
