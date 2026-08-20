@@ -8,6 +8,13 @@ from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
+from utils.mde_serde import to_mde_resource
+
+
+def _resource(record: dict) -> dict:
+    """Render a stored record as the API resource, keyed by ``id``."""
+    return to_mde_resource(record, "machineId")
+
 
 
 def list_machines(
@@ -31,7 +38,7 @@ def list_machines(
     Returns:
         OData list response with paginated machine records.
     """
-    records = [asdict(m) for m in mde_machine_repo.list_all()]
+    records = [_resource(asdict(m)) for m in mde_machine_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -61,7 +68,7 @@ def get_machine(machine_id: str) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    return asdict(machine)
+    return _resource(asdict(machine))
 
 
 def get_machine_logon_users(machine_id: str) -> dict | None:
@@ -92,7 +99,9 @@ def get_machine_alerts(machine_id: str) -> dict | None:
     if not machine:
         return None
     alerts = mde_alert_repo.get_by_machine_id(machine_id)
-    return build_mde_list_response([asdict(a) for a in alerts])
+    return build_mde_list_response(
+        [to_mde_resource(asdict(a), "alertId") for a in alerts],
+    )
 
 
 def _get_agent_id_for_machine(machine_id: str) -> str | None:

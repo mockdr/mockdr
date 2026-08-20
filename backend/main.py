@@ -311,6 +311,7 @@ from utils.es_aggs import ESAggregationError
 from utils.es_query import ESQueryError
 from utils.es_response import build_es_error_response
 from utils.logging import setup_logging
+from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
 from utils.vendor_errors import (
     build_vendor_error,
@@ -496,6 +497,23 @@ async def odata_filter_exception_handler(
         status_code=400,
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
+        ),
+    )
+
+
+@app.exception_handler(KqlError)
+async def kql_exception_handler(
+    request: Request, exc: KqlError,
+) -> JSONResponse:
+    """Answer an unusable hunting query with Defender's ``400``.
+
+    The query was previously accepted and ignored, so a malformed one
+    returned canned results rather than telling the caller anything.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, str(exc),
         ),
     )
 

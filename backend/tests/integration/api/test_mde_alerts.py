@@ -19,7 +19,7 @@ def _mde_auth(client: TestClient) -> dict[str, str]:
 def _get_first_alert_id(client: TestClient, headers: dict) -> str:
     """Return the first alert ID from the listing."""
     resp = client.get("/mde/api/alerts", headers=headers, params={"$top": 1})
-    return resp.json()["value"][0]["alertId"]
+    return resp.json()["value"][0]["id"]
 
 
 class TestListAlerts:
@@ -44,7 +44,7 @@ class TestListAlerts:
         resp = client.get("/mde/api/alerts", headers=headers, params={"$top": 1})
         alert = resp.json()["value"][0]
         required_fields = [
-            "alertId", "title", "description", "severity", "status",
+            "id", "title", "description", "severity", "status",
             "category", "detectionSource", "machineId",
             "alertCreationTime",
         ]
@@ -60,8 +60,8 @@ class TestListAlerts:
         headers = _mde_auth(client)
         r1 = client.get("/mde/api/alerts", headers=headers, params={"$top": 5, "$skip": 0})
         r2 = client.get("/mde/api/alerts", headers=headers, params={"$top": 5, "$skip": 5})
-        ids1 = {a["alertId"] for a in r1.json()["value"]}
-        ids2 = {a["alertId"] for a in r2.json()["value"]}
+        ids1 = {a["id"] for a in r1.json()["value"]}
+        ids2 = {a["id"] for a in r2.json()["value"]}
         assert ids1.isdisjoint(ids2), "Paginated pages should not overlap"
 
 
@@ -73,7 +73,7 @@ class TestGetAlert:
         alert_id = _get_first_alert_id(client, headers)
         resp = client.get(f"/mde/api/alerts/{alert_id}", headers=headers)
         assert resp.status_code == 200
-        assert resp.json()["alertId"] == alert_id
+        assert resp.json()["id"] == alert_id
 
     def test_nonexistent_alert_returns_404(self, client: TestClient) -> None:
         headers = _mde_auth(client)
@@ -138,7 +138,7 @@ class TestCreateAlertByReference:
         headers = _mde_auth(client)
         # Get a machine ID to reference
         machines_resp = client.get("/mde/api/machines", headers=headers, params={"$top": 1})
-        machine_id = machines_resp.json()["value"][0]["machineId"]
+        machine_id = machines_resp.json()["value"][0]["id"]
 
         resp = client.post(
             "/mde/api/alerts/createAlertByReference",
@@ -154,7 +154,7 @@ class TestCreateAlertByReference:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert "alertId" in body
+        assert "id" in body
         assert body["title"] == "Test Alert"
         assert body["machineId"] == machine_id
 
@@ -166,7 +166,7 @@ class TestBatchUpdateAlerts:
         headers = _mde_auth(client)
         # Get two alert IDs
         alerts_resp = client.get("/mde/api/alerts", headers=headers, params={"$top": 2})
-        alert_ids = [a["alertId"] for a in alerts_resp.json()["value"]]
+        alert_ids = [a["id"] for a in alerts_resp.json()["value"]]
 
         resp = client.post(
             "/mde/api/alerts/batchUpdate",

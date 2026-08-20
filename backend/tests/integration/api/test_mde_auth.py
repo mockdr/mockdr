@@ -184,7 +184,7 @@ class TestMdeRbac:
         # Get a machine ID using admin
         admin_headers = _mde_auth(client)
         machines_resp = client.get("/mde/api/machines", headers=admin_headers)
-        machine_id = machines_resp.json()["value"][0]["machineId"]
+        machine_id = machines_resp.json()["value"][0]["id"]
 
         resp = client.post(
             f"/mde/api/machines/{machine_id}/isolate",

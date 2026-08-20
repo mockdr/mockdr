@@ -43,10 +43,10 @@ class TestMachineActionsListing:
         actions = list_resp.json()["value"]
         if not actions:
             return  # No seeded actions; skip
-        action_id = actions[0]["actionId"]
+        action_id = actions[0]["id"]
         resp = client.get(f"/mde/api/machineactions/{action_id}", headers=headers)
         assert resp.status_code == 200
-        assert resp.json()["actionId"] == action_id
+        assert resp.json()["id"] == action_id
 
     def test_get_package_uri(self, client: TestClient) -> None:
         headers = _mde_auth(client)
@@ -54,7 +54,7 @@ class TestMachineActionsListing:
         actions = list_resp.json()["value"]
         if not actions:
             return
-        action_id = actions[0]["actionId"]
+        action_id = actions[0]["id"]
         resp = client.get(
             f"/mde/api/machineactions/{action_id}/getPackageUri",
             headers=headers,
@@ -71,13 +71,13 @@ class TestMachineActionsListing:
         headers = _mde_auth(client)
         # Isolate a machine to create an action
         machines_resp = client.get("/mde/api/machines", headers=headers, params={"$top": 1})
-        machine_id = machines_resp.json()["value"][0]["machineId"]
+        machine_id = machines_resp.json()["value"][0]["id"]
         isolate_resp = client.post(
             f"/mde/api/machines/{machine_id}/isolate",
             headers=headers,
             json={"Comment": "Test isolation", "IsolationType": "Full"},
         )
-        action_id = isolate_resp.json()["actionId"]
+        action_id = isolate_resp.json()["id"]
 
         # Verify the action appears in the listing
         resp = client.get(f"/mde/api/machineactions/{action_id}", headers=headers)
@@ -107,10 +107,10 @@ class TestInvestigations:
         investigations = list_resp.json()["value"]
         if not investigations:
             return
-        inv_id = investigations[0]["investigationId"]
+        inv_id = investigations[0]["id"]
         resp = client.get(f"/mde/api/investigations/{inv_id}", headers=headers)
         assert resp.status_code == 200
-        assert resp.json()["investigationId"] == inv_id
+        assert resp.json()["id"] == inv_id
 
     def test_collect_investigation(self, client: TestClient) -> None:
         headers = _mde_auth(client)
@@ -118,7 +118,7 @@ class TestInvestigations:
         investigations = list_resp.json()["value"]
         if not investigations:
             return
-        inv_id = investigations[0]["investigationId"]
+        inv_id = investigations[0]["id"]
         resp = client.post(f"/mde/api/investigations/{inv_id}/collect", headers=headers)
         assert resp.status_code == 200
 

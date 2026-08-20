@@ -19,7 +19,7 @@ def _mde_auth(client: TestClient) -> dict[str, str]:
 def _get_first_indicator_id(client: TestClient, headers: dict) -> str:
     """Return the first indicator ID from the listing."""
     resp = client.get("/mde/api/indicators", headers=headers, params={"$top": 1})
-    return resp.json()["value"][0]["indicatorId"]
+    return resp.json()["value"][0]["id"]
 
 
 class TestListIndicators:
@@ -44,7 +44,7 @@ class TestListIndicators:
         resp = client.get("/mde/api/indicators", headers=headers, params={"$top": 1})
         indicator = resp.json()["value"][0]
         required_fields = [
-            "indicatorId", "indicatorValue", "indicatorType",
+            "id", "indicatorValue", "indicatorType",
             "action", "severity", "title",
         ]
         for field in required_fields:
@@ -59,7 +59,7 @@ class TestGetIndicator:
         indicator_id = _get_first_indicator_id(client, headers)
         resp = client.get(f"/mde/api/indicators/{indicator_id}", headers=headers)
         assert resp.status_code == 200
-        assert resp.json()["indicatorId"] == indicator_id
+        assert resp.json()["id"] == indicator_id
 
     def test_nonexistent_indicator_returns_404(self, client: TestClient) -> None:
         headers = _mde_auth(client)
@@ -86,7 +86,7 @@ class TestCreateIndicator:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert "indicatorId" in body
+        assert "id" in body
         assert body["indicatorValue"] == "evil-domain.example.com"
         assert body["indicatorType"] == "DomainName"
         assert body["action"] == "AlertAndBlock"
@@ -104,7 +104,7 @@ class TestCreateIndicator:
                 "severity": "Low",
             },
         )
-        new_id = create_resp.json()["indicatorId"]
+        new_id = create_resp.json()["id"]
 
         get_resp = client.get(f"/mde/api/indicators/{new_id}", headers=headers)
         assert get_resp.status_code == 200

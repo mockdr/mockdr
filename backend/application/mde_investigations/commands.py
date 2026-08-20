@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from repository.mde_investigation_repo import mde_investigation_repo
+from utils.mde_serde import to_mde_resource
 
 
 def collect_investigation(investigation_id: str) -> dict | None:
@@ -24,4 +25,4 @@ def collect_investigation(investigation_id: str) -> dict | None:
     investigation.endTime = ""
     investigation.statusDetails = "CollectingEvidence"
     mde_investigation_repo.save(investigation)
-    return asdict(investigation)
+    return to_mde_resource(asdict(investigation), "investigationId")

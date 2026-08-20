@@ -8,6 +8,7 @@ from domain.mde_machine_action import MdeMachineAction
 from repository.mde_machine_action_repo import mde_machine_action_repo
 from repository.mde_machine_repo import mde_machine_repo
 from utils.dt import utc_now
+from utils.mde_serde import to_mde_resource
 
 
 def _create_action(
@@ -39,7 +40,7 @@ def _create_action(
         requestorComment=comment,
     )
     mde_machine_action_repo.save(action)
-    return asdict(action)
+    return to_mde_resource(asdict(action), "actionId")
 
 
 def isolate_machine(machine_id: str, body: dict) -> dict | None:
