@@ -39,7 +39,7 @@ class TestXsoarFlow:
             json={"search": "`notable`"},
             headers=bearer,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code == 201
         sid = create_resp.json()["sid"]
 
         # Step 3: Poll job status (XSOAR polls until DONE)
@@ -75,7 +75,7 @@ class TestXsoarFlow:
             json={"search": notable["drilldown_search"]},
             headers=bearer,
         )
-        assert drilldown_resp.status_code == 200
+        assert drilldown_resp.status_code == 201
         drilldown_sid = drilldown_resp.json()["sid"]
 
         drilldown_results = client.get(

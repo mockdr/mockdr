@@ -4,11 +4,15 @@ Implements the full async search job lifecycle used by XSOAR SplunkPy.
 """
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.search import (
-    cancel_search_job,
+    apply_control_action,
     create_search_job,
     delete_search_job,
 )
@@ -24,13 +28,13 @@ from application.splunk.queries.search import (
 router = APIRouter(tags=["Splunk Search"])
 
 
-@router.post("/services/search/v2/jobs")
-@router.post("/services/search/jobs")
+@router.post("/services/search/v2/jobs", response_model=None)
+@router.post("/services/search/jobs", response_model=None)
 async def create_job(
     request: Request,
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
-) -> dict:
+) -> JSONResponse:
     """Create a new search job.
 
     Accepts form-encoded or JSON body with ``search``, ``earliest_time``,
@@ -70,7 +74,23 @@ async def create_job(
         latest_time=latest_time,
         exec_mode=exec_mode,
     )
-    return {"sid": sid}
+
+    if exec_mode == "oneshot":
+        # A oneshot search returns the results directly; splunklib enforces
+        # this by refusing exec_mode="oneshot" in Jobs.create(). Returning a
+        # sid here left the caller polling a job it was never given.
+        results = get_results(sid, count=0)
+        delete_search_job(sid)
+        return JSONResponse(
+            status_code=200,
+            content=results or _EMPTY_RESULTS,
+        )
+
+    # Splunk answers 201 Created, and in XML mode the document is
+    # <response><sid>…</sid></response> — splunklib's _load_sid reads
+    # `_load_atom(response).response.sid`, which found nothing in the
+    # <s:dict> shape the generic renderer produced.
+    return JSONResponse(status_code=201, content={"sid": sid})
 
 
 @router.get("/services/search/v2/jobs")
@@ -83,8 +103,8 @@ def list_search_jobs(
     return list_jobs()
 
 
-@router.get("/services/search/v2/jobs/export")
-@router.get("/services/search/jobs/export")
+@router.get("/services/search/v2/jobs/export", response_model=None)
+@router.get("/services/search/jobs/export", response_model=None)
 async def export_search(
     request: Request,
     search: str = Query(default=""),
@@ -92,7 +112,7 @@ async def export_search(
     latest_time: str = Query(default=""),
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
-) -> dict:
+) -> Response:
     """One-shot blocking search export."""
     if not search:
         raise HTTPException(status_code=400, detail={"messages": [
@@ -105,8 +125,28 @@ async def export_search(
         latest_time=latest_time,
         exec_mode="oneshot",
     )
-    result = get_results(sid)
-    return result or {"results": [], "fields": [], "init_offset": 0, "messages": []}
+    result = get_results(sid, count=0) or _EMPTY_RESULTS
+    delete_search_job(sid)
+
+    if output_mode.lower() == "json":
+        # Real /export streams one JSON object per line, each carrying
+        # `preview` and `offset`; splunklib.results.JSONResultsReader is built
+        # around that and asserts `is_preview is False`. A single envelope with
+        # no `preview` key left is_preview as None.
+        return StreamingResponse(
+            _export_lines(result),
+            media_type="application/json",
+        )
+    return JSONResponse(status_code=200, content=result)
+
+
+_EMPTY_RESULTS: dict = {"results": [], "fields": [], "init_offset": 0, "messages": []}
+
+
+def _export_lines(result: dict) -> Iterator[str]:
+    """Yield the newline-delimited objects real ``/export`` streams."""
+    for offset, row in enumerate(result.get("results", [])):
+        yield json.dumps({"preview": False, "offset": offset, "result": row}) + "\n"
 
 
 @router.get("/services/search/v2/jobs/{sid}")
@@ -146,9 +186,32 @@ async def control_job(
         except Exception:
             pass
 
-    if action == "cancel":
-        cancel_search_job(sid)
-    return {"messages": [{"type": "INFO", "text": f"Action '{action}' applied to job '{sid}'"}]}
+    # Control on a job that does not exist is a 404, not a cheerful 200.
+    if get_job(sid) is None:
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+        ]})
+
+    if action not in _CONTROL_ACTIONS:
+        # Every action, including outright garbage, used to return 200 — so a
+        # typo in a playbook looked like it had worked.
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "ERROR", "text": f"Unknown action '{action}'."},
+        ]})
+
+    apply_control_action(sid, action)
+    return {
+        "messages": [
+            {"type": "INFO", "text": f"Action '{action}' applied to job '{sid}'"},
+        ],
+    }
+
+
+# The actions splunkd accepts on a search job.
+_CONTROL_ACTIONS = frozenset({
+    "cancel", "pause", "unpause", "finalize", "touch", "setttl",
+    "setpriority", "save", "unsave", "enablepreview", "disablepreview",
+})
 
 
 @router.api_route(

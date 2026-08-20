@@ -1,5 +1,6 @@
 """Integration tests for Splunk search job endpoints."""
 import base64
+import json
 
 from fastapi.testclient import TestClient
 
@@ -20,7 +21,8 @@ class TestCreateSearchJob:
             json={"search": "search index=sentinelone"},
             headers=_auth(),
         )
-        assert resp.status_code == 200
+        # Splunk answers 201 Created when dispatching a search job.
+        assert resp.status_code == 201
         assert "sid" in resp.json()
 
     def test_create_job_without_search_fails(self, client: TestClient) -> None:
@@ -37,7 +39,7 @@ class TestCreateSearchJob:
             data={"search": "search index=crowdstrike", "output_mode": "json"},
             headers=_auth(),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert "sid" in resp.json()
 
 
@@ -182,9 +184,14 @@ class TestSearchJobLifecycle:
             headers=_auth(),
         )
         assert resp.status_code == 200
-        body = resp.json()
-        assert "results" in body
-        assert len(body["results"]) <= 5
+        # /export streams one JSON object per line, each carrying `preview`
+        # and `offset` — the shape splunklib.results.JSONResultsReader parses.
+        lines = [line for line in resp.text.splitlines() if line.strip()]
+        assert len(lines) <= 5
+        for line in lines:
+            row = json.loads(line)
+            assert row["preview"] is False
+            assert "result" in row
 
     def test_get_job_summary(self, client: TestClient) -> None:
         create_resp = client.post(

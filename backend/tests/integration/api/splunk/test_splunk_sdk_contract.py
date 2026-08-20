@@ -7,6 +7,7 @@ that comparison permanently False and the documented polling loop
 (``while not job.is_done(): sleep(.2)``) never terminates against the mock.
 """
 import base64
+import json
 
 from fastapi.testclient import TestClient
 
@@ -142,3 +143,97 @@ class TestBothSdkApiModesAreServed:
                 params={"output_mode": "json"},
             )
             assert resp.status_code == 200, base
+
+
+class TestJobLifecycleStatusCodes:
+    """Statuses and bodies splunkd returns for the job lifecycle."""
+
+    def test_create_returns_201(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs",
+            data={"search": "search index=sentinelone"},
+            headers=_auth(), params={"output_mode": "json"},
+        )
+        assert resp.status_code == 201
+
+    def test_oneshot_returns_results_not_a_sid(self, client: TestClient) -> None:
+        # splunklib refuses exec_mode="oneshot" in Jobs.create() precisely
+        # because the endpoint answers with results; returning a sid left the
+        # caller polling a job it was never handed.
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs",
+            data={"search": "search index=sentinelone | head 3", "exec_mode": "oneshot"},
+            headers=_auth(), params={"output_mode": "json"},
+        )
+        body = resp.json()
+
+        assert resp.status_code == 200
+        assert "sid" not in body
+        assert "results" in body
+
+    def test_export_streams_ndjson(self, client: TestClient) -> None:
+        resp = client.get(
+            f"{SPLUNK_PREFIX}/services/search/jobs/export",
+            params={"search": "search index=sentinelone | head 3", "output_mode": "json"},
+            headers=_auth(),
+        )
+        lines = [line for line in resp.text.splitlines() if line.strip()]
+
+        assert len(lines) == 3, "one JSON object per line, not one envelope"
+        for offset, line in enumerate(lines):
+            row = json.loads(line)
+            # JSONResultsReader keys off `preview`; its absence left
+            # reader.is_preview as None where the SDK asserts False.
+            assert row["preview"] is False
+            assert row["offset"] == offset
+            assert "result" in row
+
+
+class TestJobControl:
+    """Control actions change observable state and reject nonsense."""
+
+    def _sid(self, client: TestClient) -> str:
+        return str(client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs",
+            data={"search": "search index=sentinelone"},
+            headers=_auth(), params={"output_mode": "json"},
+        ).json()["sid"])
+
+    def test_pause_is_observable(self, client: TestClient) -> None:
+        sid = self._sid(client)
+        client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs/{sid}/control",
+            data={"action": "pause"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+
+        content = _job_content(client, sid)
+        assert content["isPaused"] == "1"
+        assert content["dispatchState"] == "PAUSED"
+
+    def test_unpause_reverses_it(self, client: TestClient) -> None:
+        sid = self._sid(client)
+        for action in ("pause", "unpause"):
+            client.post(
+                f"{SPLUNK_PREFIX}/services/search/jobs/{sid}/control",
+                data={"action": action}, headers=_auth(),
+                params={"output_mode": "json"},
+            )
+        assert _job_content(client, sid)["isPaused"] == "0"
+
+    def test_unknown_action_is_rejected(self, client: TestClient) -> None:
+        sid = self._sid(client)
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs/{sid}/control",
+            data={"action": "definitely_not_an_action"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        assert resp.status_code == 400
+
+    def test_control_on_a_missing_job_is_404(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs/no-such-sid/control",
+            data={"action": "cancel"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        assert resp.status_code == 404

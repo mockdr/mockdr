@@ -88,6 +88,50 @@ def cancel_search_job(sid: str) -> bool:
     return True
 
 
+def apply_control_action(sid: str, action: str) -> bool:
+    """Apply a job control action, changing the job's observable state.
+
+    Only ``cancel`` did anything; the rest were accepted and ignored, so a
+    client could not tell a paused job from a running one or observe a
+    finalize taking effect.
+
+    Args:
+        sid:    The search job SID.
+        action: One of splunkd's job control actions.
+
+    Returns:
+        True if the job existed and the action was applied.
+    """
+    job = search_job_repo.get(sid)
+    if not job:
+        return False
+
+    if action == "cancel":
+        job.dispatch_state = "FAILED"
+        job.is_done = True
+        job.is_failed = True
+    elif action == "pause":
+        job.is_paused = True
+        job.dispatch_state = "PAUSED"
+    elif action == "unpause":
+        job.is_paused = False
+        job.dispatch_state = "DONE" if job.is_done else "RUNNING"
+    elif action == "finalize":
+        job.dispatch_state = "DONE"
+        job.is_done = True
+        job.done_progress = 1.0
+    elif action == "save":
+        job.is_saved = True
+    elif action == "unsave":
+        job.is_saved = False
+    elif action == "touch":
+        job.published_at = time.time()
+    # setttl / setpriority / (dis|en)ablepreview are accepted and have no
+    # observable effect on a mock that completes searches synchronously.
+    search_job_repo.save(job)
+    return True
+
+
 def delete_search_job(sid: str) -> bool:
     """Delete a search job.
 
