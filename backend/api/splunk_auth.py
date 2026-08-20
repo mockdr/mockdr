@@ -202,5 +202,10 @@ async def require_hec_auth(
         "token_name": token.name,
         "token": token.token,
         "index": token.index,
+        # Surfaced so the endpoint can enforce them: the token's allowed-index
+        # list and its indexer-acknowledgement setting were listed in the token
+        # API but never checked on ingest.
+        "indexes": token.indexes,
+        "use_ack": token.use_ack,
         "sourcetype": token.sourcetype,
     }
