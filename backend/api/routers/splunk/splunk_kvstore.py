@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from api.splunk_auth import require_splunk_admin, require_splunk_auth
 from application.splunk.commands.kvstore import (
+    DuplicateKeyError,
     batch_save,
     create_collection,
     delete_all_records,
@@ -16,7 +17,12 @@ from application.splunk.commands.kvstore import (
     insert_record,
     update_record,
 )
-from application.splunk.queries.kvstore import get_record, get_records, list_collections
+from application.splunk.queries.kvstore import (
+    collection_exists,
+    get_record,
+    get_records,
+    list_collections,
+)
 
 router = APIRouter(tags=["Splunk KV Store"])
 
@@ -75,10 +81,26 @@ def get_all_records(
     owner: str,
     app: str,
     name: str,
+    query: str = Query(default=""),
+    fields: str = Query(default=""),
+    sort: str = Query(default=""),
+    limit: int = Query(default=0),
+    skip: int = Query(default=0),
     current_user: dict = Depends(require_splunk_auth),
 ) -> list[dict]:
-    """Get all records from a KV collection."""
-    return get_records(name, app)
+    """Get records from a KV collection.
+
+    ``query``, ``fields``, ``sort``, ``limit`` and ``skip`` are all documented
+    on this endpoint and are what splunklib's ``query()`` sends; none were
+    declared here, so every one was dropped and the whole collection came back.
+    """
+    if not collection_exists(name, app):
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+        ]})
+    return get_records(
+        name, app, query=query, fields=fields, sort=sort, limit=limit, skip=skip,
+    )
 
 
 @router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}")
@@ -88,15 +110,25 @@ async def insert_kv_record(
     name: str,
     request: Request,
     current_user: dict = Depends(require_splunk_auth),
-) -> dict:
-    """Insert a record into a KV collection."""
+) -> JSONResponse:
+    """Insert a record into a KV collection.
+
+    Real Splunk answers 201 with only the new document key, and rejects a
+    duplicate ``_key`` with 409 — this used to return 200 with the whole
+    record and append a second copy under the same key.
+    """
     body = await request.json()
-    result = insert_record(name, body, app)
+    try:
+        result = insert_record(name, body, app)
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail={"messages": [
+            {"type": "ERROR", "text": str(exc)},
+        ]}) from exc
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
             {"type": "ERROR", "text": f"Collection '{name}' not found"},
         ]})
-    return result
+    return JSONResponse(status_code=201, content={"_key": result["_key"]})
 
 
 @router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_save")
@@ -113,7 +145,9 @@ async def batch_save_records(
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "ERROR", "text": "Expected a JSON array of records"},
         ]})
-    return batch_save(name, records, app)
+    saved = batch_save(name, records, app)
+    # Splunk returns the keys, not the documents.
+    return [{"_key": r["_key"]} for r in saved]
 
 
 @router.get("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key}")

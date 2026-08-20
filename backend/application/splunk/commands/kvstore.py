@@ -7,6 +7,10 @@ from domain.splunk.kv_collection import KVCollection
 from repository.splunk.kv_collection_repo import kv_collection_repo
 
 
+class DuplicateKeyError(ValueError):
+    """Raised when an insert would reuse an existing ``_key``."""
+
+
 def create_collection(
     name: str,
     app: str = "search",
@@ -62,6 +66,9 @@ def insert_record(
 
     Returns:
         The inserted record with ``_key``.
+
+    Raises:
+        DuplicateKeyError: If ``_key`` is already present in the collection.
     """
     coll = kv_collection_repo.get_by_name(name, app)
     if not coll:
@@ -69,6 +76,12 @@ def insert_record(
 
     if "_key" not in record:
         record["_key"] = str(uuid.uuid4())
+    elif any(r.get("_key") == record["_key"] for r in coll.records):
+        # Splunk documents that duplicate keys are not allowed; appending
+        # unconditionally left two records answering to the same _key, and a
+        # read-back returned whichever came first.
+        msg = f"Duplicate _key '{record['_key']}' in collection '{name}'"
+        raise DuplicateKeyError(msg)
 
     coll.records.append(record)
     kv_collection_repo.save(coll)

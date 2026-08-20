@@ -159,6 +159,7 @@ convention = "google"
 # SPL values are genuinely dynamic — a field may hold a string, number or list.
 "utils/splunk/spl_expr.py" = ["ANN401"]
 "utils/splunk/spl_exec.py" = ["ANN401"]
+"utils/splunk/kvstore_query.py" = ["ANN401"]
 "mockdr/testing.py" = ["ANN401"]
 # ASGI middleware — boilerplate patterns and non-crypto random for jitter/fault injection
 "api/middleware/**" = ["D107", "D102", "S311"]

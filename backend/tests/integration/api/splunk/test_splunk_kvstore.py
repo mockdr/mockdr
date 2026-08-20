@@ -62,7 +62,9 @@ class TestKVStoreRecords:
             json={"field1": "value1", "field2": 42},
             headers=_auth(),
         )
-        assert insert_resp.status_code == 200
+        # Splunk answers 201 with only the new document key.
+        assert insert_resp.status_code == 201
+        assert set(insert_resp.json()) == {"_key"}
         key = insert_resp.json()["_key"]
 
         get_resp = client.get(
