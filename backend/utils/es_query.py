@@ -29,6 +29,9 @@ from utils.nested import get_nested as _get_nested
 
 _DEFAULT_SIZE = 10
 
+#: Mirrors Elasticsearch's indices.query.bool.max_nested_depth default.
+_MAX_CLAUSE_DEPTH = 30
+
 
 class ESQueryError(ValueError):
     """Raised when a search body is not valid Elasticsearch query DSL.
@@ -89,18 +92,26 @@ def _compare_range(field_val: Any, target: Any, op: str) -> bool:
 # Predicate builders — one per query type
 # ---------------------------------------------------------------------------
 
-def build_predicate(clause: dict) -> Callable[[dict], bool]:
+def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
     """Recursively build a predicate function from an ES query clause.
 
     Args:
         clause: A single Elasticsearch query clause dict.
+        _depth: Recursion guard for nested ``bool`` clauses.
 
     Returns:
         A callable that accepts a record dict and returns ``True`` on match.
 
     Raises:
-        ValueError: If the clause contains an unsupported query type.
+        ESQueryError: If the clause is unsupported or nested too deeply.
     """
+    # Elasticsearch caps nesting at indices.query.bool.max_nested_depth for
+    # exactly this reason: without a bound, a deeply nested bool exhausts the
+    # stack and the RecursionError escapes as a 500.
+    if _depth > _MAX_CLAUSE_DEPTH:
+        msg = f"[bool] query is nested too deeply, max depth is {_MAX_CLAUSE_DEPTH}"
+        raise ESQueryError(msg)
+
     if not clause:
         return lambda _rec: True
 
@@ -116,6 +127,8 @@ def build_predicate(clause: dict) -> Callable[[dict], bool]:
         builder = _BUILDERS.get(query_type)
         if builder is None:
             raise ESQueryError(f"no [query] registered for [{query_type}]")
+        if query_type == "bool":
+            return _build_bool(body, _depth + 1)
         return builder(body)
 
     # Empty dict → match all.
@@ -276,15 +289,16 @@ def _build_exists(body: dict) -> Callable[[dict], bool]:
     return predicate
 
 
-def _build_bool(body: dict) -> Callable[[dict], bool]:
+def _build_bool(body: dict, depth: int = 0) -> Callable[[dict], bool]:
     """Build predicate for ``bool`` query.
 
     Combines ``must``, ``filter``, ``should``, and ``must_not`` sub-clauses.
+    The depth is threaded through so nesting stays bounded.
     """
-    must_preds = [build_predicate(c) for c in body.get("must", [])]
-    filter_preds = [build_predicate(c) for c in body.get("filter", [])]
-    should_preds = [build_predicate(c) for c in body.get("should", [])]
-    must_not_preds = [build_predicate(c) for c in body.get("must_not", [])]
+    must_preds = [build_predicate(c, depth) for c in body.get("must", [])]
+    filter_preds = [build_predicate(c, depth) for c in body.get("filter", [])]
+    should_preds = [build_predicate(c, depth) for c in body.get("should", [])]
+    must_not_preds = [build_predicate(c, depth) for c in body.get("must_not", [])]
     # Per ES: should clauses only carry a match requirement when there is no
     # must/filter to satisfy. Defaulting to 1 regardless meant adding a
     # non-matching should — which should affect scoring only — emptied the

@@ -121,6 +121,10 @@ _TOKEN_RE = re.compile(
     re.VERBOSE,
 )
 
+#: Bound on parenthesis nesting, so a hostile expression is refused rather
+#: than exhausting the stack.
+_MAX_DEPTH = 60
+
 _STRING_OPS = {
     "contains", "!contains", "startswith", "!startswith", "endswith",
     "!endswith", "has", "!has", "in", "!in", "matches",
@@ -153,6 +157,9 @@ class _PredicateParser:
     def __init__(self, tokens: list[_Token]) -> None:
         self._tokens = tokens
         self._pos = 0
+        # Without a bound, a deeply parenthesised expression recurses until
+        # the stack gives out and the RecursionError escapes as a 500.
+        self._depth = 0
 
     def _peek(self) -> _Token | None:
         return self._tokens[self._pos] if self._pos < len(self._tokens) else None
@@ -180,7 +187,20 @@ class _PredicateParser:
             raise KqlError(msg)
         return predicate
 
+    def _guard(self) -> None:
+        if self._depth > _MAX_DEPTH:
+            msg = "Expression is nested too deeply"
+            raise KqlError(msg)
+
     def _parse_or(self) -> Callable[[Row], bool]:
+        self._depth += 1
+        self._guard()
+        try:
+            return self._parse_or_inner()
+        finally:
+            self._depth -= 1
+
+    def _parse_or_inner(self) -> Callable[[Row], bool]:
         left = self._parse_and()
         while self._accept("or"):
             right = self._parse_and()
@@ -357,7 +377,11 @@ def evaluate_kql(rows: list[Row], query: KqlQuery) -> list[Row]:
     """
     result = [dict(r) for r in rows]
     for name, argument in query.operators:
-        result = _APPLY[name](result, argument)
+        try:
+            result = _APPLY[name](result, argument)
+        except RecursionError as exc:
+            msg = f"Expression in '{name}' is nested too deeply"
+            raise KqlError(msg) from exc
     return result
 
 
