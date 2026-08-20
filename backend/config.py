@@ -23,6 +23,15 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost
 
 PERSIST_PATH = os.getenv("MOCKDR_PERSIST", "")
 
+# How long a Splunk search job takes to reach DONE, in seconds.
+#
+# The search itself runs synchronously, so results are ready immediately and
+# the default of 0 keeps every response deterministic. Setting this makes the
+# dispatch states real Splunk passes through — QUEUED, PARSING, RUNNING,
+# FINALIZING — observable, which is what a client polling `isDone` in a loop
+# needs in order to be exercised at all.
+SPLUNK_DISPATCH_SECONDS = float(os.getenv("MOCKDR_SPLUNK_DISPATCH_SECONDS", "0"))
+
 # When true, a tenant segment in an Entra token URL must match the tenant the
 # credential belongs to. Set MOCKDR_STRICT_TENANT=false to accept any tenant,
 # e.g. when pointing a connector configured with a real tenant ID at the mock.

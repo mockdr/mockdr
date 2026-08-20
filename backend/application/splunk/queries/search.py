@@ -1,6 +1,10 @@
 """Splunk search job query handlers (read-only)."""
 from __future__ import annotations
 
+import time
+
+from config import SPLUNK_DISPATCH_SECONDS
+from domain.splunk.search_job import SearchJob
 from repository.splunk.search_job_repo import search_job_repo
 from utils.splunk.response import (
     build_search_results,
@@ -12,6 +16,39 @@ from utils.splunk.response import (
 def _splunk_bool(value: bool) -> str:
     """Render a boolean the way splunkd does in Atom content: ``"1"``/``"0"``."""
     return "1" if value else "0"
+
+
+#: The states a real search job passes through, as fractions of the dispatch
+#: window. A job reports the last state whose threshold it has passed.
+_DISPATCH_STATES: tuple[tuple[float, str], ...] = (
+    (0.00, "QUEUED"),
+    (0.20, "PARSING"),
+    (0.40, "RUNNING"),
+    (0.80, "FINALIZING"),
+    (1.00, "DONE"),
+)
+
+
+def _progress(job: SearchJob) -> tuple[str, float, bool]:
+    """Return the job's ``(dispatchState, doneProgress, isDone)`` right now.
+
+    The search runs synchronously, so a job is always *able* to answer. With
+    the default dispatch window of zero it reports DONE immediately, which
+    keeps every response deterministic. When a window is configured the job
+    walks the states real Splunk walks, so a client polling ``isDone`` in the
+    loop the SDK documents is actually exercised rather than short-circuited.
+    """
+    if job.is_failed or job.dispatch_state in ("FAILED", "PAUSED"):
+        return job.dispatch_state, job.done_progress, job.is_done
+    if SPLUNK_DISPATCH_SECONDS <= 0 or job.exec_mode == "blocking":
+        return job.dispatch_state, job.done_progress, job.is_done
+
+    elapsed = time.time() - (job.published_at or 0.0)
+    fraction = min(max(elapsed / SPLUNK_DISPATCH_SECONDS, 0.0), 1.0)
+    state = next(
+        name for threshold, name in reversed(_DISPATCH_STATES) if fraction >= threshold
+    )
+    return state, round(fraction, 3), state == "DONE"
 
 
 def get_job(sid: str) -> dict | None:
@@ -32,14 +69,15 @@ def get_job(sid: str) -> dict | None:
     # `self._state.content["isDone"] == "1"`. Emitting a JSON bool made that
     # comparison permanently False, so the SDK's documented polling loop
     # (`while not job.is_done(): sleep(.2)`) never terminated against the mock.
+    state, progress, done = _progress(job)
     content = {
         "sid": job.sid,
-        "dispatchState": job.dispatch_state,
-        "doneProgress": str(job.done_progress),
+        "dispatchState": state,
+        "doneProgress": str(progress),
         "eventCount": str(job.event_count),
         "resultCount": str(job.result_count),
         "scanCount": str(job.scan_count),
-        "isDone": _splunk_bool(job.is_done),
+        "isDone": _splunk_bool(done),
         "isFailed": _splunk_bool(job.is_failed),
         "isPaused": _splunk_bool(job.is_paused),
         "isSaved": _splunk_bool(job.is_saved),
@@ -62,13 +100,14 @@ def list_jobs() -> dict:
     jobs = search_job_repo.list_all()
     entries = []
     for job in jobs:
+        state, progress, done = _progress(job)
         content = {
             "sid": job.sid,
-            "dispatchState": job.dispatch_state,
-            "doneProgress": str(job.done_progress),
+            "dispatchState": state,
+            "doneProgress": str(progress),
             "eventCount": str(job.event_count),
             "resultCount": str(job.result_count),
-            "isDone": _splunk_bool(job.is_done),
+            "isDone": _splunk_bool(done),
             "isFailed": _splunk_bool(job.is_failed),
         }
         entries.append(build_splunk_entry(job.sid, content, collection="search/jobs"))

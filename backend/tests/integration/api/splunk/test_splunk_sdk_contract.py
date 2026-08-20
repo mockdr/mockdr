@@ -277,3 +277,73 @@ class TestResultValuesAreStrings:
         types = rows[0]["types"]
         assert isinstance(types, list)
         assert all(isinstance(t, str) for t in types)
+
+
+class TestDispatchLifecycle:
+    """A search job can walk the states real Splunk walks.
+
+    The search runs synchronously, so by default a job reports DONE at once and
+    every response stays deterministic. With a dispatch window configured the
+    job passes through QUEUED, PARSING, RUNNING and FINALIZING — without which
+    the SDK's polling loop is never actually exercised, only short-circuited.
+    """
+
+    def test_default_reports_done_immediately(self, client: TestClient) -> None:
+        content = _job_content(client, _create_job(client))
+        assert content["dispatchState"] == "DONE"
+        assert content["isDone"] == "1"
+
+    def test_states_are_observable_with_a_dispatch_window(
+        self, client: TestClient, monkeypatch: object,
+    ) -> None:
+        import time
+
+        from application.splunk.queries import search as search_queries
+
+        monkeypatch.setattr(search_queries, "SPLUNK_DISPATCH_SECONDS", 1.0)  # type: ignore[attr-defined]
+        sid = _create_job(client)
+
+        seen: list[str] = []
+        for _ in range(30):
+            content = _job_content(client, sid)
+            state = str(content["dispatchState"])
+            if not seen or seen[-1] != state:
+                seen.append(state)
+            if content["isDone"] == "1":
+                break
+            time.sleep(0.1)
+
+        assert seen[0] != "DONE", "the job was done before it started"
+        assert seen[-1] == "DONE"
+        assert set(seen) <= {"QUEUED", "PARSING", "RUNNING", "FINALIZING", "DONE"}
+
+    def test_results_are_available_regardless_of_state(
+        self, client: TestClient, monkeypatch: object,
+    ) -> None:
+        from application.splunk.queries import search as search_queries
+
+        monkeypatch.setattr(search_queries, "SPLUNK_DISPATCH_SECONDS", 30.0)  # type: ignore[attr-defined]
+        sid = _create_job(client)
+
+        # Still QUEUED, but the search itself already ran.
+        assert _job_content(client, sid)["isDone"] == "0"
+        results = client.get(
+            f"{SPLUNK_PREFIX}/services/search/v2/jobs/{sid}/results",
+            headers=_auth(), params={"output_mode": "json", "count": 0},
+        ).json()["results"]
+        assert results
+
+    def test_blocking_exec_mode_ignores_the_window(
+        self, client: TestClient, monkeypatch: object,
+    ) -> None:
+        from application.splunk.queries import search as search_queries
+
+        monkeypatch.setattr(search_queries, "SPLUNK_DISPATCH_SECONDS", 30.0)  # type: ignore[attr-defined]
+        sid = client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs",
+            data={"search": "search index=sentinelone", "exec_mode": "blocking"},
+            headers=_auth(), params={"output_mode": "json"},
+        ).json()["sid"]
+
+        # blocking waits for completion, so it is done when it returns.
+        assert _job_content(client, sid)["isDone"] == "1"

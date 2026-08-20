@@ -652,6 +652,7 @@ All data is **in-memory** by default -- mutations survive until server restart o
 | `MOCKDR_PERSIST`     | (none)                                        | File path for JSON state persistence across restarts                                               |
 | `CORS_ORIGINS`       | `http://localhost:5173,http://localhost:8001` | Comma-separated allowed CORS origins                                                               |
 | `MOCKDR_STRICT_TENANT` | `true`                                      | Require the tenant in an Entra token URL (`/{tenant}/oauth2/v2.0/token`) to match the mock tenant; set `false` to accept any tenant |
+| `MOCKDR_SPLUNK_DISPATCH_SECONDS` | `0`                             | How long a Splunk search job takes to reach `DONE`. `0` completes immediately and keeps responses deterministic; set e.g. `5` to make `QUEUED` → `PARSING` → `RUNNING` → `FINALIZING` observable, so a client's `isDone` polling loop is actually exercised |
 
 ## Middleware Stack
 

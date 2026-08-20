@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **22 endpoints that had no route at all.** These sit around the ones mockdr
+  already served: a client reads the tag vocabulary before offering it as a
+  filter, checks privileges before showing a create button, pulls a case's
+  audit trail, lists the actions run against an endpoint. Each returned 404,
+  so the surrounding workflow could not be exercised even though its central
+  endpoint worked.
+  - *Splunk:* `/services`, `/services/apps/local`, `/services/messages` and
+    `/services/search/parse` — the last is what `splunklib`'s `Service.parse()`
+    uses to validate a query without dispatching it, so it reports an
+    unrunnable query as an error rather than accepting it. Plus KV Store
+    `batch_find`, and HEC now accepts its token as `?token=` for clients that
+    cannot set headers.
+  - *Kibana platform:* `/api/status`, `/api/features`, `/api/spaces/space` and
+    `/api/fleet/agents`, the last derived from the same endpoints the metadata
+    API serves so the two inventories agree.
+  - *Detection engine:* tags, privileges, index, `rules/_bulk_create` (which
+    reports per rule rather than failing the batch), `rules/preview`,
+    `_export` and `_import`.
+  - *Cases:* status counts, reporters, `_bulk_get` (which separates hits from
+    misses), and `{id}/user_actions`.
+  - *Endpoint:* `action_log/{id}`, `action_status`, `policy_response`,
+    `suggestions` — and the four response actions are now also served at
+    `/api/endpoint/{action}`, which is where Kibana serves them; the mock had
+    them only under `/api/endpoint/action/{action}`, the listing path.
+- **`MOCKDR_SPLUNK_DISPATCH_SECONDS` makes a search job's dispatch states
+  observable.** The search runs synchronously, so a job reported `DONE` on the
+  first poll and `QUEUED`, `PARSING`, `RUNNING` and `FINALIZING` were
+  unreachable — a client's `isDone` polling loop was never exercised, only
+  short-circuited. Setting a window walks the job through those states over
+  that many seconds. The default of `0` keeps the immediate, deterministic
+  behaviour, and `exec_mode=blocking` still returns done, as real Splunk does.
+  Results are readable at any state, since the search has in fact already run.
+
+### Fixed
+
+- `_export` returned a `str`, so FastAPI serialised the NDJSON as one escaped
+  JSON string that `_import` could not read.
+- The endpoint metadata list took only `per_page` where Kibana sends
+  `pageSize`. Both spellings are accepted now.
+
 ## [2.0.1] - 2026-08-20
 
 Eight audits of every mocked platform against first-party sources — vendor
