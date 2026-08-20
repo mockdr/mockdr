@@ -22,6 +22,7 @@ router = APIRouter(tags=["Elastic Endpoints"])
 @router.get("/api/endpoint/metadata")
 def list_endpoints(
     page: int = Query(1, ge=1),
+    page_size: int = Query(None, ge=1, le=1000, alias="pageSize"),
     per_page: int = Query(20, ge=1, le=1000),
     hostname: str = Query(None),
     host_os_name: str = Query(None),
@@ -29,10 +30,15 @@ def list_endpoints(
     policy_id: str = Query(None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """List all managed endpoints with optional filtering."""
+    """List all managed endpoints with optional filtering.
+
+    Kibana spells the page size ``pageSize`` on this endpoint; ``per_page`` is
+    accepted too so callers written against mockdr's earlier spelling keep
+    working.
+    """
     return endpoint_queries.list_endpoints(
         page=page,
-        per_page=per_page,
+        per_page=page_size if page_size is not None else per_page,
         hostname=hostname,
         host_os_name=host_os_name,
         agent_status=agent_status,
@@ -58,6 +64,7 @@ def get_endpoint(
 # ── Response Actions ─────────────────────────────────────────────────────────
 
 
+@router.post("/api/endpoint/isolate", dependencies=[Depends(require_kbn_xsrf)])
 @router.post("/api/endpoint/action/isolate", dependencies=[Depends(require_kbn_xsrf)])
 def isolate_endpoint(
     body: dict = Body(...),
@@ -81,6 +88,7 @@ def isolate_endpoint(
     return result
 
 
+@router.post("/api/endpoint/unisolate", dependencies=[Depends(require_kbn_xsrf)])
 @router.post("/api/endpoint/action/unisolate", dependencies=[Depends(require_kbn_xsrf)])
 def unisolate_endpoint(
     body: dict = Body(...),
@@ -104,6 +112,7 @@ def unisolate_endpoint(
     return result
 
 
+@router.post("/api/endpoint/kill_process", dependencies=[Depends(require_kbn_xsrf)])
 @router.post("/api/endpoint/action/kill_process", dependencies=[Depends(require_kbn_xsrf)])
 def kill_process(
     body: dict = Body(...),
@@ -127,6 +136,7 @@ def kill_process(
     return result
 
 
+@router.post("/api/endpoint/scan", dependencies=[Depends(require_kbn_xsrf)])
 @router.post("/api/endpoint/action/scan", dependencies=[Depends(require_kbn_xsrf)])
 def scan_endpoint(
     body: dict = Body(...),

@@ -25,7 +25,7 @@ import secrets
 import time
 from typing import cast
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Query, Request
 
 from repository.splunk.hec_token_repo import hec_token_repo
 from repository.splunk.splunk_user_repo import splunk_user_repo
@@ -174,13 +174,17 @@ async def require_splunk_admin(
 
 async def require_hec_auth(
     authorization: str | None = Header(None),
+    token: str | None = Query(default=None),
 ) -> dict:
     """Validate Splunk HEC token authentication.
 
-    HEC uses ``Authorization: Splunk <token-value>`` header.
+    HEC takes the token in the ``Authorization: Splunk <token>`` header, and
+    also accepts it as a ``?token=`` query parameter for clients that cannot
+    set headers — a form mockdr rejected outright.
 
     Args:
         authorization: The Authorization header value.
+        token:         The token as a query parameter, if given.
 
     Returns:
         Dict with ``token_name``, ``index``, ``sourcetype`` from the token.
@@ -188,24 +192,28 @@ async def require_hec_auth(
     Raises:
         HTTPException: 401/403 if token is invalid or disabled.
     """
-    if not authorization or not authorization.lower().startswith("splunk "):
-        raise HTTPException(status_code=401, detail={"text": "Token is required", "code": 2})
-
-    token_value = authorization[7:]
-    token = hec_token_repo.get(token_value)
-    if not token:
+    if authorization and authorization.lower().startswith("splunk "):
+        token_value = authorization[7:]
+    elif token:
+        token_value = token
+    else:
+        raise HTTPException(
+            status_code=401, detail={"text": "Token is required", "code": 2},
+        )
+    record = hec_token_repo.get(token_value)
+    if not record:
         raise HTTPException(status_code=403, detail={"text": "Invalid token", "code": 4})
-    if token.disabled:
+    if record.disabled:
         raise HTTPException(status_code=403, detail={"text": "Token disabled", "code": 1})
 
     return {
-        "token_name": token.name,
-        "token": token.token,
-        "index": token.index,
+        "token_name": record.name,
+        "token": record.token,
+        "index": record.index,
         # Surfaced so the endpoint can enforce them: the token's allowed-index
         # list and its indexer-acknowledgement setting were listed in the token
         # API but never checked on ingest.
-        "indexes": token.indexes,
-        "use_ack": token.use_ack,
-        "sourcetype": token.sourcetype,
+        "indexes": record.indexes,
+        "use_ack": record.use_ack,
+        "sourcetype": record.sourcetype,
     }

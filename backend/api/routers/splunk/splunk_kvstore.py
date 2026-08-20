@@ -1,6 +1,7 @@
 """Splunk KV Store router."""
 from __future__ import annotations
 
+import json
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -148,6 +149,36 @@ async def batch_save_records(
     saved = batch_save(name, records, app)
     # Splunk returns the keys, not the documents.
     return [{"_key": r["_key"]} for r in saved]
+
+
+@router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_find")
+async def batch_find_records(
+    owner: str,
+    app: str,
+    name: str,
+    request: Request,
+    current_user: dict = Depends(require_splunk_auth),
+) -> list[list[dict]]:
+    """Run several KV Store queries in one request.
+
+    splunklib's ``KVStoreCollectionData.batch_find`` posts an array of query
+    objects and reads back one result array per query; the route was absent.
+    """
+    if not collection_exists(name, app):
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+        ]})
+
+    queries = await request.json()
+    if not isinstance(queries, list):
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "ERROR", "text": "Expected a JSON array of query objects"},
+        ]})
+
+    return [
+        get_records(name, app, query=json.dumps(q) if isinstance(q, dict) else "")
+        for q in queries
+    ]
 
 
 @router.get("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key}")

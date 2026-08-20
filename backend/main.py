@@ -98,10 +98,16 @@ from api.routers import (
     es_exception_lists as es_exception_lists_router,
 )
 from api.routers import (
+    es_platform as es_platform_router,
+)
+from api.routers import (
     es_rules as es_rules_router,
 )
 from api.routers import (
     es_search as es_search_router,
+)
+from api.routers import (
+    es_security_extras as es_security_extras_router,
 )
 from api.routers import (
     mde_advanced_hunting as mde_advanced_hunting_router,
@@ -276,6 +282,9 @@ from api.routers.splunk import (
 )
 from api.routers.splunk import (
     splunk_auth as splunk_auth_router,
+)
+from api.routers.splunk import (
+    splunk_catalog as splunk_catalog_router,
 )
 from api.routers.splunk import (
     splunk_hec as splunk_hec_router,
@@ -652,6 +661,8 @@ app.include_router(es_search_router.router, prefix=ES_PREFIX)
 # Kibana Security API endpoints — each handler applies its own auth dependency
 for _es_module in [
     es_endpoints_router,
+    es_platform_router,
+    es_security_extras_router,
     es_rules_router,
     es_alerts_router,
     es_cases_router,
@@ -698,6 +709,7 @@ for _splunk_module in [
     splunk_kvstore_router,
     splunk_indexes_router,
     splunk_alerts_router,
+    splunk_catalog_router,
     splunk_inputs_router,
 ]:
     app.include_router(_splunk_module.router, prefix=SPLUNK_PREFIX)
