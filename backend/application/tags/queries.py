@@ -5,7 +5,7 @@ from repository.agent_repo import agent_repo
 from repository.group_repo import group_repo
 from repository.site_repo import site_repo
 from repository.tag_repo import tag_repo
-from utils.filtering import FilterSpec, apply_filters
+from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import TAG_CURSOR, build_list_response, paginate
 
 FILTER_SPECS = [
@@ -139,6 +139,7 @@ def list_tags(params: dict, cursor: str | None, limit: int) -> dict:
     # Standard field filters
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: r.get("createdAt", ""), reverse=True)
+    filtered = apply_query_options(filtered, params)
 
     # Compute endpoint counts and exclusion counts per swagger spec
     for r in filtered:

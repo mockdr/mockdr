@@ -4,7 +4,7 @@ from dataclasses import asdict
 from infrastructure.process_gen import generate_processes_for_agent
 from repository.agent_repo import agent_repo
 from repository.store import store
-from utils.filtering import FilterSpec, apply_filters
+from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.pagination import AGENT_CURSOR, build_list_response, build_single_response, paginate
 from utils.strip import strip_fields
@@ -77,6 +77,7 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
     records = _apply_tag_filters(records, params)
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: r.get("lastActiveDate", ""), reverse=True)
+    filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, AGENT_CURSOR)
     stripped = [strip_fields(r, AGENT_INTERNAL_FIELDS) for r in page]
     return build_list_response(stripped, next_cursor, total)
@@ -86,13 +87,16 @@ def count_agents(params: dict) -> dict:
     """Return the count of agents matching the given filter parameters."""
     records = [asdict(a) for a in agent_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
-    return {"data": {"count": len(filtered)}}
+    filtered = apply_query_options(filtered, params)
+    # S1's own AgentsCountSchema_200 declares `total`, not `count`.
+    return {"data": {"total": len(filtered)}}
 
 
 def list_passphrases(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a paginated list of agent passphrases matching the given filters."""
     records = [asdict(a) for a in agent_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_query_options(filtered, params)
     passphrases = [
         {"agentId": r["id"], "computerName": r["computerName"], "passphrase": r["passphrase"]}
         for r in filtered

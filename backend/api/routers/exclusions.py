@@ -37,6 +37,9 @@ def list_exclusions(
     value__contains: str = Query(None),
     includeChildren: bool = Query(None),
     includeParents: bool = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

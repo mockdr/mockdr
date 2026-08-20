@@ -56,6 +56,9 @@ def list_tags(
 def list_passphrases(
     siteIds: str = Query(None),
     groupIds: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -138,6 +141,9 @@ def list_agents(
     decommissionedAt__gte: str = Query(None),
     hasTags: str = Query(None),
     tagsData: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

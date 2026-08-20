@@ -4,6 +4,7 @@ Provides ``FilterSpec`` and ``apply_filters`` for applying URL query-parameter
 filters to in-memory record lists.  Supports dot-path field access so nested
 dicts (e.g. ``threatInfo.classification``) can be targeted directly.
 """
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -127,3 +128,49 @@ def _compare_dt(field_val: Any, target: datetime, op: str) -> bool:
     if op == "gte":
         return parsed >= target
     return parsed <= target
+
+
+def apply_query_options(records: list[dict], params: dict) -> list[dict]:
+    """Apply the sorting and offset options every S1 list endpoint accepts.
+
+    ``sortBy``, ``sortOrder`` and ``skip`` are documented on every list
+    endpoint and were accepted and ignored, so a request asking for the second
+    page by offset, or for a specific order, got the default list back and
+    looked like it had worked.
+
+    Args:
+        records: Records already narrowed by :func:`apply_filters`.
+        params:  Raw URL query parameters.
+
+    Returns:
+        The records, sorted and offset as requested.
+    """
+    sort_by = str(params.get("sortBy") or "").strip()
+    if sort_by:
+        descending = str(params.get("sortOrder") or "asc").lower() == "desc"
+        records = sorted(records, key=_sort_key(sort_by), reverse=descending)
+
+    skip = _as_int(params.get("skip"))
+    if skip > 0:
+        records = records[skip:]
+    return records
+
+
+def _as_int(value: Any) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _sort_key(field: str) -> Callable[[dict], tuple[int, float, str]]:
+    """Build a sort key that orders numbers numerically and Nones last."""
+    def key(record: dict) -> tuple[int, float, str]:
+        value = _get_field(record, field)
+        if value is None:
+            return (2, 0.0, "")
+        try:
+            return (0, float(value), "")
+        except (TypeError, ValueError):
+            return (1, 0.0, str(value))
+    return key

@@ -20,6 +20,9 @@ def list_groups(
     updatedAt__lte: str = Query(None),
     updatedAt__gt: str = Query(None),
     updatedAt__lt: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
