@@ -1,4 +1,8 @@
+import time
+from dataclasses import asdict
+
 from domain.activity import Activity
+from domain.event_bus import ActivityCreated, event_bus
 from repository.store import store
 from utils.dt import utc_now
 from utils.id_gen import new_id
@@ -51,6 +55,14 @@ class ActivityRepository:
             siteId=site_id,
         )
         self.append(activity)
+        # Bridge the activity into Splunk and Sentinel (ADR-009). The bridge
+        # subscribed to activity_created and nothing ever published it, so
+        # every agent action was invisible downstream.
+        event_bus.publish(ActivityCreated(
+            entity_id=activity.id,
+            payload=asdict(activity),
+            timestamp=time.time(),
+        ))
         return activity
 
     def create_raw(self, activity: Activity) -> None:

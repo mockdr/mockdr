@@ -107,7 +107,7 @@ def get_machine_alerts(machine_id: str) -> dict | None:
 def _get_agent_id_for_machine(machine_id: str) -> str | None:
     """Find the S1 agent_id mapped to this MDE machine_id via edr_id_map."""
     from repository.store import store
-    all_maps = store._collections["edr_id_map"]  # noqa: SLF001
+    all_maps = store.get_all_with_keys("edr_id_map")
     for agent_id, mapping in all_maps.items():
         if isinstance(mapping, dict) and mapping.get("mde_machine_id") == machine_id:
             return agent_id
@@ -194,7 +194,7 @@ def get_software_export_data() -> list[dict]:
     from repository.agent_repo import agent_repo
     from repository.store import store
 
-    all_maps = store._collections["edr_id_map"]  # noqa: SLF001
+    all_maps = store.get_all_with_keys("edr_id_map")
     all_apps = store.get_all("installed_apps")
 
     agent_info: dict[str, dict] = {}

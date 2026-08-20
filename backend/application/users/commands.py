@@ -113,8 +113,26 @@ def update_user(user_id: str, data: dict) -> dict | None:
     if "role" in data:
         user.role = data["role"]
         user.lowestRole = data["role"]
+        # Authorisation reads the role off the token record, which was written
+        # once at token creation and never revisited. Demoting a user
+        # therefore left their existing token authorising everything the old
+        # role allowed — the demotion took effect in the user list and nowhere
+        # else.
+        _sync_token_role(user)
+
     user_repo.save(user)
     return {"data": strip_fields(asdict(user), USER_INTERNAL_FIELDS)}
+
+
+def _sync_token_role(user: User) -> None:
+    """Propagate a role change to the user's live API token."""
+    if not user._apiToken:
+        return
+    record = user_repo.get_token_record(user._apiToken)
+    if not record:
+        return
+    record["role"] = user.role
+    user_repo.save_token(user._apiToken, record)
 
 
 def delete_user(user_id: str) -> dict:

@@ -32,7 +32,7 @@ def _build_agent_to_cs_map() -> dict[str, str]:
             # We iterate the collection which returns values; we need agent_ids
             pass
     # Use direct store access to get all mappings with their keys
-    all_maps = store._collections["edr_id_map"]  # noqa: SLF001
+    all_maps = store.get_all_with_keys("edr_id_map")
     for agent_id, mapping in all_maps.items():
         if isinstance(mapping, dict) and "cs_device_id" in mapping:
             result[agent_id] = mapping["cs_device_id"]

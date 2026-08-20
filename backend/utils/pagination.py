@@ -98,6 +98,11 @@ def _encode_keyset(item: dict, spec: CursorSpec) -> str:
         "sort_by_column": spec._sort_by_column,
         "sort_by_value": sort_val,
         "sort_order": spec.sort_order,
+        # The identity column is not always unique — firewall rules key on
+        # createdAt — and resuming by value alone always re-found the *first*
+        # tied row, so the page never advanced and the client looped forever.
+        # The record's own id disambiguates.
+        "_tiebreak": item.get("id"),
     }
     b64 = base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
     # S1 URL-encodes the base64 padding character
@@ -106,12 +111,17 @@ def _encode_keyset(item: dict, spec: CursorSpec) -> str:
 
 def _decode_keyset(cursor: str) -> Any:
     """Extract ``id_value`` from a URL-safe S1 keyset cursor string."""
+    return _decode_keyset_payload(cursor).get("id_value")
+
+
+def _decode_keyset_payload(cursor: str) -> dict:
+    """Decode the whole cursor payload; an unreadable cursor yields ``{}``."""
     try:
         normalized = cursor.replace("%3D", "=")
         data = json.loads(base64.b64decode(normalized.encode()).decode())
-        return data.get("id_value")
     except (ValueError, KeyError, json.JSONDecodeError, UnicodeDecodeError):
-        return None
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _encode_offset(offset: int) -> str:
@@ -131,6 +141,33 @@ def _decode_offset(cursor: str) -> int:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+def _resume_index(
+    items: list,
+    spec: CursorSpec,
+    id_value: Any,
+    tiebreak: Any,
+) -> int | None:
+    """Find the position just after the cursor's record.
+
+    Matching on the identity column alone re-found the first row sharing that
+    value whenever it was not unique, so the page never advanced. The record's
+    own id is preferred; the column value is the fallback for cursors issued
+    before the tiebreaker existed.
+    """
+    id_str = str(id_value)
+
+    if tiebreak is not None:
+        tiebreak_str = str(tiebreak)
+        for i, item in enumerate(items):
+            if str(item.get("id", "")) == tiebreak_str:
+                return i + 1
+
+    for i, item in enumerate(items):
+        if str(item.get(spec.id_field, "")) == id_str:
+            return i + 1
+    return None
+
 
 def paginate(
     items: list,
@@ -159,18 +196,14 @@ def paginate(
         # ── keyset mode ──────────────────────────────────────────────────────
         start = 0
         if cursor:
-            id_value = _decode_keyset(cursor)
+            payload = _decode_keyset_payload(cursor)
+            id_value = payload.get("id_value")
             if id_value is not None:
-                id_str = str(id_value)
-                found = False
-                for i, item in enumerate(items):
-                    if str(item.get(spec.id_field, "")) == id_str:
-                        start = i + 1
-                        found = True
-                        break
-                if not found:
+                resumed = _resume_index(items, spec, id_value, payload.get("_tiebreak"))
+                if resumed is None:
                     # Cursor references an ID no longer present — stale cursor.
                     return [], None, total
+                start = resumed
 
         page = items[start: start + limit]
         if page and (start + len(page)) < total:
