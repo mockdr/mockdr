@@ -6,11 +6,13 @@ response envelopes.
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict
 from fnmatch import fnmatch
 
 from repository.es_alert_repo import es_alert_repo
 from repository.es_endpoint_repo import es_endpoint_repo
+from utils.es_aggs import apply_aggregations
 from utils.es_query import (
     _build_predicate,
     apply_es_query,
@@ -163,7 +165,116 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     hits = apply_source_filter(
         wrap_as_hits(filtered, index=canonical_index), body.get("_source"),
     )
-    return build_es_search_response(hits, total)
+    response = build_es_search_response(hits, total)
+
+    # Aggregations run over everything the query matched, not the page.
+    aggs = body.get("aggs") or body.get("aggregations")
+    if aggs:
+        matched = [r for r in records if _build_predicate(query_clause)(r)] if (
+            query_clause
+        ) else records
+        response["aggregations"] = apply_aggregations(
+            matched, aggs, index=canonical_index,
+        )
+
+    # `track_total_hits: false` tells ES not to report a total at all.
+    if body.get("track_total_hits") is False:
+        response["hits"].pop("total", None)
+
+    return response
+
+
+def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dict:
+    """Return a document count, the ``_count`` API's response.
+
+    Args:
+        index:              Target index name or pattern.
+        body:               Optional body carrying a ``query``.
+        ignore_unavailable: Skip a missing concrete index instead of failing.
+
+    Returns:
+        ``{"count": N, "_shards": {...}}``.
+
+    Raises:
+        IndexNotFoundError: If a concrete index name is unknown.
+    """
+    records, _ = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
+    query_clause = (body or {}).get("query")
+    if query_clause:
+        predicate = _build_predicate(query_clause)
+        records = [r for r in records if predicate(r)]
+    return {
+        "count": len(records),
+        "_shards": {"total": 1, "successful": 1, "skipped": 0, "failed": 0},
+    }
+
+
+def es_cat_indices() -> list[dict]:
+    """Return the ``_cat/indices`` rows, in the JSON form ``format=json`` gives."""
+    rows = []
+    for prefix in _KNOWN_PREFIXES:
+        records, _ = _resolve_collection(prefix, ignore_unavailable=True)
+        rows.append({
+            "health": "green",
+            "status": "open",
+            "index": prefix,
+            "uuid": _index_uuid(prefix),
+            "pri": "1",
+            "rep": "1",
+            "docs.count": str(len(records)),
+            "docs.deleted": "0",
+            "store.size": f"{max(len(records), 1) * 4}kb",
+            "pri.store.size": f"{max(len(records), 1) * 4}kb",
+        })
+    return rows
+
+
+def es_cluster_health(index: str = "") -> dict:
+    """Return the ``_cluster/health`` body."""
+    return {
+        "cluster_name": "mockdr-elastic",
+        "status": "green",
+        "timed_out": False,
+        "number_of_nodes": 1,
+        "number_of_data_nodes": 1,
+        "active_primary_shards": len(_KNOWN_PREFIXES),
+        "active_shards": len(_KNOWN_PREFIXES),
+        "relocating_shards": 0,
+        "initializing_shards": 0,
+        "unassigned_shards": 0,
+        "delayed_unassigned_shards": 0,
+        "number_of_pending_tasks": 0,
+        "number_of_in_flight_fetch": 0,
+        "task_max_waiting_in_queue_millis": 0,
+        "active_shards_percent_as_number": 100.0,
+        **({"index": index} if index else {}),
+    }
+
+
+def es_mget(index: str, body: dict) -> dict:
+    """Return the ``_mget`` response for the requested document ids."""
+    docs: list[dict] = []
+    for entry in body.get("docs", []) or []:
+        target = entry.get("_index") or index
+        doc_id = str(entry.get("_id", ""))
+        found = None
+        try:
+            found = es_get_doc(target, doc_id)
+        except (IndexNotFoundError, MultipleIndicesError):
+            found = None
+        docs.append(found or {"_index": target, "_id": doc_id, "found": False})
+
+    for doc_id in body.get("ids", []) or []:
+        found = es_get_doc(index, str(doc_id))
+        docs.append(found or {"_index": index, "_id": str(doc_id), "found": False})
+
+    return {"docs": docs}
+
+
+def _index_uuid(index: str) -> str:
+    """A stable pseudo-uuid for an index name."""
+    digest = hashlib.sha256(index.encode()).hexdigest()
+    return f"{digest[:8]}-{digest[8:12]}-{digest[12:16]}-{digest[16:20]}-{digest[20:32]}"
 
 
 class MultipleIndicesError(ValueError):

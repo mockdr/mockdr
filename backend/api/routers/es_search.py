@@ -6,6 +6,8 @@ use when configured to talk directly to Elasticsearch.
 """
 from __future__ import annotations
 
+from fnmatch import fnmatch
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 
 from api.es_auth import require_es_auth, require_es_write
@@ -32,10 +34,81 @@ def cluster_info(
     return search_queries.cluster_info()
 
 
+# ── Cluster / cat APIs ───────────────────────────────────────────────────────
+
+
+@router.get("/_cluster/health")
+@router.get("/_cluster/health/{index}")
+def cluster_health(
+    index: str = "",
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Return cluster health, which most clients probe before anything else."""
+    return search_queries.es_cluster_health(index)
+
+
+@router.get("/_cat/indices")
+@router.get("/_cat/indices/{pattern}")
+def cat_indices(
+    pattern: str = "",
+    format: str = Query(default="json"),  # noqa: A002 - ES's own parameter name
+    _: dict = Depends(require_es_auth),
+) -> list[dict]:
+    """List indices. Only ``format=json`` is served; the text table is not."""
+    rows = search_queries.es_cat_indices()
+    if pattern and pattern not in ("*", "_all"):
+        rows = [r for r in rows if fnmatch(str(r["index"]), pattern)]
+    return rows
+
+
+@router.get("/_cat/health")
+def cat_health(
+    format: str = Query(default="json"),  # noqa: A002 - ES's own parameter name
+    _: dict = Depends(require_es_auth),
+) -> list[dict]:
+    """One-row cluster health, as ``_cat/health?format=json`` returns."""
+    health = search_queries.es_cluster_health()
+    return [{
+        "epoch": "0",
+        "timestamp": "00:00:00",
+        "cluster": health["cluster_name"],
+        "status": health["status"],
+        "node.total": str(health["number_of_nodes"]),
+        "node.data": str(health["number_of_data_nodes"]),
+        "shards": str(health["active_shards"]),
+        "pri": str(health["active_primary_shards"]),
+        "relo": "0",
+        "init": "0",
+        "unassign": "0",
+        "pending_tasks": "0",
+        "max_task_wait_time": "-",
+        "active_shards_percent": "100.0%",
+    }]
+
+
+@router.get("/_security/_authenticate")
+def authenticate(
+    user: dict = Depends(require_es_auth),
+) -> dict:
+    """Report the authenticated user, which clients use to verify credentials."""
+    username = str(user.get("username", "elastic"))
+    return {
+        "username": username,
+        "roles": list(user.get("roles", ["superuser"])),
+        "full_name": None,
+        "email": None,
+        "metadata": {},
+        "enabled": True,
+        "authentication_realm": {"name": "native", "type": "native"},
+        "lookup_realm": {"name": "native", "type": "native"},
+        "authentication_type": "realm",
+    }
+
+
 # ── Search ───────────────────────────────────────────────────────────────────
 
 
-@router.post("/{index}/_search")
+@router.api_route("/{index}/_search", methods=["GET", "POST"])
 def es_search(
     index: str,
     body: dict = Body(default={}),
@@ -47,6 +120,33 @@ def es_search(
         return search_queries.es_search(index, body, ignore_unavailable=ignore_unavailable)
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
+
+
+@router.api_route("/{index}/_count", methods=["GET", "POST"])
+def es_count(
+    index: str,
+    body: dict = Body(default={}),
+    ignore_unavailable: bool = Query(default=False),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Return a document count without the hits."""
+    try:
+        return search_queries.es_count(
+            index, body, ignore_unavailable=ignore_unavailable,
+        )
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.api_route("/{index}/_mget", methods=["GET", "POST"])
+def es_mget(
+    index: str,
+    body: dict = Body(default={}),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Fetch several documents by id in one request."""
+    return search_queries.es_mget(index, body)
+
 
 
 # ── Mapping / Stats ──────────────────────────────────────────────────────────

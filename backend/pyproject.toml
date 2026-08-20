@@ -155,6 +155,7 @@ convention = "google"
 "utils/pagination.py" = ["ANN401"]
 "utils/cs_fql.py" = ["ANN401"]
 "utils/es_query.py" = ["ANN401"]
+"utils/es_aggs.py" = ["ANN401"]
 "utils/mde_odata.py" = ["ANN401"]
 # SPL values are genuinely dynamic — a field may hold a string, number or list.
 "utils/splunk/spl_expr.py" = ["ANN401"]

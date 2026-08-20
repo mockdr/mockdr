@@ -307,6 +307,7 @@ from application.splunk.commands.edr_bridge import register_bridge as register_s
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
+from utils.es_aggs import ESAggregationError
 from utils.es_query import ESQueryError
 from utils.es_response import build_es_error_response
 from utils.logging import setup_logging
@@ -496,6 +497,17 @@ async def odata_filter_exception_handler(
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
         ),
+    )
+
+
+@app.exception_handler(ESAggregationError)
+async def es_aggregation_exception_handler(
+    _request: Request, exc: ESAggregationError,
+) -> JSONResponse:
+    """Answer an unusable ``aggs`` block with Elasticsearch's ``400``."""
+    return JSONResponse(
+        status_code=400,
+        content=build_es_error_response(400, "parsing_exception", str(exc)),
     )
 
 
