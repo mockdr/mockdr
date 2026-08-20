@@ -39,13 +39,19 @@ class TestFindRules:
         assert resp.status_code == 200
 
     def test_find_response_has_kibana_pagination(self, client: TestClient) -> None:
-        """Response must include page, per_page, total, and data keys."""
+        """Response must match find_rules_route.gen.ts.
+
+        The request parameter is ``per_page`` but the response key is
+        ``perPage`` — the asymmetry is real, and the mock previously echoed
+        the request spelling into the response.
+        """
         body = client.get(
             "/kibana/api/detection_engine/rules/_find",
             headers=ES_AUTH,
         ).json()
         assert "page" in body
-        assert "per_page" in body
+        assert "perPage" in body
+        assert "per_page" not in body
         assert "total" in body
         assert "data" in body
         assert isinstance(body["data"], list)
@@ -68,7 +74,7 @@ class TestFindRules:
             params={"per_page": 5, "page": 2},
         ).json()
         assert body["page"] == 2
-        assert body["per_page"] == 5
+        assert body["perPage"] == 5
         assert len(body["data"]) == 5
 
     def test_find_pages_are_disjoint(self, client: TestClient) -> None:

@@ -37,10 +37,11 @@ class TestListEndpoints:
         assert resp.status_code == 200
 
     def test_list_has_kibana_pagination(self, client: TestClient) -> None:
-        """Response must include page, per_page, total, and data."""
+        """Response must include page, pageSize, total, and data."""
         body = client.get("/kibana/api/endpoint/metadata", headers=ES_AUTH).json()
         assert "page" in body
-        assert "per_page" in body
+        assert "pageSize" in body
+        assert "per_page" not in body
         assert "total" in body
         assert "data" in body
         assert isinstance(body["data"], list)

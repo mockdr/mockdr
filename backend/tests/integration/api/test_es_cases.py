@@ -24,7 +24,7 @@ def _get_first_case_id(client: TestClient) -> str:
         headers=ES_AUTH,
         params={"perPage": 1},
     ).json()
-    return body["data"][0]["id"]
+    return body["cases"][0]["id"]
 
 
 class TestFindCases:
@@ -36,12 +36,19 @@ class TestFindCases:
         assert resp.status_code == 200
 
     def test_find_has_kibana_pagination(self, client: TestClient) -> None:
-        """Response must include page, per_page, total, and data."""
+        """Response must match CasesFindResponseRt.
+
+        Kibana names the collection ``cases`` and carries per-status counts
+        alongside it; ``data`` belongs to other Kibana list APIs, not this one.
+        """
         body = client.get("/kibana/api/cases/_find", headers=ES_AUTH).json()
         assert "page" in body
         assert "per_page" in body
         assert "total" in body
-        assert "data" in body
+        assert "cases" in body
+        assert "data" not in body
+        for key in ("count_open_cases", "count_in_progress_cases", "count_closed_cases"):
+            assert key in body, f"missing status count: {key}"
 
     def test_find_returns_8_seeded_cases(self, client: TestClient) -> None:
         """Seeder creates 8 cases from _CASE_TITLES."""
@@ -59,7 +66,7 @@ class TestFindCases:
             headers=ES_AUTH,
             params={"status": "open", "perPage": 50},
         ).json()
-        for case in body["data"]:
+        for case in body["cases"]:
             assert case["status"] == "open"
 
     def test_case_has_required_fields(self, client: TestClient) -> None:
@@ -69,7 +76,7 @@ class TestFindCases:
             headers=ES_AUTH,
             params={"perPage": 1},
         ).json()
-        case = body["data"][0]
+        case = body["cases"][0]
         required = [
             "id", "title", "description", "status", "severity",
             "tags", "owner", "created_at", "created_by", "updated_at",

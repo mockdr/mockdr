@@ -6,7 +6,7 @@ from dataclasses import asdict
 from domain.es_rule import EsRule
 from repository.es_rule_repo import es_rule_repo
 from utils.es_pagination import paginate_kibana
-from utils.es_response import build_kibana_list_response
+from utils.es_response import build_kibana_rules_response
 
 
 def find_rules(
@@ -39,7 +39,7 @@ def find_rules(
         records.sort(key=lambda r: r.get(sort_field, ""), reverse=reverse)
 
     page_items, total = paginate_kibana(records, page, per_page)
-    return build_kibana_list_response(page_items, page, per_page, total)
+    return build_kibana_rules_response(page_items, page, per_page, total)
 
 
 def get_rule(rule_id: str) -> dict | None:

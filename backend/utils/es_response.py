@@ -55,6 +55,59 @@ def build_kibana_list_response(
     return {"page": page, "per_page": per_page, "total": total, "data": data}
 
 
+def build_kibana_rules_response(
+    data: list,
+    page: int,
+    per_page: int,
+    total: int,
+) -> dict:
+    """Build the Security Solution ``rules/_find`` response.
+
+    Note the asymmetry, which is real: the *request* parameter is ``per_page``
+    but the *response* key is ``perPage``. Kibana's generated schema
+    (``find_rules_route.gen.ts``) declares ``{page, perPage, total, data}``,
+    so a client reading ``perPage`` off this envelope found nothing.
+    """
+    return {"page": page, "perPage": per_page, "total": total, "data": data}
+
+
+def build_kibana_cases_response(
+    cases: list,
+    page: int,
+    per_page: int,
+    total: int,
+    status_counts: dict[str, int] | None = None,
+) -> dict:
+    """Build the Cases ``_find`` response.
+
+    ``CasesFindResponseRt`` names the collection ``cases``, not ``data``, and
+    carries the per-status counts alongside it.
+    """
+    counts = status_counts or {}
+    return {
+        "cases": cases,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "count_open_cases": counts.get("open", 0),
+        "count_in_progress_cases": counts.get("in-progress", 0),
+        "count_closed_cases": counts.get("closed", 0),
+    }
+
+
+def build_kibana_endpoint_response(
+    data: list,
+    page: int,
+    page_size: int,
+    total: int,
+) -> dict:
+    """Build the endpoint metadata list response.
+
+    The real endpoint returns ``pageSize``, not ``per_page``.
+    """
+    return {"data": data, "total": total, "page": page, "pageSize": page_size}
+
+
 def build_es_error_response(
     status_code: int,
     error: str,

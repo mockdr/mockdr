@@ -5,8 +5,9 @@ from dataclasses import asdict
 
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
+from utils.es_case_serde import serialise_case, status_counts
 from utils.es_pagination import paginate_kibana
-from utils.es_response import build_kibana_list_response
+from utils.es_response import build_kibana_cases_response
 
 
 def find_cases(
@@ -38,8 +39,11 @@ def find_cases(
     if owner:
         records = [r for r in records if r["owner"] == owner]
 
+    counts = status_counts(records)
     page_items, total = paginate_kibana(records, page, per_page)
-    return build_kibana_list_response(page_items, page, per_page, total)
+    return build_kibana_cases_response(
+        [serialise_case(r) for r in page_items], page, per_page, total, counts,
+    )
 
 
 def get_case(case_id: str) -> dict | None:
@@ -54,7 +58,7 @@ def get_case(case_id: str) -> dict | None:
     case = es_case_repo.get(case_id)
     if not case:
         return None
-    return asdict(case)
+    return serialise_case(asdict(case))
 
 
 def get_case_comments(case_id: str) -> list[dict] | None:

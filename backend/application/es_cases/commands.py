@@ -9,6 +9,7 @@ from domain.es_case_comment import EsCaseComment
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
 from utils.dt import utc_now
+from utils.es_case_serde import serialise_case
 
 
 def create_case(data: dict) -> dict:
@@ -40,7 +41,7 @@ def create_case(data: dict) -> dict:
         updated_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
     )
     es_case_repo.save(case)
-    return asdict(case)
+    return serialise_case(asdict(case))
 
 
 def update_case(case_id: str, data: dict) -> dict | None:
@@ -75,7 +76,7 @@ def update_case(case_id: str, data: dict) -> dict | None:
         case.closed_by = None
 
     es_case_repo.save(case)
-    return asdict(case)
+    return serialise_case(asdict(case))
 
 
 def delete_case(case_id: str) -> bool:
