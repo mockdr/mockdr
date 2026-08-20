@@ -27,7 +27,7 @@ from utils.es_response import (
     ES_WWW_AUTHENTICATE,
     build_es_auth_error,
     build_es_error_response,
-    build_kbn_error_response,
+    build_kibana_error,
 )
 
 
@@ -48,7 +48,7 @@ def _auth_error(request: Request | None, status: int, es_type: str, message: str
         Error body for whichever product owns the path.
     """
     if request is not None and request.url.path.startswith("/kibana"):
-        return build_kbn_error_response(status, message)
+        return build_kibana_error(request.url.path, status, message)
     if es_type == "security_exception":
         return build_es_auth_error(status, message)
     return build_es_error_response(status, es_type, message)

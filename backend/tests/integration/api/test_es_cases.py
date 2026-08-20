@@ -177,58 +177,89 @@ class TestGetCase:
 
 
 class TestUpdateCase:
-    """Tests for PATCH /kibana/api/cases/{case_id}."""
+    """Tests for PATCH /kibana/api/cases.
+
+    Kibana updates cases only through the collection endpoint, with
+    ``{"cases": [{id, version, ...}]}``. The mock had this inverted: the real
+    bulk path 405'd while ``PATCH /api/cases/{id}`` — a route Kibana does not
+    have — worked, and no version was checked.
+    """
+
+    @staticmethod
+    def _case(client: TestClient) -> dict:
+        return dict(client.get(
+            "/kibana/api/cases/_find", headers=ES_AUTH, params={"perPage": 1},
+        ).json()["cases"][0])
+
+    def _patch(self, client: TestClient, case: dict, **changes: object) -> object:
+        return client.patch(
+            "/kibana/api/cases",
+            headers=KBN_WRITE_HEADERS,
+            json={"cases": [{
+                "id": case["id"], "version": case["version"], **changes,
+            }]},
+        )
 
     def test_update_case_title(self, client: TestClient) -> None:
-        """Updating a case title should persist the change."""
-        case_id = _get_first_case_id(client)
-        resp = client.patch(
-            f"/kibana/api/cases/{case_id}",
-            headers=KBN_WRITE_HEADERS,
-            json={"title": "Updated Case Title"},
-        )
+        resp = self._patch(client, self._case(client), title="Updated Case Title")
+
         assert resp.status_code == 200
-        assert resp.json()["title"] == "Updated Case Title"
+        assert resp.json()[0]["title"] == "Updated Case Title"
 
     def test_update_case_status_to_closed(self, client: TestClient) -> None:
-        """Closing a case should set closed_at and closed_by."""
-        case_id = _get_first_case_id(client)
-        resp = client.patch(
-            f"/kibana/api/cases/{case_id}",
-            headers=KBN_WRITE_HEADERS,
-            json={"status": "closed"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
+        resp = self._patch(client, self._case(client), status="closed")
+
+        body = resp.json()[0]
         assert body["status"] == "closed"
         assert body["closed_at"] is not None
 
     def test_reopen_case_clears_closed_fields(self, client: TestClient) -> None:
-        """Reopening a case should clear closed_at and closed_by."""
-        case_id = _get_first_case_id(client)
-        # Close first
-        client.patch(
-            f"/kibana/api/cases/{case_id}",
-            headers=KBN_WRITE_HEADERS,
-            json={"status": "closed"},
-        )
-        # Then reopen
-        resp = client.patch(
-            f"/kibana/api/cases/{case_id}",
-            headers=KBN_WRITE_HEADERS,
-            json={"status": "open"},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["closed_at"] is None
+        closed = self._patch(client, self._case(client), status="closed").json()[0]
+        reopened = self._patch(client, closed, status="open")
+
+        assert reopened.status_code == 200
+        assert reopened.json()[0]["closed_at"] is None
+
+    def test_version_changes_on_every_write(self, client: TestClient) -> None:
+        case = self._case(client)
+        updated = self._patch(client, case, title="v2").json()[0]
+
+        assert updated["version"] != case["version"]
+
+    def test_stale_version_is_a_conflict(self, client: TestClient) -> None:
+        case = self._case(client)
+        self._patch(client, case, title="first")
+
+        # Same version again — the case has moved on underneath.
+        conflict = self._patch(client, case, title="second")
+        assert conflict.status_code == 409
 
     def test_update_nonexistent_case_returns_404(self, client: TestClient) -> None:
-        """Updating a non-existent case should return 404."""
         resp = client.patch(
-            "/kibana/api/cases/nonexistent-id",
+            "/kibana/api/cases",
             headers=KBN_WRITE_HEADERS,
-            json={"title": "Ghost"},
+            json={"cases": [{"id": "nonexistent-id", "version": "WzEsMV0=",
+                             "title": "Ghost"}]},
         )
         assert resp.status_code == 404
+
+    def test_missing_version_is_rejected(self, client: TestClient) -> None:
+        case = self._case(client)
+        resp = client.patch(
+            "/kibana/api/cases",
+            headers=KBN_WRITE_HEADERS,
+            json={"cases": [{"id": case["id"], "title": "no version"}]},
+        )
+        assert resp.status_code == 400
+
+    def test_per_id_route_is_not_served(self, client: TestClient) -> None:
+        # This route exists in no Kibana; it used to be the only one that did.
+        resp = client.patch(
+            f"/kibana/api/cases/{self._case(client)['id']}",
+            headers=KBN_WRITE_HEADERS,
+            json={"title": "x"},
+        )
+        assert resp.status_code == 405
 
 
 class TestCaseComments:

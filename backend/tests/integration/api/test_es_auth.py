@@ -185,7 +185,10 @@ class TestEsRbac:
         resp = client.post(
             "/kibana/api/detection_engine/rules",
             headers=headers,
-            json={"name": "Analyst Rule", "type": "query", "risk_score": 30, "severity": "low"},
+            json={
+                "name": "Analyst Rule", "description": "by analyst",
+                "type": "query", "query": "*", "risk_score": 30, "severity": "low",
+            },
         )
         assert resp.status_code == 200
 

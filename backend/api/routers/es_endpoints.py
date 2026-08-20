@@ -11,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
-from utils.es_response import build_kbn_error_response
+from utils.es_response import build_security_solution_error
 
 router = APIRouter(tags=["Elastic Endpoints"])
 
@@ -50,7 +50,7 @@ def get_endpoint(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Endpoint {agent_id} not found"),
+            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
     return result
 
@@ -69,14 +69,14 @@ def isolate_endpoint(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_kbn_error_response(400, "endpoint_ids is required"),
+            detail=build_security_solution_error(400, "endpoint_ids is required"),
         )
     comment = body.get("comment", "")
     result = endpoint_commands.isolate_endpoint(agent_id, comment)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Endpoint {agent_id} not found"),
+            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
     return result
 
@@ -92,14 +92,14 @@ def unisolate_endpoint(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_kbn_error_response(400, "endpoint_ids is required"),
+            detail=build_security_solution_error(400, "endpoint_ids is required"),
         )
     comment = body.get("comment", "")
     result = endpoint_commands.unisolate_endpoint(agent_id, comment)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Endpoint {agent_id} not found"),
+            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
     return result
 
@@ -115,14 +115,14 @@ def kill_process(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_kbn_error_response(400, "endpoint_ids is required"),
+            detail=build_security_solution_error(400, "endpoint_ids is required"),
         )
     params = body.get("parameters", {})
     result = endpoint_commands.kill_process(agent_id, params)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Endpoint {agent_id} not found"),
+            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
     return result
 
@@ -138,14 +138,14 @@ def scan_endpoint(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_kbn_error_response(400, "endpoint_ids is required"),
+            detail=build_security_solution_error(400, "endpoint_ids is required"),
         )
     comment = body.get("comment", "")
     result = endpoint_commands.scan_endpoint(agent_id, comment)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Endpoint {agent_id} not found"),
+            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
     return result
 
@@ -173,6 +173,6 @@ def get_action(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Action {action_id} not found"),
+            detail=build_security_solution_error(404, f"Action {action_id} not found"),
         )
     return result

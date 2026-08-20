@@ -74,20 +74,59 @@ def create_case(
     return case_commands.create_case(body)
 
 
-@router.patch("/api/cases/{case_id}", dependencies=[Depends(require_kbn_xsrf)])
-def update_case(
-    case_id: str,
+@router.patch("/api/cases", dependencies=[Depends(require_kbn_xsrf)])
+def update_cases(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
-) -> dict:
-    """Update an existing case (Kibana uses PATCH)."""
-    result = case_commands.update_case(case_id, body)
-    if result is None:
+) -> list[dict]:
+    """Update one or more cases.
+
+    This is the endpoint Kibana actually exposes: ``PATCH /api/cases`` with
+    ``{"cases": [{id, version, ...}]}``. The mock had it inverted — the bulk
+    path 405'd while ``PATCH /api/cases/{id}``, which exists in no Kibana,
+    worked. ``version`` is required and a stale one is a conflict, which was
+    not enforced at all.
+    """
+    patches = body.get("cases")
+    if not isinstance(patches, list) or not patches:
         raise HTTPException(
-            status_code=404,
-            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+            status_code=400,
+            detail=build_kbn_error_response(400, "cases: expected a non-empty array"),
         )
-    return result
+
+    updated: list[dict] = []
+    for patch in patches:
+        case_id = patch.get("id")
+        version = patch.get("version")
+        if not case_id or not version:
+            raise HTTPException(
+                status_code=400,
+                detail=build_kbn_error_response(
+                    400, "each case requires id and version",
+                ),
+            )
+
+        current = case_queries.get_case(case_id)
+        if current is None:
+            raise HTTPException(
+                status_code=404,
+                detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+            )
+        if current.get("version") != version:
+            raise HTTPException(
+                status_code=409,
+                detail=build_kbn_error_response(
+                    409,
+                    f"This case {case_id} has been updated. Please refresh before "
+                    f"saving additional updates.",
+                ),
+            )
+
+        changes = {k: v for k, v in patch.items() if k not in ("id", "version")}
+        result = case_commands.update_case(case_id, changes)
+        if result is not None:
+            updated.append(result)
+    return updated
 
 
 @router.delete("/api/cases", dependencies=[Depends(require_kbn_xsrf)])

@@ -225,3 +225,37 @@ def build_kbn_error_response(status_code: int, message: str) -> dict:
         "error": _KBN_TITLES.get(status_code, "Internal Server Error"),
         "message": message,
     }
+
+
+# Security Solution routes — detection_engine, exception_lists, endpoint — do
+# not use the platform's Boom envelope.
+_SECURITY_SOLUTION_PREFIXES = (
+    "/kibana/api/detection_engine",
+    "/kibana/api/exception_lists",
+    "/kibana/api/exceptions",
+    "/kibana/api/endpoint",
+)
+
+
+def build_security_solution_error(status_code: int, message: str) -> dict:
+    """Build a Security Solution error response.
+
+    Kibana has *two* error envelopes, not one. Platform routes answer through
+    Hapi/Boom with ``{statusCode, error, message}``; the Security Solution's
+    own routes answer with ``{message, status_code}``. Serving Boom everywhere
+    meant a detection-engine client read ``undefined`` for the status it was
+    told to branch on.
+    """
+    return {"message": message, "status_code": status_code}
+
+
+def is_security_solution_path(path: str) -> bool:
+    """Whether *path* belongs to a Security Solution route."""
+    return path.startswith(_SECURITY_SOLUTION_PREFIXES)
+
+
+def build_kibana_error(path: str, status_code: int, message: str) -> dict:
+    """Build the error envelope the route at *path* actually uses."""
+    if is_security_solution_path(path):
+        return build_security_solution_error(status_code, message)
+    return build_kbn_error_response(status_code, message)

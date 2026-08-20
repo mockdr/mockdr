@@ -1,8 +1,7 @@
 """Elastic Security detection rule query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
+from application.es_rules.commands import _rule_to_dict as _to_response
 from domain.es_rule import EsRule
 from repository.es_rule_repo import es_rule_repo
 from utils.es_pagination import paginate_kibana
@@ -88,14 +87,13 @@ def get_tags() -> list[str]:
 
 
 def _rule_to_dict(rule: EsRule) -> dict:
-    """Convert a rule dataclass to dict, renaming ``from_field`` back to ``from``.
+    """Render a rule as Kibana's ``RuleResponse``.
 
-    The domain dataclass uses ``from_field`` to avoid shadowing the Python
-    keyword; the Elastic API expects ``from``.
+    Delegates to the command module so reads and writes cannot describe the
+    same rule differently. The domain dataclass uses ``from_field`` to avoid
+    shadowing the Python keyword; the Elastic API expects ``from``.
     """
-    d = asdict(rule)
-    d["from"] = d.pop("from_field", "now-6m")
-    return d
+    return _to_response(rule)
 
 
 def _apply_filter(records: list[dict], filter_str: str) -> list[dict]:

@@ -2,11 +2,19 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 from domain.es_rule import EsRule
 from repository.es_rule_repo import es_rule_repo
 from utils.dt import utc_now
+
+
+class UnknownBulkActionError(ValueError):
+    """Raised for a bulk action Kibana does not define.
+
+    An unknown action used to return ``200 {"success": false}``, so a typo in
+    a playbook read as a successful call.
+    """
 
 
 def create_rule(data: dict) -> dict:
@@ -133,20 +141,71 @@ def bulk_action(action: str, rule_ids: list[str] | None = None, query: str | Non
             es_rule_repo.delete(rule.id)
         return _bulk_result(rules, action)
 
+    if action == "duplicate":
+        copies = []
+        for rule in rules:
+            clone = replace(
+                rule,
+                id=str(uuid.uuid4()),
+                rule_id=str(uuid.uuid4()),
+                name=f"{rule.name} [Duplicate]",
+                created_at=utc_now(),
+                updated_at=utc_now(),
+            )
+            es_rule_repo.save(clone)
+            copies.append(clone)
+        return _bulk_result(copies, action)
+
     if action == "export":
         exported = [_rule_to_dict(r) for r in rules]
         return {"exported_count": len(exported), "rules": exported}
 
-    return {"success": False, "message": f"Unknown action: {action}"}
+    msg = f"Unknown action: {action}"
+    raise UnknownBulkActionError(msg)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
+#: Members every RuleResponse carries that the dataclass has no slot for.
+#: `to` in particular is mandatory and its absence broke clients that read the
+#: from/to pair to compute a rule's look-back window.
+_RULE_RESPONSE_DEFAULTS: dict = {
+    "to": "now",
+    "revision": 0,
+    "rule_source": {"type": "internal"},
+    "throttle": "no_actions",
+    "output_index": "",
+    "meta": {},
+    "related_integrations": [],
+    "required_fields": [],
+    "setup": "",
+    "investigation_fields": None,
+    "note": "",
+    "license": "",
+    "building_block_type": None,
+    "severity_mapping": [],
+    "risk_score_mapping": [],
+    "timeline_id": None,
+    "timeline_title": None,
+    "filters": [],
+    "exceptions_list": [],
+    "actions": [],
+    "immutable": False,
+}
+
+
 def _rule_to_dict(rule: EsRule) -> dict:
-    """Convert a rule dataclass to dict, renaming ``from_field`` back to ``from``."""
+    """Render a rule as Kibana's ``RuleResponse``.
+
+    ``from_field`` is renamed back to ``from``, and the members every real
+    RuleResponse carries are filled in — nineteen were missing, including the
+    mandatory ``to``.
+    """
     d = asdict(rule)
     d["from"] = d.pop("from_field", "now-6m")
+    for key, value in _RULE_RESPONSE_DEFAULTS.items():
+        d.setdefault(key, value.copy() if isinstance(value, (dict, list)) else value)
     return d
 
 
@@ -173,8 +232,23 @@ def _resolve_rules(rule_ids: list[str] | None, query: str | None) -> list:
     return list(es_rule_repo.list_all())
 
 
+#: Where each action's results land in the response. Kibana groups them by
+#: what happened to the rule, not by which action asked.
+_ACTION_BUCKET = {
+    "enable": "updated",
+    "disable": "updated",
+    "edit": "updated",
+    "delete": "deleted",
+    "duplicate": "created",
+}
+
+
 def _bulk_result(rules: list, action: str) -> dict:
     """Build a bulk action result envelope.
+
+    Kibana returns ``attributes.results`` grouped into created/updated/deleted/
+    skipped plus an ``attributes.summary`` of counts. There is no top-level
+    ``rules`` key, so a client reading the documented shape found nothing.
 
     Args:
         rules:  List of affected rules.
@@ -183,9 +257,21 @@ def _bulk_result(rules: list, action: str) -> dict:
     Returns:
         Result summary dict.
     """
+    payload = [_rule_to_dict(r) for r in rules]
+    results: dict[str, list] = {
+        "updated": [], "created": [], "deleted": [], "skipped": [],
+    }
+    results[_ACTION_BUCKET.get(action, "updated")] = payload
     return {
         "success": True,
         "rules_count": len(rules),
-        "rules": [_rule_to_dict(r) for r in rules],
-        "action": action,
+        "attributes": {
+            "results": results,
+            "summary": {
+                "failed": 0,
+                "succeeded": len(rules),
+                "skipped": 0,
+                "total": len(rules),
+            },
+        },
     }

@@ -172,7 +172,9 @@ class TestCreateRule:
             headers=KBN_WRITE_HEADERS,
             json={
                 "name": "ID Check Rule",
+                "description": "checks ids",
                 "type": "query",
+                "query": "*",
                 "risk_score": 50,
                 "severity": "medium",
             },
@@ -202,7 +204,10 @@ class TestCreateRule:
         client.post(
             "/kibana/api/detection_engine/rules",
             headers=KBN_WRITE_HEADERS,
-            json={"name": "Findable Rule", "type": "query", "risk_score": 50, "severity": "low"},
+            json={
+                "name": "Findable Rule", "description": "findable",
+                "type": "query", "query": "*", "risk_score": 50, "severity": "low",
+            },
         )
 
         after = client.get(
