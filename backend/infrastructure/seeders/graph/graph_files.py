@@ -8,7 +8,7 @@ from faker import Faker
 from domain.graph.drive import GraphDrive
 from domain.graph.drive_item import GraphDriveItem
 from domain.graph.sharepoint_site import GraphSharePointSite
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.graph.graph_shared import GRAPH_DOMAIN, graph_uuid
 from repository.graph.drive_item_repo import graph_drive_item_repo
 from repository.graph.drive_repo import graph_drive_repo
@@ -57,7 +57,7 @@ def seed_graph_files(fake: Faker, user_ids: list[str]) -> None:
         for item_name, is_folder, mime_type, size_range in _ITEM_SPECS:
             item_id = graph_uuid()
             created = rand_ago(max_days=180)
-            modified = rand_ago(max_days=30)
+            modified = rand_after(created)
             size = 0 if is_folder else random.randint(*size_range)
 
             file_prop = None if is_folder else {"mimeType": mime_type}

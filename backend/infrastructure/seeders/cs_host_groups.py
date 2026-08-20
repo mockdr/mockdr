@@ -6,7 +6,7 @@ import random
 from faker import Faker
 
 from domain.cs_host_group import CsHostGroup
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.cs_shared import cs_hex_id
 from repository.cs_host_group_repo import cs_host_group_repo
 from repository.cs_host_repo import cs_host_repo
@@ -113,7 +113,7 @@ def seed_cs_host_groups(fake: Faker, host_ids: list[str]) -> list[str]:
             created_by=_CREATOR,
             created_timestamp=created_ts,
             modified_by=_CREATOR,
-            modified_timestamp=rand_ago(10),
+            modified_timestamp=rand_after(created_ts),
         ))
 
         # Assign hosts to this group

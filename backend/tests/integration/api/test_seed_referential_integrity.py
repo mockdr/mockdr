@@ -110,3 +110,141 @@ class TestExposureCountsMatchMembership:
                 headers=headers,
             ).json()["value"]
             assert vuln["exposedMachines"] == len(refs), vuln["name"]
+
+
+class TestSeedIsReproducible:
+    """``generate_all`` documents determinism; ids did not honour it."""
+
+    def test_ids_are_stable_across_reseeds(self, client: TestClient) -> None:
+        from infrastructure.seed import generate_all
+        from repository.agent_repo import agent_repo
+
+        generate_all()
+        first = [(a.id, a.uuid) for a in agent_repo.list_all()[:5]]
+        generate_all()
+        second = [(a.id, a.uuid) for a in agent_repo.list_all()[:5]]
+
+        # secrets.randbelow and uuid4() cannot be seeded, so every id and uuid
+        # changed on every restart — breaking anything that pinned one.
+        assert first == second
+
+
+class TestTimestampOrdering:
+    """A record's later timestamp must not precede its earlier one."""
+
+    PAIRS = [
+        ("createdAt", "updatedAt"),
+        ("created_at", "updated_at"),
+        ("createdDateTime", "lastModifiedDateTime"),
+        ("firstEventTime", "lastEventTime"),
+        ("alertCreationTime", "lastUpdateTime"),
+        ("start", "end"),
+        ("created_timestamp", "modified_timestamp"),
+    ]
+
+    def test_no_record_updates_before_it_was_created(self, client: TestClient) -> None:
+        from dataclasses import asdict, is_dataclass
+
+        from repository.store import store
+
+        violations = []
+        for name in store._collections:
+            for record in store.get_all(name):
+                data = (
+                    asdict(record) if is_dataclass(record)
+                    else record if isinstance(record, dict) else None
+                )
+                if not data:
+                    continue
+                for earlier, later in self.PAIRS:
+                    a, b = data.get(earlier), data.get(later)
+                    if isinstance(a, str) and isinstance(b, str) and a and b and a > b:
+                        violations.append(f"{name}.{earlier} > {later}")
+
+        assert not violations, f"{len(violations)} ordering violations: {violations[:5]}"
+
+
+class TestLicenceCountsMatchAssignments:
+    """``consumedUnits`` must describe the users who hold the licence."""
+
+    @staticmethod
+    def _graph_headers(client: TestClient) -> dict[str, str]:
+        resp = client.post("/graph/oauth2/v2.0/token", data={
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
+        })
+        return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+    def test_consumed_units_match_the_user_list(self, client: TestClient) -> None:
+        headers = self._graph_headers(client)
+        skus = client.get("/graph/v1.0/subscribedSkus", headers=headers).json()["value"]
+        users = client.get(
+            "/graph/v1.0/users", headers=headers, params={"$top": 999},
+        ).json()["value"]
+
+        held: dict[str, int] = {}
+        for user in users:
+            for licence in user.get("assignedLicenses") or []:
+                sku_id = licence.get("skuId", "")
+                held[sku_id] = held.get(sku_id, 0) + 1
+
+        for sku in skus:
+            assert sku["consumedUnits"] == held.get(sku["skuId"], 0), sku["skuPartNumber"]
+
+    def test_no_subscription_is_oversubscribed(self, client: TestClient) -> None:
+        skus = client.get(
+            "/graph/v1.0/subscribedSkus", headers=self._graph_headers(client),
+        ).json()["value"]
+
+        for sku in skus:
+            # Two SKUs described tenants consuming more seats than they bought.
+            assert sku["consumedUnits"] <= sku["prepaidUnits"]["enabled"], (
+                sku["skuPartNumber"]
+            )
+
+
+class TestManagedDeviceUsersExist:
+    """A device's primary user must be a real directory user."""
+
+    def test_every_device_upn_resolves(self, client: TestClient) -> None:
+        resp = client.post("/graph/oauth2/v2.0/token", data={
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
+        })
+        headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        upns = {
+            u["userPrincipalName"] for u in client.get(
+                "/graph/v1.0/users", headers=headers, params={"$top": 999},
+            ).json()["value"]
+        }
+        devices = client.get(
+            "/graph/v1.0/deviceManagement/managedDevices",
+            headers=headers, params={"$top": 999},
+        ).json()["value"]
+
+        dangling = [
+            d["deviceName"] for d in devices
+            if d.get("userPrincipalName") not in upns
+        ]
+        assert not dangling, f"devices whose user does not exist: {dangling[:5]}"
+
+
+class TestCasesReferenceRealAlerts:
+    """``total_alerts`` counts alerts the case actually references."""
+
+    def test_case_alert_ids_resolve(self, client: TestClient) -> None:
+        from repository.es_alert_repo import es_alert_repo
+        from repository.es_case_repo import es_case_repo
+
+        known = {a.id for a in es_alert_repo.list_all()}
+        cases = es_case_repo.list_all()
+
+        assert cases
+        for case in cases:
+            assert len(case.alert_ids) == case.total_alerts
+            assert all(alert_id in known for alert_id in case.alert_ids)

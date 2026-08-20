@@ -1,6 +1,5 @@
 """Sites seeder — seeds three sites and their default policies."""
 import random
-import uuid
 
 from faker import Faker
 
@@ -8,7 +7,7 @@ from domain.site import Site
 from infrastructure.seeders._shared import ago, make_policy, rand_ago
 from repository.policy_repo import policy_repo
 from repository.site_repo import site_repo
-from utils.id_gen import new_id
+from utils.id_gen import new_id, new_uuid
 
 _SITE_DEFS: list[tuple[str, str]] = [
     ("Workstations", "New York"),
@@ -46,7 +45,7 @@ def seed_sites(fake: Faker, account_id: str, account_name: str) -> list[str]:
             createdAt=ago(days=300),
             updatedAt=rand_ago(30),
             description=f"Site for {location}",
-            registrationToken=str(uuid.uuid4()),
+            registrationToken=str(new_uuid()),
             siteType="Paid",
             sku="Complete",
             suite="Complete",

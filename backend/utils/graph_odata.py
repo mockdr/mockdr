@@ -84,8 +84,10 @@ def _match_lambda_field(record: dict, field: str) -> Any:  # noqa: ANN401
     """Resolve a synthetic ``_lambda_collection_prop`` field.
 
     For example, ``_lambda_assignedLicenses_skuId`` iterates
-    ``record["assignedLicenses"]`` and collects all ``skuId`` values into a
-    single pipe-separated string so the standard eq/ne comparison works.
+    ``record["assignedLicenses"]`` and collects every ``skuId``. The values are
+    returned as a list so the comparison matches when *any* member matches —
+    joining them into one pipe-separated string meant the clause only ever
+    matched a record whose collection held exactly one item.
     """
     if not field.startswith("_lambda_"):
         return None
@@ -96,7 +98,7 @@ def _match_lambda_field(record: dict, field: str) -> Any:  # noqa: ANN401
     items = record.get(collection_name)
     if not isinstance(items, list):
         return None
-    return "|".join(str(item.get(prop, "")) for item in items if isinstance(item, dict))
+    return [str(item.get(prop, "")) for item in items if isinstance(item, dict)]
 
 
 def apply_graph_filter(records: list[dict], filter_str: str) -> list[dict]:

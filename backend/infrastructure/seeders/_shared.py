@@ -314,6 +314,34 @@ def rand_ago(max_days: int = 90) -> str:
     return ago(days=random.randint(0, max_days), hours=random.randint(0, 23))
 
 
+def rand_after(earlier: str, max_days: int = 30) -> str:
+    """Return a timestamp at or after *earlier*, within *max_days* of it.
+
+    Seeders drew each timestamp of a pair independently — ``createdAt =
+    rand_ago(90)`` beside ``updatedAt = rand_ago(30)`` — with nothing stopping
+    the later field landing before the earlier one. Deriving the second from
+    the first makes the ordering invariant hold by construction.
+
+    Args:
+        earlier:  The timestamp the result must not precede.
+        max_days: How far after *earlier* the result may fall.
+
+    Returns:
+        Formatted timestamp string ``YYYY-MM-DDTHH:MM:SS.000Z``.
+    """
+    try:
+        base = datetime.strptime(earlier, "%Y-%m-%dT%H:%M:%S.000Z").replace(tzinfo=UTC)
+    except (TypeError, ValueError):
+        return rand_ago(max_days)
+
+    now = datetime.now(UTC)
+    span = min((now - base).total_seconds(), max_days * 86400)
+    if span <= 0:
+        return earlier
+    moment = base + timedelta(seconds=random.uniform(0, span))
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
 def passphrase() -> str:
     """Return a random four-word passphrase in ``XXXX-XXXX-XXXX-XXXX`` format.
 

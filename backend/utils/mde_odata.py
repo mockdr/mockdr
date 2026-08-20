@@ -449,6 +449,18 @@ def _match_clause(record: dict, clause: ODataClause) -> bool:
     if clause.literal in ("bool", "null"):
         return _match_keyword_literal(field_val, clause)
 
+    # A collection-valued field matches when any member matches, which is what
+    # a lambda like `assignedLicenses/any(l: l/skuId eq '…')` asks.
+    if isinstance(field_val, (list, tuple)):
+        members = [str(v) for v in field_val]
+        if clause.operator == "eq":
+            return any(m == target for m in members)
+        if clause.operator == "ne":
+            return all(m != target for m in members)
+        return any(
+            _match_clause({clause.field: m}, clause) for m in members
+        )
+
     if clause.operator == "eq":
         return field_str == target
 

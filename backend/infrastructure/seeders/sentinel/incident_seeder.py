@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import random
 import time
-import uuid
 from dataclasses import asdict
 
 from domain.sentinel.alert import SentinelAlert
@@ -17,6 +16,7 @@ from repository.sentinel.entity_repo import sentinel_entity_repo
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
 from repository.store import store
+from utils.id_gen import new_hex
 
 # Fixed reference epoch for deterministic seed data
 _SEED_EPOCH = 1700000000.0
@@ -61,7 +61,7 @@ def _seed_from_mde() -> None:
             eid = _save_entity("Host", {"hostName": hostname})
             entity_ids.append(eid)
 
-        alert_id = f"mde-{d.get('id', uuid.uuid4().hex)}"
+        alert_id = f"mde-{d.get('id', new_hex())}"
         alert = SentinelAlert(
             alert_id=alert_id,
             alert_display_name=str(d.get("title", d.get("alert_name", "MDE Alert"))),
@@ -73,7 +73,7 @@ def _seed_from_mde() -> None:
             entity_ids=entity_ids,
         )
 
-        inc_id = f"inc-mde-{uuid.uuid4().hex[:12]}"
+        inc_id = f"inc-mde-{new_hex()[:12]}"
         incident = SentinelIncident(
             incident_id=inc_id,
             title=alert.alert_display_name,
@@ -91,7 +91,7 @@ def _seed_from_mde() -> None:
             entity_ids=entity_ids,
             alert_product_names=["Microsoft Defender for Endpoint"],
             tactics=["Execution"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         alert.incident_id = inc_id
         sentinel_alert_repo.save(alert)
@@ -111,7 +111,7 @@ def _seed_from_s1() -> None:
         if comp:
             entity_ids.append(_save_entity("Host", {"hostName": comp}))
 
-        alert_id = f"s1-{d.get('id', uuid.uuid4().hex)}"
+        alert_id = f"s1-{d.get('id', new_hex())}"
         threat_name = str(d.get("threatName", d.get("classification", "Threat")))
         alert = SentinelAlert(
             alert_id=alert_id,
@@ -123,7 +123,7 @@ def _seed_from_s1() -> None:
             entity_ids=entity_ids,
         )
 
-        inc_id = f"inc-s1-{uuid.uuid4().hex[:12]}"
+        inc_id = f"inc-s1-{new_hex()[:12]}"
         incident = SentinelIncident(
             incident_id=inc_id,
             title=alert.alert_display_name,
@@ -138,7 +138,7 @@ def _seed_from_s1() -> None:
             alert_ids=[alert_id], entity_ids=entity_ids,
             alert_product_names=["SentinelOne"],
             related_analytic_rule_ids=["rule-s1-threats"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         alert.incident_id = inc_id
         sentinel_alert_repo.save(alert)
@@ -158,7 +158,7 @@ def _seed_from_cs() -> None:
         if hn:
             entity_ids.append(_save_entity("Host", {"hostName": hn}))
 
-        alert_id = f"cs-{d.get('detection_id', uuid.uuid4().hex)}"
+        alert_id = f"cs-{d.get('detection_id', new_hex())}"
         alert = SentinelAlert(
             alert_id=alert_id,
             alert_display_name=f"CrowdStrike: {d.get('detect_name', 'Detection')}",
@@ -169,7 +169,7 @@ def _seed_from_cs() -> None:
             entity_ids=entity_ids,
         )
 
-        inc_id = f"inc-cs-{uuid.uuid4().hex[:12]}"
+        inc_id = f"inc-cs-{new_hex()[:12]}"
         incident = SentinelIncident(
             incident_id=inc_id,
             title=alert.alert_display_name,
@@ -184,7 +184,7 @@ def _seed_from_cs() -> None:
             alert_ids=[alert_id], entity_ids=entity_ids,
             alert_product_names=["CrowdStrike Falcon"],
             related_analytic_rule_ids=["rule-cs-detections"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         alert.incident_id = inc_id
         sentinel_alert_repo.save(alert)
@@ -199,7 +199,7 @@ def _seed_from_es() -> None:
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
-        alert_id = f"es-{d.get('id', uuid.uuid4().hex)}"
+        alert_id = f"es-{d.get('id', new_hex())}"
         alert = SentinelAlert(
             alert_id=alert_id,
             alert_display_name=f"Elastic: {d.get('rule_name', 'Alert')}",
@@ -209,7 +209,7 @@ def _seed_from_es() -> None:
             time_generated=now,
         )
 
-        inc_id = f"inc-es-{uuid.uuid4().hex[:12]}"
+        inc_id = f"inc-es-{new_hex()[:12]}"
         incident = SentinelIncident(
             incident_id=inc_id,
             title=alert.alert_display_name,
@@ -224,7 +224,7 @@ def _seed_from_es() -> None:
             alert_ids=[alert_id],
             alert_product_names=["Elastic Security"],
             related_analytic_rule_ids=["rule-elastic-alerts"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         alert.incident_id = inc_id
         sentinel_alert_repo.save(alert)
@@ -239,7 +239,7 @@ def _seed_from_xdr() -> None:
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
-        alert_id = f"xdr-{d.get('incident_id', uuid.uuid4().hex)}"
+        alert_id = f"xdr-{d.get('incident_id', new_hex())}"
         alert = SentinelAlert(
             alert_id=alert_id,
             alert_display_name=f"Cortex XDR: {d.get('description', 'Incident')}",
@@ -249,7 +249,7 @@ def _seed_from_xdr() -> None:
             time_generated=now,
         )
 
-        inc_id = f"inc-xdr-{uuid.uuid4().hex[:12]}"
+        inc_id = f"inc-xdr-{new_hex()[:12]}"
         incident = SentinelIncident(
             incident_id=inc_id,
             title=alert.alert_display_name,
@@ -264,7 +264,7 @@ def _seed_from_xdr() -> None:
             alert_ids=[alert_id],
             alert_product_names=["Palo Alto Cortex XDR"],
             related_analytic_rule_ids=["rule-xdr-incidents"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         alert.incident_id = inc_id
         sentinel_alert_repo.save(alert)
@@ -277,13 +277,13 @@ def _seed_bookmarks() -> None:
     all_inc = sentinel_incident_repo.list_all()[:3]
     for _i, inc in enumerate(all_inc):
         bm = SentinelBookmark(
-            bookmark_id=f"bm-{uuid.uuid4().hex[:8]}",
+            bookmark_id=f"bm-{new_hex()[:8]}",
             display_name=f"Investigation note for {inc.title[:40]}",
             notes=f"Initial triage completed. Severity confirmed as {inc.severity}.",
             query=f"SecurityIncident | where IncidentNumber == {inc.incident_number}",
             incident_id=inc.incident_id,
             created=now, updated=now,
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         sentinel_bookmark_repo.save(bm)
         inc.bookmark_ids.append(bm.bookmark_id)
@@ -302,18 +302,18 @@ def _seed_comments() -> None:
     for inc in all_inc:
         msg = random.choice(comments_text)
         comment = SentinelIncidentComment(
-            comment_id=f"cmt-{uuid.uuid4().hex[:8]}",
+            comment_id=f"cmt-{new_hex()[:8]}",
             incident_id=inc.incident_id,
             message=msg,
             created_time_utc=now,
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         sentinel_incident_comment_repo.save(comment)
 
 
 def _save_entity(kind: str, properties: dict) -> str:
     """Create and persist a Sentinel entity."""
-    eid = f"ent-{uuid.uuid4().hex[:12]}"
+    eid = f"ent-{new_hex()[:12]}"
     entity = SentinelEntity(entity_id=eid, kind=kind, properties=properties)
     sentinel_entity_repo.save(entity)
     return eid

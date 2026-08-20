@@ -3,7 +3,7 @@ import random
 
 from faker import Faker
 
-from infrastructure.seeders._shared import MALWARE_NAMES, rand_ago
+from infrastructure.seeders._shared import MALWARE_NAMES, rand_after, rand_ago
 from repository.blocklist_repo import blocklist_repo
 from repository.site_repo import site_repo
 from repository.user_repo import user_repo
@@ -52,8 +52,8 @@ def seed_blocklist(
             "includeChildren": random.choice([True, False]),
             "includeParents": False,
             "notRecommended": False,
-            "createdAt": rand_ago(60),
-            "updatedAt": rand_ago(10),
+            "createdAt": (created := rand_ago(60)),
+            "updatedAt": rand_after(created),
             # internal
             "siteId": bl_site_id,
         })

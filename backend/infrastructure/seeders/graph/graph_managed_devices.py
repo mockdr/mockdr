@@ -10,6 +10,7 @@ from domain.graph.managed_device import GraphManagedDevice
 from infrastructure.seeders.graph.graph_shared import GRAPH_DOMAIN, graph_uuid
 from repository.agent_repo import agent_repo
 from repository.graph.managed_device_repo import graph_managed_device_repo
+from repository.graph.user_repo import graph_user_repo
 from repository.store import store
 
 # ---------------------------------------------------------------------------
@@ -68,6 +69,8 @@ def seed_graph_managed_devices(fake: Faker) -> None:
     s1_agents = agent_repo.list_all()
     total = len(s1_agents)
 
+    graph_users = graph_user_repo.list_all()
+
     for idx, agent in enumerate(s1_agents):
         device_id = graph_uuid()
 
@@ -105,8 +108,15 @@ def seed_graph_managed_devices(fake: Faker) -> None:
         # Serial number
         serial_number = fake.bothify("???-########").upper()
 
-        # UPN from agent computerName
-        upn = f"{agent.computerName.lower().replace(' ', '.')}@{GRAPH_DOMAIN}"
+        # A device's primary user has to be a real directory user: deriving the
+        # UPN from the S1 computer name produced addresses matching no Graph
+        # user, so `$filter=userPrincipalName eq '<a real upn>'` on
+        # /deviceManagement/managedDevices always came back empty.
+        upn = (
+            graph_users[idx % len(graph_users)].userPrincipalName
+            if graph_users
+            else f"{agent.computerName.lower().replace(' ', '.')}@{GRAPH_DOMAIN}"
+        )
 
         # EOL OS devices get noncompliant state (OS already set from S1 agent)
         eol_markers = ("8.1", "1809", "Big Sur", "CentOS 7")
@@ -138,7 +148,9 @@ def seed_graph_managed_devices(fake: Faker) -> None:
         ("Google Pixel 8", "Android", "14", "Google", "personal"),
         ("iPad Pro 12.9 (6th gen)", "iOS", "17.4.1", "Apple Inc.", "company"),
     ]
-    for model_name, os_name, os_ver, mfg, owner_type in mobile_devices:
+    for mobile_index, (model_name, os_name, os_ver, mfg, owner_type) in enumerate(
+        mobile_devices,
+    ):
         dev_id = graph_uuid()
         sync_dt = datetime.now(UTC) - timedelta(days=random.randint(0, 14))
         graph_managed_device_repo.save(GraphManagedDevice(
@@ -151,7 +163,13 @@ def seed_graph_managed_devices(fake: Faker) -> None:
             managementState="managed",
             managedDeviceOwnerType=owner_type,
             enrolledDateTime=sync_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            userPrincipalName=f"mobile.user{random.randint(1,5)}@{GRAPH_DOMAIN}",
+            # Mobile devices belong to directory users too; a synthesised
+            # "mobile.userN@" address matched no Graph user.
+            userPrincipalName=(
+                graph_users[mobile_index % len(graph_users)].userPrincipalName
+                if graph_users
+                else f"mobile.user{random.randint(1, 5)}@{GRAPH_DOMAIN}"
+            ),
             model=model_name,
             manufacturer=mfg,
             serialNumber=fake.bothify("???-########").upper(),

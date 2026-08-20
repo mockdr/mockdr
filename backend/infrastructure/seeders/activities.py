@@ -1,6 +1,5 @@
 """Activities seeder — seeds 120 activity log entries spread across 90 days."""
 import random
-import uuid
 
 from faker import Faker
 
@@ -9,6 +8,7 @@ from repository.activity_repo import activity_repo
 from repository.agent_repo import agent_repo
 from repository.group_repo import group_repo
 from repository.site_repo import site_repo
+from utils.id_gen import new_uuid
 
 
 def seed_activities(
@@ -52,7 +52,7 @@ def seed_activities(
             user_id=random.choice(user_ids),
             site_id=act_sid,
         )
-        activity.activityUuid = str(uuid.uuid4())
+        activity.activityUuid = str(new_uuid())
         activity.siteName = act_site.name if act_site else None
         activity.groupId = act_gid
         activity.groupName = act_group.name if act_group else None

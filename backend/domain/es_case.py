@@ -43,3 +43,7 @@ class EsCase:
     # ── Counts ────────────────────────────────────────────────────────────────
     total_comment: int = 0
     total_alerts: int = 0
+    # The alerts this case was opened from. total_alerts used to be a bare
+    # random number with nothing behind it, so it could not be verified
+    # against anything and a case pointed at no alert at all.
+    alert_ids: list[str] = field(default_factory=list)

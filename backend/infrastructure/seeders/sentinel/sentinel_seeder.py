@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import time
-import uuid
 
 from domain.sentinel.alert_rule import SentinelAlertRule
 from domain.sentinel.data_connector import SentinelDataConnector
@@ -13,6 +12,7 @@ from repository.sentinel.data_connector_repo import sentinel_data_connector_repo
 from repository.sentinel.threat_indicator_repo import sentinel_threat_indicator_repo
 from repository.sentinel.watchlist_repo import sentinel_watchlist_repo
 from repository.store import store
+from utils.id_gen import new_hex, new_uuid
 
 
 def seed_sentinel_infrastructure() -> None:
@@ -45,7 +45,7 @@ def _seed_alert_rules() -> None:
             severity="High",
             query="SentinelOne_CL | where confidenceLevel_s == 'malicious'",
             tactics=["Execution", "Impact"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         ),
         SentinelAlertRule(
             rule_id="rule-cs-detections",
@@ -55,7 +55,7 @@ def _seed_alert_rules() -> None:
             severity="High",
             query="CrowdStrike_CL | where Severity_d >= 3",
             tactics=["Execution", "LateralMovement"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         ),
         SentinelAlertRule(
             rule_id="rule-mde-alerts",
@@ -64,7 +64,7 @@ def _seed_alert_rules() -> None:
             kind="MicrosoftSecurityIncidentCreation",
             severity="Medium",
             product_filter="Microsoft Defender for Endpoint",
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         ),
         SentinelAlertRule(
             rule_id="rule-elastic-alerts",
@@ -74,7 +74,7 @@ def _seed_alert_rules() -> None:
             severity="Medium",
             query="ElasticSecurity_CL | where severity_s in ('high', 'critical')",
             tactics=["Execution"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         ),
         SentinelAlertRule(
             rule_id="rule-xdr-incidents",
@@ -84,7 +84,7 @@ def _seed_alert_rules() -> None:
             severity="High",
             query="CortexXDR_CL | where severity_s in ('high', 'critical')",
             tactics=["Execution", "CommandAndControl"],
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         ),
     ]
     for rule in rules:
@@ -106,7 +106,7 @@ def _seed_data_connectors() -> None:
             name=name,
             kind=kind,
             data_types_state="Enabled",
-            etag=uuid.uuid4().hex[:8],
+            etag=new_hex()[:8],
         )
         sentinel_data_connector_repo.save(dc)
 
@@ -120,7 +120,7 @@ def _seed_watchlists() -> None:
         display_name="VIP Users",
         description="Executive and privileged accounts requiring enhanced monitoring",
         items_search_key="UserPrincipalName",
-        created=now, updated=now, etag=uuid.uuid4().hex[:8],
+        created=now, updated=now, etag=new_hex()[:8],
         items=[
             {"_key": "vip-1", "UserPrincipalName": "ceo@acmecorp.com", "DisplayName": "Jane Smith", "Department": "Executive"},
             {"_key": "vip-2", "UserPrincipalName": "cfo@acmecorp.com", "DisplayName": "Bob Johnson", "Department": "Finance"},
@@ -136,7 +136,7 @@ def _seed_watchlists() -> None:
         display_name="High Value Assets",
         description="Critical servers and infrastructure requiring enhanced protection",
         items_search_key="Hostname",
-        created=now, updated=now, etag=uuid.uuid4().hex[:8],
+        created=now, updated=now, etag=new_hex()[:8],
         items=[
             {"_key": "hva-1", "Hostname": "DC01.acmecorp.com", "Role": "Domain Controller", "Criticality": "Critical"},
             {"_key": "hva-2", "Hostname": "SQL-PROD-01", "Role": "Production Database", "Criticality": "Critical"},
@@ -152,7 +152,7 @@ def _seed_watchlists() -> None:
         display_name="Threat IOCs",
         description="Known-bad indicators from threat intelligence feeds",
         items_search_key="Indicator",
-        created=now, updated=now, etag=uuid.uuid4().hex[:8],
+        created=now, updated=now, etag=new_hex()[:8],
         items=[
             {"_key": "ioc-1", "Indicator": "198.51.100.42", "Type": "IPv4", "ThreatType": "C2", "Confidence": "90"},
             {"_key": "ioc-2", "Indicator": "evil-domain.example.com", "Type": "Domain", "ThreatType": "Phishing", "Confidence": "85"},
@@ -167,7 +167,7 @@ def _seed_threat_indicators() -> None:
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     indicators = [
         SentinelThreatIndicator(
-            name=f"indicator--{uuid.uuid4()}",
+            name=f"indicator--{new_uuid()}",
             display_name="Suspicious C2 IP",
             description="Known command and control IP address",
             pattern="[ipv4-addr:value = '198.51.100.42']",
@@ -177,10 +177,10 @@ def _seed_threat_indicators() -> None:
             threat_types=["malicious-activity"],
             labels=["c2", "high-confidence"],
             valid_from=now,
-            created=now, last_updated=now, etag=uuid.uuid4().hex[:8],
+            created=now, last_updated=now, etag=new_hex()[:8],
         ),
         SentinelThreatIndicator(
-            name=f"indicator--{uuid.uuid4()}",
+            name=f"indicator--{new_uuid()}",
             display_name="Phishing Domain",
             description="Known phishing domain",
             pattern="[domain-name:value = 'evil-domain.example.com']",
@@ -190,10 +190,10 @@ def _seed_threat_indicators() -> None:
             threat_types=["phishing"],
             labels=["phishing"],
             valid_from=now,
-            created=now, last_updated=now, etag=uuid.uuid4().hex[:8],
+            created=now, last_updated=now, etag=new_hex()[:8],
         ),
         SentinelThreatIndicator(
-            name=f"indicator--{uuid.uuid4()}",
+            name=f"indicator--{new_uuid()}",
             display_name="Ransomware Hash",
             description="SHA-256 hash of known ransomware binary",
             pattern="[file:hashes.'SHA-256' = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2']",
@@ -203,7 +203,7 @@ def _seed_threat_indicators() -> None:
             threat_types=["malicious-activity"],
             labels=["ransomware", "critical"],
             valid_from=now,
-            created=now, last_updated=now, etag=uuid.uuid4().hex[:8],
+            created=now, last_updated=now, etag=new_hex()[:8],
         ),
     ]
     for ind in indicators:
