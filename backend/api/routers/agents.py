@@ -120,6 +120,7 @@ def list_agent_processes(
 @router.get("/agents")
 def list_agents(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),
     osTypes: str = Query(None),

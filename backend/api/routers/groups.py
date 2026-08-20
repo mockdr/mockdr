@@ -12,6 +12,7 @@ router = APIRouter(tags=["Groups"])
 @router.get("/groups")
 def list_groups(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     siteIds: str = Query(None),
     types: str = Query(None),
     name: str = Query(None),

@@ -15,6 +15,7 @@ router = APIRouter(tags=["Alerts"])
 @router.get("/cloud-detection/alerts")
 def list_alerts(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),
     agentIds: str = Query(None),

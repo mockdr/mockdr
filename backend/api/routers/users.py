@@ -12,6 +12,7 @@ router = APIRouter(tags=["Users"])
 @router.get("/users")
 def list_users(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     roles: str = Query(None),
     email: str = Query(None),
     cursor: str = Query(None),

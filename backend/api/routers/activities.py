@@ -14,6 +14,7 @@ def list_activity_types() -> dict:
 
 @router.get("/activities")
 def list_activities(
+    accountIds: str = Query(None),
     siteIds: str = Query(None),
     userIds: str = Query(None),
     agentIds: str = Query(None),

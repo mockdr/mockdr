@@ -22,6 +22,7 @@ class NoteBody(BaseModel):
 @router.get("/threats")
 def list_threats(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),
     agentIds: str = Query(None),
