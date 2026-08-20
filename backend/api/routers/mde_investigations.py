@@ -38,7 +38,7 @@ def get_investigation(
         raise HTTPException(
             status_code=404,
             detail=build_mde_error_response(
-                "NotFound", f"Investigation {investigation_id} not found",
+                "ResourceNotFound", f"Investigation {investigation_id} not found",
             ),
         )
     return result
@@ -55,7 +55,7 @@ def collect_investigation(
         raise HTTPException(
             status_code=404,
             detail=build_mde_error_response(
-                "NotFound", f"Investigation {investigation_id} not found",
+                "ResourceNotFound", f"Investigation {investigation_id} not found",
             ),
         )
     return result

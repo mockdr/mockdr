@@ -37,7 +37,10 @@ def get_vulnerability(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Vulnerability {vuln_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Vulnerability {vuln_id} not found",
+            ),
         )
     return result
 
@@ -52,6 +55,9 @@ def get_vulnerability_machine_references(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Vulnerability {vuln_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Vulnerability {vuln_id} not found",
+            ),
         )
     return result

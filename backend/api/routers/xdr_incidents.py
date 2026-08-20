@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_incidents import commands as incident_commands
 from application.xdr_incidents import queries as incident_queries
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
 
 router = APIRouter(tags=["XDR Incidents"])
 
@@ -37,7 +37,7 @@ def get_incident_extra_data(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Incident {incident_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Incident {incident_id} not found"),
         )
     return result
 
@@ -55,6 +55,6 @@ def update_incident(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Incident {incident_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Incident {incident_id} not found"),
         )
     return result

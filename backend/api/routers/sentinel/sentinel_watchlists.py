@@ -46,7 +46,7 @@ def get_watchlist(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Watchlist '{alias}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
         )
     return result
 
@@ -81,7 +81,7 @@ def delete_watchlist(
     if not watchlist_cmds.delete_watchlist(alias):
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Watchlist '{alias}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
         )
     return {}
 
@@ -103,7 +103,7 @@ def list_watchlist_items(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Watchlist '{alias}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
         )
     return result
 
@@ -123,7 +123,7 @@ def get_watchlist_item(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Watchlist item '{item_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist item '{item_id}' not found"),
         )
     return result
 
@@ -146,7 +146,7 @@ async def create_or_update_watchlist_item(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Watchlist '{alias}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
         )
     return build_arm_resource("watchlistItems", item_id, {"itemsKeyValue": result})
 
@@ -165,6 +165,6 @@ def delete_watchlist_item(
     if not watchlist_cmds.delete_watchlist_item(alias, item_id):
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Watchlist item '{item_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist item '{item_id}' not found"),
         )
     return {}

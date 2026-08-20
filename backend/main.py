@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Match
 
 from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
@@ -665,6 +666,32 @@ if _DIST.exists():
         """
         return "text/html" in request.headers.get("accept", "")
 
+    def _allowed_methods(request: Request) -> list[str]:
+        """Return the verbs a registered route accepts for this exact path.
+
+        Claiming every verb on the catch-all hides Starlette's own
+        method-not-allowed handling, which would turn a wrong verb against a
+        *real* endpoint into a 404 — the same misdirection this fallback exists
+        to remove, pointed the other way. Routers report only that *some*
+        method would have matched, not which, so each verb is offered in turn
+        and the ones that resolve are the answer. Only unmatched requests reach
+        here, so this never runs on a served route.
+        """
+        allowed: list[str] = []
+        for method in _SPA_METHODS:
+            scope = {**request.scope, "method": method}
+            for route in app.routes:
+                if getattr(route, "path", None) == "/{full_path:path}":
+                    continue
+                try:
+                    match, _ = route.matches(scope)
+                except Exception:  # noqa: BLE001, S112 - unmatchable route is not a match
+                    continue
+                if match is Match.FULL:
+                    allowed.append(method)
+                    break
+        return allowed
+
     @app.api_route("/{full_path:path}", methods=_SPA_METHODS, include_in_schema=False)
     def spa_fallback(request: Request, full_path: str = "") -> Response:
         """Serve the SPA, or a vendor-shaped 404 for unmatched API routes.
@@ -677,6 +704,18 @@ if _DIST.exists():
         """
         path = "/" + full_path
         vendor = vendor_mount_for_path(path)
+
+        # The path exists — the verb is what is wrong. That is a 405 for
+        # everyone, including the SPA's own routes.
+        allowed = _allowed_methods(request)
+        if allowed:
+            return JSONResponse(
+                status_code=405,
+                content=build_vendor_error(
+                    vendor or "s1", 405, f"Method {request.method} not allowed",
+                ),
+                headers={"Allow": ", ".join(allowed)},
+            )
 
         if vendor is not None and not _wants_html(request):
             return JSONResponse(
@@ -692,6 +731,7 @@ if _DIST.exists():
                 content=build_vendor_error(
                     vendor or "s1", 405, f"Method {request.method} not allowed",
                 ),
+                headers={"Allow": "GET, HEAD"},
             )
 
         return FileResponse(_DIST / "index.html")

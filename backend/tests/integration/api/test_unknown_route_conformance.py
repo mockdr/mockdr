@@ -103,3 +103,36 @@ class TestSpaStillServed:
             pytest.skip("frontend/dist not built in this environment")
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/html")
+
+
+class TestWrongVerbStillFiveOhFive:
+    """A wrong verb on a route that exists is 405, not 404.
+
+    The catch-all claims every method, which would otherwise hide Starlette's
+    own method-not-allowed handling and turn a wrong verb against a real
+    endpoint into a 404 — the same misdirection this module exists to remove,
+    pointed the other way.
+    """
+
+    @pytest.mark.parametrize(("method", "path"), [
+        ("delete", "/web/api/v2.1/agents"),
+        ("put", "/web/api/v2.1/agents"),
+        ("delete", "/mde/api/machines"),
+        ("put", "/graph/v1.0/users"),
+    ])
+    def test_existing_path_wrong_verb_is_405(
+        self, client: TestClient, method: str, path: str,
+    ) -> None:
+        resp = getattr(client, method)(path, headers=JSON_ACCEPT)
+        assert resp.status_code == 405, f"{method.upper()} {path}"
+
+    def test_405_advertises_allowed_methods(self, client: TestClient) -> None:
+        """RFC 7231 requires Allow on a 405; a client uses it to correct itself."""
+        resp = client.delete("/web/api/v2.1/agents", headers=JSON_ACCEPT)
+        assert resp.status_code == 405
+        assert "GET" in resp.headers.get("Allow", "")
+
+    def test_405_body_is_the_vendor_envelope(self, client: TestClient) -> None:
+        resp = client.delete("/mde/api/machines", headers=JSON_ACCEPT)
+        assert resp.status_code == 405
+        assert "error" in resp.json()

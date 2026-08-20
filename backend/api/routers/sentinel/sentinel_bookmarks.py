@@ -64,7 +64,7 @@ def get_single_bookmark(
     if not bm:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Bookmark '{bookmark_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Bookmark '{bookmark_id}' not found"),
         )
     return _bookmark_to_arm(bm)
 
@@ -99,6 +99,6 @@ def delete_single_bookmark(
     if not delete_bookmark(bookmark_id):
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Bookmark '{bookmark_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Bookmark '{bookmark_id}' not found"),
         )
     return {}

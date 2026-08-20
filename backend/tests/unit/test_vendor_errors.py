@@ -118,3 +118,24 @@ class TestBuildVendorError:
         for vendor in ("s1", "crowdstrike", "mde", "graph", "sentinel", "xdr",
                        "elasticsearch", "kibana", "splunk"):
             assert "detail" not in build_vendor_error(vendor, 400, "bad")
+
+
+class TestElasticsearchTypes:
+    """A routing 404 is not a missing index."""
+
+    def test_generic_404_is_not_index_not_found(self) -> None:
+        """index_not_found_exception promises `index`/`index_uuid` members.
+
+        A routing 404 has no index to name, so claiming that type would hand a
+        client a type it cannot read the way the type implies.
+        """
+        body = build_vendor_error("elasticsearch", 404, "nope")
+        assert body["error"]["type"] == "resource_not_found_exception"
+        assert "index" not in body["error"]
+
+    @pytest.mark.parametrize("status", [401, 403])
+    def test_auth_failures_are_security_exception(self, status: int) -> None:
+        """One type covers both; only `status` separates them."""
+        assert build_vendor_error("elasticsearch", status, "x")["error"]["type"] == (
+            "security_exception"
+        )

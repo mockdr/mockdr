@@ -36,7 +36,10 @@ def get_machine_action(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"MachineAction {action_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"MachineAction {action_id} not found",
+            ),
         )
     return result
 
@@ -51,6 +54,9 @@ def get_package_uri(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"MachineAction {action_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"MachineAction {action_id} not found",
+            ),
         )
     return result

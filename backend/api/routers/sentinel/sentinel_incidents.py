@@ -60,7 +60,7 @@ def get_incident(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Incident '{incident_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
         )
     return result
 
@@ -95,7 +95,7 @@ def delete_incident(
     if not incident_cmds.delete_incident(incident_id):
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Incident '{incident_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
         )
     return {}
 
@@ -176,7 +176,7 @@ def get_incident_comment(
             return cast(dict[str, Any], c)
     raise HTTPException(
         status_code=404,
-        detail=build_arm_error("NotFound", f"Comment '{comment_id}' not found"),
+        detail=build_arm_error("ResourceNotFound", f"Comment '{comment_id}' not found"),
     )
 
 

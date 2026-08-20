@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_endpoints import commands as endpoint_commands
 from application.xdr_endpoints import queries as endpoint_queries
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
 
 router = APIRouter(tags=["XDR Endpoints"])
 
@@ -37,7 +37,7 @@ def isolate_endpoint(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -54,7 +54,7 @@ def unisolate_endpoint(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -71,7 +71,7 @@ def scan_endpoint(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -99,7 +99,7 @@ def get_policy(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -117,7 +117,7 @@ def update_agent_name(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -134,7 +134,7 @@ def terminate_process(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -151,7 +151,7 @@ def quarantine_file(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -168,7 +168,7 @@ def restore_file(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result
 
@@ -185,6 +185,6 @@ def file_retrieval(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
         )
     return result

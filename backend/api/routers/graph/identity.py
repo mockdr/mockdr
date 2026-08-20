@@ -36,7 +36,7 @@ async def get_conditional_access_policy(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Policy '{policy_id}' not found",
             ),
         )

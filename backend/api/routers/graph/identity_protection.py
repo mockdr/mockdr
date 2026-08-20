@@ -34,7 +34,7 @@ async def get_risky_user(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Resource '{user_id}' does not exist or cannot be found.",
             ),
         )

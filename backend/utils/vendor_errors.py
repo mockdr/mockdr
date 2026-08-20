@@ -57,7 +57,10 @@ _ES_TYPES: dict[int, str] = {
     400: "illegal_argument_exception",
     401: "security_exception",
     403: "security_exception",
-    404: "index_not_found_exception",
+    # Not index_not_found_exception: that names a *missing index* and carries
+    # `index`/`index_uuid` members clients read, which a routing 404 has no
+    # values for. build_es_index_not_found covers the index case properly.
+    404: "resource_not_found_exception",
     429: "circuit_breaking_exception",
     500: "exception",
 }

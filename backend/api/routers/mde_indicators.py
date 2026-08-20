@@ -38,7 +38,10 @@ def get_indicator(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Indicator {indicator_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Indicator {indicator_id} not found",
+            ),
         )
     return result
 
@@ -79,7 +82,10 @@ def update_indicator(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Indicator {indicator_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Indicator {indicator_id} not found",
+            ),
         )
     return result
 
@@ -94,7 +100,10 @@ def delete_indicator(
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Indicator {indicator_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Indicator {indicator_id} not found",
+            ),
         )
     return Response(status_code=204)
 

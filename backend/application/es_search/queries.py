@@ -30,18 +30,55 @@ class IndexNotFoundError(LookupError):
         super().__init__(f"no such index [{index}]")
 
 
-#: Index-name prefixes this mock actually backs with data.
-_KNOWN_PREFIXES: tuple[str, ...] = (
-    ".siem-signals",
-    ".alerts-security",
-    "metrics-endpoint",
-    "logs-endpoint",
-)
+#: Index-name prefixes this mock actually backs, grouped by their source.
+_ALERT_PREFIXES: tuple[str, ...] = (".siem-signals", ".alerts-security")
+_ENDPOINT_PREFIXES: tuple[str, ...] = ("metrics-endpoint", "logs-endpoint")
+_KNOWN_PREFIXES: tuple[str, ...] = _ALERT_PREFIXES + _ENDPOINT_PREFIXES
 
 
-def _is_known_index(idx: str) -> bool:
-    """Return whether *idx* names an index the mock serves."""
-    return idx.startswith(_KNOWN_PREFIXES)
+def _pattern_hits(name: str, prefixes: tuple[str, ...]) -> bool:
+    """Return whether an index expression selects any of *prefixes*.
+
+    A trailing wildcard is compared against the literal part on both sides, so
+    ``logs-*`` selects ``logs-endpoint`` and ``.siem-signals-*`` selects
+    ``.siem-signals`` — the mock stores prefixes where a real cluster would
+    hold dated concrete names.
+    """
+    if name in ("_all", "*"):
+        return True
+    if "*" in name:
+        literal = name.split("*", 1)[0]
+        return any(p.startswith(literal) or literal.startswith(p) for p in prefixes)
+    return name.startswith(prefixes)
+
+
+def _missing_target(index: str) -> str | None:
+    """Return the first target in *index* that cannot be resolved.
+
+    Elasticsearch accepts a comma-separated list of targets and only refuses
+    the ones it must: a *concrete* name that does not exist. A wildcard, or the
+    ``_all`` alias, resolving to nothing is governed by ``allow_no_indices``,
+    which defaults to true — so those stay a 200 with no hits rather than a
+    404. Conflating the two would make a legitimate empty search look broken.
+
+    Args:
+        index: Raw index expression from the request path.
+
+    Returns:
+        The offending target name, or ``None`` when every target is resolvable.
+    """
+    for target in index.split(","):
+        name = target.strip().lower()
+        if not name or name == "_all" or "*" in name:
+            continue
+        if not name.startswith(_KNOWN_PREFIXES):
+            return target.strip()
+    return None
+
+
+def known_index_prefixes() -> tuple[str, ...]:
+    """Return the index prefixes this mock serves, for docs and diagnostics."""
+    return _KNOWN_PREFIXES
 
 
 def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tuple[list[dict], str]:
@@ -56,25 +93,22 @@ def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tupl
         Tuple of (records as dicts, canonical index name).
 
     Raises:
-        IndexNotFoundError: If a concrete index name is unknown. A wildcard
-            that matches nothing returns empty instead, because
-            ``allow_no_indices`` defaults to true — the two cases are governed
-            by different parameters in Elasticsearch, not one.
+        IndexNotFoundError: If a concrete index name is unknown.
     """
     idx = index.lower()
 
-    if idx.startswith((".siem-signals", ".alerts-security")):
-        records = [asdict(a) for a in es_alert_repo.list_all()]
-        return records, idx
+    if not ignore_unavailable:
+        missing = _missing_target(index)
+        if missing is not None:
+            raise IndexNotFoundError(missing)
 
-    if idx.startswith(("metrics-endpoint", "logs-endpoint")):
-        records = [asdict(ep) for ep in es_endpoint_repo.list_all()]
-        return records, idx
-
-    if not ignore_unavailable and "*" not in idx and not _is_known_index(idx):
-        raise IndexNotFoundError(index)
-
-    return [], idx
+    names = [t.strip().lower() for t in idx.split(",") if t.strip()]
+    records: list[dict] = []
+    if any(_pattern_hits(n, _ALERT_PREFIXES) for n in names):
+        records += [asdict(a) for a in es_alert_repo.list_all()]
+    if any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
+        records += [asdict(ep) for ep in es_endpoint_repo.list_all()]
+    return records, idx
 
 
 # ── Public query functions ───────────────────────────────────────────────────
@@ -152,7 +186,16 @@ def es_get_mapping(index: str) -> dict:
 
     Returns:
         Elasticsearch mapping response dict.
+
+    Raises:
+        IndexNotFoundError: If a concrete index name is unknown, as ``_search``
+            and ``_stats`` already do — answering an empty mapping instead said
+            the index existed and had no fields.
     """
+    missing = _missing_target(index)
+    if missing is not None:
+        raise IndexNotFoundError(missing)
+
     idx = index.lower()
 
     if idx.startswith(".siem-signals") or idx.startswith(".alerts-security"):

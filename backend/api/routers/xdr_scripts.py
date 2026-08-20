@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_scripts import commands as script_commands
 from application.xdr_scripts import queries as script_queries
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
 
 router = APIRouter(tags=["XDR Scripts"])
 
@@ -37,7 +37,7 @@ def get_script_metadata(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Script {script_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Script {script_id} not found"),
         )
     return result
 
@@ -55,7 +55,7 @@ def run_script(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Script {script_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Script {script_id} not found"),
         )
     return result
 
@@ -72,7 +72,7 @@ def get_execution_status(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Action {action_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Action {action_id} not found"),
         )
     return result
 
@@ -89,6 +89,6 @@ def get_execution_results(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Action {action_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Action {action_id} not found"),
         )
     return result

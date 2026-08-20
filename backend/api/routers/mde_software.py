@@ -37,7 +37,10 @@ def get_software(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Software {software_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Software {software_id} not found",
+            ),
         )
     return result
 
@@ -52,6 +55,9 @@ def get_software_machine_references(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Software {software_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Software {software_id} not found",
+            ),
         )
     return result

@@ -32,7 +32,7 @@ async def get_team(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Team '{team_id}' not found",
             ),
         )

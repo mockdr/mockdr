@@ -61,7 +61,7 @@ def get_machine(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -79,7 +79,7 @@ def get_machine_logon_users(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -94,7 +94,7 @@ def get_machine_alerts(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -109,7 +109,7 @@ def get_machine_software(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -124,7 +124,7 @@ def get_machine_vulnerabilities(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -139,7 +139,7 @@ def get_machine_recommendations(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -158,7 +158,7 @@ def isolate_machine(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -174,7 +174,7 @@ def unisolate_machine(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -190,7 +190,7 @@ def run_av_scan(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -206,7 +206,7 @@ def restrict_code_execution(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -222,7 +222,7 @@ def unrestrict_code_execution(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -238,7 +238,7 @@ def collect_investigation_package(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -254,7 +254,7 @@ def offboard_machine(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
 
@@ -270,6 +270,6 @@ def run_live_response(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Machine {machine_id} not found"),
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
         )
     return result
