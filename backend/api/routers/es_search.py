@@ -211,24 +211,33 @@ def get_doc(
     return result
 
 
-@router.post("/{index}/_doc/{doc_id}")
+@router.api_route("/{index}/_doc/{doc_id}", methods=["POST", "PUT"])
 def index_doc(
     index: str,
     doc_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Index (create) a document.
+    """Index (create or replace) a document.
 
-    This is a simplified mock — it acknowledges the write but does not
-    persist the document into any backing collection.
+    The document is stored, so a subsequent ``GET _doc`` finds it. This used
+    to answer ``result: created`` without writing anything, which meant the
+    very next read 404'd.
     """
-    return {
-        "_index": index,
-        "_id": doc_id,
-        "_version": 1,
-        "result": "created",
-        "_shards": {"total": 2, "successful": 1, "failed": 0},
-        "_seq_no": 0,
-        "_primary_term": 1,
-    }
+    return search_queries.es_index_doc(index, doc_id, body)
+
+
+@router.delete("/{index}/_doc/{doc_id}")
+def delete_doc(
+    index: str,
+    doc_id: str,
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Delete a document written through the index API."""
+    result = search_queries.es_delete_doc(index, doc_id)
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"_index": index, "_id": doc_id, "result": "not_found"},
+        )
+    return result

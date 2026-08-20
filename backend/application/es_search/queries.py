@@ -12,6 +12,7 @@ from fnmatch import fnmatch
 
 from repository.es_alert_repo import es_alert_repo
 from repository.es_endpoint_repo import es_endpoint_repo
+from repository.store import store
 from utils.es_aggs import apply_aggregations
 from utils.es_ecs import to_ecs_document
 from utils.es_query import (
@@ -314,6 +315,18 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
         msg = "multiple indices are not allowed for this operation"
         raise MultipleIndicesError(msg)
 
+    written = store.get("es_documents", f"{index}:{doc_id}")
+    if written:
+        return {
+            "_index": index,
+            "_id": doc_id,
+            "_version": written.get("_version", 1),
+            "_seq_no": 0,
+            "_primary_term": 1,
+            "found": True,
+            "_source": written.get("_source", {}),
+        }
+
     records, canonical_index = _resolve_collection(index)
 
     for rec in records:
@@ -331,6 +344,54 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
             }
 
     return None
+
+
+def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
+    """Store a document so a subsequent read finds it.
+
+    The handler previously returned ``result: created`` without writing
+    anything, so ``POST _doc`` followed by ``GET _doc`` 404'd — an
+    acknowledgement of work never done.
+
+    Args:
+        index:  Target index name.
+        doc_id: Document id.
+        body:   The document.
+
+    Returns:
+        The Elasticsearch index-API response.
+    """
+    key = f"{index}:{doc_id}"
+    existing = store.get("es_documents", key)
+    version = int(existing.get("_version", 0)) + 1 if existing else 1
+    store.save("es_documents", key, {"_version": version, "_source": dict(body)})
+    return {
+        "_index": index,
+        "_id": doc_id,
+        "_version": version,
+        "result": "updated" if existing else "created",
+        "_shards": {"total": 2, "successful": 1, "failed": 0},
+        "_seq_no": version - 1,
+        "_primary_term": 1,
+    }
+
+
+def es_delete_doc(index: str, doc_id: str) -> dict | None:
+    """Delete a document written through the index API."""
+    key = f"{index}:{doc_id}"
+    existing = store.get("es_documents", key)
+    if not existing:
+        return None
+    store.delete("es_documents", key)
+    return {
+        "_index": index,
+        "_id": doc_id,
+        "_version": int(existing.get("_version", 1)) + 1,
+        "result": "deleted",
+        "_shards": {"total": 2, "successful": 1, "failed": 0},
+        "_seq_no": 0,
+        "_primary_term": 1,
+    }
 
 
 def es_get_mapping(index: str, *, ignore_unavailable: bool = False) -> dict:

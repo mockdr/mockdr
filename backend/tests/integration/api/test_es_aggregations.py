@@ -275,3 +275,90 @@ class TestGetSearchIsServed:
         )
         assert resp.status_code == 200
         assert len(resp.json()["hits"]["hits"]) == 1
+
+
+class TestDocumentWritesPersist:
+    """``POST _doc`` used to acknowledge a write it never performed."""
+
+    URL = f"/elastic/{INDEX}/_doc/round-trip-probe"
+
+    def test_write_then_read(self, client: TestClient) -> None:
+        created = client.post(self.URL, json={"hostname": "ZZZ"}, headers=ES_AUTH)
+        assert created.json()["result"] == "created"
+
+        fetched = client.get(self.URL, headers=ES_AUTH)
+        assert fetched.status_code == 200
+        assert fetched.json()["found"] is True
+        assert fetched.json()["_source"] == {"hostname": "ZZZ"}
+
+    def test_rewrite_increments_version(self, client: TestClient) -> None:
+        client.post(self.URL, json={"n": 1}, headers=ES_AUTH)
+        second = client.post(self.URL, json={"n": 2}, headers=ES_AUTH)
+
+        assert second.json()["result"] == "updated"
+        assert second.json()["_version"] == 2
+
+    def test_put_is_served(self, client: TestClient) -> None:
+        # PUT is the primary index API in real ES; only POST was routed.
+        resp = client.put(self.URL, json={"n": 1}, headers=ES_AUTH)
+        assert resp.status_code == 200
+
+    def test_delete_removes_the_document(self, client: TestClient) -> None:
+        client.post(self.URL, json={"n": 1}, headers=ES_AUTH)
+        deleted = client.delete(self.URL, headers=ES_AUTH)
+        assert deleted.json()["result"] == "deleted"
+
+        assert client.get(self.URL, headers=ES_AUTH).status_code == 404
+
+    def test_delete_of_a_missing_document_is_404(self, client: TestClient) -> None:
+        resp = client.delete(f"/elastic/{INDEX}/_doc/never-written", headers=ES_AUTH)
+        assert resp.status_code == 404
+
+
+class TestMatchIsAnalyzed:
+    """``match`` compares analysed tokens, not raw substrings."""
+
+    def _search(self, client: TestClient, query: dict) -> list:
+        return list(client.post(
+            SEARCH_URL, json={"query": query, "size": 100}, headers=ES_AUTH,
+        ).json()["hits"]["hits"])
+
+    def test_partial_token_does_not_match(self, client: TestClient) -> None:
+        # "SERV" is not a token any analyzer produces from "SERVER-KQEZSV".
+        assert self._search(client, {"match": {"host.name": "SERV"}}) == []
+
+    def test_whole_token_matches(self, client: TestClient) -> None:
+        sample = client.post(
+            SEARCH_URL, json={"size": 1}, headers=ES_AUTH,
+        ).json()["hits"]["hits"][0]["_source"]["host"]["name"]
+        token = sample.split("-")[0]
+
+        assert self._search(client, {"match": {"host.name": token}})
+
+    def test_match_phrase_needs_contiguous_tokens(self, client: TestClient) -> None:
+        assert self._search(
+            client, {"match_phrase": {"host.name": "kqezsv server"}},
+        ) == []
+
+
+class TestScoreSorting:
+    """``_score`` and ``_doc`` are metadata, not ``_source`` fields."""
+
+    def test_sort_by_score_is_accepted(self, client: TestClient) -> None:
+        resp = client.post(
+            SEARCH_URL, json={"size": 3, "sort": ["_score"]}, headers=ES_AUTH,
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()["hits"]["hits"]) == 3
+
+    def test_sort_by_score_does_not_scramble_results(self, client: TestClient) -> None:
+        # Every document scores the same here, so the order must be preserved
+        # rather than bucketed by a field lookup that finds nothing.
+        plain = client.post(
+            SEARCH_URL, json={"size": 5}, headers=ES_AUTH,
+        ).json()["hits"]["hits"]
+        scored = client.post(
+            SEARCH_URL, json={"size": 5, "sort": ["_score"]}, headers=ES_AUTH,
+        ).json()["hits"]["hits"]
+
+        assert [h["_id"] for h in plain] == [h["_id"] for h in scored]

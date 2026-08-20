@@ -141,17 +141,18 @@ def _build_match(body: dict) -> Callable[[dict], bool]:
         query = str(spec)
         operator = "or"
 
-    query_lower = query.lower()
-    words = query_lower.split()
+    terms = _analyze(query)
 
     def predicate(rec: dict) -> bool:
         val = _get_nested(rec, field)
         if val is None:
             return False
-        val_lower = str(val).lower()
+        # Match against analysed tokens, not raw substrings: `match: "SERV"`
+        # used to hit "SERVER-KQEZSV", which no analyzer produces.
+        tokens = set(_analyze_value(val))
         if operator == "and":
-            return all(w in val_lower for w in words)
-        return any(w in val_lower for w in words)
+            return all(t in tokens for t in terms)
+        return any(t in tokens for t in terms)
 
     return predicate
 
@@ -161,14 +162,22 @@ def _build_match_phrase(body: dict) -> Callable[[dict], bool]:
 
     Exact phrase match (case-insensitive).
     """
-    field, query = next(iter(body.items()))
-    phrase = str(query).lower()
+    field, spec = next(iter(body.items()))
+    query = spec.get("query", "") if isinstance(spec, dict) else spec
+    phrase = _analyze(str(query))
 
     def predicate(rec: dict) -> bool:
         val = _get_nested(rec, field)
         if val is None:
             return False
-        return phrase in str(val).lower()
+        # A phrase is a contiguous run of tokens, not a substring.
+        tokens = _analyze_value(val)
+        if not phrase:
+            return False
+        span = len(phrase)
+        return any(
+            tokens[i : i + span] == phrase for i in range(len(tokens) - span + 1)
+        )
 
     return predicate
 
@@ -531,12 +540,37 @@ def apply_es_sort(records: list[dict], sort_spec: list) -> list[dict]:
 
     result = list(records)
     for field, reverse in reversed(sort_keys):
+        # `_score` and `_doc` are metadata, not `_source` fields. Looking them
+        # up nested found nothing and bucketed every document equally, so the
+        # sort silently did nothing. Every document scores the same here, and
+        # `_doc` is index order, so both preserve the current order.
+        if field in ("_score", "_doc"):
+            continue
+
         def _make_key(f: str) -> Callable[[dict], tuple[int, Any]]:
             def key(rec: dict) -> tuple[int, Any]:
                 return _sort_key(_get_nested(rec, f))
             return key
         result.sort(key=_make_key(field), reverse=reverse)
     return result
+
+
+_TOKEN_SPLIT = re.compile(r"[^0-9A-Za-z_]+")
+
+
+def _analyze(text: str) -> list[str]:
+    """Split text the way Elasticsearch's standard analyzer would."""
+    return [t for t in _TOKEN_SPLIT.split(str(text).lower()) if t]
+
+
+def _analyze_value(value: Any) -> list[str]:
+    """Analyse a field value, flattening arrays as ES does."""
+    if isinstance(value, (list, tuple, set)):
+        tokens: list[str] = []
+        for item in value:
+            tokens.extend(_analyze(str(item)))
+        return tokens
+    return _analyze(str(value))
 
 
 def _sort_key(val: Any) -> tuple[int, Any]:

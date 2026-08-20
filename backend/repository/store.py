@@ -56,6 +56,10 @@ class InMemoryStore:
             "es_endpoints": {},
             "es_rules": {},
             "es_alerts": {},
+            # Documents written through the Elasticsearch index API, keyed
+            # "{index}:{id}". POST _doc used to acknowledge a write it never
+            # performed, so the document was absent on the very next read.
+            "es_documents": {},
             "es_cases": {},
             "es_case_comments": {},
             "es_exception_lists": {},
