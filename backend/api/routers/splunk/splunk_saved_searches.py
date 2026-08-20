@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.saved_search import (
@@ -30,12 +31,12 @@ def list_searches(
     return list_saved_searches()
 
 
-@router.post("/services/saved/searches")
+@router.post("/services/saved/searches", response_model=None)
 async def create_search(
     request: Request,
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
-) -> dict:
+) -> JSONResponse:
     """Create a new saved search."""
     body = await _parse_body(request)
     name = body.get("name", "")
@@ -45,10 +46,16 @@ async def create_search(
             {"type": "ERROR", "text": "name and search are required"},
         ]})
 
+    if get_saved_search(name):
+        # A duplicate name replaced the existing search in place and reported
+        # success; Splunk answers 409.
+        raise HTTPException(status_code=409, detail={"messages": [
+            {"type": "ERROR", "text": f"Saved search '{name}' already exists"},
+        ]})
+
     extra = {k: v for k, v in body.items() if k not in ("name", "search")}
     create_saved_search(name, search, **extra)
-    result = get_saved_search(name)
-    return result or {}
+    return JSONResponse(status_code=201, content=get_saved_search(name) or {})
 
 
 @router.get("/services/saved/searches/{name}")

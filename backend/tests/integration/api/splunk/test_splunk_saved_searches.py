@@ -37,7 +37,7 @@ class TestSavedSearches:
             json={"name": "Test Search", "search": "search index=main | head 10"},
             headers=_auth(),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
     def test_update_saved_search(self, client: TestClient) -> None:
         # Create first

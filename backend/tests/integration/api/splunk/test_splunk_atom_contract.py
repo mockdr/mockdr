@@ -119,3 +119,53 @@ class TestCollectionPaging:
     ) -> None:
         body = _get(client, "/services/data/indexes", count=1)
         assert body["paging"]["total"] > 1
+
+
+class TestCreateSemantics:
+    """Creation answers 201, and a duplicate name is a conflict."""
+
+    def test_index_create_returns_201(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/data/indexes",
+            data={"name": "conflict_probe"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        assert resp.status_code == 201
+
+    def test_duplicate_index_is_409(self, client: TestClient) -> None:
+        client.post(
+            f"{SPLUNK_PREFIX}/services/data/indexes",
+            data={"name": "dupe_index"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        second = client.post(
+            f"{SPLUNK_PREFIX}/services/data/indexes",
+            data={"name": "dupe_index"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        assert second.status_code == 409
+
+    def test_index_delete_is_supported(self, client: TestClient) -> None:
+        client.post(
+            f"{SPLUNK_PREFIX}/services/data/indexes",
+            data={"name": "deletable_index"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        resp = client.delete(
+            f"{SPLUNK_PREFIX}/services/data/indexes/deletable_index",
+            headers=_auth(), params={"output_mode": "json"},
+        )
+        # Real Splunk supports DELETE here; the route was absent, so it 405'd.
+        assert resp.status_code == 200
+
+    def test_duplicate_saved_search_is_409(self, client: TestClient) -> None:
+        payload = {"name": "dupe_search", "search": "search index=main"}
+        client.post(
+            f"{SPLUNK_PREFIX}/services/saved/searches",
+            data=payload, headers=_auth(), params={"output_mode": "json"},
+        )
+        second = client.post(
+            f"{SPLUNK_PREFIX}/services/saved/searches",
+            data=payload, headers=_auth(), params={"output_mode": "json"},
+        )
+        assert second.status_code == 409

@@ -48,7 +48,7 @@ class TestIndexes:
             json={"name": "test_new_index"},
             headers=_auth(),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
         # Verify it exists
         get_resp = client.get(
@@ -99,7 +99,7 @@ class TestIndexManagementRequiresAdmin:
             headers=self._session(client, "admin", "mockdr-admin"),
             data={"name": "admin_index"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
     def test_cloud_admin_can_create_index(self, client: TestClient) -> None:
         """sc_admin is Splunk Cloud's administrator role."""
@@ -108,7 +108,7 @@ class TestIndexManagementRequiresAdmin:
             headers=self._session(client, "analyst", "mockdr-analyst"),
             data={"name": "sc_admin_index"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
     def test_viewer_cannot_mint_hec_token(self, client: TestClient) -> None:
         resp = client.post(
