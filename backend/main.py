@@ -19,7 +19,9 @@ from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.request_logging import RequestLoggingMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
+from api.middleware.splunk_namespace import SplunkNamespaceMiddleware
 from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
+from api.middleware.splunk_paging import SplunkPagingMiddleware
 from api.middleware.tenant_scope import TenantScopeMiddleware
 from api.routers import (
     accounts,
@@ -370,7 +372,11 @@ app.add_middleware(
 
 # Middleware registration order: last added = outermost wrapper.
 # RequestLoggingMiddleware runs first (outermost), then RateLimit, Security, Audit, Proxy innermost.
+# Paging runs inside XML rendering, so the sliced entries are what gets rendered.
+app.add_middleware(SplunkPagingMiddleware)     # count/offset on Atom collections
 app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the routers
+# Path rewriting must happen before routing, so this is added last (outermost).
+app.add_middleware(SplunkNamespaceMiddleware)  # /servicesNS/{owner}/{app} -> /services
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last
 app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors before proxy
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries

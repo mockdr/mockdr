@@ -16,7 +16,9 @@ def list_collections(app: str = "search") -> dict:
             "field.types": coll.field_types,
             "accelerated_fields": coll.accelerated_fields,
         }
-        entries.append(build_splunk_entry(coll.name, content))
+        entries.append(build_splunk_entry(
+            coll.name, content, collection="storage/collections/config",
+        ))
     return build_splunk_envelope(entries)
 
 

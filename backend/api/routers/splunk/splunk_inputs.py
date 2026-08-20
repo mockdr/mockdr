@@ -13,9 +13,8 @@ from utils.splunk.response import build_splunk_entry, build_splunk_envelope
 router = APIRouter(tags=["Splunk Inputs"])
 
 
-@router.get("/servicesNS/{owner}/splunk_httpinput/data/inputs/http")
+@router.get("/services/data/inputs/http")
 def list_hec_tokens(
-    owner: str,
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
@@ -33,13 +32,12 @@ def list_hec_tokens(
             "disabled": t.disabled,
             "useACK": t.use_ack,
         }
-        entries.append(build_splunk_entry(t.name, content))
+        entries.append(build_splunk_entry(t.name, content, collection="data/inputs/http"))
     return build_splunk_envelope(entries)
 
 
-@router.post("/servicesNS/{owner}/splunk_httpinput/data/inputs/http")
+@router.post("/services/data/inputs/http")
 async def create_hec_token(
-    owner: str,
     request: Request,
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_admin),
@@ -69,12 +67,12 @@ async def create_hec_token(
     )
     hec_token_repo.save(token)
     content = {"token": token.token, "index": token.index, "name": token.name}
-    return build_splunk_envelope([build_splunk_entry(name, content)], total=1)
+    entry = build_splunk_entry(name, content, collection="data/inputs/http")
+    return build_splunk_envelope([entry], total=1)
 
 
-@router.delete("/servicesNS/{owner}/splunk_httpinput/data/inputs/http/{name}")
+@router.delete("/services/data/inputs/http/{name}")
 def delete_hec_token(
-    owner: str,
     name: str,
     current_user: dict = Depends(require_splunk_admin),
 ) -> dict:

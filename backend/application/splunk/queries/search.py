@@ -71,7 +71,7 @@ def list_jobs() -> dict:
             "isDone": _splunk_bool(job.is_done),
             "isFailed": _splunk_bool(job.is_failed),
         }
-        entries.append(build_splunk_entry(job.sid, content))
+        entries.append(build_splunk_entry(job.sid, content, collection="search/jobs"))
     return build_splunk_envelope(entries)
 
 
