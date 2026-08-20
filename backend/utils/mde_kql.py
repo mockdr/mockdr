@@ -208,7 +208,7 @@ class _PredicateParser:
                 raise KqlError(msg)
             return inner
 
-        left = self._parse_operand()
+        left = self.parse_operand()
         token = self._peek()
         if token is None:
             # A bare term is truthiness on that column.
@@ -217,17 +217,18 @@ class _PredicateParser:
         operator = token.text.lower()
         if token.kind == "op" and operator in ("==", "!=", "<", "<=", ">", ">=", "=~", "!~"):
             self._next()
-            right = self._parse_operand()
+            right = self.parse_operand()
             return _comparison(operator, left, right)
         if operator in _STRING_OPS:
             self._next()
             if operator == "matches":
                 self._accept("regex")
-            right = self._parse_operand()
+            right = self.parse_operand()
             return _string_op(operator, left, right)
         return lambda row: bool(left(row))
 
-    def _parse_operand(self) -> Callable[[Row], Any]:
+    def parse_operand(self) -> Callable[[Row], Any]:
+        """Parse one operand — a literal, a value list, or a column."""
         token = self._next()
         if token.kind == "string":
             literal = token.text[1:-1]
@@ -382,10 +383,15 @@ def _op_extend(rows: list[Row], argument: str) -> list[Row]:
         updated = dict(row)
         for assignment in assignments:
             name, _, expression = assignment.partition("=")
-            operand = _PredicateParser(_tokenize(expression.strip()))._parse_operand()  # noqa: SLF001
-            updated[name.strip()] = operand(updated)
+            updated[name.strip()] = _evaluate_operand(expression.strip(), updated)
         out.append(updated)
     return out
+
+
+def _evaluate_operand(expression: str, row: Row) -> Any:
+    """Evaluate a single ``extend`` right-hand side against *row*."""
+    parser = _PredicateParser(_tokenize(expression))
+    return parser.parse_operand()(row)
 
 
 def _op_summarize(rows: list[Row], argument: str) -> list[Row]:

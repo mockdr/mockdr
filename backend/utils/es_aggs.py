@@ -16,7 +16,7 @@ from collections import OrderedDict
 from datetime import UTC, datetime
 from typing import Any
 
-from utils.es_query import _build_predicate, wrap_as_hits
+from utils.es_query import build_predicate, wrap_as_hits
 from utils.nested import get_nested
 
 __all__ = ["ESAggregationError", "apply_aggregations"]
@@ -122,7 +122,7 @@ def _bucket(
     if agg_type == "range":
         return _range(body, sub, records, index, depth)
     if agg_type == "filter":
-        matched = [r for r in records if _build_predicate(body)(r)]
+        matched = [r for r in records if build_predicate(body)(r)]
         return _with_sub({"doc_count": len(matched)}, sub, matched, index, depth)
     # filters
     return _filters(body, sub, records, index, depth)
@@ -234,7 +234,7 @@ def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int)
     if isinstance(named, dict):
         buckets: dict[str, Any] = {}
         for key, clause in named.items():
-            members = [r for r in records if _build_predicate(clause)(r)]
+            members = [r for r in records if build_predicate(clause)(r)]
             buckets[key] = _with_sub(
                 {"doc_count": len(members)}, sub, members, index, depth,
             )
@@ -242,7 +242,7 @@ def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int)
 
     anonymous = []
     for clause in named:
-        members = [r for r in records if _build_predicate(clause)(r)]
+        members = [r for r in records if build_predicate(clause)(r)]
         anonymous.append(
             _with_sub({"doc_count": len(members)}, sub, members, index, depth),
         )

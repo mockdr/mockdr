@@ -19,7 +19,7 @@ from utils.splunk.spl_expr import (
     parse_search,
     parse_where,
 )
-from utils.splunk.spl_parser import SPLCommand, SPLQuery
+from utils.splunk.spl_parser import SPLCommand, SPLQuery, parse_sort_keys
 
 __all__ = ["execute_pipeline"]
 
@@ -197,9 +197,7 @@ def _cmd_rex(rows: Rows, command: SPLCommand) -> Rows:
 
 
 def _cmd_sort(rows: Rows, command: SPLCommand) -> Rows:
-    from utils.splunk.spl_parser import _parse_sort  # noqa: PLC0415 - avoids a cycle
-
-    keys = _parse_sort(command.arg)
+    keys = parse_sort_keys(command.arg)
     if not keys:
         return rows
     limit = _leading_count(command.arg)

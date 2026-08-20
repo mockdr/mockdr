@@ -24,6 +24,7 @@ from utils.splunk.spl_expr import Node, SPLExprError, parse_search, parse_where
 
 __all__ = [
     "KNOWN_COMMANDS",
+    "parse_sort_keys",
     "SPLCommand",
     "SPLQuery",
     "parse_spl",
@@ -120,7 +121,7 @@ class SPLQuery:
     def sort_keys(self) -> list[tuple[str, bool]]:
         """Sort fields as ``(field, descending)``, in precedence order."""
         arg = self._first("sort")
-        return _parse_sort(arg) if arg else []
+        return parse_sort_keys(arg) if arg else []
 
     @property
     def where_clauses(self) -> list[tuple[str, str]]:
@@ -167,7 +168,7 @@ def _split_fields(text: str) -> list[str]:
     return [f.strip() for f in re.split(r"[,\s]+", text.strip()) if f.strip()]
 
 
-def _parse_sort(arg: str) -> list[tuple[str, bool]]:
+def parse_sort_keys(arg: str) -> list[tuple[str, bool]]:
     """Parse ``sort`` into ordered ``(field, descending)`` pairs.
 
     Splunk allows several fields and a per-field direction, e.g.

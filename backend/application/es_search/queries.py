@@ -16,9 +16,10 @@ from repository.store import store
 from utils.es_aggs import apply_aggregations
 from utils.es_ecs import to_ecs_document
 from utils.es_query import (
-    _build_predicate,
     apply_es_query,
     apply_source_filter,
+    build_predicate,
+    hit_id,
     wrap_as_hits,
 )
 from utils.es_response import build_es_search_response
@@ -162,7 +163,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     query_clause = body.get("query")
     if query_clause:
         # Re-filter without pagination to get the true total.
-        predicate = _build_predicate(query_clause)
+        predicate = build_predicate(query_clause)
         total = sum(1 for r in records if predicate(r))
     else:
         total = total_before
@@ -175,7 +176,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     # Aggregations run over everything the query matched, not the page.
     aggs = body.get("aggs") or body.get("aggregations")
     if aggs:
-        matched = [r for r in records if _build_predicate(query_clause)(r)] if (
+        matched = [r for r in records if build_predicate(query_clause)(r)] if (
             query_clause
         ) else records
         response["aggregations"] = apply_aggregations(
@@ -206,7 +207,7 @@ def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dic
     records, _ = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
     query_clause = (body or {}).get("query")
     if query_clause:
-        predicate = _build_predicate(query_clause)
+        predicate = build_predicate(query_clause)
         records = [r for r in records if predicate(r)]
     return {
         "count": len(records),
@@ -278,9 +279,7 @@ def es_mget(index: str, body: dict) -> dict:
 
 def _document_id(record: dict) -> str:
     """The ``_id`` a record answers to, flat or ECS."""
-    from utils.es_query import _hit_id  # noqa: PLC0415 - avoids an import cycle
-
-    return _hit_id(record)
+    return hit_id(record)
 
 
 def _index_uuid(index: str) -> str:

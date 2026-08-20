@@ -89,7 +89,7 @@ def _compare_range(field_val: Any, target: Any, op: str) -> bool:
 # Predicate builders — one per query type
 # ---------------------------------------------------------------------------
 
-def _build_predicate(clause: dict) -> Callable[[dict], bool]:
+def build_predicate(clause: dict) -> Callable[[dict], bool]:
     """Recursively build a predicate function from an ES query clause.
 
     Args:
@@ -281,10 +281,10 @@ def _build_bool(body: dict) -> Callable[[dict], bool]:
 
     Combines ``must``, ``filter``, ``should``, and ``must_not`` sub-clauses.
     """
-    must_preds = [_build_predicate(c) for c in body.get("must", [])]
-    filter_preds = [_build_predicate(c) for c in body.get("filter", [])]
-    should_preds = [_build_predicate(c) for c in body.get("should", [])]
-    must_not_preds = [_build_predicate(c) for c in body.get("must_not", [])]
+    must_preds = [build_predicate(c) for c in body.get("must", [])]
+    filter_preds = [build_predicate(c) for c in body.get("filter", [])]
+    should_preds = [build_predicate(c) for c in body.get("should", [])]
+    must_not_preds = [build_predicate(c) for c in body.get("must_not", [])]
     # Per ES: should clauses only carry a match requirement when there is no
     # must/filter to satisfy. Defaulting to 1 regardless meant adding a
     # non-matching should — which should affect scoring only — emptied the
@@ -608,7 +608,7 @@ def wrap_as_hits(
     return [
         {
             "_index": index,
-            "_id": _hit_id(rec),
+            "_id": hit_id(rec),
             "_score": 1.0,
             "_source": rec,
         }
@@ -616,7 +616,7 @@ def wrap_as_hits(
     ]
 
 
-def _hit_id(rec: dict) -> str:
+def hit_id(rec: dict) -> str:
     """Derive a stable ``_id`` for a record.
 
     A fresh UUID per response meant the same document came back under a
@@ -717,7 +717,7 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
     # Filter.
     query_clause = query_body.get("query")
     if query_clause:
-        predicate = _build_predicate(query_clause)
+        predicate = build_predicate(query_clause)
         records = [r for r in records if predicate(r)]
 
     # Sort.
