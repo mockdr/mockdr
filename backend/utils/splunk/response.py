@@ -123,6 +123,18 @@ def build_search_results(
 # ---------------------------------------------------------------------------
 
 
+#: splunkd does not label every failure the same way, and the label does not
+#: track severity: an authentication failure ships as ``WARN`` even though a
+#: permission failure ships as ``ERROR``. A client filtering on ``type`` sees
+#: the difference, so the status has to pick the label. Only 401 is mapped —
+#: splunkd is reported to use ``FATAL`` for an unknown search id, but its own
+#: ``messages.conf`` declares that stanza ``severity = error``, so the label
+#: there is left alone rather than guessed at.
+_SPLUNK_MSG_TYPES: dict[int, str] = {
+    401: "WARN",
+}
+
+
 def build_splunk_error(status: int, message: str) -> dict:
     """Build a Splunk error response body.
 
@@ -134,7 +146,9 @@ def build_splunk_error(status: int, message: str) -> dict:
         Splunk error envelope dict.
     """
     return {
-        "messages": [{"type": "ERROR", "text": message}],
+        "messages": [
+            {"type": _SPLUNK_MSG_TYPES.get(status, "ERROR"), "text": message},
+        ],
     }
 
 

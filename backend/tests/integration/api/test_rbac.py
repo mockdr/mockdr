@@ -152,6 +152,6 @@ class TestForbiddenResponseFormat:
         assert resp.status_code == 403
         body = resp.json()
         assert "errors" in body
-        assert body["data"] is None
+        assert "data" not in body, "S1 error bodies carry `errors` alone"
         assert body["errors"][0]["code"] == 4030010
-        assert body["errors"][0]["title"] == "Forbidden"
+        assert body["errors"][0]["title"] == "Insufficient permissions"

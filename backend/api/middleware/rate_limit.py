@@ -11,7 +11,6 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 _RATE_LIMIT_RESPONSE = json.dumps({
     "errors": [{"code": 4290001, "detail": "Rate limit exceeded", "title": "Too Many Requests"}],
-    "data": None,
 }).encode()
 
 _UNAUTHENTICATED_EXEMPT_PATHS = {"/web/api/v2.1/system/status"}

@@ -30,6 +30,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from repository.splunk.hec_token_repo import hec_token_repo
 from repository.splunk.splunk_user_repo import splunk_user_repo
 from repository.store import store
+from utils.splunk.response import build_splunk_error
 
 # ── Session token management ───────────────────────────────────────────────
 
@@ -77,6 +78,12 @@ def _resolve_session(session_key: str) -> str | None:
 
 # ── Public dependencies ──────────────────────────────────────────────────
 
+#: splunkd answers every authentication failure with this one string,
+#: whether credentials were absent, malformed or simply wrong.
+_AUTH_FAILED = "call not properly authenticated"
+
+
+
 async def require_splunk_auth(
     request: Request,
     authorization: str | None = Header(None),
@@ -101,9 +108,7 @@ async def require_splunk_auth(
                 user = splunk_user_repo.get(username)
                 if user:
                     return {"username": user.username, "roles": user.roles}
-            raise HTTPException(status_code=401, detail={"messages": [
-                {"type": "ERROR", "text": "Invalid or expired session key"},
-            ]})
+            raise HTTPException(status_code=401, detail=build_splunk_error(401, _AUTH_FAILED))
 
         if authorization.lower().startswith("bearer "):
             token = authorization[7:]
@@ -112,9 +117,7 @@ async def require_splunk_auth(
                 user = splunk_user_repo.get(username)
                 if user:
                     return {"username": user.username, "roles": user.roles}
-            raise HTTPException(status_code=401, detail={"messages": [
-                {"type": "ERROR", "text": "Invalid or expired session token"},
-            ]})
+            raise HTTPException(status_code=401, detail=build_splunk_error(401, _AUTH_FAILED))
 
         # Basic auth
         if authorization.lower().startswith("basic "):
@@ -126,13 +129,9 @@ async def require_splunk_auth(
                     return {"username": user.username, "roles": user.roles}
             except Exception:
                 pass
-            raise HTTPException(status_code=401, detail={"messages": [
-                {"type": "ERROR", "text": "Invalid credentials"},
-            ]})
+            raise HTTPException(status_code=401, detail=build_splunk_error(401, _AUTH_FAILED))
 
-    raise HTTPException(status_code=401, detail={"messages": [
-        {"type": "ERROR", "text": "Authentication required"},
-    ]})
+    raise HTTPException(status_code=401, detail=build_splunk_error(401, _AUTH_FAILED))
 
 
 _ADMIN_ROLES: frozenset[str] = frozenset({"admin", "sc_admin"})
@@ -161,9 +160,15 @@ async def require_splunk_admin(
         HTTPException: 403 if the user holds no administrator role.
     """
     if not _ADMIN_ROLES.intersection(current_user.get("roles", [])):
-        raise HTTPException(status_code=403, detail={"messages": [
-            {"type": "ERROR", "text": "Insufficient privileges"},
-        ]})
+        user = current_user.get("username", "")
+        raise HTTPException(
+            status_code=403,
+            detail=build_splunk_error(
+                403,
+                f"You (user={user}) do not have permission to perform this "
+                f"operation (requires capability: admin_all_objects).",
+            ),
+        )
     return current_user
 
 
@@ -184,7 +189,7 @@ async def require_hec_auth(
         HTTPException: 401/403 if token is invalid or disabled.
     """
     if not authorization or not authorization.lower().startswith("splunk "):
-        raise HTTPException(status_code=401, detail={"text": "Token required", "code": 2})
+        raise HTTPException(status_code=401, detail={"text": "Token is required", "code": 2})
 
     token_value = authorization[7:]
     token = hec_token_repo.get(token_value)

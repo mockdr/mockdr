@@ -3,6 +3,7 @@
 Implements Kibana Security signal management endpoints: search, status
 update, tag management, and assignee management.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_alerts import commands as alert_commands
 from application.es_alerts import queries as alert_queries
-from utils.es_response import build_es_error_response
+from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["Elastic Alerts"])
 
@@ -49,8 +50,9 @@ def update_alert_status(
     if not signal_ids or not status:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request", "signal_ids and status are required",
+            detail=build_kbn_error_response(
+                400,
+                "signal_ids and status are required",
             ),
         )
     return alert_commands.update_alert_status(signal_ids, status)
@@ -78,7 +80,7 @@ def update_alert_tags(
     if not alert_ids:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(400, "bad_request", "ids is required"),
+            detail=build_kbn_error_response(400, "ids is required"),
         )
     return alert_commands.update_alert_tags(
         alert_ids,
@@ -112,7 +114,7 @@ def update_alert_assignees(
     if not alert_ids:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(400, "bad_request", "ids is required"),
+            detail=build_kbn_error_response(400, "ids is required"),
         )
     return alert_commands.update_alert_assignees(
         alert_ids,

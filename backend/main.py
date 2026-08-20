@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from api.auth import require_admin, require_auth
@@ -303,7 +303,11 @@ from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.logging import setup_logging
 from utils.mde_odata import ODataFilterError
-from utils.vendor_errors import build_vendor_error, vendor_for_path
+from utils.vendor_errors import (
+    build_vendor_error,
+    vendor_for_path,
+    vendor_mount_for_path,
+)
 
 setup_logging()
 
@@ -641,9 +645,48 @@ _DIST = Path(__file__).parent.parent / "frontend" / "dist"
 if _DIST.exists():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa_fallback(full_path: str = "") -> FileResponse:
-        """Serve the SPA index.html for all unmatched routes."""
+    _SPA_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+
+    def _wants_html(request: Request) -> bool:
+        """Return whether this looks like a browser navigation.
+
+        Browsers name ``text/html`` explicitly when navigating; API clients
+        send ``application/json`` or ``*/*``.  The UI routes under the same
+        top-level prefixes as the APIs it mocks — ``/graph/users`` is a page,
+        ``/graph/v1.0/users`` is an endpoint — so the path alone cannot say
+        which of the two an unmatched request wanted.
+        """
+        return "text/html" in request.headers.get("accept", "")
+
+    @app.api_route("/{full_path:path}", methods=_SPA_METHODS, include_in_schema=False)
+    def spa_fallback(request: Request, full_path: str = "") -> Response:
+        """Serve the SPA, or a vendor-shaped 404 for unmatched API routes.
+
+        Serving index.html for everything meant a mistyped endpoint answered
+        ``200 text/html`` — or ``405``, for anything but GET, because only GET
+        reached this route. A client written against the real vendor got
+        neither the status nor the body it parses, turning a typo into a
+        puzzle. Every mocked vendor answers an unknown path with ``404``.
+        """
+        path = "/" + full_path
+        vendor = vendor_mount_for_path(path)
+
+        if vendor is not None and not _wants_html(request):
+            return JSONResponse(
+                status_code=404,
+                content=build_vendor_error(
+                    vendor, 404, f"Resource not found: {request.method} {path}",
+                ),
+            )
+
+        if request.method not in ("GET", "HEAD"):
+            return JSONResponse(
+                status_code=405,
+                content=build_vendor_error(
+                    vendor or "s1", 405, f"Method {request.method} not allowed",
+                ),
+            )
+
         return FileResponse(_DIST / "index.html")
 
 

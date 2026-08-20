@@ -83,7 +83,7 @@ class TestRateLimiting:
         assert resp.status_code == 429
         body = resp.json()
         assert "errors" in body
-        assert body["data"] is None
+        assert "data" not in body, "S1 error bodies carry `errors` alone"
         errors = body["errors"]
         assert len(errors) >= 1
         assert errors[0]["code"] == 4290001

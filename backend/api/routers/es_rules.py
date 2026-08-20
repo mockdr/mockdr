@@ -3,6 +3,7 @@
 Implements Kibana Security Detection Engine rule management endpoints:
 CRUD, find, bulk actions, tags, and prepackaged status.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_rules import commands as rule_commands
 from application.es_rules import queries as rule_queries
-from utils.es_response import build_es_error_response
+from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["Elastic Detection Rules"])
 
@@ -34,7 +35,7 @@ def get_rule(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", "rule not found"),
+            detail=build_kbn_error_response(404, "rule not found"),
         )
     return result
 
@@ -58,15 +59,16 @@ def update_rule(
     if not rule_id:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request", "id is required in the request body",
+            detail=build_kbn_error_response(
+                400,
+                "id is required in the request body",
             ),
         )
     result = rule_commands.update_rule(rule_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"rule {rule_id} not found"),
+            detail=build_kbn_error_response(404, f"rule {rule_id} not found"),
         )
     return result
 
@@ -82,7 +84,7 @@ def delete_rule(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"rule {id} not found"),
+            detail=build_kbn_error_response(404, f"rule {id} not found"),
         )
     rule_commands.delete_rule(id)
     return result
@@ -92,8 +94,14 @@ def delete_rule(
 
 
 _ALLOWED_SORT_FIELDS = {
-    "created_at", "updated_at", "name", "enabled", "severity",
-    "risk_score", "rule_id", "execution_summary.last_execution.date",
+    "created_at",
+    "updated_at",
+    "name",
+    "enabled",
+    "severity",
+    "risk_score",
+    "rule_id",
+    "execution_summary.last_execution.date",
 }
 
 
@@ -110,8 +118,8 @@ def find_rules(
     if sort_field and sort_field not in _ALLOWED_SORT_FIELDS:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=build_kbn_error_response(
+                400,
                 f"Invalid sort_field '{sort_field}'. "
                 f"Allowed: {', '.join(sorted(_ALLOWED_SORT_FIELDS))}",
             ),
@@ -141,7 +149,7 @@ def bulk_action(
     if not action:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(400, "bad_request", "action is required"),
+            detail=build_kbn_error_response(400, "action is required"),
         )
     rule_ids = body.get("ids")
     query = body.get("query")

@@ -97,7 +97,6 @@ class FaultInjectionMiddleware:
                     "detail": "Injected error (fault injection enabled)",
                     "title": "Simulated Error",
                 }],
-                "data": None,
             }).encode()
             await send({
                 "type": "http.response.start",

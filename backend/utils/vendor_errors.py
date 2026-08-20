@@ -39,21 +39,95 @@ _STATUS_TITLES: dict[int, str] = {
     401: "Unauthorized",
     403: "Forbidden",
     404: "Not Found",
+    405: "Method Not Allowed",
     409: "Conflict",
     429: "Too Many Requests",
     500: "Internal Server Error",
 }
 
-# Error code names used by the Microsoft-flavoured APIs.
-_MS_CODES: dict[int, str] = {
+# The three Microsoft-flavoured APIs share an envelope but NOT their code
+# strings, so one table for all of them put the wrong code in two of the three.
+# Each of these is the string the vendor documents for that status.
+
+#: Elasticsearch derives its ``type`` from the Java exception class, so it names
+#: the failure rather than the status — one type for every status told a client
+#: an auth rejection was a bad argument. ``security_exception`` covers both 401
+#: and 403; only ``status`` separates them.
+_ES_TYPES: dict[int, str] = {
+    400: "illegal_argument_exception",
+    401: "security_exception",
+    403: "security_exception",
+    404: "index_not_found_exception",
+    429: "circuit_breaking_exception",
+    500: "exception",
+}
+
+#: SentinelOne writes its own wording into ``title`` rather than reusing the
+#: HTTP reason phrase, so a client keying off the title sees a different string
+#: from the generic one. Values observed on real tenants.
+_S1_TITLES: dict[int, str] = {
+    400: "Validation Error",
+    401: "Authentication Failed",
+    403: "Insufficient permissions",
+    404: "Requested resource was not found",
+    405: "Requested resource was not found",
+    501: "Not supported",
+}
+
+#: Defender for Endpoint — learn.microsoft.com/defender-endpoint/api/common-errors
+_MDE_CODES: dict[int, str] = {
     400: "BadRequest",
-    401: "Unauthenticated",
+    401: "Unauthorized",
     403: "Forbidden",
-    404: "NotFound",
+    404: "ResourceNotFound",
+    405: "BadRequest",
     409: "Conflict",
     429: "TooManyRequests",
     500: "InternalServerError",
 }
+
+#: Microsoft Graph. Graph is not internally consistent — directory endpoints use
+#: ``Underscore_Case`` while the files workload uses ``camelCase`` — so these are
+#: the directory-flavoured codes, which is what the mocked surface serves.
+_GRAPH_CODES: dict[int, str] = {
+    400: "badRequest",
+    401: "InvalidAuthenticationToken",
+    403: "Authorization_RequestDenied",
+    404: "Request_ResourceNotFound",
+    405: "badRequest",
+    409: "Request_BadRequest",
+    429: "TooManyRequests",
+    500: "generalException",
+}
+
+#: Azure Resource Manager, which Sentinel sits behind.
+_ARM_CODES: dict[int, str] = {
+    400: "BadRequest",
+    401: "AuthenticationFailed",
+    403: "AuthorizationFailed",
+    404: "ResourceNotFound",
+    405: "BadRequest",
+    409: "Conflict",
+    429: "TooManyRequests",
+    500: "InternalServerError",
+}
+
+
+def vendor_mount_for_path(path: str) -> str | None:
+    """Identify the vendor mount a request path falls under, if any.
+
+    Args:
+        path: Request path, e.g. ``/cs/devices/queries/devices/v1``.
+
+    Returns:
+        Vendor key, or ``None`` when the path is outside every vendor mount —
+        which :func:`vendor_for_path` cannot express, because it has to answer
+        with *some* vendor for the error envelope.
+    """
+    for prefix, vendor in _VENDOR_PREFIXES:
+        if path == prefix or path.startswith(prefix + "/"):
+            return vendor
+    return None
 
 
 def vendor_for_path(path: str) -> str:
@@ -65,10 +139,7 @@ def vendor_for_path(path: str) -> str:
     Returns:
         Vendor key, defaulting to ``"s1"`` for paths outside a vendor mount.
     """
-    for prefix, vendor in _VENDOR_PREFIXES:
-        if path == prefix or path.startswith(prefix + "/"):
-            return vendor
-    return "s1"
+    return vendor_mount_for_path(path) or "s1"
 
 
 def build_vendor_error(vendor: str, status: int, message: str) -> dict:
@@ -85,15 +156,15 @@ def build_vendor_error(vendor: str, status: int, message: str) -> dict:
     if vendor == "crowdstrike":
         return build_cs_error_response(status, message)
     if vendor == "mde":
-        return build_mde_error_response(_MS_CODES.get(status, "Error"), message)
+        return build_mde_error_response(_MDE_CODES.get(status, "InternalServerError"), message)
     if vendor == "graph":
-        return build_graph_error_response(_MS_CODES.get(status, "Error"), message)
+        return build_graph_error_response(_GRAPH_CODES.get(status, "generalException"), message)
     if vendor == "sentinel":
-        return build_arm_error(_MS_CODES.get(status, "Error"), message)
+        return build_arm_error(_ARM_CODES.get(status, "InternalServerError"), message)
     if vendor == "xdr":
         return build_xdr_error(status, message)
     if vendor == "elasticsearch":
-        return build_es_error_response(status, "illegal_argument_exception", message)
+        return build_es_error_response(status, _ES_TYPES.get(status, "exception"), message)
     if vendor == "kibana":
         return {
             "statusCode": status,
@@ -103,9 +174,15 @@ def build_vendor_error(vendor: str, status: int, message: str) -> dict:
     if vendor == "splunk":
         return build_splunk_error(status, message)
 
-    # SentinelOne — codes follow the <status><domain>0 convention.
-    title = _STATUS_TITLES.get(status, "Error")
+    # SentinelOne — codes follow the <status><domain>0 convention, and the body
+    # carries no `data` key: the schemas backing every error status in S1's own
+    # Swagger are named `_NoDataSchema_<status>` and declare `errors` alone.
     return {
-        "errors": [{"code": status * 10000 + 10, "detail": message, "title": title}],
-        "data": None,
+        "errors": [
+            {
+                "code": status * 10000 + 10,
+                "detail": message,
+                "title": _S1_TITLES.get(status, _STATUS_TITLES.get(status, "Error")),
+            },
+        ],
     }

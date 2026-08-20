@@ -2,6 +2,7 @@
 
 Implements the Elastic Security Cases API endpoints at ``/api/cases``.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -10,7 +11,7 @@ from fastapi.responses import Response
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_cases import commands as case_commands
 from application.es_cases import queries as case_queries
-from utils.es_response import build_es_error_response
+from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["ES Cases"])
 
@@ -30,8 +31,11 @@ def find_cases(
     """Find cases with optional filters and pagination."""
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     return case_queries.find_cases(
-        status=status, tags=tag_list, owner=owner,
-        page=page, per_page=per_page,
+        status=status,
+        tags=tag_list,
+        owner=owner,
+        page=page,
+        per_page=per_page,
     )
 
 
@@ -56,7 +60,7 @@ def get_case(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -81,7 +85,7 @@ def update_case(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -110,7 +114,7 @@ def get_case_comments(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -126,7 +130,7 @@ def add_comment(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -146,8 +150,8 @@ def update_comment(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found",
+            detail=build_kbn_error_response(
+                404,
                 f"Comment {comment_id} not found on case {case_id}",
             ),
         )
@@ -168,8 +172,8 @@ def delete_comment(
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found",
+            detail=build_kbn_error_response(
+                404,
                 f"Comment {comment_id} not found on case {case_id}",
             ),
         )

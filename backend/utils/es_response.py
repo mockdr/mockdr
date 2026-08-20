@@ -78,3 +78,39 @@ def build_es_error_response(
         },
         "status": status_code,
     }
+
+
+#: Boom's status-title table, which is what lands in Kibana's ``error`` field.
+_KBN_TITLES: dict[int, str] = {
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    405: "Method Not Allowed",
+    409: "Conflict",
+    429: "Too Many Requests",
+    500: "Internal Server Error",
+}
+
+
+def build_kbn_error_response(status_code: int, message: str) -> dict:
+    """Build a Kibana error response.
+
+    Kibana does not share Elasticsearch's envelope, even though the two ship
+    together: it serves errors through Hapi/Boom, so ``error`` is a status
+    *title string* and the status travels as ``statusCode`` inside the body.
+    Elasticsearch's ``error`` is an object and its status is a top-level
+    ``status``. A client switching between the two cannot use one parser.
+
+    Args:
+        status_code: HTTP status code.
+        message:     Human-readable error description.
+
+    Returns:
+        Kibana (Boom) error response envelope.
+    """
+    return {
+        "statusCode": status_code,
+        "error": _KBN_TITLES.get(status_code, "Internal Server Error"),
+        "message": message,
+    }

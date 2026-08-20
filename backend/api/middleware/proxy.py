@@ -21,7 +21,6 @@ from utils.id_gen import new_id
 
 _ERROR_UPSTREAM = json.dumps({
     "errors": [{"code": 5020001, "detail": "Upstream request failed", "title": "Bad Gateway"}],
-    "data": None,
 }).encode()
 
 

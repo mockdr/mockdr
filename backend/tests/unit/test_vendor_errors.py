@@ -38,8 +38,19 @@ class TestBuildVendorError:
 
     def test_s1_uses_errors_array(self) -> None:
         body = build_vendor_error("s1", 400, "bad")
-        assert body["data"] is None
-        assert body["errors"][0]["title"] == "Bad Request"
+        assert "data" not in body, "S1 error bodies carry `errors` alone"
+        assert body["errors"][0]["code"] == 4000010
+        assert body["errors"][0]["title"] == "Validation Error"
+
+    @pytest.mark.parametrize(("status", "title"), [
+        (401, "Authentication Failed"),
+        (403, "Insufficient permissions"),
+        (404, "Requested resource was not found"),
+    ])
+    def test_s1_uses_its_own_titles(self, status: int, title: str) -> None:
+        """S1 writes its own wording into `title`, not the HTTP reason phrase."""
+        body = build_vendor_error("s1", status, "x")
+        assert body["errors"][0]["title"] == title
 
     def test_crowdstrike_uses_meta_resources_errors(self) -> None:
         body = build_vendor_error("crowdstrike", 400, "bad")
@@ -48,8 +59,41 @@ class TestBuildVendorError:
     def test_microsoft_apis_use_error_object(self) -> None:
         for vendor in ("mde", "graph", "sentinel"):
             body = build_vendor_error(vendor, 400, "bad")
-            assert body["error"]["code"] == "BadRequest"
             assert body["error"]["message"] == "bad"
+
+    @pytest.mark.parametrize(("vendor", "status", "code"), [
+        # The three Microsoft APIs share an envelope but not their code strings.
+        ("mde", 401, "Unauthorized"),
+        ("mde", 404, "ResourceNotFound"),
+        ("graph", 401, "InvalidAuthenticationToken"),
+        ("graph", 403, "Authorization_RequestDenied"),
+        ("graph", 404, "Request_ResourceNotFound"),
+        ("sentinel", 401, "AuthenticationFailed"),
+        ("sentinel", 403, "AuthorizationFailed"),
+        ("sentinel", 404, "ResourceNotFound"),
+    ])
+    def test_microsoft_codes_are_per_vendor(
+        self, vendor: str, status: int, code: str,
+    ) -> None:
+        assert build_vendor_error(vendor, status, "x")["error"]["code"] == code
+
+    def test_mde_error_carries_tracking_target(self) -> None:
+        """Defender's envelope has a third member the others do not."""
+        body = build_vendor_error("mde", 404, "gone")
+        assert body["error"]["target"]
+
+    def test_splunk_auth_failure_is_warn_not_error(self) -> None:
+        """splunkd labels an auth failure WARN; permission failures stay ERROR."""
+        assert build_vendor_error("splunk", 401, "x")["messages"][0]["type"] == "WARN"
+        assert build_vendor_error("splunk", 403, "x")["messages"][0]["type"] == "ERROR"
+
+    def test_kibana_envelope_differs_from_elasticsearch(self) -> None:
+        """They ship together but do not share an error shape."""
+        kbn = build_vendor_error("kibana", 404, "nope")
+        es = build_vendor_error("elasticsearch", 404, "nope")
+        assert kbn == {"statusCode": 404, "error": "Not Found", "message": "nope"}
+        assert isinstance(es["error"], dict)
+        assert es["status"] == 404
 
     def test_xdr_uses_reply_envelope(self) -> None:
         body = build_vendor_error("xdr", 400, "bad")

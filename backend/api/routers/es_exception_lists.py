@@ -3,6 +3,7 @@
 Implements the Elastic Security Exception Lists and Exception Items API
 endpoints at ``/api/exception_lists``.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_exception_lists import commands as exc_commands
 from application.es_exception_lists import queries as exc_queries
-from utils.es_response import build_es_error_response
+from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["ES Exception Lists"])
 
@@ -28,8 +29,10 @@ def find_lists(
 ) -> dict:
     """Find exception lists with optional filters and pagination."""
     return exc_queries.find_lists(
-        list_id=list_id, namespace_type=namespace_type,
-        page=page, per_page=per_page,
+        list_id=list_id,
+        namespace_type=namespace_type,
+        page=page,
+        per_page=per_page,
     )
 
 
@@ -44,8 +47,8 @@ def get_list(
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=build_kbn_error_response(
+                400,
                 "Either list_id or id query parameter is required",
             ),
         )
@@ -53,8 +56,9 @@ def get_list(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found", f"Exception list {lookup} not found",
+            detail=build_kbn_error_response(
+                404,
+                f"Exception list {lookup} not found",
             ),
         )
     return result
@@ -79,8 +83,9 @@ def update_list(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found", "Exception list not found",
+            detail=build_kbn_error_response(
+                404,
+                "Exception list not found",
             ),
         )
     return result
@@ -97,8 +102,8 @@ def delete_list(
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=build_kbn_error_response(
+                400,
                 "Either list_id or id query parameter is required",
             ),
         )
@@ -106,8 +111,9 @@ def delete_list(
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found", f"Exception list {lookup} not found",
+            detail=build_kbn_error_response(
+                404,
+                f"Exception list {lookup} not found",
             ),
         )
     return {}
@@ -128,8 +134,11 @@ def find_items(
     """Find exception items with optional filters and pagination."""
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     return exc_queries.find_items(
-        list_id=list_id, namespace_type=namespace_type, tags=tag_list,
-        page=page, per_page=per_page,
+        list_id=list_id,
+        namespace_type=namespace_type,
+        tags=tag_list,
+        page=page,
+        per_page=per_page,
     )
 
 
@@ -144,8 +153,8 @@ def get_item(
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=build_kbn_error_response(
+                400,
                 "Either item_id or id query parameter is required",
             ),
         )
@@ -153,8 +162,9 @@ def get_item(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found", f"Exception item {lookup} not found",
+            detail=build_kbn_error_response(
+                404,
+                f"Exception item {lookup} not found",
             ),
         )
     return result
@@ -179,8 +189,9 @@ def update_item(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found", "Exception item not found",
+            detail=build_kbn_error_response(
+                404,
+                "Exception item not found",
             ),
         )
     return result
@@ -197,8 +208,8 @@ def delete_item(
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=build_kbn_error_response(
+                400,
                 "Either item_id or id query parameter is required",
             ),
         )
@@ -206,8 +217,9 @@ def delete_item(
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found", f"Exception item {lookup} not found",
+            detail=build_kbn_error_response(
+                404,
+                f"Exception item {lookup} not found",
             ),
         )
     return {}
