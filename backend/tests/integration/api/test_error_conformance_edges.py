@@ -215,3 +215,71 @@ class TestElasticIndexResolution:
         resp = client.get("/elastic/_all/_doc/anything", headers=ES_AUTH)
         assert resp.status_code == 400
         assert resp.json()["error"]["type"] == "illegal_argument_exception"
+
+
+class TestMalformedBodiesNeverReach500:
+    """A body the handler cannot use must be a vendor 400, not a crash.
+
+    Found by probing every write route with a set of hostile bodies: seven
+    routes answered a plain-text 500, which an integration cannot tell apart
+    from the service falling over.
+    """
+
+    HOSTILE = [
+        {"composite_ids": None},
+        {"action_parameters": "x"},
+        {"action_parameters": [None]},
+        {"cases": [None]},
+        {"query": {"bool": None}},
+        {"query": []},
+        {"size": "big"},
+        {"from": "x"},
+        {"Query": 5},
+        [],
+        "string",
+    ]
+
+    ROUTES = [
+        ("PATCH", "/cs/alerts/entities/alerts/v3", "cs"),
+        ("POST", "/cs/alerts/entities/alerts/v2", "cs"),
+        ("PATCH", "/kibana/api/cases", "es"),
+        ("POST", "/kibana/api/detection_engine/signals/search", "es"),
+        ("POST", "/elastic/.siem-signals-default/_search", "es"),
+        ("POST", "/mde/api/advancedqueries/run", "mde"),
+        ("POST", "/splunk/services/saved/searches", "splunk"),
+        ("POST", "/splunk/services/data/inputs/http", "splunk"),
+        ("POST", "/splunk/services/data/indexes", "splunk"),
+    ]
+
+    @pytest.mark.parametrize(("method", "path", "vendor"), ROUTES)
+    def test_no_hostile_body_produces_a_5xx(
+        self, client: TestClient, method: str, path: str, vendor: str,
+    ) -> None:
+        headers = _vendor_headers(client, vendor)
+        for body in self.HOSTILE:
+            resp = client.request(method, path, json=body, headers=headers)
+            assert resp.status_code < 500, (
+                f"{method} {path} answered {resp.status_code} to {body!r}"
+            )
+
+
+def _vendor_headers(client: TestClient, vendor: str) -> dict[str, str]:
+    """Authorization headers for the named vendor mount."""
+    if vendor == "cs":
+        token = client.post("/cs/oauth2/token", data={
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+    if vendor == "mde":
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+    if vendor == "es":
+        encoded = base64.b64encode(b"elastic:mock-elastic-password").decode()
+        return {"Authorization": f"Basic {encoded}", "kbn-xsrf": "true"}
+    encoded = base64.b64encode(b"admin:mockdr-admin").decode()
+    return {"Authorization": f"Basic {encoded}"}

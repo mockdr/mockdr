@@ -81,6 +81,10 @@ def parse_kql(query: str) -> KqlQuery:
     Raises:
         KqlError: If the query is empty or an operator is not supported.
     """
+    if query is not None and not isinstance(query, str):
+        # A non-string Query reached re.sub and raised TypeError as a 500.
+        msg = f"A recognized query is expected, found {type(query).__name__}"
+        raise KqlError(msg)
     text = re.sub(r"//[^\n]*", " ", query or "").strip()
     if not text:
         msg = "A recognized query is expected"

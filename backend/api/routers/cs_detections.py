@@ -15,6 +15,18 @@ from utils.vendor_errors import build_vendor_error
 router = APIRouter(tags=["CrowdStrike Detections"])
 
 
+def _id_list(body: dict) -> list[str]:
+    """Read the alert ids from a request body.
+
+    An explicit ``null`` defeats a dict default, so ``composite_ids: null``
+    produced None and iterating it raised TypeError out of the handler.
+    """
+    raw = body.get("composite_ids")
+    if raw is None:
+        raw = body.get("ids")
+    return [str(i) for i in raw] if isinstance(raw, (list, tuple)) else []
+
+
 @router.get("/alerts/queries/alerts/v2")
 def query_detections(
     filter: str = Query(None),
@@ -33,7 +45,7 @@ def get_detections(
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return full detection entities for the given composite IDs."""
-    ids: list[str] = body.get("composite_ids", body.get("ids", []))
+    ids: list[str] = _id_list(body)
     return detection_queries.get_detection_entities(ids)
 
 
@@ -49,7 +61,7 @@ def update_detections(
     is not what any real client sends, so a genuine request was accepted with
     a 200 and changed nothing.
     """
-    ids: list[str] = body.get("composite_ids", body.get("ids", []))
+    ids: list[str] = _id_list(body)
     try:
         return detection_commands.update_detections(
             ids=ids,

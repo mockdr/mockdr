@@ -115,6 +115,10 @@ def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
     if not clause:
         return lambda _rec: True
 
+    if not isinstance(clause, dict):
+        msg = f"[query] malformed query, expected an object but found {type(clause).__name__}"
+        raise ESQueryError(msg)
+
     # Elasticsearch allows exactly one query type per clause object. Returning
     # on the first key silently discarded every later clause, so a body whose
     # second clause excluded everything still matched.
@@ -127,6 +131,11 @@ def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
         builder = _BUILDERS.get(query_type)
         if builder is None:
             raise ESQueryError(f"no [query] registered for [{query_type}]")
+        if not isinstance(body, dict):
+            # A clause body of null or a scalar reached the builders as-is and
+            # raised AttributeError out of the handler as a plain-text 500.
+            msg = f"[{query_type}] query malformed, expected an object"
+            raise ESQueryError(msg)
         if query_type == "bool":
             return _build_bool(body, _depth + 1)
         return builder(body)
@@ -652,6 +661,24 @@ def hit_id(rec: dict) -> str:
     return str(uuid.UUID(digest.hexdigest()[:32]))
 
 
+def _as_bound(value: Any, name: str) -> int | None:
+    """Coerce a ``from``/``size`` bound, rejecting what Elasticsearch rejects."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        msg = f"[{name}] must be a number"
+        raise ESQueryError(msg)
+    try:
+        bound = int(value)
+    except (TypeError, ValueError) as exc:
+        msg = f"Failed to parse int parameter [{name}] with value [{value}]"
+        raise ESQueryError(msg) from exc
+    if bound < 0:
+        msg = f"[{name}] parameter cannot be negative, found [{bound}]"
+        raise ESQueryError(msg)
+    return bound
+
+
 # ---------------------------------------------------------------------------
 # _source filtering
 # ---------------------------------------------------------------------------
@@ -740,10 +767,12 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
         records = apply_es_sort(records, sort_spec)
 
     # Paginate.
-    offset = query_body.get("from", 0)
+    # ES rejects a non-numeric from/size; slicing by one raised TypeError out
+    # of the handler as a plain-text 500.
+    offset = _as_bound(query_body.get("from", 0), "from")
     # ES defaults to 10; returning the whole index let a client that never sets
     # size look like it worked against a seeded mock and then truncate in prod.
-    size = query_body.get("size", _DEFAULT_SIZE)
+    size = _as_bound(query_body.get("size", _DEFAULT_SIZE), "size")
     if offset:
         records = records[offset:]
     if size is not None:

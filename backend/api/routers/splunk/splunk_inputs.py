@@ -49,9 +49,12 @@ async def create_hec_token(
         body: dict = {k: str(v) for k, v in form.items()}
     else:
         try:
-            body = await request.json()
+            parsed = await request.json()
         except Exception:
-            body = {}
+            parsed = None
+        # A JSON array or scalar body used to flow straight into .get() and
+        # raise AttributeError out of the handler as a plain-text 500.
+        body = parsed if isinstance(parsed, dict) else {}
 
     name = body.get("name", "")
     if not name:

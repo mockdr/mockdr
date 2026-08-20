@@ -141,6 +141,9 @@ async def _parse_body(request: Request) -> dict:
         form = await request.form()
         return {k: str(v) for k, v in form.items()}
     try:
-        return cast(dict[str, Any], await request.json())
+        parsed = await request.json()
     except Exception:
         return {}
+    # A JSON array or scalar was cast to dict unchecked, so the next .get()
+    # raised AttributeError out of the handler as a plain-text 500.
+    return cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}

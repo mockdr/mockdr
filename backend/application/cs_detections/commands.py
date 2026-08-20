@@ -68,7 +68,14 @@ def _collect_changes(
 ) -> list[tuple[str, str]]:
     """Normalise both body shapes into an ordered list of (action, value)."""
     changes: list[tuple[str, str]] = []
+    if action_parameters is not None and not isinstance(action_parameters, list):
+        msg = "action_parameters must be an array of {name, value} objects"
+        raise UnknownAlertActionError(msg)
+
     for parameter in action_parameters or []:
+        if not isinstance(parameter, dict):
+            msg = "each action parameter must be an object with name and value"
+            raise UnknownAlertActionError(msg)
         name = str(parameter.get("name", ""))
         if name not in _ALERT_ACTIONS:
             supported = ", ".join(sorted(_ALERT_ACTIONS))

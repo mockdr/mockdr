@@ -114,6 +114,13 @@ def update_cases(
 
     updated: list[dict] = []
     for patch in patches:
+        if not isinstance(patch, dict):
+            raise HTTPException(
+                status_code=400,
+                detail=build_kbn_error_response(
+                    400, "cases: each entry must be an object",
+                ),
+            )
         case_id = patch.get("id")
         version = patch.get("version")
         if not case_id or not version:
