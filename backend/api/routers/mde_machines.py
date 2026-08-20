@@ -40,7 +40,7 @@ def software_inventory_export(
 @router.get("/api/machines")
 def list_machines(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(50, alias="$top", le=1000),
+    top: int = Query(50, alias="$top", ge=1, le=1000),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),

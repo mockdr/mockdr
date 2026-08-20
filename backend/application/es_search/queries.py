@@ -7,6 +7,7 @@ response envelopes.
 from __future__ import annotations
 
 from dataclasses import asdict
+from fnmatch import fnmatch
 
 from repository.es_alert_repo import es_alert_repo
 from repository.es_endpoint_repo import es_endpoint_repo
@@ -39,16 +40,20 @@ _KNOWN_PREFIXES: tuple[str, ...] = _ALERT_PREFIXES + _ENDPOINT_PREFIXES
 def _pattern_hits(name: str, prefixes: tuple[str, ...]) -> bool:
     """Return whether an index expression selects any of *prefixes*.
 
-    A trailing wildcard is compared against the literal part on both sides, so
-    ``logs-*`` selects ``logs-endpoint`` and ``.siem-signals-*`` selects
-    ``.siem-signals`` — the mock stores prefixes where a real cluster would
-    hold dated concrete names.
+    The mock stores prefixes where a real cluster holds dated concrete names,
+    so a pattern matches if it selects the prefix itself *or* any name beneath
+    it — ``logs-*`` and ``.siem-signals-*`` both hit. Matching is delegated to
+    :mod:`fnmatch` rather than a literal-prefix comparison, which treated every
+    leading-wildcard pattern as matching everything: ``*zzz`` selected the
+    whole cluster instead of nothing.
     """
     if name in ("_all", "*"):
         return True
     if "*" in name:
-        literal = name.split("*", 1)[0]
-        return any(p.startswith(literal) or literal.startswith(p) for p in prefixes)
+        return any(
+            fnmatch(prefix, name) or fnmatch(f"{prefix}-suffix", name)
+            for prefix in prefixes
+        )
     return name.startswith(prefixes)
 
 
@@ -68,11 +73,14 @@ def _missing_target(index: str) -> str | None:
         The offending target name, or ``None`` when every target is resolvable.
     """
     for target in index.split(","):
-        name = target.strip().lower()
+        raw = target.strip()
+        name = raw.lower()
         if not name or name == "_all" or "*" in name:
             continue
-        if not name.startswith(_KNOWN_PREFIXES):
-            return target.strip()
+        # Elasticsearch rejects uppercase index names outright, so a target
+        # that only matches when folded cannot name a real index.
+        if raw != name or not name.startswith(_KNOWN_PREFIXES):
+            return raw
     return None
 
 
@@ -151,16 +159,32 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     return build_es_search_response(hits, total)
 
 
+class MultipleIndicesError(ValueError):
+    """Raised when a single-document route is given more than one target.
+
+    ``_doc`` addresses one document in one index, so Elasticsearch refuses a
+    comma list, a wildcard or ``_all`` rather than picking one.
+    """
+
+
 def es_get_doc(index: str, doc_id: str) -> dict | None:
     """Get a single document by ID from the appropriate collection.
 
     Args:
-        index:  Target index name or pattern.
+        index:  Target index name.
         doc_id: Document ID.
 
     Returns:
         Elasticsearch get response dict, or None if not found.
+
+    Raises:
+        MultipleIndicesError: If *index* names more than one target.
+        IndexNotFoundError:   If the index is unknown.
     """
+    if "," in index or "*" in index or index.lower() == "_all":
+        msg = "multiple indices are not allowed for this operation"
+        raise MultipleIndicesError(msg)
+
     records, canonical_index = _resolve_collection(index)
 
     for rec in records:
@@ -178,11 +202,12 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
     return None
 
 
-def es_get_mapping(index: str) -> dict:
+def es_get_mapping(index: str, *, ignore_unavailable: bool = False) -> dict:
     """Return a canned index mapping for known index patterns.
 
     Args:
-        index: Target index name or pattern.
+        index:              Target index name or pattern.
+        ignore_unavailable: Skip a missing concrete index instead of failing.
 
     Returns:
         Elasticsearch mapping response dict.
@@ -192,13 +217,15 @@ def es_get_mapping(index: str) -> dict:
             and ``_stats`` already do — answering an empty mapping instead said
             the index existed and had no fields.
     """
-    missing = _missing_target(index)
-    if missing is not None:
-        raise IndexNotFoundError(missing)
+    if not ignore_unavailable:
+        missing = _missing_target(index)
+        if missing is not None:
+            raise IndexNotFoundError(missing)
 
     idx = index.lower()
+    names = [t.strip() for t in idx.split(",") if t.strip()]
 
-    if idx.startswith(".siem-signals") or idx.startswith(".alerts-security"):
+    if any(_pattern_hits(n, _ALERT_PREFIXES) for n in names):
         properties = {
             "@timestamp": {"type": "date"},
             "signal.rule.id": {"type": "keyword"},
@@ -209,7 +236,7 @@ def es_get_mapping(index: str) -> dict:
             "agent.id": {"type": "keyword"},
             "host.name": {"type": "keyword"},
         }
-    elif idx.startswith("metrics-endpoint") or idx.startswith("logs-endpoint"):
+    elif any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
         properties = {
             "@timestamp": {"type": "date"},
             "agent.id": {"type": "keyword"},
@@ -231,16 +258,17 @@ def es_get_mapping(index: str) -> dict:
     }
 
 
-def es_get_stats(index: str) -> dict:
+def es_get_stats(index: str, *, ignore_unavailable: bool = False) -> dict:
     """Return canned index stats for known index patterns.
 
     Args:
-        index: Target index name or pattern.
+        index:              Target index name or pattern.
+        ignore_unavailable: Skip a missing concrete index instead of failing.
 
     Returns:
         Elasticsearch index stats response dict.
     """
-    records, _ = _resolve_collection(index)
+    records, _ = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
     doc_count = len(records)
 
     return {

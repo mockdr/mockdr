@@ -13,7 +13,7 @@ router = APIRouter(tags=["Graph Mail"])
 @router.get("/v1.0/users/{user_id}/messages")
 async def list_messages(
     user_id: str,
-    top: int = Query(25, alias="$top", le=999),
+    top: int = Query(25, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_auth),
 ) -> dict:

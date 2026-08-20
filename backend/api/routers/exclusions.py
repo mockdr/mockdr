@@ -38,7 +38,7 @@ def list_exclusions(
     includeChildren: bool = Query(None),
     includeParents: bool = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of threat exclusions.
 
@@ -92,7 +92,7 @@ def list_blocklist(
     siteIds: str = Query(None),
     types: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of hash blocklist entries."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

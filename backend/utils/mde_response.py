@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import uuid
 
+#: Stable namespace for deriving the tracking GUID, so identical errors
+#: report an identical target across runs.
+_TARGET_NAMESPACE = uuid.UUID("6f1a3d52-0c2e-4a7f-9b8d-2c5e7a1f4b30")
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -60,10 +64,16 @@ def build_mde_error_response(code: str, message: str, target: str | None = None)
     ask for it by name, so a client that surfaces it has nothing to show if the
     mock omits it.
 
+    The GUID is derived from the error rather than drawn fresh: mockdr promises
+    repeatable responses, and a random value here would make two identical
+    requests differ, defeating snapshot comparison and recorded replay for the
+    one field a caller is least likely to think to exclude.
+
     Args:
         code:    Error code string (e.g. ``"ResourceNotFound"``).
         message: Human-readable error description.
-        target:  Tracking identifier; a fresh GUID when not supplied.
+        target:  Tracking identifier; derived from *code* and *message* when
+                 not supplied.
 
     Returns:
         MDE error envelope dict.
@@ -72,6 +82,6 @@ def build_mde_error_response(code: str, message: str, target: str | None = None)
         "error": {
             "code": code,
             "message": message,
-            "target": target or str(uuid.uuid4()),
+            "target": target or str(uuid.uuid5(_TARGET_NAMESPACE, f"{code}:{message}")),
         },
     }

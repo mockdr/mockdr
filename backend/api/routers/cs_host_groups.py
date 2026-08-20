@@ -18,7 +18,7 @@ router = APIRouter(tags=["CrowdStrike Host Groups"])
 def list_host_groups(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, ge=1, le=500),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
@@ -114,7 +114,7 @@ def list_group_members(
     id: str = Query(...),
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, ge=1, le=1000),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return hosts that are members of the specified host group."""

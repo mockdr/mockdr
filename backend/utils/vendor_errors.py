@@ -14,11 +14,11 @@ real API would use.
 from __future__ import annotations
 
 from utils.cs_response import build_cs_error_response
-from utils.es_response import build_es_error_response
+from utils.es_response import build_es_error_response, build_kbn_error_response
 from utils.graph_response import build_graph_error_response
 from utils.mde_response import build_mde_error_response
 from utils.sentinel.response import build_arm_error
-from utils.splunk.response import build_splunk_error
+from utils.splunk.response import build_hec_error, build_splunk_error
 from utils.xdr_response import build_xdr_error
 
 # Longest prefix wins, so order matters.
@@ -30,6 +30,9 @@ _VENDOR_PREFIXES: tuple[tuple[str, str], ...] = (
     ("/xdr", "xdr"),
     ("/elastic", "elasticsearch"),
     ("/kibana", "kibana"),
+    # HEC is a different service from splunkd with a different error shape, and
+    # it sits under the same mount — longest prefix wins, so it goes first.
+    ("/splunk/services/collector", "splunk_hec"),
     ("/splunk", "splunk"),
     ("/sentinel", "sentinel"),
 )
@@ -73,7 +76,6 @@ _S1_TITLES: dict[int, str] = {
     401: "Authentication Failed",
     403: "Insufficient permissions",
     404: "Requested resource was not found",
-    405: "Requested resource was not found",
     501: "Not supported",
 }
 
@@ -169,11 +171,9 @@ def build_vendor_error(vendor: str, status: int, message: str) -> dict:
     if vendor == "elasticsearch":
         return build_es_error_response(status, _ES_TYPES.get(status, "exception"), message)
     if vendor == "kibana":
-        return {
-            "statusCode": status,
-            "error": _STATUS_TITLES.get(status, "Error"),
-            "message": message,
-        }
+        return build_kbn_error_response(status, message)
+    if vendor == "splunk_hec":
+        return build_hec_error(status, message)
     if vendor == "splunk":
         return build_splunk_error(status, message)
 

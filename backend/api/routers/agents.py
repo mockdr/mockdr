@@ -45,7 +45,7 @@ def list_tags(
     query: str = Query(None),
     scopePath: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of scoped tag definitions."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
@@ -57,7 +57,7 @@ def list_passphrases(
     siteIds: str = Query(None),
     groupIds: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of agent disk-encryption passphrases."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
@@ -71,7 +71,7 @@ def list_installed_applications(
     agentIsDecommissioned: str = Query(None),
     installedAt__between: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of installed applications (top-level endpoint).
 
@@ -91,7 +91,7 @@ def list_installed_applications(
 def list_agent_applications(
     ids: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return installed applications filtered by agent IDs (global endpoint).
 
@@ -105,7 +105,7 @@ def list_agent_applications(
 def list_agent_processes(
     ids: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return running processes filtered by agent IDs (global endpoint).
 
@@ -138,7 +138,7 @@ def list_agents(
     hasTags: str = Query(None),
     tagsData: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of agents."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
@@ -175,7 +175,7 @@ def get_passphrase(agent_id: str) -> dict:
 def get_processes(
     agent_id: str,
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of running processes for the given agent."""
     result = agent_queries.get_agent_processes(agent_id, cursor, limit)
@@ -188,7 +188,7 @@ def get_processes(
 def get_agent_apps(
     agent_id: str,
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of installed applications for the given agent."""
     result = agent_queries.get_agent_applications(agent_id, cursor, limit)

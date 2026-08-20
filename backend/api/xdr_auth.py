@@ -91,12 +91,18 @@ async def require_xdr_auth(
     # Advanced authentication — SHA-256 over key + nonce + timestamp, plainly
     # concatenated in that order (Cortex XDR sends no delimiter).
     if not x_xdr_nonce or not x_xdr_timestamp:
+        # Reached when the key did not match verbatim, which is either a wrong
+        # standard-auth secret or an advanced-auth request missing its nonce.
+        # Naming only the second would misdirect a standard-auth caller at a
+        # mechanism they are not using.
         raise HTTPException(
             status_code=401,
             detail=build_xdr_error(
                 401,
                 XDR_ERR_UNAUTHORIZED,
-                "Advanced authentication requires x-xdr-nonce and x-xdr-timestamp",
+                "Standard authentication requires the API key verbatim in "
+                "Authorization; advanced authentication additionally requires "
+                "x-xdr-nonce and x-xdr-timestamp",
             ),
         )
 

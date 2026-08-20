@@ -12,7 +12,7 @@ router = APIRouter(tags=["Accounts"])
 @router.get("/accounts")
 def list_accounts(
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of all accounts."""
     return account_queries.list_accounts(cursor, limit)

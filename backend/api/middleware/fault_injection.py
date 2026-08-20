@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from utils.vendor_errors import build_vendor_error, vendor_for_path
+
 
 @dataclass
 class FaultInjectionConfig:
@@ -91,13 +93,16 @@ class FaultInjectionMiddleware:
 
         # Inject error
         if cfg.error_rate > 0 and random.random() < cfg.error_rate:
-            error_body = json.dumps({
-                "errors": [{
-                    "code": cfg.error_status * 10000 + 10,
-                    "detail": "Injected error (fault injection enabled)",
-                    "title": "Simulated Error",
-                }],
-            }).encode()
+            # Shaped for whichever vendor owns the path: an injected fault is
+            # meant to exercise a client's error handling, which it cannot do
+            # if the body is another vendor's envelope.
+            error_body = json.dumps(
+                build_vendor_error(
+                    vendor_for_path(scope.get("path", "")),
+                    cfg.error_status,
+                    "Injected error (fault injection enabled)",
+                ),
+            ).encode()
             await send({
                 "type": "http.response.start",
                 "status": cfg.error_status,

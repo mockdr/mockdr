@@ -9,9 +9,28 @@ from dataclasses import dataclass
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-_RATE_LIMIT_RESPONSE = json.dumps({
-    "errors": [{"code": 4290001, "detail": "Rate limit exceeded", "title": "Too Many Requests"}],
-}).encode()
+from utils.vendor_errors import build_vendor_error, vendor_for_path
+
+#: Seconds a client is told to wait. The window is per-minute, so a full minute
+#: is always long enough for the bucket to drain.
+_RETRY_AFTER_SECONDS = 60
+
+def _rate_limited_body(scope: Scope) -> bytes:
+    """Build the throttling body in the envelope the target vendor uses.
+
+    This middleware writes its response as raw ASGI messages, so it never
+    reaches the exception handler that shapes everything else — which is how
+    every vendor ended up returning SentinelOne's envelope when throttled.
+
+    Args:
+        scope: ASGI scope, read for the request path.
+
+    Returns:
+        Encoded JSON body for whichever vendor owns the path.
+    """
+    vendor = vendor_for_path(scope.get("path", ""))
+    return json.dumps(build_vendor_error(vendor, 429, "Rate limit exceeded")).encode()
+
 
 _UNAUTHENTICATED_EXEMPT_PATHS = {"/web/api/v2.1/system/status"}
 
@@ -131,11 +150,16 @@ class RateLimitMiddleware:
             await send({
                 "type": "http.response.start",
                 "status": 429,
-                "headers": [(b"content-type", b"application/json")],
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    # Every mocked vendor tells a throttled client when to
+                    # return; without it a client can only guess or spin.
+                    (b"retry-after", str(_RETRY_AFTER_SECONDS).encode()),
+                ],
             })
             await send({
                 "type": "http.response.body",
-                "body": _RATE_LIMIT_RESPONSE,
+                "body": _rate_limited_body(scope),
             })
             return
 

@@ -16,7 +16,7 @@ router = APIRouter(tags=["Graph Device Management"])
 async def list_managed_devices(
     request: Request,
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     select: str = Query(None, alias="$select"),
     count: bool = Query(False, alias="$count"),
@@ -52,7 +52,7 @@ async def get_managed_device(
 @router.get("/v1.0/deviceManagement/detectedApps")
 async def list_detected_apps(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_feature("deviceManagement")),

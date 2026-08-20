@@ -254,7 +254,7 @@ async def test_record_mode_upstream_failure_returns_502() -> None:
 
     assert collected[0]["status"] == 502
     body = json.loads(collected[1]["body"])
-    assert body["errors"][0]["code"] == 5020001
+    assert body["errors"][0]["code"] == 5020010
 
 
 @pytest.mark.asyncio

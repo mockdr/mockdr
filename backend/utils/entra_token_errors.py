@@ -17,6 +17,8 @@ from utils.dt import utc_now
 AADSTS_INVALID_CLIENT = 7000215
 AADSTS_UNSUPPORTED_GRANT = 70003
 AADSTS_TENANT_NOT_FOUND = 90002
+#: A required form field was absent from the token request.
+AADSTS_MISSING_PARAMETER = 900144
 
 
 def build_token_error(

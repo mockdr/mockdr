@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from json import JSONDecodeError
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -12,6 +13,7 @@ from starlette.routing import Match
 from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
+from api.middleware.head_method import HeadMethodMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
@@ -302,6 +304,7 @@ from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
+from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
 from utils.logging import setup_logging
 from utils.mde_odata import ODataFilterError
 from utils.vendor_errors import (
@@ -354,7 +357,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=[
-        "Authorization", "Content-Type", "Accept", "kbn-xsrf",
+        # kbn-version is Kibana's accepted alternative to kbn-xsrf; without it
+        # here a browser client cannot actually send the header the xsrf guard
+        # accepts.
+        "Authorization", "Content-Type", "Accept", "kbn-xsrf", "kbn-version",
         "x-xdr-auth-id", "x-xdr-nonce", "x-xdr-timestamp",
         "ConsistencyLevel",
     ],
@@ -370,6 +376,7 @@ app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
 app.add_middleware(MetricsMiddleware)         # outermost — runs first, captures all timings
 
 
@@ -399,6 +406,37 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     )
 
 
+#: Paths that mock Entra's token endpoint rather than the API in front of it.
+_TOKEN_ENDPOINT_SUFFIX = "/oauth2/v2.0/token"
+
+
+def _is_token_endpoint(path: str) -> bool:
+    """Return whether *path* is one of the mocked Entra token endpoints."""
+    return path.endswith(_TOKEN_ENDPOINT_SUFFIX)
+
+
+@app.exception_handler(JSONDecodeError)
+async def json_decode_exception_handler(
+    request: Request, exc: JSONDecodeError,
+) -> JSONResponse:
+    """Answer an unparseable request body the way the mocked vendor would.
+
+    Handlers that read ``await request.json()`` directly — rather than through
+    a body model, which pydantic guards — let the decode error escape. That
+    surfaced as a bare ``500 Internal Server Error`` in ``text/plain``: not the
+    vendor's envelope, not the vendor's status, and not even JSON. Every mocked
+    API answers a malformed body with ``400``.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path),
+            400,
+            f"Invalid JSON in request body: {exc}",
+        ),
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError,
@@ -416,12 +454,22 @@ async def validation_exception_handler(
         location = ".".join(str(loc) for loc in err.get("loc", ()) if loc != "body")
         message = err.get("msg", "invalid value")
         parts.append(f"{location}: {message}" if location else message)
+    detail = "; ".join(parts) or "Invalid request"
+
+    # A token endpoint is not part of the API it fronts: Entra answers there in
+    # OAuth 2.0's flat shape, which is what MSAL parses. Returning the resource
+    # API's envelope would hand an OAuth client keys it never reads.
+    if _is_token_endpoint(request.url.path):
+        return JSONResponse(
+            status_code=400,
+            content=build_token_error(
+                "invalid_request", f"AADSTS900144: {detail}", AADSTS_MISSING_PARAMETER,
+            ),
+        )
 
     return JSONResponse(
         status_code=400,
-        content=build_vendor_error(
-            vendor_for_path(request.url.path), 400, "; ".join(parts) or "Invalid request",
-        ),
+        content=build_vendor_error(vendor_for_path(request.url.path), 400, detail),
     )
 
 
@@ -647,94 +695,117 @@ for _graph_module in [
 ]:
     app.include_router(_graph_module.router, prefix=GRAPH_PREFIX)
 
-# ── Frontend (SPA) — only active when frontend/dist exists ────────────────────
+# ── Unmatched routes ─────────────────────────────────────────────────────────
+#
+# The SPA is served here too when a build is present, but the vendor-shaped 404
+# must not depend on that: the backend runs without `frontend/dist` in CI and in
+# any API-only deployment, and gating this block on the build meant every mocked
+# vendor answered FastAPI's `{"detail": "Not Found"}` there instead of its own
+# envelope — the exact mismatch this fallback exists to remove.
 _DIST = Path(__file__).parent.parent / "frontend" / "dist"
+_SPA_AVAILABLE = _DIST.exists()
 
-if _DIST.exists():
+if _SPA_AVAILABLE:
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
-    _SPA_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+_FALLBACK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+_SAFE_METHODS = ("GET", "HEAD")
 
-    def _wants_html(request: Request) -> bool:
-        """Return whether this looks like a browser navigation.
 
-        Browsers name ``text/html`` explicitly when navigating; API clients
-        send ``application/json`` or ``*/*``.  The UI routes under the same
-        top-level prefixes as the APIs it mocks — ``/graph/users`` is a page,
-        ``/graph/v1.0/users`` is an endpoint — so the path alone cannot say
-        which of the two an unmatched request wanted.
-        """
-        return "text/html" in request.headers.get("accept", "")
+def _wants_html(request: Request) -> bool:
+    """Return whether this looks like a browser navigation.
 
-    def _allowed_methods(request: Request) -> list[str]:
-        """Return the verbs a registered route accepts for this exact path.
+    Browsers name ``text/html`` explicitly when navigating; API clients send
+    ``application/json`` or ``*/*``. The UI routes under the same top-level
+    prefixes as the APIs it mocks — ``/graph/users`` is a page,
+    ``/graph/v1.0/users`` is an endpoint — so the path alone cannot say which
+    of the two an unmatched request wanted. Only a safe method can be a
+    navigation, so a POST carrying a browser's Accept header is still an API
+    call and still wants the vendor's error.
+    """
+    return (
+        request.method in _SAFE_METHODS
+        and "text/html" in request.headers.get("accept", "")
+    )
 
-        Claiming every verb on the catch-all hides Starlette's own
-        method-not-allowed handling, which would turn a wrong verb against a
-        *real* endpoint into a 404 — the same misdirection this fallback exists
-        to remove, pointed the other way. Routers report only that *some*
-        method would have matched, not which, so each verb is offered in turn
-        and the ones that resolve are the answer. Only unmatched requests reach
-        here, so this never runs on a served route.
-        """
-        allowed: list[str] = []
-        for method in _SPA_METHODS:
-            scope = {**request.scope, "method": method}
-            for route in app.routes:
-                if getattr(route, "path", None) == "/{full_path:path}":
-                    continue
-                try:
-                    match, _ = route.matches(scope)
-                except Exception:  # noqa: BLE001, S112 - unmatchable route is not a match
-                    continue
-                if match is Match.FULL:
-                    allowed.append(method)
-                    break
-        return allowed
 
-    @app.api_route("/{full_path:path}", methods=_SPA_METHODS, include_in_schema=False)
-    def spa_fallback(request: Request, full_path: str = "") -> Response:
-        """Serve the SPA, or a vendor-shaped 404 for unmatched API routes.
+def _allowed_methods(request: Request) -> list[str]:
+    """Return the verbs a registered route accepts for this exact path.
 
-        Serving index.html for everything meant a mistyped endpoint answered
-        ``200 text/html`` — or ``405``, for anything but GET, because only GET
-        reached this route. A client written against the real vendor got
-        neither the status nor the body it parses, turning a typo into a
-        puzzle. Every mocked vendor answers an unknown path with ``404``.
-        """
-        path = "/" + full_path
-        vendor = vendor_mount_for_path(path)
+    Claiming every verb on the fallback hides Starlette's own
+    method-not-allowed handling, which would turn a wrong verb against a *real*
+    endpoint into a 404 — the same misdirection this fallback exists to remove,
+    pointed the other way. Routers report only that *some* method would have
+    matched, not which, so each verb is offered in turn and the ones that
+    resolve are the answer. Only unmatched requests reach here, so this never
+    runs on a served route.
+    """
+    allowed: list[str] = []
+    for method in _FALLBACK_METHODS:
+        scope = {**request.scope, "method": method}
+        for route in app.routes:
+            if getattr(route, "path", None) == "/{full_path:path}":
+                continue
+            try:
+                match, _ = route.matches(scope)
+            except Exception:  # noqa: BLE001, S112 - unmatchable route is not a match
+                continue
+            if match is Match.FULL:
+                allowed.append(method)
+                break
 
-        # The path exists — the verb is what is wrong. That is a 405 for
-        # everyone, including the SPA's own routes.
-        allowed = _allowed_methods(request)
-        if allowed:
-            return JSONResponse(
-                status_code=405,
-                content=build_vendor_error(
-                    vendor or "s1", 405, f"Method {request.method} not allowed",
-                ),
-                headers={"Allow": ", ".join(allowed)},
-            )
+    # RFC 9110 makes HEAD mandatory wherever GET is served, and requires Allow
+    # to list it. Starlette answers HEAD from the GET route without registering
+    # one, so probing never reports it.
+    if "GET" in allowed and "HEAD" not in allowed:
+        allowed.append("HEAD")
+    return allowed
 
-        if vendor is not None and not _wants_html(request):
-            return JSONResponse(
-                status_code=404,
-                content=build_vendor_error(
-                    vendor, 404, f"Resource not found: {request.method} {path}",
-                ),
-            )
 
-        if request.method not in ("GET", "HEAD"):
-            return JSONResponse(
-                status_code=405,
-                content=build_vendor_error(
-                    vendor or "s1", 405, f"Method {request.method} not allowed",
-                ),
-                headers={"Allow": "GET, HEAD"},
-            )
+@app.api_route("/{full_path:path}", methods=_FALLBACK_METHODS, include_in_schema=False)
+def unmatched_route(request: Request, full_path: str = "") -> Response:
+    """Serve the SPA, or a vendor-shaped error for unmatched API routes.
 
+    Serving index.html for everything meant a mistyped endpoint answered
+    ``200 text/html`` — or ``405``, for anything but GET, because only GET
+    reached this route. A client written against the real vendor got neither
+    the status nor the body it parses, turning a typo into a puzzle. Every
+    mocked vendor answers an unknown path with ``404``.
+    """
+    path = "/" + full_path
+    vendor = vendor_mount_for_path(path)
+
+    # The path exists — the verb is what is wrong. That is a 405 for everyone,
+    # including the SPA's own routes, and it carries the Allow header RFC 7231
+    # requires so a client can correct itself.
+    allowed = _allowed_methods(request)
+    if allowed:
+        return JSONResponse(
+            status_code=405,
+            content=build_vendor_error(
+                vendor or "s1", 405, f"Method {request.method} not allowed",
+            ),
+            headers={"Allow": ", ".join(allowed)},
+        )
+
+    if _SPA_AVAILABLE and _wants_html(request):
         return FileResponse(_DIST / "index.html")
+
+    if vendor is not None:
+        return JSONResponse(
+            status_code=404,
+            content=build_vendor_error(
+                vendor, 404, f"Resource not found: {request.method} {path}",
+            ),
+        )
+
+    if _SPA_AVAILABLE and request.method in _SAFE_METHODS:
+        return FileResponse(_DIST / "index.html")
+
+    return JSONResponse(
+        status_code=404,
+        content=build_vendor_error("s1", 404, f"Resource not found: {path}"),
+    )
 
 
 def _cli() -> None:

@@ -19,7 +19,7 @@ router = APIRouter(tags=["CrowdStrike Legacy IOCs"])
 def query_legacy_ioc_ids(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, ge=1, le=500),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:

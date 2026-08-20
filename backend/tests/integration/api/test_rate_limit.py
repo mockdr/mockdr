@@ -86,7 +86,8 @@ class TestRateLimiting:
         assert "data" not in body, "S1 error bodies carry `errors` alone"
         errors = body["errors"]
         assert len(errors) >= 1
-        assert errors[0]["code"] == 4290001
+        # S1 codes are status*10000+10; 4290001 disagreed with every other status.
+        assert errors[0]["code"] == 4290010
         assert errors[0]["title"] == "Too Many Requests"
 
     def test_dev_paths_exempt_from_rate_limit(

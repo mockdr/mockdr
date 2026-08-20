@@ -18,10 +18,14 @@ from application.proxy.vendor_routing import detect_vendor, strip_prefix
 from domain.proxy_recording import ProxyRecording, VendorProxyConfig
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.vendor_errors import build_vendor_error, vendor_for_path
 
-_ERROR_UPSTREAM = json.dumps({
-    "errors": [{"code": 5020001, "detail": "Upstream request failed", "title": "Bad Gateway"}],
-}).encode()
+
+def _upstream_error(path: str) -> bytes:
+    """Build the upstream-failure body in the target vendor's envelope."""
+    return json.dumps(
+        build_vendor_error(vendor_for_path(path), 502, "Upstream request failed"),
+    ).encode()
 
 
 class RecordingProxyMiddleware:
@@ -87,7 +91,7 @@ class RecordingProxyMiddleware:
                 send=send,
             )
             if not succeeded:
-                await _send_bytes(502, _ERROR_UPSTREAM, "application/json", send)
+                await _send_bytes(502, _upstream_error(path), "application/json", send)
 
         elif config.mode == "replay":
             recording = proxy_queries.find_recording(method, path, vendor=vendor)

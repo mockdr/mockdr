@@ -167,3 +167,32 @@ def build_auth_response(session_key: str) -> dict:
         Response dict with ``sessionKey``.
     """
     return {"sessionKey": session_key}
+
+
+#: HEC's own status→code table, from Splunk's documented error codes. HEC is a
+#: separate service from splunkd and does not share its ``messages`` envelope.
+_HEC_CODES: dict[int, int] = {
+    400: 6,   # Invalid data format
+    401: 2,   # Token is required
+    403: 4,   # Invalid token
+    404: 6,   # nothing more specific exists; the body still names the failure
+    500: 8,   # Internal server error
+    503: 9,   # Server is busy
+}
+
+
+def build_hec_error(status: int, message: str) -> dict:
+    """Build a Splunk HTTP Event Collector error body.
+
+    HEC answers with ``{"text": ..., "code": ...}`` where splunkd's management
+    API answers with ``{"messages": [...]}``. They share a mount but not a
+    format, so a client written against HEC cannot parse the other.
+
+    Args:
+        status:  HTTP status code.
+        message: Human-readable error description.
+
+    Returns:
+        HEC error envelope dict.
+    """
+    return {"text": message, "code": _HEC_CODES.get(status, 8)}

@@ -10,8 +10,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 
 from api.es_auth import require_es_auth, require_es_write
 from application.es_search import queries as search_queries
-from application.es_search.queries import IndexNotFoundError
-from utils.es_response import build_es_index_not_found
+from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
+from utils.es_response import build_es_error_response, build_es_index_not_found
 
 router = APIRouter(tags=["ES Search"])
 
@@ -55,11 +55,12 @@ def es_search(
 @router.get("/{index}/_mapping")
 def get_mapping(
     index: str,
+    ignore_unavailable: bool = Query(default=False),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Return the index mapping for a known index pattern."""
     try:
-        return search_queries.es_get_mapping(index)
+        return search_queries.es_get_mapping(index, ignore_unavailable=ignore_unavailable)
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
 
@@ -67,11 +68,12 @@ def get_mapping(
 @router.get("/{index}/_stats")
 def get_stats(
     index: str,
+    ignore_unavailable: bool = Query(default=False),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Return index stats for a known index pattern."""
     try:
-        return search_queries.es_get_stats(index)
+        return search_queries.es_get_stats(index, ignore_unavailable=ignore_unavailable)
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
 
@@ -95,6 +97,11 @@ def get_doc(
     """
     try:
         result = search_queries.es_get_doc(index, doc_id)
+    except MultipleIndicesError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_es_error_response(400, "illegal_argument_exception", str(exc)),
+        ) from exc
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
 

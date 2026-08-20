@@ -20,7 +20,7 @@ def list_groups(
     updatedAt__gt: str = Query(None),
     updatedAt__lt: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of agent groups."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

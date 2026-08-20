@@ -7,6 +7,7 @@ from application.sentinel.commands.auth import client_tenant, token_exchange
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
+    AADSTS_MISSING_PARAMETER,
     AADSTS_TENANT_NOT_FOUND,
     build_token_error,
 )
@@ -59,9 +60,25 @@ def _issue_token(tenant_id: str | None, client_id: str, client_secret: str) -> d
         Token response dict.
 
     Raises:
-        HTTPException: 400 if the tenant does not address this directory.
+        HTTPException: 400 if a required field is absent or the tenant does not
+            address this directory.
         HTTPException: 401 if the credentials are invalid.
     """
+    # An absent field is a malformed request, not a rejected credential: Entra
+    # answers it 400 invalid_request, and a client that retries on 401 would
+    # otherwise loop on a request that can never succeed.
+    missing = [
+        name for name, value in (("client_id", client_id), ("client_secret", client_secret))
+        if not value
+    ]
+    if missing:
+        raise HTTPException(status_code=400, detail=build_token_error(
+            "invalid_request",
+            f"AADSTS900144: The request body must contain the following parameter: "
+            f"'{missing[0]}'.",
+            AADSTS_MISSING_PARAMETER,
+        ))
+
     if not tenant_segment_matches(tenant_id, *client_tenant(client_id)):
         raise HTTPException(status_code=400, detail=build_token_error(
             "invalid_request",
