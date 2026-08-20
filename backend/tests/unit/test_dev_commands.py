@@ -103,17 +103,45 @@ class TestImportState:
         import_state(snap)
         assert len(agent_repo.list_all()) == good_count
 
+    def test_legacy_list_snapshot_still_loads(self) -> None:
+        # Raw collections are exported as key->value maps now, because several
+        # are keyed by a token or session id that a bare list loses. An older
+        # snapshot carrying lists must still import.
+        snap = export_state()
+        snap["blocklist"] = [{"id": "legacy-1", "value": "abc"}]
+
+        import_state(snap)
+
+        assert store.get("blocklist", "legacy-1") is not None
+
     def test_non_dict_raw_record_is_skipped(self) -> None:
         snap = export_state()
-        snap["blocklist"].append("not-a-dict")
+        snap["blocklist"] = ["not-a-dict"]
         # Should not crash
         import_state(snap)
 
     def test_raw_record_without_id_is_skipped(self) -> None:
         snap = export_state()
-        snap["blocklist"].append({"value": "abc", "type": "black_hash"})
+        snap["blocklist"] = [{"value": "abc", "type": "black_hash"}]
         # Should not crash
         import_state(snap)
+
+    def test_raw_collection_keys_survive(self) -> None:
+        # Keyed by the token string, not by an "id" field.
+        store.save("graph_oauth_tokens", "tok-xyz", {"access_token": "tok-xyz"})
+
+        import_state(export_state())
+
+        assert store.get("graph_oauth_tokens", "tok-xyz") is not None
+
+    def test_binary_collection_survives(self) -> None:
+        # json.dump(default=str) rendered bytes as a Python repr that import
+        # then skipped, so a collected file vanished on restart.
+        store.save("agent_uploads", "activity-1", b"PK\x03\x04zip")
+
+        import_state(export_state())
+
+        assert store.get("agent_uploads", "activity-1") == b"PK\x03\x04zip"
 
     def test_activity_order_restored(self) -> None:
         snap = export_state()

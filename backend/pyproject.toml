@@ -151,6 +151,8 @@ convention = "google"
 "api/xdr_auth.py" = ["B008"]
 # store and utils use Any intentionally for generic record handling
 "repository/store.py" = ["ANN401"]
+# import_state keys heterogeneous domain objects.
+"application/dev/commands.py" = ["ANN401"]
 "utils/filtering.py" = ["ANN401"]
 "utils/pagination.py" = ["ANN401"]
 "utils/cs_fql.py" = ["ANN401"]

@@ -1,9 +1,12 @@
 """Write-only application commands for dev tooling: reset, export, import, scenarios."""
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import random
 import time
+from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any
 
@@ -101,6 +104,7 @@ from domain.splunk.hec_token import HecToken
 from domain.splunk.kv_collection import KVCollection
 from domain.splunk.notable_event import NotableEvent
 from domain.splunk.saved_search import SavedSearch
+from domain.splunk.search_job import SearchJob
 from domain.splunk.splunk_event import SplunkEvent
 from domain.splunk.splunk_index import SplunkIndex
 from domain.splunk.splunk_user import SplunkUser
@@ -129,6 +133,9 @@ logger = logging.getLogger(__name__)
 # Collections whose values are domain dataclasses — reconstructed via ClassName(**data)
 _TYPED_COLLECTIONS: dict[str, type] = {
     "accounts": Account,
+    # An in-flight search job used to disappear on restart, so a client
+    # polling its sid got a 404 for a job the server had accepted.
+    "splunk_search_jobs": SearchJob,
     "sites": Site,
     "groups": Group,
     "agents": Agent,
@@ -253,6 +260,9 @@ _TYPED_COLLECTIONS: dict[str, type] = {
 # snapshotted as ``{key: value}`` maps and restored verbatim.
 _MAPPING_COLLECTIONS = {
     "edr_id_map",
+    # Seeded per user and keyed by user id; it was never registered, so a
+    # restart lost every user's registered authentication methods.
+    "graph_user_auth_methods",
     "graph_detected_app_devices",
     "graph_directory_role_members",
     "graph_group_members",
@@ -266,13 +276,30 @@ _RAW_COLLECTIONS = {
     "api_tokens",
     "star_rules",
     "remote_script_runs",
-    "agent_uploads",
     # CrowdStrike
     "cs_oauth_tokens",
     # Elastic Security
     "es_api_keys",
     # Microsoft Defender
     "mde_oauth_tokens",
+    # None of these were registered, so an issued token, an open Splunk
+    # session or a fired alert vanished on restart while the rest of the
+    # store survived — leaving a client holding credentials the server had
+    # never heard of.
+    "graph_oauth_tokens",
+    "sentinel_oauth_tokens",
+    "splunk_sessions",
+    "splunk_fired_alerts",
+    "graph_safe_links_policies",
+    "graph_safe_attachments_policies",
+}
+
+# Collections whose values are raw bytes. `json.dump(default=str)` rendered
+# these as a Python repr ("b'PK\\x03\\x04…'") that import then skipped, so a
+# collected file was gone after a restart while the activity referencing it
+# remained.
+_BINARY_COLLECTIONS = {
+    "agent_uploads",
 }
 
 
@@ -300,7 +327,15 @@ def export_state() -> dict:
         records = store.get_all(collection)
         snapshot[collection] = [asdict(r) for r in records]
     for collection in _RAW_COLLECTIONS:
-        snapshot[collection] = list(store.get_all(collection))
+        # Exported as a key->value map: several of these are keyed by a token
+        # or session id rather than an "id" field, which a bare list loses.
+        snapshot[collection] = dict(store.get_all_with_keys(collection))
+    for collection in _BINARY_COLLECTIONS:
+        snapshot[collection] = {
+            key: base64.b64encode(value).decode()
+            for key, value in store.get_all_with_keys(collection).items()
+            if isinstance(value, bytes)
+        }
     for collection in _MAPPING_COLLECTIONS:
         snapshot[collection] = dict(store.get_all_with_keys(collection))
     snapshot["_activity_order"] = store.get_activity_order()
@@ -311,6 +346,60 @@ def export_state() -> dict:
     snapshot["_proxy_config"] = asdict(cfg)
 
     return snapshot
+
+
+#: Collections whose store key is not the object's ``id``. The repositories own
+#: these rules; import_state carried a partial copy that had drifted, so the six
+#: composite-keyed Graph collections came back under a bare id and every lookup
+#: by ``{user}:{message}`` missed. Keeping them in one table means a new
+#: composite key cannot be added to a repo without appearing here.
+_COMPOSITE_KEYS: dict[str, Callable[[Any], str]] = {
+    "policies": lambda o: f"{o.scopeType}:{o.scopeId}",
+    "alerts": lambda o: str(o.alertInfo["alertId"]),
+    "iocs": lambda o: str(o.uuid),
+    "graph_mail_messages": lambda o: f"{o._user_id}:{o.id}",
+    "graph_mail_folders": lambda o: f"{o._user_id}:{o.id}",
+    "graph_mail_rules": lambda o: f"{o._user_id}:{o.id}",
+    "graph_channels": lambda o: f"{o._team_id}:{o.id}",
+    "graph_channel_messages": lambda o: f"{o._team_id}:{o._channel_id}:{o.id}",
+    "graph_drive_items": lambda o: f"{o._drive_id}:{o.id}",
+}
+
+
+def _store_key(collection: str, obj: Any) -> str:
+    """Return the key *collection* stores *obj* under."""
+    builder = _COMPOSITE_KEYS.get(collection)
+    return builder(obj) if builder else str(obj.id)
+
+
+def _import_raw(collection: str, entries: object) -> int:
+    """Restore a raw-dict collection, accepting both snapshot shapes.
+
+    Newer snapshots carry a key->value map, which preserves keys that are not
+    an ``id`` field. Older ones carry a bare list; those keys are rebuilt the
+    way they used to be so an existing snapshot still loads.
+    """
+    if isinstance(entries, dict):
+        for key, value in entries.items():
+            store.save(collection, key, value)
+        return len(entries)
+
+    if not isinstance(entries, list):
+        return 0
+
+    restored = 0
+    for record in entries:
+        if not isinstance(record, dict):
+            continue
+        record_id = (
+            record.get("token", "") if collection == "api_tokens"
+            else record.get("id", "")
+        )
+        if not record_id:
+            continue
+        store.save(collection, record_id, record)
+        restored += 1
+    return restored
 
 
 def import_state(snapshot: dict) -> dict:
@@ -334,19 +423,7 @@ def import_state(snapshot: dict) -> dict:
         for record in records:
             try:
                 obj = cls(**record)
-                # Collections with non-standard primary keys:
-                #   policies  → "site:{scopeId}" or "group:{scopeId}"
-                #   alerts    → alertInfo["alertId"]  (no top-level id field)
-                #   iocs      → uuid  (not id)
-                if collection == "policies":
-                    key = f"{obj.scopeType}:{obj.scopeId}"
-                elif collection == "alerts":
-                    key = obj.alertInfo["alertId"]
-                elif collection == "iocs":
-                    key = obj.uuid
-                else:
-                    key = obj.id
-                store.save(collection, key, obj)
+                store.save(collection, _store_key(collection, obj), obj)
                 total += 1
             except (TypeError, KeyError) as exc:
                 logger.warning(
@@ -356,19 +433,18 @@ def import_state(snapshot: dict) -> dict:
                 skipped += 1
 
     for collection in _RAW_COLLECTIONS:
-        records = snapshot.get(collection, [])
-        for record in records:
-            if not isinstance(record, dict):
-                continue
-            # api_tokens are keyed by the token string; other raw dicts by "id"
-            if collection == "api_tokens":
-                record_id = record.get("token", "")
-            else:
-                record_id = record.get("id", "")
-            if not record_id:
-                continue
-            store.save(collection, record_id, record)
-            total += 1
+        total += _import_raw(collection, snapshot.get(collection))
+
+    for collection in _BINARY_COLLECTIONS:
+        entries = snapshot.get(collection) or {}
+        if not isinstance(entries, dict):
+            continue
+        for key, encoded in entries.items():
+            try:
+                store.save(collection, key, base64.b64decode(str(encoded)))
+                total += 1
+            except (ValueError, binascii.Error):
+                logger.warning("Skipped unreadable binary entry in '%s'", collection)
 
     for collection in _MAPPING_COLLECTIONS:
         records = snapshot.get(collection, {})
