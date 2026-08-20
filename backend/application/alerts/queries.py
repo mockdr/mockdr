@@ -8,7 +8,7 @@ FILTER_SPECS = [
     FilterSpec("ids", "alertInfo.alertId", "in"),
     FilterSpec("accountIds", "agentDetectionInfo.accountId", "in"),
     FilterSpec("siteIds", "agentDetectionInfo.siteId", "in"),
-    FilterSpec("agentIds", "agentDetectionInfo.uuid", "in"),
+    FilterSpec("agentIds", "agentRealtimeInfo.id", "in"),
     FilterSpec("severities", "ruleInfo.severity", "in"),
     FilterSpec("analystVerdicts", "alertInfo.analystVerdict", "in"),
     FilterSpec("incidentStatuses", "alertInfo.incidentStatus", "in"),

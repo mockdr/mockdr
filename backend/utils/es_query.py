@@ -17,6 +17,8 @@ top-level search body.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import uuid
 from collections.abc import Callable
@@ -24,6 +26,17 @@ from fnmatch import fnmatch
 from typing import Any
 
 from utils.nested import get_nested as _get_nested
+
+_DEFAULT_SIZE = 10
+
+
+class ESQueryError(ValueError):
+    """Raised when a search body is not valid Elasticsearch query DSL.
+
+    Elasticsearch answers a malformed or unknown query with a 400 carrying
+    ``parsing_exception``; these previously escaped as bare ``ValueError`` and
+    surfaced as a plain-text 500.
+    """
 
 # ---------------------------------------------------------------------------
 # Range comparison helper
@@ -91,10 +104,18 @@ def _build_predicate(clause: dict) -> Callable[[dict], bool]:
     if not clause:
         return lambda _rec: True
 
+    # Elasticsearch allows exactly one query type per clause object. Returning
+    # on the first key silently discarded every later clause, so a body whose
+    # second clause excluded everything still matched.
+    if len(clause) > 1:
+        extra = sorted(clause)[1]
+        msg = f"[query] malformed query, expected [END_OBJECT] but found [{extra}]"
+        raise ESQueryError(msg)
+
     for query_type, body in clause.items():
         builder = _BUILDERS.get(query_type)
         if builder is None:
-            raise ValueError(f"Unsupported ES query type: {query_type}")
+            raise ESQueryError(f"no [query] registered for [{query_type}]")
         return builder(body)
 
     # Empty dict → match all.
@@ -255,7 +276,12 @@ def _build_bool(body: dict) -> Callable[[dict], bool]:
     filter_preds = [_build_predicate(c) for c in body.get("filter", [])]
     should_preds = [_build_predicate(c) for c in body.get("should", [])]
     must_not_preds = [_build_predicate(c) for c in body.get("must_not", [])]
-    min_should = body.get("minimum_should_match", 1 if should_preds else 0)
+    # Per ES: should clauses only carry a match requirement when there is no
+    # must/filter to satisfy. Defaulting to 1 regardless meant adding a
+    # non-matching should — which should affect scoring only — emptied the
+    # result set.
+    _default_min = 1 if (should_preds and not must_preds and not filter_preds) else 0
+    min_should = body.get("minimum_should_match", _default_min)
 
     def predicate(rec: dict) -> bool:
         # must + filter: all must match.
@@ -548,12 +574,31 @@ def wrap_as_hits(
     return [
         {
             "_index": index,
-            "_id": str(uuid.uuid4()),
+            "_id": _hit_id(rec),
             "_score": 1.0,
             "_source": rec,
         }
         for rec in records
     ]
+
+
+def _hit_id(rec: dict) -> str:
+    """Derive a stable ``_id`` for a record.
+
+    A fresh UUID per response meant the same document came back under a
+    different ``_id`` every call, so search → get-by-id, dedup, and
+    alert-status updates could never round-trip. The document's own
+    identifier is used where it has one; anything else gets a digest of its
+    contents so the value is at least stable for identical input.
+    """
+    for field in ("id", "_id", "rule_id", "item_id", "list_id"):
+        val = rec.get(field)
+        if isinstance(val, str) and val:
+            return val
+    digest = hashlib.sha1(  # noqa: S324 - identity, not security
+        json.dumps(rec, sort_keys=True, default=str).encode()
+    )
+    return str(uuid.UUID(digest.hexdigest()[:32]))
 
 
 # ---------------------------------------------------------------------------
@@ -587,7 +632,9 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
 
     # Paginate.
     offset = query_body.get("from", 0)
-    size = query_body.get("size")
+    # ES defaults to 10; returning the whole index let a client that never sets
+    # size look like it worked against a seeded mock and then truncate in prod.
+    size = query_body.get("size", _DEFAULT_SIZE)
     if offset:
         records = records[offset:]
     if size is not None:

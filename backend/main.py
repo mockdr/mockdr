@@ -305,6 +305,8 @@ from application.splunk.commands.edr_bridge import register_bridge as register_s
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
 from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
+from utils.es_query import ESQueryError
+from utils.es_response import build_es_error_response
 from utils.logging import setup_logging
 from utils.mde_odata import ODataFilterError
 from utils.vendor_errors import (
@@ -488,6 +490,22 @@ async def odata_filter_exception_handler(
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
         ),
+    )
+
+
+@app.exception_handler(ESQueryError)
+async def es_query_exception_handler(
+    _request: Request, exc: ESQueryError,
+) -> JSONResponse:
+    """Answer an unparseable search body with Elasticsearch's ``400``.
+
+    Six query types the interpreter does not implement raised a bare
+    ``ValueError``, which reached the client as a plain-text ``500`` — an
+    Elasticsearch client cannot tell that apart from the cluster falling over.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_es_error_response(400, "parsing_exception", str(exc)),
     )
 
 

@@ -105,7 +105,7 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
                 "osRevision": agent.osRevision,
             },
             agentRealtimeInfo={
-                "id": agent.uuid,
+                "id": agent.id,
                 "agentComputerName": agent.computerName,
                 "os": agent.osType,
                 "agentVersion": agent.agentVersion,

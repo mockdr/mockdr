@@ -57,3 +57,50 @@ class TestListAlerts:
         alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()["data"][0]
         assert alert["alertInfo"]["incidentStatus"] in _VALID_STATUSES
 
+
+
+class TestAlertToAgentPivot:
+    """An alert must name an agent the API can actually resolve.
+
+    ``agentRealtimeInfo.id`` carried the agent's *uuid*, so the standard
+    SOAR pivot — read an alert, look up the endpoint it fired on — returned
+    404 for every alert in the store.
+    """
+
+    def test_alert_agent_id_resolves_to_an_agent(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        alerts = client.get(
+            "/web/api/v2.1/cloud-detection/alerts", headers=auth_headers,
+        ).json()["data"]
+
+        for alert in alerts:
+            agent_id = alert["agentRealtimeInfo"]["id"]
+            resp = client.get(f"/web/api/v2.1/agents/{agent_id}", headers=auth_headers)
+            assert resp.status_code == 200, f"alert names unknown agent {agent_id}"
+
+    def test_agent_id_is_not_the_uuid(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        alert = client.get(
+            "/web/api/v2.1/cloud-detection/alerts?limit=1", headers=auth_headers,
+        ).json()["data"][0]
+        assert alert["agentRealtimeInfo"]["id"] != alert["agentDetectionInfo"]["uuid"]
+
+    def test_agent_ids_filter_selects_by_agent_id(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        alert = client.get(
+            "/web/api/v2.1/cloud-detection/alerts?limit=1", headers=auth_headers,
+        ).json()["data"][0]
+        agent_id = alert["agentRealtimeInfo"]["id"]
+
+        resp = client.get(
+            f"/web/api/v2.1/cloud-detection/alerts?agentIds={agent_id}",
+            headers=auth_headers,
+        ).json()
+
+        assert resp["pagination"]["totalItems"] >= 1
+        assert all(
+            a["agentRealtimeInfo"]["id"] == agent_id for a in resp["data"]
+        )

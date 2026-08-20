@@ -38,13 +38,41 @@ class PersistenceManager:
         try:
             with open(self._path) as f:
                 snapshot = json.load(f)
+            if not isinstance(snapshot, dict):
+                # A JSON array/scalar reached import_state as `snapshot.get(...)`
+                # and crashed the lifespan handler, so the server refused to boot.
+                msg = f"expected a JSON object, got {type(snapshot).__name__}"
+                raise ValueError(msg)
             from application.dev.commands import import_state
-            import_state(snapshot)
-            logger.info("Loaded persisted state from %s", self._path)
-            return True
-        except (json.JSONDecodeError, OSError):
+            result = import_state(snapshot)["data"]
+        except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError):
             logger.warning("Failed to load %s, will seed fresh", self._path, exc_info=True)
             return False
+
+        # A record written by a different schema version raises inside
+        # import_state and is skipped — but clear_all() has already run, so the
+        # rows are gone, and the next mutation's debounced save would overwrite
+        # the good file and make the loss permanent. Quarantine the snapshot and
+        # seed fresh instead of silently serving a hollowed-out store.
+        if result["skipped"] or not result["imported"]:
+            self._quarantine(result)
+            return False
+
+        logger.info("Loaded persisted state from %s", self._path)
+        return True
+
+    def _quarantine(self, result: dict) -> None:
+        """Move an unusable snapshot aside so the next save cannot destroy it."""
+        backup = self._path.with_suffix(self._path.suffix + ".corrupt")
+        try:
+            os.replace(self._path, backup)
+        except OSError:
+            logger.error("Could not quarantine %s", self._path, exc_info=True)
+        logger.error(
+            "Refusing to use %s: imported %d record(s), skipped %d. "
+            "Moved to %s and seeding fresh so the snapshot is not overwritten.",
+            self._path, result["imported"], result["skipped"], backup,
+        )
 
     def schedule_save(self) -> None:
         """Schedule a debounced save. Resets timer on each call."""

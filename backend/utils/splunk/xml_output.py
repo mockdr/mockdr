@@ -34,12 +34,15 @@ def render_splunk_xml(payload: object) -> str:
     if isinstance(payload, dict):
         if "sessionKey" in payload:
             return _render_session_key(str(payload["sessionKey"]))
-        if "messages" in payload and "entry" not in payload:
-            return _render_messages(payload["messages"])
         if "entry" in payload:
             return _render_feed(payload)
+        # The results envelope always carries a `messages` key, so testing for
+        # messages first matched it here and rendered an empty <messages/> —
+        # discarding every row in XML, which is splunkd's default output mode.
         if "results" in payload:
             return _render_results(payload["results"])
+        if "messages" in payload:
+            return _render_messages(payload["messages"])
     return _HEADER + f"<response>{_render_value(payload)}</response>"
 
 
