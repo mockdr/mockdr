@@ -32,7 +32,7 @@ def get_script_metadata(
 ) -> dict:
     """Get metadata for a single script."""
     request_data = body.get("request_data", {})
-    script_id = request_data.get("script_id", "")
+    script_id = request_data.get("script_uid") or request_data.get("script_id", "")
     result = script_queries.get_script_metadata(script_id)
     if result is None:
         raise HTTPException(
@@ -50,7 +50,7 @@ def run_script(
     """Execute a script on one or more endpoints."""
     request_data = body.get("request_data", {})
     endpoint_ids = request_data.get("endpoint_id_list", [])
-    script_id = request_data.get("script_id", "")
+    script_id = request_data.get("script_uid") or request_data.get("script_id", "")
     result = script_commands.run_script(endpoint_ids, script_id, request_data)
     if result is None:
         raise HTTPException(

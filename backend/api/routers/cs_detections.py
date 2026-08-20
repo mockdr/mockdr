@@ -5,11 +5,12 @@ matching the real CrowdStrike Falcon API path structure.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_detections import commands as detection_commands
 from application.cs_detections import queries as detection_queries
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["CrowdStrike Detections"])
 
@@ -41,11 +42,24 @@ def update_detections(
     body: dict = Body(...),
     _: dict = Depends(require_cs_write),
 ) -> dict:
-    """Update detection status, assignment, or add a comment."""
+    """Update alert status, assignment, tags, or add a comment.
+
+    CrowdStrike sends the changes as ``action_parameters`` — a list of
+    ``{name, value}`` pairs — not as top-level fields. The flat shape this read
+    is not what any real client sends, so a genuine request was accepted with
+    a 200 and changed nothing.
+    """
     ids: list[str] = body.get("composite_ids", body.get("ids", []))
-    return detection_commands.update_detections(
-        ids=ids,
-        status=body.get("status"),
-        assigned_to_uuid=body.get("assigned_to_uuid"),
-        comment=body.get("comment"),
-    )
+    try:
+        return detection_commands.update_detections(
+            ids=ids,
+            action_parameters=body.get("action_parameters"),
+            status=body.get("status"),
+            assigned_to_uuid=body.get("assigned_to_uuid"),
+            comment=body.get("comment"),
+        )
+    except detection_commands.UnknownAlertActionError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("crowdstrike", 400, str(exc)),
+        ) from exc

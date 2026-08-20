@@ -318,6 +318,7 @@ from utils.vendor_errors import (
     vendor_for_path,
     vendor_mount_for_path,
 )
+from utils.xdr_filters import XdrFilterError
 
 setup_logging()
 
@@ -497,6 +498,19 @@ async def odata_filter_exception_handler(
         status_code=400,
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
+        ),
+    )
+
+
+@app.exception_handler(XdrFilterError)
+async def xdr_filter_exception_handler(
+    request: Request, exc: XdrFilterError,
+) -> JSONResponse:
+    """Answer an unsupported XDR filter with a 400, as Cortex XDR does."""
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, str(exc),
         ),
     )
 

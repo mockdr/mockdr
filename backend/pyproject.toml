@@ -154,6 +154,7 @@ convention = "google"
 "utils/filtering.py" = ["ANN401"]
 "utils/pagination.py" = ["ANN401"]
 "utils/cs_fql.py" = ["ANN401"]
+"utils/xdr_filters.py" = ["ANN401"]
 "utils/es_query.py" = ["ANN401"]
 "utils/es_aggs.py" = ["ANN401"]
 "utils/es_ecs.py" = ["ANN401"]

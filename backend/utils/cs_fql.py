@@ -242,19 +242,22 @@ def _match_clause(record: dict, clause: FqlClause) -> bool:
         ``True`` if the record matches the clause.
     """
     field_val = _get_nested(record, clause.field)
-    field_str = str(field_val) if field_val is not None else ""
+    # An array-valued field matches when any member matches, which is how FQL
+    # treats them. Stringifying the list produced "['a', 'b']", so a query on
+    # tags, host_groups or any other array field could never match.
+    candidates = _candidate_values(field_val)
 
     if clause.operator == "eq":
-        return any(field_str == v for v in clause.values)
+        return any(c == v for c in candidates for v in clause.values)
 
     if clause.operator == "neq":
-        return all(field_str != v for v in clause.values)
+        return all(c != v for c in candidates for v in clause.values)
 
     if clause.operator == "wildcard":
-        return any(fnmatch(field_str, v) for v in clause.values)
+        return any(fnmatch(c, v) for c in candidates for v in clause.values)
 
     if clause.operator == "in":
-        return field_str in clause.values
+        return any(c in clause.values for c in candidates)
 
     # Range operators — attempt numeric comparison first, fall back to string.
     if clause.operator in ("gte", "lte", "gt", "lt"):
@@ -264,6 +267,19 @@ def _match_clause(record: dict, clause: FqlClause) -> bool:
         return True
 
     return False
+
+
+def _candidate_values(field_val: Any) -> list[str]:
+    """Render a field as the values a clause may match against.
+
+    A scalar yields one candidate; an array yields one per member, so
+    membership works the way FQL defines it.
+    """
+    if field_val is None:
+        return [""]
+    if isinstance(field_val, (list, tuple, set)):
+        return [str(v) for v in field_val] or [""]
+    return [str(field_val)]
 
 
 def _compare_range(field_val: Any, target: str, op: str) -> bool:

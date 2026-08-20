@@ -39,7 +39,7 @@ def run_script(endpoint_ids: list[str], script_id: str, params: dict) -> dict | 
             endpoint_id=eid,
             creation_time=now_ms,
             result={
-                "script_id": script_id,
+                "script_uid": script_id,
                 "script_name": script.name,
                 "parameters": params.get("parameters", {}),
                 "timeout": params.get("timeout", 600),
