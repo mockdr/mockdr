@@ -25,7 +25,7 @@ def _get_first_endpoint_id(client: TestClient) -> str:
         headers=ES_AUTH,
         params={"per_page": 1},
     ).json()
-    return body["data"][0]["agent_id"]
+    return body["data"][0]["metadata"]["agent"]["id"]
 
 
 class TestListEndpoints:
@@ -77,8 +77,8 @@ class TestListEndpoints:
             headers=ES_AUTH,
             params={"per_page": 5, "page": 2},
         ).json()["data"]
-        ids1 = {ep["agent_id"] for ep in p1}
-        ids2 = {ep["agent_id"] for ep in p2}
+        ids1 = {ep["metadata"]["agent"]["id"] for ep in p1}
+        ids2 = {ep["metadata"]["agent"]["id"] for ep in p2}
         assert ids1.isdisjoint(ids2)
 
     def test_endpoint_has_required_fields(self, client: TestClient) -> None:
@@ -88,14 +88,19 @@ class TestListEndpoints:
             headers=ES_AUTH,
             params={"per_page": 1},
         ).json()
-        ep = body["data"][0]
-        required = [
-            "agent_id", "hostname", "host_ip", "host_os_name",
-            "agent_version", "agent_status", "policy_name",
-            "isolation_status", "enrolled_at", "last_checkin",
-        ]
-        for field in required:
-            assert field in ep, f"Missing endpoint field: {field}"
+        entry = body["data"][0]
+        # Real entries wrap the document in metadata/host_status/policy_info
+        # and nest the host fields as ECS; the flat names this used to assert
+        # share nothing with the real API.
+        assert {"metadata", "host_status", "policy_info"} <= set(entry)
+
+        metadata = entry["metadata"]
+        assert metadata["agent"]["id"]
+        assert metadata["agent"]["version"]
+        assert metadata["host"]["hostname"]
+        assert metadata["host"]["os"]["name"]
+        assert metadata["Endpoint"]["policy"]["applied"]["id"]
+        assert "@timestamp" in metadata
 
 
 class TestGetEndpoint:
@@ -109,7 +114,7 @@ class TestGetEndpoint:
             headers=ES_AUTH,
         )
         assert resp.status_code == 200
-        assert resp.json()["agent_id"] == agent_id
+        assert resp.json()["metadata"]["agent"]["id"] == agent_id
 
     def test_get_nonexistent_endpoint_returns_404(self, client: TestClient) -> None:
         """Non-existent agent_id should return 404."""
@@ -138,7 +143,7 @@ class TestIsolateEndpoint:
         assert body["status"] == "pending"
 
     def test_isolate_changes_isolation_status(self, client: TestClient) -> None:
-        """After isolation, the endpoint isolation_status should be 'isolated'."""
+        """After isolation, Endpoint.state.isolation should be true."""
         agent_id = _get_first_endpoint_id(client)
         client.post(
             "/kibana/api/endpoint/action/isolate",
@@ -149,7 +154,7 @@ class TestIsolateEndpoint:
             f"/kibana/api/endpoint/metadata/{agent_id}",
             headers=ES_AUTH,
         ).json()
-        assert ep["isolation_status"] == "isolated"
+        assert ep["metadata"]["Endpoint"]["state"]["isolation"] is True
 
     def test_isolate_nonexistent_returns_404(self, client: TestClient) -> None:
         """Isolating a non-existent endpoint should return 404."""
@@ -202,7 +207,7 @@ class TestUnisolateEndpoint:
         assert resp.json()["action"] == "unisolate"
 
     def test_unisolate_restores_normal_status(self, client: TestClient) -> None:
-        """After unisolation, isolation_status should be 'normal'."""
+        """After unisolation, Endpoint.state.isolation should be false."""
         agent_id = _get_first_endpoint_id(client)
         client.post(
             "/kibana/api/endpoint/action/isolate",
@@ -218,7 +223,7 @@ class TestUnisolateEndpoint:
             f"/kibana/api/endpoint/metadata/{agent_id}",
             headers=ES_AUTH,
         ).json()
-        assert ep["isolation_status"] == "normal"
+        assert ep["metadata"]["Endpoint"]["state"]["isolation"] is False
 
 
 class TestListActions:

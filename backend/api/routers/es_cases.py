@@ -26,16 +26,34 @@ def find_cases(
     owner: str = Query(None),
     page: int = Query(1),
     per_page: int = Query(20, ge=1, le=1000, alias="perPage"),
+    severity: str = Query(None),
+    search: str = Query(None),
+    reporters: str = Query(None, description="Comma-separated usernames"),
+    sort_field: str = Query(None, alias="sortField"),
+    sort_order: str = Query("desc", alias="sortOrder"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Find cases with optional filters and pagination."""
+    """Find cases with optional filters and pagination.
+
+    severity, search, reporters, sortField and sortOrder are documented on
+    this endpoint but were declared on no parameter, so FastAPI dropped them
+    and a filtered request returned the full unfiltered list.
+    """
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    reporter_list = (
+        [r.strip() for r in reporters.split(",") if r.strip()] if reporters else None
+    )
     return case_queries.find_cases(
         status=status,
         tags=tag_list,
         owner=owner,
         page=page,
         per_page=per_page,
+        severity=severity,
+        search=search,
+        reporters=reporter_list,
+        sort_field=sort_field,
+        sort_order=sort_order,
     )
 
 
