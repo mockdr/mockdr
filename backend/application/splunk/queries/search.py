@@ -9,6 +9,11 @@ from utils.splunk.response import (
 )
 
 
+def _splunk_bool(value: bool) -> str:
+    """Render a boolean the way splunkd does in Atom content: ``"1"``/``"0"``."""
+    return "1" if value else "0"
+
+
 def get_job(sid: str) -> dict | None:
     """Return a single search job in Splunk envelope format.
 
@@ -22,18 +27,23 @@ def get_job(sid: str) -> dict | None:
     if not job:
         return None
 
+    # splunkd renders every Atom content value as a string, booleans as "1"/"0"
+    # — and splunklib depends on it: Job.is_done() is
+    # `self._state.content["isDone"] == "1"`. Emitting a JSON bool made that
+    # comparison permanently False, so the SDK's documented polling loop
+    # (`while not job.is_done(): sleep(.2)`) never terminated against the mock.
     content = {
         "sid": job.sid,
         "dispatchState": job.dispatch_state,
-        "doneProgress": job.done_progress,
-        "eventCount": job.event_count,
-        "resultCount": job.result_count,
-        "scanCount": job.scan_count,
-        "isDone": job.is_done,
-        "isFailed": job.is_failed,
-        "isPaused": job.is_paused,
-        "isSaved": job.is_saved,
-        "ttl": job.ttl,
+        "doneProgress": str(job.done_progress),
+        "eventCount": str(job.event_count),
+        "resultCount": str(job.result_count),
+        "scanCount": str(job.scan_count),
+        "isDone": _splunk_bool(job.is_done),
+        "isFailed": _splunk_bool(job.is_failed),
+        "isPaused": _splunk_bool(job.is_paused),
+        "isSaved": _splunk_bool(job.is_saved),
+        "ttl": str(job.ttl),
     }
     entry = build_splunk_entry(
         job.sid,
@@ -55,11 +65,11 @@ def list_jobs() -> dict:
         content = {
             "sid": job.sid,
             "dispatchState": job.dispatch_state,
-            "doneProgress": job.done_progress,
-            "eventCount": job.event_count,
-            "resultCount": job.result_count,
-            "isDone": job.is_done,
-            "isFailed": job.is_failed,
+            "doneProgress": str(job.done_progress),
+            "eventCount": str(job.event_count),
+            "resultCount": str(job.result_count),
+            "isDone": _splunk_bool(job.is_done),
+            "isFailed": _splunk_bool(job.is_failed),
         }
         entries.append(build_splunk_entry(job.sid, content))
     return build_splunk_envelope(entries)

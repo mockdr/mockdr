@@ -61,7 +61,10 @@ class TestGetSearchJob:
         assert "entry" in body
         content = body["entry"][0]["content"]
         assert content["dispatchState"] == "DONE"
-        assert content["isDone"] is True
+        # splunkd renders content values as strings; splunklib's Job.is_done()
+        # is literally `content["isDone"] == "1"`, so a JSON bool here would
+        # make the SDK's polling loop spin forever.
+        assert content["isDone"] == "1"
 
     def test_nonexistent_job_returns_404(self, client: TestClient) -> None:
         resp = client.get(
