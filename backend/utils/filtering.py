@@ -70,7 +70,13 @@ def apply_filters(records: list[dict], params: dict, specs: list[FilterSpec]) ->
             result = [r for r in result if str(_get_field(r, spec.field) or "") == str(raw)]
 
         elif spec.type == "in":
-            values = {v.strip() for v in str(raw).split(",")}
+            # Query params arrive comma-separated, request bodies as JSON
+            # arrays. Splitting unconditionally turned ["abc"] into the literal
+            # "['abc']", so a body-supplied filter silently matched nothing.
+            if isinstance(raw, (list, tuple, set)):
+                values = {str(v).strip() for v in raw}
+            else:
+                values = {v.strip() for v in str(raw).split(",")}
             result = [r for r in result if str(_get_field(r, spec.field) or "") in values]
 
         elif spec.type == "contains":
