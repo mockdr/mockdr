@@ -24,6 +24,7 @@ from application.splunk.queries.search import (
 router = APIRouter(tags=["Splunk Search"])
 
 
+@router.post("/services/search/v2/jobs")
 @router.post("/services/search/jobs")
 async def create_job(
     request: Request,
@@ -72,6 +73,7 @@ async def create_job(
     return {"sid": sid}
 
 
+@router.get("/services/search/v2/jobs")
 @router.get("/services/search/jobs")
 def list_search_jobs(
     output_mode: str = "json",
@@ -81,6 +83,7 @@ def list_search_jobs(
     return list_jobs()
 
 
+@router.get("/services/search/v2/jobs/export")
 @router.get("/services/search/jobs/export")
 async def export_search(
     request: Request,
@@ -106,6 +109,7 @@ async def export_search(
     return result or {"results": [], "fields": [], "init_offset": 0, "messages": []}
 
 
+@router.get("/services/search/v2/jobs/{sid}")
 @router.get("/services/search/jobs/{sid}")
 def get_search_job(
     sid: str,
@@ -121,6 +125,7 @@ def get_search_job(
     return result
 
 
+@router.post("/services/search/v2/jobs/{sid}/control")
 @router.post("/services/search/jobs/{sid}/control")
 async def control_job(
     sid: str,
@@ -146,7 +151,12 @@ async def control_job(
     return {"messages": [{"type": "INFO", "text": f"Action '{action}' applied to job '{sid}'"}]}
 
 
-@router.get("/services/search/v2/jobs/{sid}/results")
+@router.api_route(
+    "/services/search/v2/jobs/{sid}/results", methods=["GET", "POST"],
+)
+@router.api_route(
+    "/services/search/jobs/{sid}/results", methods=["GET", "POST"],
+)
 def get_job_results(
     sid: str,
     count: int = Query(default=100),
@@ -164,7 +174,12 @@ def get_job_results(
     return result
 
 
-@router.get("/services/search/v2/jobs/{sid}/events")
+@router.api_route(
+    "/services/search/v2/jobs/{sid}/events", methods=["GET", "POST"],
+)
+@router.api_route(
+    "/services/search/jobs/{sid}/events", methods=["GET", "POST"],
+)
 def get_job_events(
     sid: str,
     count: int = Query(default=100),
@@ -182,6 +197,7 @@ def get_job_events(
     return result
 
 
+@router.get("/services/search/v2/jobs/{sid}/summary")
 @router.get("/services/search/jobs/{sid}/summary")
 def get_job_summary(
     sid: str,
@@ -197,6 +213,7 @@ def get_job_summary(
     return result
 
 
+@router.get("/services/search/v2/jobs/{sid}/timeline")
 @router.get("/services/search/jobs/{sid}/timeline")
 def get_job_timeline(
     sid: str,
@@ -212,6 +229,7 @@ def get_job_timeline(
     return result
 
 
+@router.delete("/services/search/v2/jobs/{sid}")
 @router.delete("/services/search/jobs/{sid}")
 def delete_job(
     sid: str,

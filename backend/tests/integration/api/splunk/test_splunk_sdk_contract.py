@@ -82,3 +82,63 @@ class TestSdkPollingLoopTerminates:
         else:
             msg = "polling loop never saw isDone == '1'"
             raise AssertionError(msg)
+
+
+class TestBothSdkApiModesAreServed:
+    """splunk-sdk-python drives v2 by default and v1 with disable_v2_api.
+
+    The mock registered job create/status/control/summary under v1 while
+    results/events lived only under v2 — a combination no real Splunk has, so
+    neither SDK mode completed a search end to end.
+    """
+
+    def _lifecycle(self, client: TestClient, base: str) -> None:
+        created = client.post(
+            f"{SPLUNK_PREFIX}{base}",
+            data={"search": "search index=sentinelone"},
+            headers=_auth(), params={"output_mode": "json"},
+        )
+        assert created.status_code in (200, 201), f"{base} create"
+        sid = created.json()["sid"]
+
+        status = client.get(
+            f"{SPLUNK_PREFIX}{base}/{sid}", headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        assert status.status_code == 200, f"{base}/{{sid}} status"
+
+        for verb in ("get", "post"):
+            for sub in ("results", "events"):
+                resp = getattr(client, verb)(
+                    f"{SPLUNK_PREFIX}{base}/{sid}/{sub}",
+                    headers=_auth(), params={"output_mode": "json"},
+                )
+                assert resp.status_code == 200, f"{verb.upper()} {base}/{{sid}}/{sub}"
+
+        for sub in ("summary", "timeline"):
+            resp = client.get(
+                f"{SPLUNK_PREFIX}{base}/{sid}/{sub}",
+                headers=_auth(), params={"output_mode": "json"},
+            )
+            assert resp.status_code == 200, f"{base}/{{sid}}/{sub}"
+
+        control = client.post(
+            f"{SPLUNK_PREFIX}{base}/{sid}/control",
+            data={"action": "finalize"}, headers=_auth(),
+            params={"output_mode": "json"},
+        )
+        assert control.status_code == 200, f"{base}/{{sid}}/control"
+
+    def test_v2_lifecycle(self, client: TestClient) -> None:
+        self._lifecycle(client, "/services/search/v2/jobs")
+
+    def test_v1_lifecycle(self, client: TestClient) -> None:
+        self._lifecycle(client, "/services/search/jobs")
+
+    def test_job_listing_is_served_on_both(self, client: TestClient) -> None:
+        for base in ("/services/search/jobs", "/services/search/v2/jobs"):
+            resp = client.get(
+                f"{SPLUNK_PREFIX}{base}", headers=_auth(),
+                params={"output_mode": "json"},
+            )
+            assert resp.status_code == 200, base
