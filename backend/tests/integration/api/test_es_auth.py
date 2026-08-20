@@ -198,3 +198,68 @@ class TestEsRbac:
             json={"name": "Should Fail", "type": "query", "risk_score": 50, "severity": "low"},
         )
         assert resp.status_code == 403
+
+
+class TestErrorEnvelopeConformance:
+    """Elasticsearch and Kibana ship together but do not share error shapes."""
+
+    def test_elasticsearch_401_offers_www_authenticate(self, client: TestClient) -> None:
+        """The challenge belongs in the real header, not only the body.
+
+        A client following RFC 7235 reads the header to decide which scheme to
+        retry with; without it there is nothing to act on.
+        """
+        resp = client.post("/elastic/logs-endpoint/_search", json={})
+        assert resp.status_code == 401
+        assert "WWW-Authenticate" in resp.headers
+        assert 'Basic realm="security"' in resp.headers["WWW-Authenticate"]
+
+        error = resp.json()["error"]
+        assert error["type"] == "security_exception"
+        assert "Bearer" in " ".join(error["header"]["WWW-Authenticate"])
+        # Present on the root cause as well as the top-level error.
+        assert error["root_cause"][0]["type"] == "security_exception"
+
+    def test_elasticsearch_401_names_the_request_path(self, client: TestClient) -> None:
+        resp = client.post("/elastic/logs-endpoint/_search", json={})
+        assert "[/elastic/logs-endpoint/_search]" in resp.json()["error"]["reason"]
+
+    def test_kibana_401_uses_the_boom_envelope(self, client: TestClient) -> None:
+        """Kibana answers through Hapi/Boom: statusCode + error title + message."""
+        resp = client.get("/kibana/api/cases/_find")
+        assert resp.status_code == 401
+        body = resp.json()
+        assert body["statusCode"] == 401
+        assert body["error"] == "Unauthorized"
+        assert isinstance(body["error"], str), "Kibana's `error` is a title, not an object"
+        assert "message" in body
+        assert "root_cause" not in body
+
+    def test_kibana_404_uses_the_boom_envelope(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/cases/no-such-case", headers=ES_BASIC_AUTH)
+        assert resp.status_code == 404
+        assert resp.json()["statusCode"] == 404
+        assert resp.json()["error"] == "Not Found"
+
+    def test_kibana_does_not_offer_www_authenticate(self, client: TestClient) -> None:
+        """That challenge is an Elasticsearch behaviour, not a Kibana one."""
+        resp = client.get("/kibana/api/cases/_find")
+        assert "WWW-Authenticate" not in resp.headers
+
+    def test_kbn_version_satisfies_the_xsrf_check(self, client: TestClient) -> None:
+        """Kibana's guard passes when either header is present."""
+        resp = client.post(
+            "/kibana/api/cases",
+            headers={**ES_BASIC_AUTH, "kbn-version": "8.19.0"},
+            json={"title": "x", "description": "y"},
+        )
+        assert resp.status_code != 400
+
+    def test_missing_xsrf_is_400_with_boom_envelope(self, client: TestClient) -> None:
+        resp = client.post(
+            "/kibana/api/cases", headers=ES_BASIC_AUTH, json={"title": "x"},
+        )
+        assert resp.status_code == 400
+        body = resp.json()
+        assert body["statusCode"] == 400
+        assert body["message"] == "Request must contain a kbn-xsrf header."

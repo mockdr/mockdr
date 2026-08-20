@@ -30,7 +30,7 @@ _TOKEN_LIFETIME_SECONDS: int = 1799
 # Token endpoint
 # ---------------------------------------------------------------------------
 
-@router.post("/oauth2/token")
+@router.post("/oauth2/token", status_code=201)
 async def create_token(
     client_id: str = Form(...),
     client_secret: str = Form(...),
@@ -40,6 +40,10 @@ async def create_token(
     Validates against the ``cs_oauth_clients`` repository, generates a
     Bearer token, stores it in ``cs_oauth_tokens`` with expiration, and
     returns the token in CrowdStrike format.
+
+    Answers ``201``, not ``200`` — Falcon's OpenAPI declares the success
+    status as Created, and a client asserting on it fails against a mock
+    that returns 200.
 
     Args:
         client_id:     OAuth2 client identifier (form-encoded).

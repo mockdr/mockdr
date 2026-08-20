@@ -6,12 +6,19 @@ use when configured to talk directly to Elasticsearch.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 
 from api.es_auth import require_es_auth, require_es_write
 from application.es_search import queries as search_queries
+from application.es_search.queries import IndexNotFoundError
+from utils.es_response import build_es_index_not_found
 
 router = APIRouter(tags=["ES Search"])
+
+
+def _missing_index(exc: IndexNotFoundError) -> HTTPException:
+    """Translate a missing index into Elasticsearch's 404."""
+    return HTTPException(status_code=404, detail=build_es_index_not_found(exc.index))
 
 
 # ── Cluster Info ─────────────────────────────────────────────────────────────
@@ -32,10 +39,14 @@ def cluster_info(
 def es_search(
     index: str,
     body: dict = Body(default={}),
+    ignore_unavailable: bool = Query(default=False),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Execute an Elasticsearch query DSL search against a mock index."""
-    return search_queries.es_search(index, body)
+    try:
+        return search_queries.es_search(index, body, ignore_unavailable=ignore_unavailable)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
 
 
 # ── Mapping / Stats ──────────────────────────────────────────────────────────
@@ -47,7 +58,10 @@ def get_mapping(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Return the index mapping for a known index pattern."""
-    return search_queries.es_get_mapping(index)
+    try:
+        return search_queries.es_get_mapping(index)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
 
 
 @router.get("/{index}/_stats")
@@ -56,7 +70,10 @@ def get_stats(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Return index stats for a known index pattern."""
-    return search_queries.es_get_stats(index)
+    try:
+        return search_queries.es_get_stats(index)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
 
 
 # ── Document CRUD ────────────────────────────────────────────────────────────
@@ -66,16 +83,24 @@ def get_stats(
 def get_doc(
     index: str,
     doc_id: str,
+    response: Response,
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Get a single document by ID."""
-    result = search_queries.es_get_doc(index, doc_id)
+    """Get a single document by ID.
+
+    A miss is a ``404`` carrying ``found: false`` — not the standard error
+    envelope, and not the ``200`` this returned before. Elasticsearch's own
+    REST spec test asserts the 404; its API reference documents only the 200,
+    which is why the status is easy to get wrong.
+    """
+    try:
+        result = search_queries.es_get_doc(index, doc_id)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
     if result is None:
-        return {
-            "_index": index,
-            "_id": doc_id,
-            "found": False,
-        }
+        response.status_code = 404
+        return {"_index": index, "_id": doc_id, "found": False}
     return result
 
 

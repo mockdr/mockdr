@@ -80,6 +80,64 @@ def build_es_error_response(
     }
 
 
+def build_es_index_not_found(index: str) -> dict:
+    """Build Elasticsearch's ``index_not_found_exception`` body.
+
+    The exception carries the index name as exception metadata, which renders
+    as extra ``index`` and ``index_uuid`` members beside ``reason`` — a client
+    that reads them to name the missing index finds nothing without them.
+    ``_na_`` is what Elasticsearch reports for an index that never existed.
+
+    Args:
+        index: The index name that could not be resolved.
+
+    Returns:
+        Elasticsearch 404 error envelope.
+    """
+    detail = {
+        "type": "index_not_found_exception",
+        "reason": f"no such index [{index}]",
+        "index": index,
+        "index_uuid": "_na_",
+    }
+    return {
+        "error": {"root_cause": [dict(detail)], **detail},
+        "status": 404,
+    }
+
+
+#: Challenges Elasticsearch offers on a 401, ordered by its own scheme priority.
+ES_WWW_AUTHENTICATE: tuple[str, ...] = (
+    'Bearer realm="security"',
+    "ApiKey",
+    'Basic realm="security", charset="UTF-8"',
+)
+
+
+def build_es_auth_error(status_code: int, reason: str) -> dict:
+    """Build an Elasticsearch ``security_exception`` body.
+
+    Authentication failures carry the ``WWW-Authenticate`` challenges in the
+    body under ``header`` as well as in the real HTTP headers, and they appear
+    in both the top-level error and each ``root_cause`` entry.
+
+    Args:
+        status_code: 401 or 403.
+        reason:      Human-readable error description.
+
+    Returns:
+        Elasticsearch error envelope with the challenge headers attached.
+    """
+    detail: dict = {"type": "security_exception", "reason": reason}
+    if status_code == 401:
+        detail["header"] = {"WWW-Authenticate": list(ES_WWW_AUTHENTICATE)}
+    return {
+        "error": {"root_cause": [dict(detail)], **detail},
+        "status": status_code,
+    }
+
+
+
 #: Boom's status-title table, which is what lands in Kibana's ``error`` field.
 _KBN_TITLES: dict[int, str] = {
     400: "Bad Request",

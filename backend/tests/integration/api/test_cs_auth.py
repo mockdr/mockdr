@@ -27,12 +27,13 @@ def _cs_viewer_auth(client: TestClient) -> dict[str, str]:
 class TestCsTokenEndpoint:
     """Tests for POST /cs/oauth2/token."""
 
-    def test_valid_credentials_return_200(self, client: TestClient) -> None:
+    def test_valid_credentials_return_201(self, client: TestClient) -> None:
         resp = client.post("/cs/oauth2/token", data={
             "client_id": "cs-mock-admin-client",
             "client_secret": "cs-mock-admin-secret",
         })
-        assert resp.status_code == 200
+        # Falcon's OpenAPI declares the token endpoint's success status as 201.
+        assert resp.status_code == 201
 
     def test_valid_credentials_return_access_token(self, client: TestClient) -> None:
         resp = client.post("/cs/oauth2/token", data={
@@ -89,20 +90,22 @@ class TestCsTokenEndpoint:
         })
         assert resp.status_code == 400
 
-    def test_viewer_credentials_return_200(self, client: TestClient) -> None:
+    def test_viewer_credentials_return_201(self, client: TestClient) -> None:
         resp = client.post("/cs/oauth2/token", data={
             "client_id": "cs-mock-viewer-client",
             "client_secret": "cs-mock-viewer-secret",
         })
-        assert resp.status_code == 200
+        # Falcon's OpenAPI declares the token endpoint's success status as 201.
+        assert resp.status_code == 201
         assert "access_token" in resp.json()
 
-    def test_analyst_credentials_return_200(self, client: TestClient) -> None:
+    def test_analyst_credentials_return_201(self, client: TestClient) -> None:
         resp = client.post("/cs/oauth2/token", data={
             "client_id": "cs-mock-analyst-client",
             "client_secret": "cs-mock-analyst-secret",
         })
-        assert resp.status_code == 200
+        # Falcon's OpenAPI declares the token endpoint's success status as 201.
+        assert resp.status_code == 201
         assert "access_token" in resp.json()
 
 

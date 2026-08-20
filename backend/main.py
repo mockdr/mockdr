@@ -379,15 +379,22 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     If the handler already carries a dict detail (e.g. the auth module),
     use it verbatim.  Otherwise synthesise an envelope in the shape of
     whichever vendor owns the request path.
+
+    Headers set on the exception are forwarded. Dropping them silently
+    discarded the ``WWW-Authenticate`` challenge Elasticsearch sends on a 401,
+    which is the part of the response RFC 7235 clients actually read.
     """
     if isinstance(exc.detail, dict):
-        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+        return JSONResponse(
+            status_code=exc.status_code, content=exc.detail, headers=exc.headers,
+        )
 
     vendor = vendor_for_path(request.url.path)
     message = exc.detail if isinstance(exc.detail, str) else "Error"
     return JSONResponse(
         status_code=exc.status_code,
         content=build_vendor_error(vendor, exc.status_code, message),
+        headers=exc.headers,
     )
 
 

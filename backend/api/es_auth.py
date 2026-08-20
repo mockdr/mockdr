@@ -23,7 +23,12 @@ import os
 from fastapi import Depends, Header, HTTPException, Request
 
 from repository.store import store
-from utils.es_response import build_es_error_response, build_kbn_error_response
+from utils.es_response import (
+    ES_WWW_AUTHENTICATE,
+    build_es_auth_error,
+    build_es_error_response,
+    build_kbn_error_response,
+)
 
 
 def _auth_error(request: Request | None, status: int, es_type: str, message: str) -> dict:
@@ -44,7 +49,21 @@ def _auth_error(request: Request | None, status: int, es_type: str, message: str
     """
     if request is not None and request.url.path.startswith("/kibana"):
         return build_kbn_error_response(status, message)
+    if es_type == "security_exception":
+        return build_es_auth_error(status, message)
     return build_es_error_response(status, es_type, message)
+
+
+def _auth_headers(request: Request | None, status: int) -> dict[str, str] | None:
+    """Return the challenge headers Elasticsearch sends alongside a 401.
+
+    Elasticsearch emits ``WWW-Authenticate`` as a real response header as well
+    as inside the error body, and a client that follows RFC 7235 looks at the
+    header, not the JSON.  Kibana does not do this, so the mount decides.
+    """
+    if status != 401 or (request is not None and request.url.path.startswith("/kibana")):
+        return None
+    return {"WWW-Authenticate": ", ".join(ES_WWW_AUTHENTICATE)}
 
 # ── User credentials (read from env vars with mock defaults) ──────────────────
 
@@ -140,6 +159,7 @@ async def require_es_auth(
                 request, 401, "security_exception",
                 f"missing authentication credentials for REST request [{request.url.path}]",
             ),
+            headers=_auth_headers(request, 401),
         )
 
     lower = authorization.lower()
@@ -170,6 +190,7 @@ async def require_es_auth(
                 request, 401, "security_exception",
                 f"unable to authenticate user for REST request [{request.url.path}]",
             ),
+            headers=_auth_headers(request, 401),
         )
 
     return result

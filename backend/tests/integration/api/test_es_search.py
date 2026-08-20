@@ -151,10 +151,38 @@ class TestEsSearch:
         ids2 = {h["_id"] for h in page2}
         assert ids1.isdisjoint(ids2), "Paginated pages should not overlap"
 
-    def test_search_unknown_index_returns_empty(self, client: TestClient) -> None:
-        """Searching a non-existent index should return zero hits."""
+    def test_search_unknown_index_returns_404(self, client: TestClient) -> None:
+        """A missing concrete index is 404 index_not_found_exception.
+
+        Returning zero hits would say the index exists and is empty, which is
+        a different fact and one the caller cannot act on.
+        """
         resp = client.post(
             "/elastic/totally-unknown-index/_search",
+            headers=ES_AUTH,
+            json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["status"] == 404
+        assert body["error"]["type"] == "index_not_found_exception"
+        assert body["error"]["reason"] == "no such index [totally-unknown-index]"
+        assert body["error"]["index"] == "totally-unknown-index"
+
+    def test_search_unknown_index_ignore_unavailable(self, client: TestClient) -> None:
+        """``ignore_unavailable=true`` skips the missing target instead."""
+        resp = client.post(
+            "/elastic/totally-unknown-index/_search?ignore_unavailable=true",
+            headers=ES_AUTH,
+            json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["hits"]["total"]["value"] == 0
+
+    def test_search_wildcard_matching_nothing_is_ok(self, client: TestClient) -> None:
+        """``allow_no_indices`` defaults true, so a dead wildcard is not 404."""
+        resp = client.post(
+            "/elastic/nothing-matches-this-*/_search",
             headers=ES_AUTH,
             json={"query": {"match_all": {}}},
         )
@@ -273,12 +301,20 @@ class TestEsGetDoc:
         assert "_source" in body
 
     def test_get_nonexistent_document(self, client: TestClient) -> None:
-        """Getting a non-existent document should return found=False."""
+        """A document miss is 404 with ``found: false``, not 200.
+
+        Elasticsearch's API reference documents only the 200 for this route,
+        which is why the status is commonly mocked wrong; its own REST spec
+        test asserts the 404.
+        """
         resp = client.get(
             "/elastic/.siem-signals-default/_doc/does-not-exist",
             headers=ES_AUTH,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         body = resp.json()
         assert body["found"] is False
+        assert body["_id"] == "does-not-exist"
+        # Not the error envelope — a get miss keeps the document shape.
+        assert "error" not in body
         assert body["_id"] == "does-not-exist"
