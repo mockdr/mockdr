@@ -33,7 +33,9 @@ def list_users() -> dict:
             "defaultApp": user.default_app,
             "tz": user.tz,
         }
-        entries.append(build_splunk_entry(user.username, content))
+        entries.append(build_splunk_entry(
+            user.username, content, collection="authentication/users",
+        ))
     return build_splunk_envelope(entries)
 
 
@@ -49,7 +51,7 @@ def get_user(username: str) -> dict | None:
         "defaultApp": user.default_app,
         "tz": user.tz,
     }
-    entry = build_splunk_entry(user.username, content)
+    entry = build_splunk_entry(user.username, content, collection="authentication/users")
     return build_splunk_envelope([entry], total=1)
 
 
@@ -58,7 +60,8 @@ def get_current_context(username: str) -> dict:
     user = splunk_user_repo.get(username)
     if not user:
         return {}
-    return build_splunk_envelope([build_splunk_entry(username, {
+    return build_splunk_envelope([build_splunk_entry(
+        username, collection="authentication/users", content={
         "username": user.username,
         "realname": user.realname,
         "roles": user.roles,
@@ -73,7 +76,10 @@ def list_roles() -> dict:
         {"name": "sc_admin", "capabilities": SC_ADMIN_CAPABILITIES},
         {"name": "user", "capabilities": USER_CAPABILITIES},
     ]
-    entries = [build_splunk_entry(str(r["name"]), r) for r in roles]
+    entries = [
+        build_splunk_entry(str(r["name"]), r, collection="authorization/roles")
+        for r in roles
+    ]
     return build_splunk_envelope(entries)
 
 
@@ -81,5 +87,8 @@ def list_capabilities() -> dict:
     """Return available capabilities."""
     all_caps = sorted(set(ADMIN_CAPABILITIES + SC_ADMIN_CAPABILITIES + USER_CAPABILITIES))
     return build_splunk_envelope(
-        [build_splunk_entry("capabilities", {"capabilities": all_caps})],
+        [build_splunk_entry(
+            "capabilities", {"capabilities": all_caps},
+            collection="authorization/capabilities",
+        )],
     )

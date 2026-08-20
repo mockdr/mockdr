@@ -3,6 +3,7 @@
 Implements Kibana Security Detection Engine rule management endpoints:
 CRUD, find, bulk actions, tags, and prepackaged status.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_rules import commands as rule_commands
 from application.es_rules import queries as rule_queries
-from utils.es_response import build_es_error_response
+from utils.es_response import build_security_solution_error
 
 router = APIRouter(tags=["Elastic Detection Rules"])
 
@@ -34,7 +35,7 @@ def get_rule(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", "rule not found"),
+            detail=build_security_solution_error(404, "rule not found"),
         )
     return result
 
@@ -44,8 +45,42 @@ def create_rule(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Create a new detection rule."""
+    """Create a new detection rule.
+
+    ``RuleCreateProps`` requires name, description, type, risk_score and
+    severity, plus the type-specific query. Everything used to be optional and
+    silently defaulted, so ``{"name": "x"}`` created a rule with an empty
+    query that would match nothing — reported as a success.
+    """
+    missing = [f for f in _REQUIRED_RULE_FIELDS if not body.get(f)]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=build_security_solution_error(
+                400, f"Invalid value \"undefined\" supplied to \"{missing[0]}\"",
+            ),
+        )
+    if body.get("type") in ("query", "saved_query", "eql", "esql") and not body.get(
+        "query",
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=build_security_solution_error(
+                400, 'Invalid value "undefined" supplied to "query"',
+            ),
+        )
+    if body.get("rule_id") and rule_queries.get_rule_by_rule_id(body["rule_id"]):
+        raise HTTPException(
+            status_code=409,
+            detail=build_security_solution_error(
+                409, f"rule_id: \"{body['rule_id']}\" already exists",
+            ),
+        )
     return rule_commands.create_rule(body)
+
+
+#: Fields RuleCreateProps declares as required.
+_REQUIRED_RULE_FIELDS = ("name", "description", "type", "severity", "risk_score")
 
 
 @router.put("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])
@@ -58,15 +93,16 @@ def update_rule(
     if not rule_id:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request", "id is required in the request body",
+            detail=build_security_solution_error(
+                400,
+                "id is required in the request body",
             ),
         )
     result = rule_commands.update_rule(rule_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"rule {rule_id} not found"),
+            detail=build_security_solution_error(404, f"rule {rule_id} not found"),
         )
     return result
 
@@ -82,7 +118,7 @@ def delete_rule(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"rule {id} not found"),
+            detail=build_security_solution_error(404, f"rule {id} not found"),
         )
     rule_commands.delete_rule(id)
     return result
@@ -92,8 +128,14 @@ def delete_rule(
 
 
 _ALLOWED_SORT_FIELDS = {
-    "created_at", "updated_at", "name", "enabled", "severity",
-    "risk_score", "rule_id", "execution_summary.last_execution.date",
+    "created_at",
+    "updated_at",
+    "name",
+    "enabled",
+    "severity",
+    "risk_score",
+    "rule_id",
+    "execution_summary.last_execution.date",
 }
 
 
@@ -110,8 +152,8 @@ def find_rules(
     if sort_field and sort_field not in _ALLOWED_SORT_FIELDS:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=build_security_solution_error(
+                400,
                 f"Invalid sort_field '{sort_field}'. "
                 f"Allowed: {', '.join(sorted(_ALLOWED_SORT_FIELDS))}",
             ),
@@ -135,17 +177,26 @@ def bulk_action(
 ) -> dict:
     """Perform a bulk action on detection rules.
 
-    Supported actions: ``enable``, ``disable``, ``delete``, ``export``.
+    Supported actions: ``enable``, ``disable``, ``delete``, ``duplicate``,
+    ``export``.
     """
     action = body.get("action")
     if not action:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(400, "bad_request", "action is required"),
+            detail=build_security_solution_error(400, "action is required"),
         )
     rule_ids = body.get("ids")
     query = body.get("query")
-    return rule_commands.bulk_action(action, rule_ids, query)
+    try:
+        return rule_commands.bulk_action(action, rule_ids, query)
+    except rule_commands.UnknownBulkActionError as exc:
+        # An unknown action used to be 200 {"success": false}, so a typo read
+        # as a successful call.
+        raise HTTPException(
+            status_code=400,
+            detail=build_security_solution_error(400, str(exc)),
+        ) from exc
 
 
 # ── Tags ─────────────────────────────────────────────────────────────────────

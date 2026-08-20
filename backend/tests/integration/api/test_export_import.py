@@ -168,7 +168,7 @@ class TestImportEdgeCases:
     ) -> None:
         """Non-dict entries in raw collections (blocklist, installed_apps) are skipped."""
         snap = client.get("/web/api/v2.1/_dev/export", headers=auth_headers).json()
-        snap["blocklist"].append("not-a-dict")
+        snap["blocklist"] = ["not-a-dict"]
         resp = client.post("/web/api/v2.1/_dev/import", headers=auth_headers, json=snap)
         assert resp.status_code == 200
 
@@ -177,7 +177,7 @@ class TestImportEdgeCases:
     ) -> None:
         """Raw records with no 'id' field are silently skipped."""
         snap = client.get("/web/api/v2.1/_dev/export", headers=auth_headers).json()
-        snap["blocklist"].append({"value": "abc", "type": "black_hash"})  # no "id" key
+        snap["blocklist"] = [{"value": "abc", "type": "black_hash"}]  # no "id" key
         resp = client.post("/web/api/v2.1/_dev/import", headers=auth_headers, json=snap)
         assert resp.status_code == 200
 

@@ -39,7 +39,7 @@ class TestXsoarFlow:
             json={"search": "`notable`"},
             headers=bearer,
         )
-        assert create_resp.status_code == 200
+        assert create_resp.status_code == 201
         sid = create_resp.json()["sid"]
 
         # Step 3: Poll job status (XSOAR polls until DONE)
@@ -50,7 +50,10 @@ class TestXsoarFlow:
         assert status_resp.status_code == 200
         job_content = status_resp.json()["entry"][0]["content"]
         assert job_content["dispatchState"] == "DONE"
-        assert job_content["isDone"] is True
+        # splunkd renders content values as strings; splunklib's Job.is_done()
+        # is literally `job_content["isDone"] == "1"`, so a JSON bool here would
+        # make the SDK's polling loop spin forever.
+        assert job_content["isDone"] == "1"
 
         # Step 4: Get results
         results_resp = client.get(
@@ -72,7 +75,7 @@ class TestXsoarFlow:
             json={"search": notable["drilldown_search"]},
             headers=bearer,
         )
-        assert drilldown_resp.status_code == 200
+        assert drilldown_resp.status_code == 201
         drilldown_sid = drilldown_resp.json()["sid"]
 
         drilldown_results = client.get(

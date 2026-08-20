@@ -21,7 +21,7 @@ def query_status(
 ) -> dict:
     """Return the current status and progress of a Deep Visibility query."""
     if not queryId:
-        raise HTTPException(status_code=422, detail="queryId required")
+        raise HTTPException(status_code=400, detail="queryId required")
     result = dv_queries.get_query_status(queryId)
     if not result:
         raise HTTPException(status_code=404)
@@ -32,11 +32,11 @@ def query_status(
 def get_events(
     queryId: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of events for a Deep Visibility query."""
     if not queryId:
-        raise HTTPException(status_code=422, detail="queryId required")
+        raise HTTPException(status_code=400, detail="queryId required")
     result = dv_queries.get_events(queryId, cursor, limit)
     if not result:
         raise HTTPException(status_code=404)
@@ -47,11 +47,11 @@ def get_events(
 def get_events_by_type(
     event_type: str,
     queryId: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return events of a specific type for a Deep Visibility query."""
     if not queryId:
-        raise HTTPException(status_code=422, detail="queryId required")
+        raise HTTPException(status_code=400, detail="queryId required")
     result = dv_queries.get_events(queryId, None, limit, event_type=event_type)
     if not result:
         raise HTTPException(status_code=404)

@@ -38,11 +38,26 @@ class TestResolveIds:
         assert resp.status_code == 200
         assert resp.json()["data"]["affected"] == 1
 
-    def test_all_agents_fallback(self, client: TestClient, auth_headers: dict) -> None:
-        """Empty body → applies to all non-decommissioned agents."""
+    def test_unscoped_body_is_refused(self, client: TestClient, auth_headers: dict) -> None:
+        """An empty body must not mean "the whole fleet"."""
         resp = _act(client, auth_headers, "connect", {})
+        assert resp.status_code == 400
+        assert "filter is required" in resp.json()["errors"][0]["detail"]
+
+    def test_group_filter_scopes_the_action(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """A non-`ids` filter must select what the same filter selects on GET."""
+        group_id = client.get(
+            "/web/api/v2.1/groups?limit=1", headers=auth_headers,
+        ).json()["data"][0]["id"]
+        expected = client.get(
+            f"/web/api/v2.1/agents?limit=1000&groupIds={group_id}", headers=auth_headers,
+        ).json()["pagination"]["totalItems"]
+
+        resp = _act(client, auth_headers, "connect", {"filter": {"groupIds": [group_id]}})
         assert resp.status_code == 200
-        assert resp.json()["data"]["affected"] > 1
+        assert resp.json()["data"]["affected"] == expected
 
     def test_unknown_agent_id_skipped(self, client: TestClient, auth_headers: dict) -> None:
         resp = _act(client, auth_headers, "connect", {"filter": {"ids": ["does-not-exist"]}})

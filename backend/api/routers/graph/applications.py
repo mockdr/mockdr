@@ -12,7 +12,7 @@ router = APIRouter(tags=["Graph Applications"])
 @router.get("/v1.0/applications")
 async def list_applications(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_auth),

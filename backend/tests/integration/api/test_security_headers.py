@@ -37,13 +37,13 @@ class TestErrorResponseEnvelope:
         resp = client.get("/web/api/v2.1/agents")
         body = resp.json()
         assert "errors" in body
-        assert body["data"] is None
+        assert "data" not in body, "S1 error bodies carry `errors` alone"
 
     def test_404_has_s1_envelope(self, client: TestClient) -> None:
         resp = client.get("/web/api/v2.1/agents/nonexistent-id", headers=_ADMIN)
         body = resp.json()
         assert "errors" in body
-        assert body["data"] is None
+        assert "data" not in body, "S1 error bodies carry `errors` alone"
 
     def test_403_has_s1_envelope(self, client: TestClient) -> None:
         viewer = {"Authorization": "ApiToken viewer-token-0000-0000-000000000002"}
@@ -52,4 +52,4 @@ class TestErrorResponseEnvelope:
         body = resp.json()
         assert resp.status_code == 403
         assert "errors" in body
-        assert body["data"] is None
+        assert "data" not in body, "S1 error bodies carry `errors` alone"

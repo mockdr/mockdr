@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import random
-import uuid
 from dataclasses import asdict
 
 from domain.splunk.notable_event import NotableEvent
@@ -16,6 +15,7 @@ from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from repository.store import store
+from utils.id_gen import new_hex, new_uuid
 
 # Fixed reference epoch for deterministic seed data (2023-11-14T22:13:20Z)
 _SEED_EPOCH = 1700000000.0
@@ -245,7 +245,7 @@ def _save_event(index: str, sourcetype: str, source: str, payload: dict, event_t
             fields[key] = value
 
     event = SplunkEvent(
-        id=str(uuid.uuid4()),
+        id=str(new_uuid()),
         index=index,
         sourcetype=sourcetype,
         source=source,
@@ -270,13 +270,13 @@ def _save_notable(
     event_time: float,
 ) -> None:
     """Create and persist an ES notable event."""
-    event_id = f"{uuid.uuid4().hex[:12]}@@notable@@{uuid.uuid4().hex[:12]}"
+    event_id = f"{new_hex()[:12]}@@notable@@{new_hex()[:12]}"
     time_str = str(event_time)
     notable = NotableEvent(
         event_id=event_id,
         rule_name=rule_name,
         rule_title=rule_title,
-        rule_id=str(uuid.uuid4()),
+        rule_id=str(new_uuid()),
         search_name=rule_name,
         security_domain="endpoint",
         severity=severity,

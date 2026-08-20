@@ -40,5 +40,5 @@ def get_index(name: str) -> dict | None:
         "disabled": idx.disabled,
         "datatype": idx.data_type,
     }
-    entry = build_splunk_entry(idx.name, content)
+    entry = build_splunk_entry(idx.name, content, collection="data/indexes")
     return build_splunk_envelope([entry], total=1)

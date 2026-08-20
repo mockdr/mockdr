@@ -7,6 +7,7 @@ from dataclasses import asdict
 from domain.mde_indicator import MdeIndicator
 from repository.mde_indicator_repo import mde_indicator_repo
 from utils.dt import utc_now
+from utils.mde_serde import to_mde_resource
 
 
 def create_indicator(body: dict) -> dict:
@@ -41,7 +42,7 @@ def create_indicator(body: dict) -> dict:
         lastUpdateTime=now,
     )
     mde_indicator_repo.save(indicator)
-    return asdict(indicator)
+    return to_mde_resource(asdict(indicator), "indicatorId")
 
 
 def update_indicator(indicator_id: str, body: dict) -> dict | None:
@@ -79,7 +80,7 @@ def update_indicator(indicator_id: str, body: dict) -> dict | None:
     indicator.lastUpdateTime = utc_now()
 
     mde_indicator_repo.save(indicator)
-    return asdict(indicator)
+    return to_mde_resource(asdict(indicator), "indicatorId")
 
 
 def delete_indicator(indicator_id: str) -> bool:

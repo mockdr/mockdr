@@ -6,7 +6,7 @@ import random
 from faker import Faker
 
 from domain.mde_alert import MdeAlert
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.mde_shared import (
     MDE_ALERT_CATEGORIES,
     MDE_ALERT_TITLES,
@@ -81,8 +81,10 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
         # Timestamps
         creation_time = rand_ago(30)
         first_event = creation_time
-        last_event = rand_ago(15)
-        last_update = rand_ago(5)
+        # Derived from creation so the event window and the update cannot
+        # precede the alert that owns them.
+        last_event = rand_after(creation_time)
+        last_update = rand_after(creation_time)
         resolved_time = rand_ago(2) if status == "Resolved" else ""
 
         # Evidence items: 1-3

@@ -4,7 +4,7 @@ import random
 from faker import Faker
 
 from domain.exclusion import Exclusion
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from repository.exclusion_repo import exclusion_repo
 from repository.site_repo import site_repo
 from repository.user_repo import user_repo
@@ -55,8 +55,8 @@ def seed_exclusions(
             value=value_map[ex_type],
             description=fake.sentence(nb_words=6),
             osType=random.choice(["windows", "macos", "linux", "windows_legacy"]),
-            createdAt=rand_ago(60),
-            updatedAt=rand_ago(10),
+            createdAt=(created := rand_ago(60)),
+            updatedAt=rand_after(created),
             userId=uid,
             userName=(
                 f"{user_obj.fullName} ({user_obj.email})"

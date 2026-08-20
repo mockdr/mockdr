@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from repository.activity_repo import activity_repo
-from utils.filtering import FilterSpec, apply_filters
+from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import ACTIVITY_CURSOR, build_list_response, paginate
 
 
@@ -38,5 +38,6 @@ def list_activities(params: dict, cursor: str | None, limit: int) -> dict:
     ]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: r.get("id", 0))
+    filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, ACTIVITY_CURSOR)
     return build_list_response(page, next_cursor, total)

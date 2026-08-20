@@ -103,7 +103,17 @@ class Agent:
     remoteProfilingStateExpiration: str | None = None
 
     # ── Proxy ─────────────────────────────────────────────────────────────────
-    proxyStates: dict = field(default_factory=lambda: {"console": False, "deepVisibility": False})
+    #: All six members the 2.1 spec defines. The two address strings and the two
+    #: PAC/method fields were absent, so a client reading them off an agent got
+    #: a KeyError against the mock and a value against a real console.
+    proxyStates: dict = field(default_factory=lambda: {
+        "console": False,
+        "consoleProxyAddress": "",
+        "deepVisibility": False,
+        "deepVisibilityProxyAddress": "",
+        "pacFileUsage": False,
+        "proxyMethod": "",
+    })
 
     # ── Cloud / Container ─────────────────────────────────────────────────────
     cloudProviders: dict = field(default_factory=dict)

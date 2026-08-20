@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "mockdr"
-version = "2.0.0"
+version = "2.0.1"
 description = "Full-fidelity multi-EDR mock server (SentinelOne, CrowdStrike, MDE, Elastic Security, Cortex XDR, Splunk) for SOAR/SIEM integration testing"
 requires-python = ">=3.11"
 license = "LicenseRef-BSL-1.1"
@@ -151,11 +151,23 @@ convention = "google"
 "api/xdr_auth.py" = ["B008"]
 # store and utils use Any intentionally for generic record handling
 "repository/store.py" = ["ANN401"]
+# import_state keys heterogeneous domain objects.
+"application/dev/commands.py" = ["ANN401"]
 "utils/filtering.py" = ["ANN401"]
 "utils/pagination.py" = ["ANN401"]
 "utils/cs_fql.py" = ["ANN401"]
+"utils/xdr_filters.py" = ["ANN401"]
 "utils/es_query.py" = ["ANN401"]
+"utils/es_aggs.py" = ["ANN401"]
+"utils/es_ecs.py" = ["ANN401"]
 "utils/mde_odata.py" = ["ANN401"]
+# KQL and hunting rows are genuinely dynamic — a column may hold any type.
+"utils/mde_kql.py" = ["ANN401"]
+"application/mde_advanced_hunting/queries.py" = ["ANN401"]
+# SPL values are genuinely dynamic — a field may hold a string, number or list.
+"utils/splunk/spl_expr.py" = ["ANN401"]
+"utils/splunk/spl_exec.py" = ["ANN401"]
+"utils/splunk/kvstore_query.py" = ["ANN401"]
 "mockdr/testing.py" = ["ANN401"]
 # ASGI middleware — boilerplate patterns and non-crypto random for jitter/fault injection
 "api/middleware/**" = ["D107", "D102", "S311"]

@@ -27,13 +27,19 @@ _PATHS: list[str] = [
 ]
 
 
-def seed_cs_quarantine(fake: Faker, cs_host_ids: list[str]) -> None:
+def seed_cs_quarantine(
+    fake: Faker,
+    cs_host_ids: list[str],
+    cs_detection_ids: list[str] | None = None,
+) -> None:
     """Create mock quarantined file records tied to CS hosts.
 
     Args:
-        fake:        Shared Faker instance (seeded externally).
-        cs_host_ids: List of CrowdStrike device IDs to associate files with.
+        fake:             Shared Faker instance (seeded externally).
+        cs_host_ids:      CrowdStrike device IDs to associate files with.
+        cs_detection_ids: Detection IDs the quarantined files came from.
     """
+    detection_ids = cs_detection_ids or []
     count = min(15, len(cs_host_ids))
 
     for i in range(count):
@@ -57,5 +63,10 @@ def seed_cs_quarantine(fake: Faker, cs_host_ids: list[str]) -> None:
             username=f"ACMECORP\\{fake.user_name()}",
             date_created=rand_ago(30),
             date_updated=rand_ago(5),
-            detect_ids=[cs_hex_id() for _ in range(random.randint(1, 3))],
+            # A quarantined file is produced *by* a detection, so these have
+            # to be real detection ids. Random hex could never match one:
+            # CS detection ids are shaped ldt:{cid}:{n}.
+            detect_ids=random.sample(
+                detection_ids, min(len(detection_ids), random.randint(1, 3)),
+            ) if detection_ids else [],
         ))

@@ -1,22 +1,27 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from json import JSONDecodeError
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Match
 
 from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
+from api.middleware.head_method import HeadMethodMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.request_logging import RequestLoggingMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
+from api.middleware.splunk_namespace import SplunkNamespaceMiddleware
 from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
+from api.middleware.splunk_paging import SplunkPagingMiddleware
 from api.middleware.tenant_scope import TenantScopeMiddleware
 from api.routers import (
     accounts,
@@ -301,9 +306,19 @@ from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
+from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
+from utils.es_aggs import ESAggregationError
+from utils.es_query import ESQueryError
+from utils.es_response import build_es_error_response
 from utils.logging import setup_logging
+from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
-from utils.vendor_errors import build_vendor_error, vendor_for_path
+from utils.vendor_errors import (
+    build_vendor_error,
+    vendor_for_path,
+    vendor_mount_for_path,
+)
+from utils.xdr_filters import XdrFilterError
 
 setup_logging()
 
@@ -349,7 +364,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=[
-        "Authorization", "Content-Type", "Accept", "kbn-xsrf",
+        # kbn-version is Kibana's accepted alternative to kbn-xsrf; without it
+        # here a browser client cannot actually send the header the xsrf guard
+        # accepts.
+        "Authorization", "Content-Type", "Accept", "kbn-xsrf", "kbn-version",
         "x-xdr-auth-id", "x-xdr-nonce", "x-xdr-timestamp",
         "ConsistencyLevel",
     ],
@@ -357,7 +375,11 @@ app.add_middleware(
 
 # Middleware registration order: last added = outermost wrapper.
 # RequestLoggingMiddleware runs first (outermost), then RateLimit, Security, Audit, Proxy innermost.
+# Paging runs inside XML rendering, so the sliced entries are what gets rendered.
+app.add_middleware(SplunkPagingMiddleware)     # count/offset on Atom collections
 app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the routers
+# Path rewriting must happen before routing, so this is added last (outermost).
+app.add_middleware(SplunkNamespaceMiddleware)  # /servicesNS/{owner}/{app} -> /services
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last
 app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors before proxy
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries
@@ -365,6 +387,7 @@ app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
 app.add_middleware(MetricsMiddleware)         # outermost — runs first, captures all timings
 
 
@@ -375,15 +398,53 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     If the handler already carries a dict detail (e.g. the auth module),
     use it verbatim.  Otherwise synthesise an envelope in the shape of
     whichever vendor owns the request path.
+
+    Headers set on the exception are forwarded. Dropping them silently
+    discarded the ``WWW-Authenticate`` challenge Elasticsearch sends on a 401,
+    which is the part of the response RFC 7235 clients actually read.
     """
     if isinstance(exc.detail, dict):
-        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+        return JSONResponse(
+            status_code=exc.status_code, content=exc.detail, headers=exc.headers,
+        )
 
     vendor = vendor_for_path(request.url.path)
     message = exc.detail if isinstance(exc.detail, str) else "Error"
     return JSONResponse(
         status_code=exc.status_code,
         content=build_vendor_error(vendor, exc.status_code, message),
+        headers=exc.headers,
+    )
+
+
+#: Paths that mock Entra's token endpoint rather than the API in front of it.
+_TOKEN_ENDPOINT_SUFFIX = "/oauth2/v2.0/token"
+
+
+def _is_token_endpoint(path: str) -> bool:
+    """Return whether *path* is one of the mocked Entra token endpoints."""
+    return path.endswith(_TOKEN_ENDPOINT_SUFFIX)
+
+
+@app.exception_handler(JSONDecodeError)
+async def json_decode_exception_handler(
+    request: Request, exc: JSONDecodeError,
+) -> JSONResponse:
+    """Answer an unparseable request body the way the mocked vendor would.
+
+    Handlers that read ``await request.json()`` directly — rather than through
+    a body model, which pydantic guards — let the decode error escape. That
+    surfaced as a bare ``500 Internal Server Error`` in ``text/plain``: not the
+    vendor's envelope, not the vendor's status, and not even JSON. Every mocked
+    API answers a malformed body with ``400``.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path),
+            400,
+            f"Invalid JSON in request body: {exc}",
+        ),
     )
 
 
@@ -404,12 +465,22 @@ async def validation_exception_handler(
         location = ".".join(str(loc) for loc in err.get("loc", ()) if loc != "body")
         message = err.get("msg", "invalid value")
         parts.append(f"{location}: {message}" if location else message)
+    detail = "; ".join(parts) or "Invalid request"
+
+    # A token endpoint is not part of the API it fronts: Entra answers there in
+    # OAuth 2.0's flat shape, which is what MSAL parses. Returning the resource
+    # API's envelope would hand an OAuth client keys it never reads.
+    if _is_token_endpoint(request.url.path):
+        return JSONResponse(
+            status_code=400,
+            content=build_token_error(
+                "invalid_request", f"AADSTS900144: {detail}", AADSTS_MISSING_PARAMETER,
+            ),
+        )
 
     return JSONResponse(
         status_code=400,
-        content=build_vendor_error(
-            vendor_for_path(request.url.path), 400, "; ".join(parts) or "Invalid request",
-        ),
+        content=build_vendor_error(vendor_for_path(request.url.path), 400, detail),
     )
 
 
@@ -428,6 +499,63 @@ async def odata_filter_exception_handler(
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
         ),
+    )
+
+
+@app.exception_handler(XdrFilterError)
+async def xdr_filter_exception_handler(
+    request: Request, exc: XdrFilterError,
+) -> JSONResponse:
+    """Answer an unsupported XDR filter with a 400, as Cortex XDR does."""
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, str(exc),
+        ),
+    )
+
+
+@app.exception_handler(KqlError)
+async def kql_exception_handler(
+    request: Request, exc: KqlError,
+) -> JSONResponse:
+    """Answer an unusable hunting query with Defender's ``400``.
+
+    The query was previously accepted and ignored, so a malformed one
+    returned canned results rather than telling the caller anything.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, str(exc),
+        ),
+    )
+
+
+@app.exception_handler(ESAggregationError)
+async def es_aggregation_exception_handler(
+    _request: Request, exc: ESAggregationError,
+) -> JSONResponse:
+    """Answer an unusable ``aggs`` block with Elasticsearch's ``400``."""
+    return JSONResponse(
+        status_code=400,
+        content=build_es_error_response(400, "parsing_exception", str(exc)),
+    )
+
+
+@app.exception_handler(ESQueryError)
+async def es_query_exception_handler(
+    _request: Request, exc: ESQueryError,
+) -> JSONResponse:
+    """Answer an unparseable search body with Elasticsearch's ``400``.
+
+    Six query types the interpreter does not implement raised a bare
+    ``ValueError``, which reached the client as a plain-text ``500`` — an
+    Elasticsearch client cannot tell that apart from the cluster falling over.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_es_error_response(400, "parsing_exception", str(exc)),
     )
 
 
@@ -635,16 +763,117 @@ for _graph_module in [
 ]:
     app.include_router(_graph_module.router, prefix=GRAPH_PREFIX)
 
-# ── Frontend (SPA) — only active when frontend/dist exists ────────────────────
+# ── Unmatched routes ─────────────────────────────────────────────────────────
+#
+# The SPA is served here too when a build is present, but the vendor-shaped 404
+# must not depend on that: the backend runs without `frontend/dist` in CI and in
+# any API-only deployment, and gating this block on the build meant every mocked
+# vendor answered FastAPI's `{"detail": "Not Found"}` there instead of its own
+# envelope — the exact mismatch this fallback exists to remove.
 _DIST = Path(__file__).parent.parent / "frontend" / "dist"
+_SPA_AVAILABLE = _DIST.exists()
 
-if _DIST.exists():
+if _SPA_AVAILABLE:
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa_fallback(full_path: str = "") -> FileResponse:
-        """Serve the SPA index.html for all unmatched routes."""
+_FALLBACK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+_SAFE_METHODS = ("GET", "HEAD")
+
+
+def _wants_html(request: Request) -> bool:
+    """Return whether this looks like a browser navigation.
+
+    Browsers name ``text/html`` explicitly when navigating; API clients send
+    ``application/json`` or ``*/*``. The UI routes under the same top-level
+    prefixes as the APIs it mocks — ``/graph/users`` is a page,
+    ``/graph/v1.0/users`` is an endpoint — so the path alone cannot say which
+    of the two an unmatched request wanted. Only a safe method can be a
+    navigation, so a POST carrying a browser's Accept header is still an API
+    call and still wants the vendor's error.
+    """
+    return (
+        request.method in _SAFE_METHODS
+        and "text/html" in request.headers.get("accept", "")
+    )
+
+
+def _allowed_methods(request: Request) -> list[str]:
+    """Return the verbs a registered route accepts for this exact path.
+
+    Claiming every verb on the fallback hides Starlette's own
+    method-not-allowed handling, which would turn a wrong verb against a *real*
+    endpoint into a 404 — the same misdirection this fallback exists to remove,
+    pointed the other way. Routers report only that *some* method would have
+    matched, not which, so each verb is offered in turn and the ones that
+    resolve are the answer. Only unmatched requests reach here, so this never
+    runs on a served route.
+    """
+    allowed: list[str] = []
+    for method in _FALLBACK_METHODS:
+        scope = {**request.scope, "method": method}
+        for route in app.routes:
+            if getattr(route, "path", None) == "/{full_path:path}":
+                continue
+            try:
+                match, _ = route.matches(scope)
+            except Exception:  # noqa: BLE001, S112 - unmatchable route is not a match
+                continue
+            if match is Match.FULL:
+                allowed.append(method)
+                break
+
+    # RFC 9110 makes HEAD mandatory wherever GET is served, and requires Allow
+    # to list it. Starlette answers HEAD from the GET route without registering
+    # one, so probing never reports it.
+    if "GET" in allowed and "HEAD" not in allowed:
+        allowed.append("HEAD")
+    return allowed
+
+
+@app.api_route("/{full_path:path}", methods=_FALLBACK_METHODS, include_in_schema=False)
+def unmatched_route(request: Request, full_path: str = "") -> Response:
+    """Serve the SPA, or a vendor-shaped error for unmatched API routes.
+
+    Serving index.html for everything meant a mistyped endpoint answered
+    ``200 text/html`` — or ``405``, for anything but GET, because only GET
+    reached this route. A client written against the real vendor got neither
+    the status nor the body it parses, turning a typo into a puzzle. Every
+    mocked vendor answers an unknown path with ``404``.
+    """
+    path = "/" + full_path
+    vendor = vendor_mount_for_path(path)
+
+    # The path exists — the verb is what is wrong. That is a 405 for everyone,
+    # including the SPA's own routes, and it carries the Allow header RFC 7231
+    # requires so a client can correct itself.
+    allowed = _allowed_methods(request)
+    if allowed:
+        return JSONResponse(
+            status_code=405,
+            content=build_vendor_error(
+                vendor or "s1", 405, f"Method {request.method} not allowed",
+            ),
+            headers={"Allow": ", ".join(allowed)},
+        )
+
+    if _SPA_AVAILABLE and _wants_html(request):
         return FileResponse(_DIST / "index.html")
+
+    if vendor is not None:
+        return JSONResponse(
+            status_code=404,
+            content=build_vendor_error(
+                vendor, 404, f"Resource not found: {request.method} {path}",
+            ),
+        )
+
+    if _SPA_AVAILABLE and request.method in _SAFE_METHODS:
+        return FileResponse(_DIST / "index.html")
+
+    return JSONResponse(
+        status_code=404,
+        content=build_vendor_error("s1", 404, f"Resource not found: {path}"),
+    )
 
 
 def _cli() -> None:

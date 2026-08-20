@@ -43,7 +43,7 @@ def get_alert_rule(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Alert rule '{rule_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Alert rule '{rule_id}' not found"),
         )
     return result
 
@@ -80,7 +80,7 @@ def delete_alert_rule(
     if not rule_cmds.delete_rule(rule_id):
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Alert rule '{rule_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Alert rule '{rule_id}' not found"),
         )
     return {}
 

@@ -1,8 +1,11 @@
 """Cortex XDR Alert command handlers (mutations)."""
 from __future__ import annotations
 
+import time
 import uuid
+from dataclasses import asdict
 
+from domain.event_bus import XdrAlertCreated, event_bus
 from domain.xdr_alert import XdrAlert
 from repository.xdr_alert_repo import xdr_alert_repo
 from utils.xdr_response import build_xdr_reply
@@ -33,6 +36,13 @@ def insert_parsed_alerts(alerts: list[dict]) -> dict:
             event_type=alert_data.get("event_type", ""),
         )
         xdr_alert_repo.save(alert)
+        # Bridge the alert into Splunk and Sentinel (ADR-009). The bridge
+        # subscribed to this event and nothing ever published it.
+        event_bus.publish(XdrAlertCreated(
+            entity_id=alert.alert_id,
+            payload=asdict(alert),
+            timestamp=time.time(),
+        ))
 
     return build_xdr_reply(True)
 
@@ -59,6 +69,13 @@ def insert_cef_alerts(alerts: list[dict]) -> dict:
             host_name=alert_data.get("device_host_name", ""),
         )
         xdr_alert_repo.save(alert)
+        # Bridge the alert into Splunk and Sentinel (ADR-009). The bridge
+        # subscribed to this event and nothing ever published it.
+        event_bus.publish(XdrAlertCreated(
+            entity_id=alert.alert_id,
+            payload=asdict(alert),
+            timestamp=time.time(),
+        ))
 
     return build_xdr_reply(True)
 

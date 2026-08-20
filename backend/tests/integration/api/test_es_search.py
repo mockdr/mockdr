@@ -95,7 +95,7 @@ class TestEsSearch:
                 "query": {
                     "bool": {
                         "must": [
-                            {"match": {"signal_status": "open"}},
+                            {"match": {"signal.status": "open"}},
                         ],
                     },
                 },
@@ -103,9 +103,9 @@ class TestEsSearch:
         )
         assert resp.status_code == 200
         hits = resp.json()["hits"]["hits"]
-        # All returned hits should have signal_status == "open"
+        assert hits, "the filter matched nothing, so this asserted nothing"
         for hit in hits:
-            assert hit["_source"]["signal_status"] == "open"
+            assert hit["_source"]["signal"]["status"] == "open"
 
     def test_search_with_term_query(self, client: TestClient) -> None:
         """Term query should perform exact match filtering."""
@@ -114,13 +114,15 @@ class TestEsSearch:
             headers=ES_AUTH,
             json={
                 "query": {
-                    "term": {"signal_status": "closed"},
+                    "term": {"signal.status": "closed"},
                 },
             },
         )
         assert resp.status_code == 200
-        for hit in resp.json()["hits"]["hits"]:
-            assert hit["_source"]["signal_status"] == "closed"
+        hits = resp.json()["hits"]["hits"]
+        assert hits, "the filter matched nothing, so this asserted nothing"
+        for hit in hits:
+            assert hit["_source"]["signal"]["status"] == "closed"
 
     def test_search_with_size_param(self, client: TestClient) -> None:
         """The 'size' parameter should limit the number of returned hits."""
@@ -151,10 +153,66 @@ class TestEsSearch:
         ids2 = {h["_id"] for h in page2}
         assert ids1.isdisjoint(ids2), "Paginated pages should not overlap"
 
-    def test_search_unknown_index_returns_empty(self, client: TestClient) -> None:
-        """Searching a non-existent index should return zero hits."""
+    def test_search_unknown_index_returns_404(self, client: TestClient) -> None:
+        """A missing concrete index is 404 index_not_found_exception.
+
+        Returning zero hits would say the index exists and is empty, which is
+        a different fact and one the caller cannot act on.
+        """
         resp = client.post(
             "/elastic/totally-unknown-index/_search",
+            headers=ES_AUTH,
+            json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["status"] == 404
+        assert body["error"]["type"] == "index_not_found_exception"
+        assert body["error"]["reason"] == "no such index [totally-unknown-index]"
+        assert body["error"]["index"] == "totally-unknown-index"
+
+    def test_search_unknown_index_ignore_unavailable(self, client: TestClient) -> None:
+        """``ignore_unavailable=true`` skips the missing target instead."""
+        resp = client.post(
+            "/elastic/totally-unknown-index/_search?ignore_unavailable=true",
+            headers=ES_AUTH,
+            json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["hits"]["total"]["value"] == 0
+
+    def test_search_all_alias_is_not_a_missing_index(self, client: TestClient) -> None:
+        """``_all`` is Elasticsearch's every-index alias, not a concrete name."""
+        resp = client.post(
+            "/elastic/_all/_search", headers=ES_AUTH, json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["hits"]["total"]["value"] > 0
+
+    def test_search_comma_list_of_known_indices(self, client: TestClient) -> None:
+        """A comma-separated target list resolves each name independently."""
+        resp = client.post(
+            "/elastic/.siem-signals-default,logs-endpoint/_search",
+            headers=ES_AUTH,
+            json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["hits"]["total"]["value"] > 0
+
+    def test_search_comma_list_rejects_the_missing_member(self, client: TestClient) -> None:
+        """One bad concrete name fails the request and is named in the error."""
+        resp = client.post(
+            "/elastic/.siem-signals-default,not-an-index/_search",
+            headers=ES_AUTH,
+            json={"query": {"match_all": {}}},
+        )
+        assert resp.status_code == 404
+        assert resp.json()["error"]["index"] == "not-an-index"
+
+    def test_search_wildcard_matching_nothing_is_ok(self, client: TestClient) -> None:
+        """``allow_no_indices`` defaults true, so a dead wildcard is not 404."""
+        resp = client.post(
+            "/elastic/nothing-matches-this-*/_search",
             headers=ES_AUTH,
             json={"query": {"match_all": {}}},
         )
@@ -204,15 +262,17 @@ class TestEsMapping:
         assert "agent.id" in props
         assert "host.hostname" in props
 
-    def test_unknown_index_mapping_returns_empty_properties(self, client: TestClient) -> None:
-        """Unknown index should return an empty properties map."""
+    def test_unknown_index_mapping_returns_404(self, client: TestClient) -> None:
+        """_mapping refuses a missing index like _search and _stats do.
+
+        An empty properties map said the index existed and had no fields.
+        """
         resp = client.get(
             "/elastic/unknown-index/_mapping",
             headers=ES_AUTH,
         )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["unknown-index"]["mappings"]["properties"] == {}
+        assert resp.status_code == 404
+        assert resp.json()["error"]["type"] == "index_not_found_exception"
 
 
 class TestEsStats:
@@ -249,17 +309,16 @@ class TestEsGetDoc:
     def test_get_existing_document(self, client: TestClient) -> None:
         """Getting a document by ID that exists should return found=True.
 
-        The ``es_get_doc`` handler matches against the ``id`` field inside
-        each record (the domain entity key), not the random Elasticsearch
-        ``_id`` generated by ``wrap_as_hits``.
+        ``_id`` identifies the document rather than being regenerated per
+        response, so search → get round-trips the way it does in a real
+        cluster.
         """
-        # First get an alert's domain ID via search _source
         search_resp = client.post(
             "/elastic/.siem-signals-default/_search",
             headers=ES_AUTH,
             json={"size": 1},
         )
-        entity_id = search_resp.json()["hits"]["hits"][0]["_source"]["id"]
+        entity_id = search_resp.json()["hits"]["hits"][0]["_id"]
 
         resp = client.get(
             f"/elastic/.siem-signals-default/_doc/{entity_id}",
@@ -273,12 +332,20 @@ class TestEsGetDoc:
         assert "_source" in body
 
     def test_get_nonexistent_document(self, client: TestClient) -> None:
-        """Getting a non-existent document should return found=False."""
+        """A document miss is 404 with ``found: false``, not 200.
+
+        Elasticsearch's API reference documents only the 200 for this route,
+        which is why the status is commonly mocked wrong; its own REST spec
+        test asserts the 404.
+        """
         resp = client.get(
             "/elastic/.siem-signals-default/_doc/does-not-exist",
             headers=ES_AUTH,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         body = resp.json()
         assert body["found"] is False
+        assert body["_id"] == "does-not-exist"
+        # Not the error envelope — a get miss keeps the document shape.
+        assert "error" not in body
         assert body["_id"] == "does-not-exist"

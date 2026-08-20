@@ -12,10 +12,14 @@ router = APIRouter(tags=["Users"])
 @router.get("/users")
 def list_users(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     roles: str = Query(None),
     email: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of management console users."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

@@ -1,6 +1,5 @@
 """Agents seeder — seeds the configured number of endpoint agents."""
 import random
-import uuid
 
 from faker import Faker
 
@@ -21,7 +20,7 @@ from repository.agent_repo import agent_repo
 from repository.group_repo import group_repo
 from repository.site_repo import site_repo
 from repository.tag_repo import tag_repo
-from utils.id_gen import new_id
+from utils.id_gen import new_id, new_uuid
 
 
 def seed_agents(
@@ -180,10 +179,10 @@ def seed_agents(
 
         agent_repo.save(Agent(
             id=aid,
-            uuid=str(uuid.uuid4()),
+            uuid=str(new_uuid()),
             computerName=hostname,
             externalId="",
-            serialNumber=str(uuid.uuid4()).upper(),
+            serialNumber=str(new_uuid()).upper(),
             accountId=account_id,
             accountName=account_name,
             siteId=sid,
@@ -268,7 +267,14 @@ def seed_agents(
             inRemoteShellSession=False,
             remoteProfilingState="disabled",
             remoteProfilingStateExpiration=None,
-            proxyStates={"console": False, "deepVisibility": False},
+            proxyStates={
+                "console": False,
+                "consoleProxyAddress": "",
+                "deepVisibility": False,
+                "deepVisibilityProxyAddress": "",
+                "pacFileUsage": False,
+                "proxyMethod": "",
+            },
             cloudProviders={},
             hasContainerizedWorkload=(
                 os_type == "linux" and random.random() > 0.5

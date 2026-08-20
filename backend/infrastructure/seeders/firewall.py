@@ -4,7 +4,7 @@ import random
 from faker import Faker
 
 from domain.firewall_rule import FirewallRule
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from repository.firewall_repo import firewall_repo
 from utils.id_gen import new_id
 
@@ -39,8 +39,8 @@ def seed_firewall_rules(
             protocol=random.choice(["TCP", "UDP", "ICMP", None]),
             osType=fw_os,
             osTypes=[fw_os],
-            createdAt=rand_ago(90),
-            updatedAt=rand_ago(30),
+            createdAt=(created := rand_ago(90)),
+            updatedAt=rand_after(created),
             order=i + 1,
             ruleCategory="firewall",
             scope="site",

@@ -6,6 +6,137 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-08-20
+
+Eight audits of every mocked platform against first-party sources — vendor
+docs, published OpenAPI/Swagger, and in most cases the vendor's own SDK and
+server source — produced roughly 200 findings. This release closes the
+substantial majority.
+
+Almost none were crashes. They were `200`s carrying the wrong thing, which is
+the failure mode a mock exists to expose rather than manufacture: a client
+cannot tell it is being lied to, so the bug surfaces later, against production.
+
+**Read the Changed section before upgrading.** Several responses now use the
+field names the real vendors use. A client written against mockdr's previous
+output will need updating; a client written against the real API will start
+working.
+
+### Security
+
+- **`GET /users/{id}/api-token-details` no longer returns the token itself.**
+  Any authenticated caller could read the administrator's credential and act
+  as them. S1's own `ApiTokenDetailSchema` declares exactly `createdAt` and
+  `expiresAt`.
+- **Graph write routes enforce the writer role.** `require_graph_write` existed
+  and was correct but was attached to nothing, so the documented "reader is
+  read-only" was never implemented — a reader could send mail and post to
+  Teams.
+- **Tenant scoping applies on every list endpoint.** The middleware appended
+  `accountIds=<caller's account>` and each endpoint declared a matching filter,
+  but six of seven routes never declared the parameter, so it was dropped
+  before the handler saw it and a confined caller was served the whole store.
+- **A role change takes effect immediately.** Authorisation reads the role from
+  the token record, which was written once at token creation and never
+  revisited, so a demoted user kept every privilege of their old role.
+- **A quadratic regular expression in the Graph `$filter` lambda parser is
+  bounded.** A 32 KB filter took 2.8 s to reject; it now takes 0.6 ms.
+- Agent actions are scoped to their filter. A body scoped by `groupIds` matched
+  nothing and fell through to *every* agent, reporting success.
+
+### Changed
+
+- **Elastic Security alert documents are ECS.** `host.name`, `@timestamp`,
+  `process.pid`, `file.hash.sha256`, with rule metadata under
+  `kibana.alert.rule.*` or `signal.rule.*` by index. The previous flat
+  snake_case names exist in no cluster, so a query written against a real one
+  matched nothing — and the two index families returned byte-identical
+  documents despite different schemas.
+- **Defender resources are addressed by `id`.** `machineId`, `alertId`,
+  `actionId`, `investigationId` and `indicatorId` were the primary keys where
+  every real resource uses `id`. Foreign keys are unchanged: an alert still
+  carries `machineId`.
+- **Kibana list envelopes differ per API, as they do in Kibana.**
+  `rules/_find` returns `perPage` (the *request* parameter remains `per_page`),
+  `cases/_find` names its collection `cases` and carries per-status counts,
+  case objects declare `totalComment`/`totalAlerts`, and `endpoint/metadata`
+  returns `pageSize` with entries wrapped in `metadata`/`host_status`/
+  `policy_info`.
+- **Splunk renders values as splunkd does.** Search results are strings — or
+  lists of strings — and job status fields are `"1"`/`"0"`. `splunklib`'s
+  `Job.is_done()` compares `content["isDone"] == "1"`, so the SDK's documented
+  polling loop previously never terminated.
+- **Case updates go through `PATCH /api/cases`** with `{"cases": [{id,
+  version, …}]}`, the endpoint Kibana actually exposes. `PATCH
+  /api/cases/{id}`, which exists in no Kibana, is gone. `version` is required
+  and a stale one is a `409`.
+- `GET /agents/count` returns `data.total`, as S1's `AgentsCountSchema_200`
+  declares, rather than `data.count`.
+- Cortex XDR reports scripts as `script_uid`; CrowdStrike alert updates read
+  `action_parameters`.
+- Creating a Splunk index or saved search returns `201`, and a duplicate name
+  is `409` instead of silently overwriting.
+- Seed data is reproducible. Ids came from `secrets.randbelow` and `uuid4()`,
+  neither of which can be seeded, so every id changed on each restart despite
+  the seeder documenting determinism.
+
+### Added
+
+- **A working SPL pipeline.** Commands run in the order written, with one
+  expression grammar behind `search`/`where`/`eval` supporting AND/OR/NOT,
+  parentheses, real comparison operators and wildcards, plus `stats`, `dedup`,
+  `top`, `rare`, `fields`, `timechart`, `rex`, `regex`, `fillnull` and `sort`.
+  Unrecognised commands are reported in the job's `messages`.
+- **Advanced Hunting evaluates KQL** over five tables projected from the same
+  seeded data the REST endpoints serve, so a hunting result cannot contradict
+  `/api/machines`.
+- **Elasticsearch aggregations** — terms, date_histogram, histogram, range,
+  filter, filters, cardinality, value_count, min/max/sum/avg/stats and
+  top_hits, with sub-aggregations — plus `_count`, `_mget`, `_cat/indices`,
+  `_cat/health`, `_cluster/health`, `_security/_authenticate`, `GET _search`,
+  and `PUT`/`DELETE` on `_doc`.
+- **The Splunk job API is served under both v1 and v2**, and
+  `/servicesNS/{owner}/{app}/` reaches every endpoint — `splunklib` rewrites
+  every path to that form as soon as a namespace is set.
+- KV Store `query`, `fields`, `sort`, `limit` and `skip`; S1 `sortBy`,
+  `sortOrder` and `skip`; Kibana `cases/_find` `severity`, `search`,
+  `reporters`, `sortField` and `sortOrder`. All were documented and all were
+  dropped before the handler ran.
+
+### Fixed
+
+- **A snapshot written by a different schema version no longer destroys the
+  store.** Affected records were silently dropped and the next mutation
+  overwrote the good file; 60 agents became 0, unrecoverably. Lossy snapshots
+  are quarantined instead. A snapshot whose top level was not a JSON object
+  crashed startup outright.
+- Six composite-keyed Graph collections restored under bare ids, so
+  `GET /users/{id}/messages/{id}` returned `404` after a restart while row
+  counts looked unchanged. Collected-file bytes were mangled by the JSON
+  encoder and skipped on import. Nine collections — OAuth tokens, Splunk
+  sessions, in-flight search jobs — were registered nowhere and vanished on
+  restart, leaving clients holding credentials the server had never issued.
+- Elasticsearch `_id` was a fresh UUID per response, so search → get-by-id
+  could never round-trip, and `POST _doc` acknowledged a write it never
+  performed.
+- A keyset cursor on a non-unique column never advanced, so paging the
+  firewall rules looped forever on the same page.
+- `$filter` and `$orderby` on Sentinel read the whole expression: only the
+  first clause was matched, so `and`/`or` were ignored, and `properties/x`
+  ordering silently did nothing.
+- Twelve request bodies and query shapes that returned a plain-text `500` —
+  indistinguishable from the service falling over — now answer their vendor's
+  `400`. Probing every route with hostile input finds no `5xx` at all.
+- Seeded records reference data that exists: STAR rules, CrowdStrike
+  `detect_ids`, `exposedMachines` against `machineReferences`, managed-device
+  users, Graph licence seat counts, and 34 records whose "updated" timestamp
+  preceded their own creation.
+- The EDR→SIEM bridge subscribed to ten event types and three were published;
+  agent activity, Defender machine changes and XDR alert inserts now reach the
+  SIEMs.
+- Four call sites iterated the store's live dictionaries outside its lock, so a
+  read racing a concurrent write raised `RuntimeError`.
+
 ## [2.0.0] - 2026-08-14
 
 First tagged release since the project was opened up; `v1.0.4` pointed at the

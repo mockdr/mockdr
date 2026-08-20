@@ -8,6 +8,13 @@ from repository.mde_machine_action_repo import mde_machine_action_repo
 from utils.dt import utc_now
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.mde_response import build_mde_list_response
+from utils.mde_serde import to_mde_resource
+
+
+def _resource(record: dict) -> dict:
+    """Render a stored record as the API resource, keyed by ``id``."""
+    return to_mde_resource(record, "actionId")
+
 
 
 def _auto_promote(action_dict: dict) -> dict:
@@ -64,7 +71,7 @@ def list_machine_actions(
     Returns:
         OData list response with paginated machine action records.
     """
-    records = [_auto_promote(asdict(a)) for a in mde_machine_action_repo.list_all()]
+    records = [_resource(_auto_promote(asdict(a))) for a in mde_machine_action_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -91,7 +98,7 @@ def get_machine_action(action_id: str) -> dict | None:
     action = mde_machine_action_repo.get(action_id)
     if not action:
         return None
-    return _auto_promote(asdict(action))
+    return _resource(_auto_promote(asdict(action)))
 
 
 def get_package_uri(action_id: str) -> dict | None:

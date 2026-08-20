@@ -255,7 +255,10 @@ Each vendor uses a different authentication mechanism. Tests must cover all erro
 ##### SentinelOne — ApiToken header
 
 - Header format: `Authorization: ApiToken <token>`
-- **Missing header** must return `401` with `{"errors": [...], "data": null}`.
+- **Missing header** must return `401` with `{"errors": [...]}` and **no** `data`
+  key — the schemas backing every error status in SentinelOne's own Swagger are
+  named `_NoDataSchema_<status>` and declare `errors` alone. The `title` is S1's
+  own wording (`Authentication Failed`), not the HTTP reason phrase.
 - **Wrong scheme** (e.g. `Bearer token`) must return `401`.
 - **Invalid token** (valid format, not in store) must return `401`.
 - **Valid admin token** must pass all guarded endpoints.

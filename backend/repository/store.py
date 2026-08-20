@@ -56,6 +56,10 @@ class InMemoryStore:
             "es_endpoints": {},
             "es_rules": {},
             "es_alerts": {},
+            # Documents written through the Elasticsearch index API, keyed
+            # "{index}:{id}". POST _doc used to acknowledge a write it never
+            # performed, so the document was absent on the very next read.
+            "es_documents": {},
             "es_cases": {},
             "es_case_comments": {},
             "es_exception_lists": {},
@@ -168,7 +172,10 @@ class InMemoryStore:
             # Service Health
             "graph_service_health": {},
             # ── Cross-EDR identity mapping ───────────────────────────────────
-            "edr_id_map": {},  # keyed by s1_agent_id → {cs_device_id, mde_machine_id}
+            # Keyed by s1_agent_id → {cs_device_id, mde_machine_id, ...};
+            # the Graph user seeder also adds entries keyed by Graph user id,
+            # so a lookup here may be either.
+            "edr_id_map": {},
         }
         # newest-first ordered IDs
         self._activity_order: collections.deque[str] = collections.deque(maxlen=10000)

@@ -5,6 +5,7 @@ import zipfile
 from dataclasses import asdict
 from typing import cast
 
+from application.agents.queries import FILTER_SPECS as AGENT_FILTER_SPECS
 from application.webhooks import commands as webhook_commands
 from domain.webhook import AGENT_OFFLINE
 from repository.activity_repo import activity_repo
@@ -14,16 +15,55 @@ from repository.site_repo import site_repo
 from repository.store import store
 from repository.tag_repo import tag_repo
 from utils.dt import utc_now
+from utils.filtering import apply_filters
+
+
+class UnscopedActionError(ValueError):
+    """Raised when an agent action carries no filter that selects anything.
+
+    SentinelOne requires one of ``ids``, ``groupIds`` or ``filterId`` on every
+    ``/agents/actions/*`` body. Treating an absent filter as "everything" turned
+    a scoped request into a fleet-wide one, so an unscoped call is refused.
+    """
 
 
 def _resolve_ids(body: dict) -> list[str]:
-    """Extract agent IDs from body: supports {filter: {ids: [...]}} or {ids: [...]}."""
-    if body.get("filter") and body["filter"].get("ids"):
-        return cast(list[str], body["filter"]["ids"])
+    """Resolve an action body's filter to the agent IDs it selects.
+
+    The whole documented filter is honoured, not just ``ids``: a body scoped by
+    ``groupIds`` or ``osTypes`` previously matched nothing here and fell through
+    to *every* agent, so an action aimed at one group ran against the fleet and
+    reported success.
+
+    Args:
+        body: Request body carrying ``filter`` (or a bare ``ids`` list).
+
+    Returns:
+        IDs of the agents the filter selects.
+
+    Raises:
+        UnscopedActionError: If the body names no filter at all.
+    """
     if body.get("ids"):
         return cast(list[str], body["ids"])
-    # If no IDs specified, apply to all non-decommissioned agents
-    return [a.id for a in agent_repo.list_all() if not a.isDecommissioned]
+
+    raw_filter = body.get("filter") or {}
+    if not raw_filter:
+        msg = (
+            "A filter is required. Supply at least one of: "
+            "ids, groupIds, siteIds, accountIds."
+        )
+        raise UnscopedActionError(msg)
+
+    if raw_filter.get("ids"):
+        return cast(list[str], raw_filter["ids"])
+
+    # Everything else goes through the same filter engine the list endpoint
+    # uses, so an action selects exactly what a GET with those params returns.
+    params = {k: v for k, v in raw_filter.items() if v is not None}
+    records = [asdict(a) for a in agent_repo.list_all()]
+    matched = apply_filters(records, params, AGENT_FILTER_SPECS)
+    return [str(r["id"]) for r in matched]
 
 
 _KNOWN_ACTIONS = frozenset({

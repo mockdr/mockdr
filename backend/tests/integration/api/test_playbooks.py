@@ -135,7 +135,7 @@ class TestRunPlaybook:
             json={},
         )
         assert resp.status_code == 400
-        assert resp.json()["errors"][0]["title"] == "Bad Request"
+        assert resp.json()["errors"][0]["title"] == "Validation Error"
 
     def test_run_returns_200_with_valid_agent(
         self, client: TestClient, auth_headers: dict

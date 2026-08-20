@@ -11,7 +11,7 @@ router = APIRouter(tags=["Graph Enrollment"])
 
 @router.get("/beta/deviceManagement/windowsUpdateForBusinessConfigurations")
 async def list_update_rings(
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
@@ -21,7 +21,7 @@ async def list_update_rings(
 
 @router.get("/v1.0/deviceManagement/deviceEnrollmentConfigurations")
 async def list_enrollment_restrictions(
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
@@ -31,7 +31,7 @@ async def list_enrollment_restrictions(
 
 @router.get("/v1.0/deviceManagement/deviceCategories")
 async def list_device_categories(
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:

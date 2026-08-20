@@ -16,6 +16,7 @@ from utils.pagination import (
     build_single_response,
     paginate,
 )
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Exclusions & Blocklist"])
 
@@ -37,8 +38,11 @@ def list_exclusions(
     value__contains: str = Query(None),
     includeChildren: bool = Query(None),
     includeParents: bool = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of threat exclusions.
 
@@ -59,7 +63,13 @@ def create_exclusion(body: dict, current_user: dict = Depends(require_admin)) ->
 
     Accepts both flat and wrapped (``{"data": {...}}``) payloads per real S1 API.
     """
-    return exclusion_commands.create_exclusion(body, current_user.get("userId"))
+    try:
+        return exclusion_commands.create_exclusion(body, current_user.get("userId"))
+    except exclusion_commands.InvalidExclusionError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
 
 
 @router.put("/exclusions/{exclusion_id}")
@@ -92,7 +102,7 @@ def list_blocklist(
     siteIds: str = Query(None),
     types: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of hash blocklist entries."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

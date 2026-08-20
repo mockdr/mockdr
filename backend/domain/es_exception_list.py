@@ -33,3 +33,9 @@ class EsExceptionList:
 
     # ── Versioning ────────────────────────────────────────────────────────────
     version: int = 1
+    # Members every real exception list carries; without them a client
+    # reading _version for optimistic concurrency found nothing.
+    _version: str = "WzAsMV0="
+    tie_breaker_id: str = ""
+    immutable: bool = False
+    meta: dict | None = None

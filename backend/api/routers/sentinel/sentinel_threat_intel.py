@@ -93,7 +93,7 @@ def get_indicator(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Indicator '{name}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Indicator '{name}' not found"),
         )
     return result
 
@@ -128,7 +128,7 @@ def delete_indicator(
     if not ti_cmds.delete_indicator(name):
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Indicator '{name}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Indicator '{name}' not found"),
         )
     return {}
 

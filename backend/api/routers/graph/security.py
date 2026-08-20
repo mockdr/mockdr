@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 
-from api.graph_auth import require_graph_feature
+from api.graph_auth import require_graph_feature, require_graph_write
 from application.graph.security import queries as sec_queries
 from utils.graph_response import build_graph_error_response
 
@@ -15,7 +15,7 @@ router = APIRouter(tags=["Graph Security"])
 @router.get("/v1.0/security/alerts_v2")
 async def list_alerts_v2(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
@@ -46,7 +46,7 @@ async def get_alert_v2(
     return result
 
 
-@router.patch("/v1.0/security/alerts_v2/{alert_id}")
+@router.patch("/v1.0/security/alerts_v2/{alert_id}", dependencies=[Depends(require_graph_write)])
 async def update_alert_v2(
     alert_id: str,
     body: dict = Body(...),
@@ -70,7 +70,7 @@ async def update_alert_v2(
 @router.get("/v1.0/security/incidents")
 async def list_incidents(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
@@ -105,7 +105,7 @@ async def get_incident(
 
 # ── Advanced Hunting ──────────────────────────────────────────────────────────
 
-@router.post("/v1.0/security/runHuntingQuery")
+@router.post("/v1.0/security/runHuntingQuery", dependencies=[Depends(require_graph_write)])
 async def run_hunting_query(
     body: dict = Body(...),
     _: dict = Depends(require_graph_feature("security/runHuntingQuery")),
@@ -118,7 +118,7 @@ async def run_hunting_query(
 
 @router.get("/v1.0/security/secureScores")
 async def list_secure_scores(
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("security/secureScores")),
 ) -> dict:
@@ -131,7 +131,7 @@ async def list_secure_scores(
 @router.get("/v1.0/security/tiIndicators")
 async def list_ti_indicators(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("security/tiIndicators")),
 ) -> dict:
@@ -141,7 +141,7 @@ async def list_ti_indicators(
     )
 
 
-@router.post("/v1.0/security/tiIndicators")
+@router.post("/v1.0/security/tiIndicators", dependencies=[Depends(require_graph_write)])
 async def create_ti_indicator(
     body: dict = Body(...),
     _: dict = Depends(require_graph_feature("security/tiIndicators")),
@@ -150,7 +150,10 @@ async def create_ti_indicator(
     return sec_queries.create_ti_indicator(body=body)
 
 
-@router.delete("/v1.0/security/tiIndicators/{indicator_id}")
+@router.delete(
+    "/v1.0/security/tiIndicators/{indicator_id}",
+    dependencies=[Depends(require_graph_write)],
+)
 async def delete_ti_indicator(
     indicator_id: str,
     _: dict = Depends(require_graph_feature("security/tiIndicators")),

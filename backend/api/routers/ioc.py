@@ -15,8 +15,11 @@ def list_iocs(
     types: str = Query(None),
     sources: str = Query(None),
     value: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of IOC indicators."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

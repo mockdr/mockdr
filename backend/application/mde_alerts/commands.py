@@ -9,6 +9,7 @@ from domain.event_bus import MdeAlertCreated, event_bus
 from domain.mde_alert import MdeAlert
 from repository.mde_alert_repo import mde_alert_repo
 from utils.dt import utc_now
+from utils.mde_serde import to_mde_resource
 
 
 def update_alert(alert_id: str, body: dict) -> dict | None:
@@ -49,7 +50,7 @@ def update_alert(alert_id: str, body: dict) -> dict | None:
         alert.resolvedTime = now
 
     mde_alert_repo.save(alert)
-    return asdict(alert)
+    return to_mde_resource(asdict(alert), "alertId")
 
 
 def create_alert_by_reference(body: dict) -> dict:
@@ -85,7 +86,7 @@ def create_alert_by_reference(body: dict) -> dict:
     mde_alert_repo.save(alert)
 
     # Bridge the alert into Splunk and Sentinel (ADR-009).
-    payload = asdict(alert)
+    payload = to_mde_resource(asdict(alert), "alertId")
     event_bus.publish(MdeAlertCreated(
         entity_id=alert.alertId,
         payload=payload,

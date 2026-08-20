@@ -8,6 +8,23 @@ from repository.xdr_script_repo import xdr_script_repo
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 
+def _script_to_api(record: dict) -> dict:
+    """Rename the stored ``script_id`` to the ``script_uid`` XDR reports.
+
+    The scripts API identifies a script by ``script_uid`` everywhere — in the
+    listing, in ``get_script_metadata`` and in ``run_script`` — so a client
+    reading ``script_uid`` off this response found nothing and had no id to
+    run.
+    """
+    if "script_id" not in record:
+        return record
+    return {
+        ("script_uid" if key == "script_id" else key): value
+        for key, value in record.items()
+    }
+
+
+
 def get_scripts(request_data: dict) -> dict:
     """List scripts with optional filtering and pagination.
 
@@ -17,7 +34,7 @@ def get_scripts(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching scripts.
     """
-    all_scripts = [asdict(s) for s in xdr_script_repo.list_all()]
+    all_scripts = [_script_to_api(asdict(s)) for s in xdr_script_repo.list_all()]
 
     script_type = request_data.get("script_type")
     if script_type:
@@ -44,7 +61,7 @@ def get_script_metadata(script_id: str) -> dict | None:
     script = xdr_script_repo.get(script_id)
     if not script:
         return None
-    return build_xdr_reply(asdict(script))
+    return build_xdr_reply(_script_to_api(asdict(script)))
 
 
 def get_execution_status(action_id: str) -> dict | None:

@@ -13,7 +13,7 @@ router = APIRouter(tags=["Graph Identity Protection"])
 @router.get("/v1.0/identityProtection/riskyUsers")
 async def list_risky_users(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("identityProtection")),
 ) -> dict:
@@ -34,7 +34,7 @@ async def get_risky_user(
         raise HTTPException(
             status_code=404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Resource '{user_id}' does not exist or cannot be found.",
             ),
         )
@@ -44,7 +44,7 @@ async def get_risky_user(
 @router.get("/v1.0/identityProtection/riskDetections")
 async def list_risk_detections(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_feature("identityProtection")),
 ) -> dict:

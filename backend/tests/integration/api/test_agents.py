@@ -81,11 +81,15 @@ class TestAgentCount:
     def test_returns_count_dict(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.get("/web/api/v2.1/agents/count", headers=auth_headers)
         assert resp.status_code == 200
-        assert "count" in resp.json()["data"]
-        assert isinstance(resp.json()["data"]["count"], int)
+        # S1's own AgentsCountSchema_200 declares `total`, not `count`.
+        assert "total" in resp.json()["data"]
+        assert isinstance(resp.json()["data"]["total"], int)
+        assert "count" not in resp.json()["data"]
 
     def test_count_matches_list_total(self, client: TestClient, auth_headers: dict) -> None:
         total = client.get("/web/api/v2.1/agents", headers=auth_headers,
                            params={"limit": 1}).json()["pagination"]["totalItems"]
-        count = client.get("/web/api/v2.1/agents/count", headers=auth_headers).json()["data"]["count"]
+        count = client.get(
+            "/web/api/v2.1/agents/count", headers=auth_headers,
+        ).json()["data"]["total"]
         assert count == total

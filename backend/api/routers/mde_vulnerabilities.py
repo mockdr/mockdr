@@ -17,7 +17,7 @@ router = APIRouter(tags=["MDE Vulnerabilities"])
 @router.get("/api/vulnerabilities")
 def list_vulnerabilities(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(50, alias="$top", le=1000),
+    top: int = Query(50, alias="$top", ge=1, le=1000),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
@@ -37,7 +37,10 @@ def get_vulnerability(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Vulnerability {vuln_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Vulnerability {vuln_id} not found",
+            ),
         )
     return result
 
@@ -52,6 +55,9 @@ def get_vulnerability_machine_references(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_mde_error_response("NotFound", f"Vulnerability {vuln_id} not found"),
+            detail=build_mde_error_response(
+                "ResourceNotFound",
+                f"Vulnerability {vuln_id} not found",
+            ),
         )
     return result

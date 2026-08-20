@@ -19,7 +19,7 @@ def _mde_auth(client: TestClient) -> dict[str, str]:
 def _get_first_machine_id(client: TestClient, headers: dict) -> str:
     """Return the first machine ID from the listing."""
     resp = client.get("/mde/api/machines", headers=headers, params={"$top": 1})
-    return resp.json()["value"][0]["machineId"]
+    return resp.json()["value"][0]["id"]
 
 
 class TestListMachines:
@@ -44,7 +44,7 @@ class TestListMachines:
         resp = client.get("/mde/api/machines", headers=headers, params={"$top": 1})
         machine = resp.json()["value"][0]
         required_fields = [
-            "machineId", "computerDnsName", "osPlatform", "healthStatus",
+            "id", "computerDnsName", "osPlatform", "healthStatus",
             "riskScore", "exposureLevel", "lastSeen", "firstSeen",
             "machineTags", "lastIpAddress", "agentVersion",
         ]
@@ -62,8 +62,8 @@ class TestListMachines:
         headers = _mde_auth(client)
         r1 = client.get("/mde/api/machines", headers=headers, params={"$top": 5, "$skip": 0})
         r2 = client.get("/mde/api/machines", headers=headers, params={"$top": 5, "$skip": 5})
-        ids1 = {m["machineId"] for m in r1.json()["value"]}
-        ids2 = {m["machineId"] for m in r2.json()["value"]}
+        ids1 = {m["id"] for m in r1.json()["value"]}
+        ids2 = {m["id"] for m in r2.json()["value"]}
         assert ids1.isdisjoint(ids2), "Paginated pages should not overlap"
 
     def test_filter_health_status(self, client: TestClient) -> None:
@@ -179,11 +179,11 @@ class TestListMachines:
         resp = client.get(
             "/mde/api/machines",
             headers=headers,
-            params={"$select": "machineId,computerDnsName", "$top": 3},
+            params={"$select": "id,computerDnsName", "$top": 3},
         )
         assert resp.status_code == 200
         for machine in resp.json()["value"]:
-            assert "machineId" in machine
+            assert "id" in machine
             assert "computerDnsName" in machine
             # Other fields should be absent
             assert "healthStatus" not in machine
@@ -197,7 +197,7 @@ class TestGetMachine:
         machine_id = _get_first_machine_id(client, headers)
         resp = client.get(f"/mde/api/machines/{machine_id}", headers=headers)
         assert resp.status_code == 200
-        assert resp.json()["machineId"] == machine_id
+        assert resp.json()["id"] == machine_id
 
     def test_nonexistent_machine_returns_404(self, client: TestClient) -> None:
         headers = _mde_auth(client)
@@ -268,7 +268,7 @@ class TestMachineActions:
         body = resp.json()
         assert body["type"] == "Isolate"
         assert body["machineId"] == machine_id
-        assert "actionId" in body
+        assert "id" in body
 
     def test_unisolate_machine(self, client: TestClient) -> None:
         headers = _mde_auth(client)

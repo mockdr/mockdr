@@ -39,6 +39,10 @@ class CsDetection:
     assigned_to_name: str = ""
     assigned_to_uid: str = ""
 
+    # Real alerts carry tags, and PATCH /alerts/v3 has add_tag / remove_tag
+    # actions; without the field those actions had nowhere to land.
+    tags: list[str] = field(default_factory=list)
+
     # ── Triage metrics ────────────────────────────────────────────────────────
     seconds_to_triaged: int = 0
     seconds_to_resolved: int = 0

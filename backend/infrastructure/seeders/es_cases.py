@@ -7,7 +7,7 @@ from faker import Faker
 
 from domain.es_case import EsCase
 from domain.es_case_comment import EsCaseComment
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.es_shared import ES_CASE_TAGS, es_uuid
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
@@ -61,7 +61,8 @@ def seed_es_cases(fake: Faker, alert_ids: list[str]) -> None:
 
     Args:
         fake:      Shared Faker instance (seeded externally).
-        alert_ids: List of alert ID strings (used for total_alerts count).
+        alert_ids: Alert IDs to attach cases to; ``total_alerts`` counts the
+                   alerts a case actually references.
     """
     for i, title in enumerate(_CASE_TITLES):
         case_id = es_uuid()
@@ -69,7 +70,13 @@ def seed_es_cases(fake: Faker, alert_ids: list[str]) -> None:
         severity = random.choice(_SEVERITY_LEVELS)
         tags = random.sample(ES_CASE_TAGS, random.randint(1, 3))
         created_at = rand_ago(random.randint(7, 60))
-        num_alerts = random.randint(1, 5)
+        # Attach real alerts rather than inventing a count: the parameter was
+        # passed in and discarded, so total_alerts described nothing.
+        pool = alert_ids or []
+        case_alert_ids = (
+            random.sample(pool, min(len(pool), random.randint(1, 5))) if pool else []
+        )
+        num_alerts = len(case_alert_ids)
         num_comments = random.randint(2, 5)
 
         closed_at = None
@@ -89,13 +96,14 @@ def seed_es_cases(fake: Faker, alert_ids: list[str]) -> None:
             assignees=[{"uid": "elastic-admin-uid"}],
             created_at=created_at,
             created_by=_MOCK_USER,
-            updated_at=rand_ago(random.randint(0, 6)),
+            updated_at=rand_after(created_at),
             updated_by=_MOCK_USER,
             closed_at=closed_at,
             closed_by=closed_by,
             version=f"Wz{i + 1}sMV0=",
             total_comment=num_comments,
             total_alerts=num_alerts,
+            alert_ids=case_alert_ids,
         ))
 
         # Generate comments
@@ -110,9 +118,9 @@ def seed_es_cases(fake: Faker, alert_ids: list[str]) -> None:
                 case_id=case_id,
                 comment=comment_text,
                 type="user",
-                created_at=rand_ago(random.randint(0, 30)),
+                created_at=(comment_created := rand_ago(random.randint(0, 30))),
                 created_by=_MOCK_USER,
-                updated_at=rand_ago(random.randint(0, 7)),
+                updated_at=rand_after(comment_created),
                 updated_by=_MOCK_USER,
                 version=f"Wz{random.randint(1, 50)}sMV0=",
             ))

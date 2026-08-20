@@ -4963,9 +4963,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{elastic_base_url}}/sentinelone/_search",
+                  "raw": "{{elastic_base_url}}/.siem-signals-default/_search",
                   "host": [
-                    "{{elastic_base_url}}/sentinelone/_search"
+                    "{{elastic_base_url}}/.siem-signals-default/_search"
                   ],
                   "path": []
                 },
@@ -4991,9 +4991,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{elastic_base_url}}/sentinelone/_mapping",
+                  "raw": "{{elastic_base_url}}/.siem-signals-default/_mapping",
                   "host": [
-                    "{{elastic_base_url}}/sentinelone/_mapping"
+                    "{{elastic_base_url}}/.siem-signals-default/_mapping"
                   ],
                   "path": []
                 }
@@ -5010,9 +5010,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{elastic_base_url}}/sentinelone/_stats",
+                  "raw": "{{elastic_base_url}}/.siem-signals-default/_stats",
                   "host": [
-                    "{{elastic_base_url}}/sentinelone/_stats"
+                    "{{elastic_base_url}}/.siem-signals-default/_stats"
                   ],
                   "path": []
                 }
@@ -5029,9 +5029,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{elastic_base_url}}/sentinelone/_doc/replace-with-doc-id",
+                  "raw": "{{elastic_base_url}}/.siem-signals-default/_doc/replace-with-doc-id",
                   "host": [
-                    "{{elastic_base_url}}/sentinelone/_doc/replace-with-doc-id"
+                    "{{elastic_base_url}}/.siem-signals-default/_doc/replace-with-doc-id"
                   ],
                   "path": []
                 }

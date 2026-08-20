@@ -96,7 +96,7 @@ def get_user_member_of(user_id: str) -> dict:
     """
     memberships: list[dict] = []
     # graph_group_members is keyed by group_id → list of user dicts
-    groups_collection = store._collections.get("graph_group_members", {})
+    groups_collection = store.get_all_with_keys("graph_group_members")
     for group_id, members in groups_collection.items():
         if isinstance(members, list):
             for member in members:

@@ -91,6 +91,7 @@ from infrastructure.seeders.xdr_incidents import seed_xdr_incidents
 from infrastructure.seeders.xdr_iocs import seed_xdr_iocs
 from infrastructure.seeders.xdr_scripts import seed_xdr_scripts
 from repository.store import store
+from utils import id_gen
 
 
 def generate_all() -> None:
@@ -103,6 +104,9 @@ def generate_all() -> None:
     random.seed(42)
     fake = Faker()
     Faker.seed(42)
+    # Ids and uuids came from secrets/uuid4, neither of which can be seeded, so
+    # the docstring's promise held for attributes but not for identifiers.
+    id_gen.reseed(42)
 
     store.clear_all()
     reset_registry()
@@ -136,7 +140,7 @@ def generate_all() -> None:
     seed_cs_iocs(fake)
     seed_cs_host_groups(fake, cs_host_ids)
     seed_cs_users(fake)
-    seed_cs_quarantine(fake, cs_host_ids)
+    seed_cs_quarantine(fake, cs_host_ids, cs_detection_ids)
     seed_cs_cases(fake, cs_detection_ids)
 
     # ── Microsoft Defender for Endpoint seeders ──────────────────────────────

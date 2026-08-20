@@ -15,6 +15,7 @@ router = APIRouter(tags=["Alerts"])
 @router.get("/cloud-detection/alerts")
 def list_alerts(
     ids: str = Query(None),
+    accountIds: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),
     agentIds: str = Query(None),
@@ -25,8 +26,11 @@ def list_alerts(
     query: str = Query(None),
     createdAt__gte: str = Query(None),
     createdAt__lte: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of cloud-detection alerts."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

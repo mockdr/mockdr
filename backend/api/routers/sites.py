@@ -15,8 +15,11 @@ def list_sites(
     accountIds: str = Query(None),
     states: str = Query(None),
     name: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, le=MAX_PAGE_SIZE),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered list of sites in the S1 allSites envelope format."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}

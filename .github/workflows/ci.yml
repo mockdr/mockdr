@@ -163,8 +163,16 @@ jobs:
             sleep 1
           done
 
+      # data/ is gitignored, so without this the spec is absent and the check
+      # skipped — reporting success while comparing nothing.
+      - name: Fetch SentinelOne API spec
+        run: ./scripts/fetch_swagger.sh
+
       - name: Run field-drift check
-        run: python scripts/field_drift.py --base-url http://localhost:8001/web/api/v2.1
+        run: |
+          python scripts/field_drift.py \
+            --base-url http://localhost:8001/web/api/v2.1 \
+            --require-spec
 
   # ── Secret Scanning ─────────────────────────────────────────────────────────
   secret-scanning:

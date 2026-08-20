@@ -5,7 +5,7 @@ from faker import Faker
 
 from domain.graph.app_protection_policy import GraphAppProtectionPolicy
 from domain.graph.mobile_app import GraphMobileApp
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.app_protection_policy_repo import graph_app_protection_policy_repo
 from repository.graph.mobile_app_repo import graph_mobile_app_repo
@@ -86,7 +86,7 @@ def seed_graph_app_management(fake: Faker) -> None:
     # ── Seed app protection policies ──────────────────────────────────────
     for cfg in _APP_PROTECTION_POLICIES:
         created = rand_ago(max_days=180)
-        modified = rand_ago(max_days=30)
+        modified = rand_after(created)
         graph_app_protection_policy_repo.save(GraphAppProtectionPolicy(
             id=graph_uuid(),
             displayName=cfg["displayName"],
@@ -105,7 +105,7 @@ def seed_graph_app_management(fake: Faker) -> None:
     # ── Seed mobile apps ──────────────────────────────────────────────────
     for app_cfg in _MOBILE_APPS:
         created = rand_ago(max_days=365)
-        modified = rand_ago(max_days=60)
+        modified = rand_after(created)
         graph_mobile_app_repo.save(GraphMobileApp(
             id=graph_uuid(),
             displayName=app_cfg["displayName"],

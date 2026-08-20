@@ -13,6 +13,7 @@ from domain.graph.user import GraphUser
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.graph.graph_shared import (
     GRAPH_DOMAIN,
+    SKU_ID_INTUNE_P1,
     SKU_ID_M365_BUSINESS_PREMIUM,
     SKU_ID_M365_E3,
     SKU_ID_M365_E5,
@@ -53,13 +54,24 @@ _OFFICE_LOCATIONS: list[str] = [
     "Branch - West", "Branch - East", "Remote",
 ]
 
+# Most users also carry an Intune licence, which is what puts that SKU near
+# its seat limit. consumedUnits is derived from these assignments now, so the
+# "near exhaustion" fixture has to be real rather than a hardcoded number that
+# contradicted the user list.
 _LICENSE_POOLS: list[list[dict]] = [
-    [{"disabledPlans": [], "skuId": SKU_ID_M365_E5}],
-    [{"disabledPlans": [], "skuId": SKU_ID_M365_E3}],
+    [
+        {"disabledPlans": [], "skuId": SKU_ID_M365_E5},
+        {"disabledPlans": [], "skuId": SKU_ID_INTUNE_P1},
+    ],
+    [
+        {"disabledPlans": [], "skuId": SKU_ID_M365_E3},
+        {"disabledPlans": [], "skuId": SKU_ID_INTUNE_P1},
+    ],
     [{"disabledPlans": [], "skuId": SKU_ID_M365_BUSINESS_PREMIUM}],
     [
         {"disabledPlans": [], "skuId": SKU_ID_M365_E5},
         {"disabledPlans": [], "skuId": SKU_ID_M365_E3},
+        {"disabledPlans": [], "skuId": SKU_ID_INTUNE_P1},
     ],
 ]
 

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_distributions import commands as dist_commands
 from application.xdr_distributions import queries as dist_queries
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
 
 router = APIRouter(tags=["XDR Distributions"])
 
@@ -46,7 +46,9 @@ def get_distribution_url(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Distribution {distribution_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Distribution {distribution_id} not found",
+            ),
         )
     return result
 
@@ -63,6 +65,8 @@ def get_distribution_status(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Distribution {distribution_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Distribution {distribution_id} not found",
+            ),
         )
     return result

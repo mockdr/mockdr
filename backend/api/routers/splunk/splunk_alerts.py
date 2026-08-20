@@ -20,7 +20,10 @@ def list_fired_alerts(
     """List fired alerts."""
     from utils.splunk.response import build_splunk_entry
     alerts = store.get_all(_COLLECTION)
-    entries = [build_splunk_entry(a.get("name", ""), a) for a in alerts]
+    entries = [
+        build_splunk_entry(a.get("name", ""), a, collection="alerts/fired_alerts")
+        for a in alerts
+    ]
     return build_splunk_envelope(entries)
 
 
@@ -34,7 +37,8 @@ def get_fired_alert(
     for a in store.get_all(_COLLECTION):
         if a.get("name") == name:
             from utils.splunk.response import build_splunk_entry
-            return build_splunk_envelope([build_splunk_entry(name, a)], total=1)
+            entry = build_splunk_entry(name, a, collection="alerts/fired_alerts")
+            return build_splunk_envelope([entry], total=1)
     raise HTTPException(status_code=404, detail={"messages": [
         {"type": "ERROR", "text": f"Fired alert '{name}' not found"},
     ]})

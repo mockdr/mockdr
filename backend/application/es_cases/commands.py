@@ -1,6 +1,8 @@
 """Elastic Security Cases command handlers (mutations)."""
 from __future__ import annotations
 
+import base64
+import binascii
 import uuid
 from dataclasses import asdict
 
@@ -9,6 +11,7 @@ from domain.es_case_comment import EsCaseComment
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
 from utils.dt import utc_now
+from utils.es_case_serde import serialise_case, serialise_comment
 
 
 def create_case(data: dict) -> dict:
@@ -40,7 +43,22 @@ def create_case(data: dict) -> dict:
         updated_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
     )
     es_case_repo.save(case)
-    return asdict(case)
+    return serialise_case(asdict(case))
+
+
+def _next_version(current: str) -> str:
+    """Issue the next opaque version token for a case.
+
+    Kibana's tokens are base64 of a two-element sequence; the exact contents
+    are not part of the contract, only that the token changes on each write.
+    """
+    try:
+        decoded = base64.b64decode(current).decode()
+        sequence, _, primary = decoded.strip("[]").partition(",")
+        nxt = f"[{int(sequence) + 1},{primary.strip() or 1}]"
+    except (ValueError, UnicodeDecodeError, binascii.Error):
+        nxt = "[1,1]"
+    return base64.b64encode(nxt.encode()).decode()
 
 
 def update_case(case_id: str, data: dict) -> dict | None:
@@ -66,6 +84,9 @@ def update_case(case_id: str, data: dict) -> dict | None:
 
     case.updated_at = now
     case.updated_by = data.get("updated_by", {"username": "elastic", "full_name": "Elastic Admin"})
+    # The version is an opaque optimistic-concurrency token; Kibana issues a
+    # new one on every write, which is what makes a stale version a conflict.
+    case.version = _next_version(case.version)
 
     if data.get("status") == "closed":
         case.closed_at = now
@@ -75,7 +96,7 @@ def update_case(case_id: str, data: dict) -> dict | None:
         case.closed_by = None
 
     es_case_repo.save(case)
-    return asdict(case)
+    return serialise_case(asdict(case))
 
 
 def delete_case(case_id: str) -> bool:
@@ -129,7 +150,7 @@ def add_comment(case_id: str, data: dict) -> dict | None:
     case.updated_at = now
     es_case_repo.save(case)
 
-    return asdict(comment)
+    return serialise_comment(asdict(comment))
 
 
 def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
@@ -160,7 +181,7 @@ def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
     )
 
     es_case_comment_repo.save(comment)
-    return asdict(comment)
+    return serialise_comment(asdict(comment))
 
 
 def delete_comment(case_id: str, comment_id: str) -> bool:

@@ -4,7 +4,7 @@ import random
 from faker import Faker
 
 from domain.device_control_rule import DeviceControlRule
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from repository.device_control_repo import device_control_repo
 from repository.site_repo import site_repo
 from repository.user_repo import user_repo
@@ -54,7 +54,7 @@ def seed_device_control_rules(
             scope="site",
             scopeName=dc_site.name if dc_site else "",
             scopeId=dc_site_id,
-            createdAt=rand_ago(90),
-            updatedAt=rand_ago(30),
+            createdAt=(created := rand_ago(90)),
+            updatedAt=rand_after(created),
             siteId=dc_site_id,
         ))

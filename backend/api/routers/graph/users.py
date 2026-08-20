@@ -35,7 +35,7 @@ async def get_me(
 async def list_users(
     request: Request,
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
@@ -55,7 +55,7 @@ async def list_users(
 async def list_users_beta(
     request: Request,
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
@@ -97,7 +97,7 @@ async def get_user(
 async def list_user_member_of(
     user_id: str,
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", le=999),
+    top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_auth),

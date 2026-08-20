@@ -127,9 +127,10 @@ class TestGetEventsByType:
         assert resp.status_code == 200
         assert isinstance(resp.json()["data"], list)
 
-    def test_missing_id_returns_422(self, client: TestClient, auth_headers: dict) -> None:
+    def test_missing_id_returns_400(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.get(f"{BASE}/dv/events/process", headers=auth_headers)
-        assert resp.status_code == 422
+        # 422 is FastAPI's status; SentinelOne answers a bad parameter with 400.
+        assert resp.status_code == 400
 
     def test_unknown_query_returns_404(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.get(

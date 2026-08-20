@@ -1,14 +1,32 @@
 """Microsoft Defender for Endpoint Machine command handlers (mutations)."""
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import asdict
 
+from domain.event_bus import MdeMachineUpdated, event_bus
+from domain.mde_machine import MdeMachine
 from domain.mde_machine_action import MdeMachineAction
 from repository.mde_machine_action_repo import mde_machine_action_repo
 from repository.mde_machine_repo import mde_machine_repo
 from utils.dt import utc_now
+from utils.mde_serde import to_mde_resource
 
+
+def _publish_machine_updated(machine: MdeMachine) -> None:
+    """Persist a machine and bridge the change into Splunk and Sentinel.
+
+    The bridge subscribed to mde_machine_updated and nothing ever published
+    it, so isolating or scanning a machine changed its health status while the
+    downstream SIEMs saw nothing (ADR-009).
+    """
+    mde_machine_repo.save(machine)
+    event_bus.publish(MdeMachineUpdated(
+        entity_id=machine.machineId,
+        payload=to_mde_resource(asdict(machine), "machineId"),
+        timestamp=time.time(),
+    ))
 
 def _create_action(
     machine_id: str,
@@ -39,7 +57,7 @@ def _create_action(
         requestorComment=comment,
     )
     mde_machine_action_repo.save(action)
-    return asdict(action)
+    return to_mde_resource(asdict(action), "actionId")
 
 
 def isolate_machine(machine_id: str, body: dict) -> dict | None:
@@ -59,7 +77,7 @@ def isolate_machine(machine_id: str, body: dict) -> dict | None:
     if not machine:
         return None
     machine.healthStatus = "ImpairedCommunication"
-    mde_machine_repo.save(machine)
+    _publish_machine_updated(machine)
     comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "Isolate", comment, requestor)
@@ -81,7 +99,7 @@ def unisolate_machine(machine_id: str, body: dict) -> dict | None:
     if not machine:
         return None
     machine.healthStatus = "Active"
-    mde_machine_repo.save(machine)
+    _publish_machine_updated(machine)
     comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "Unisolate", comment, requestor)
@@ -175,7 +193,7 @@ def offboard_machine(machine_id: str, body: dict) -> dict | None:
     if not machine:
         return None
     machine.onboardingStatus = "CanBeOnboarded"
-    mde_machine_repo.save(machine)
+    _publish_machine_updated(machine)
     comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "Offboard", comment, requestor)

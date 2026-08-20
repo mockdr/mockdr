@@ -23,7 +23,47 @@ import os
 from fastapi import Depends, Header, HTTPException, Request
 
 from repository.store import store
-from utils.es_response import build_es_error_response
+from utils.es_response import (
+    ES_WWW_AUTHENTICATE,
+    build_es_auth_error,
+    build_es_error_response,
+    build_kibana_error,
+)
+
+
+def _auth_error(request: Request | None, status: int, es_type: str, message: str) -> dict:
+    """Build an error body in the envelope the requested product uses.
+
+    These dependencies guard both mounts, but Elasticsearch and Kibana do not
+    share an error envelope — Kibana serves Boom payloads — so the body has to
+    follow the path the caller actually hit.
+
+    Args:
+        request:  Incoming request, used only to tell the two mounts apart.
+        status:   HTTP status code.
+        es_type:  Elasticsearch exception type, ignored for Kibana.
+        message:  Human-readable error description.
+
+    Returns:
+        Error body for whichever product owns the path.
+    """
+    if request is not None and request.url.path.startswith("/kibana"):
+        return build_kibana_error(request.url.path, status, message)
+    if es_type == "security_exception":
+        return build_es_auth_error(status, message)
+    return build_es_error_response(status, es_type, message)
+
+
+def _auth_headers(request: Request | None, status: int) -> dict[str, str] | None:
+    """Return the challenge headers Elasticsearch sends alongside a 401.
+
+    Elasticsearch emits ``WWW-Authenticate`` as a real response header as well
+    as inside the error body, and a client that follows RFC 7235 looks at the
+    header, not the JSON.  Kibana does not do this, so the mount decides.
+    """
+    if status != 401 or (request is not None and request.url.path.startswith("/kibana")):
+        return None
+    return {"WWW-Authenticate": ", ".join(ES_WWW_AUTHENTICATE)}
 
 # ── User credentials (read from env vars with mock defaults) ──────────────────
 
@@ -94,12 +134,16 @@ def _decode_api_key(header_value: str) -> dict | None:
 
 # ── Public dependencies ──────────────────────────────────────────────────────
 
-async def require_es_auth(authorization: str = Header(None)) -> dict:
+async def require_es_auth(
+    request: Request,
+    authorization: str = Header(None),
+) -> dict:
     """Validate Elastic Security authentication and return the user context.
 
     Supports both Basic and ApiKey authentication schemes.
 
     Args:
+        request:       Incoming request, used to pick the error envelope.
         authorization: Raw ``Authorization`` header value.
 
     Returns:
@@ -111,10 +155,11 @@ async def require_es_auth(authorization: str = Header(None)) -> dict:
     if not authorization:
         raise HTTPException(
             status_code=401,
-            detail=build_es_error_response(
-                401, "security_exception",
-                "missing authentication credentials",
+            detail=_auth_error(
+                request, 401, "security_exception",
+                f"missing authentication credentials for REST request [{request.url.path}]",
             ),
+            headers=_auth_headers(request, 401),
         )
 
     lower = authorization.lower()
@@ -141,21 +186,24 @@ async def require_es_auth(authorization: str = Header(None)) -> dict:
     if result is None:
         raise HTTPException(
             status_code=401,
-            detail=build_es_error_response(
-                401, "security_exception",
-                "unable to authenticate user",
+            detail=_auth_error(
+                request, 401, "security_exception",
+                f"unable to authenticate user for REST request [{request.url.path}]",
             ),
+            headers=_auth_headers(request, 401),
         )
 
     return result
 
 
 async def require_es_write(
+    request: Request,
     current: dict = Depends(require_es_auth),
 ) -> dict:
     """Require admin or analyst role for write operations.
 
     Args:
+        request: Incoming request, used to pick the error envelope.
         current: Injected by ``require_es_auth``.
 
     Returns:
@@ -165,11 +213,12 @@ async def require_es_write(
         HTTPException: 403 if the user role is not permitted to write.
     """
     if current.get("role") not in _WRITE_ROLES:
+        user = current.get("user", "")
         raise HTTPException(
             status_code=403,
-            detail=build_es_error_response(
-                403, "security_exception",
-                "action [write] is unauthorized for user [" + current.get("user", "") + "]",
+            detail=_auth_error(
+                request, 403, "security_exception",
+                f"action [write] is unauthorized for user [{user}]",
             ),
         )
     return current
@@ -178,24 +227,26 @@ async def require_es_write(
 async def require_kbn_xsrf(request: Request) -> None:
     """Validate the ``kbn-xsrf`` header on non-GET Kibana requests.
 
-    Kibana requires this header to prevent CSRF attacks. Any truthy value
-    is accepted.
+    Kibana requires this header to prevent CSRF attacks. Any truthy value is
+    accepted, and ``kbn-version`` satisfies the check on its own — Kibana's own
+    guard passes when *either* header is present, which is how its browser
+    client gets through without sending ``kbn-xsrf``.
 
     Args:
         request: The incoming FastAPI request.
 
     Raises:
-        HTTPException: 400 if the header is missing on a non-GET request.
+        HTTPException: 400 if neither header is present on a non-GET request.
     """
     if request.method.upper() in ("GET", "HEAD", "OPTIONS"):
         return
 
-    xsrf = request.headers.get("kbn-xsrf")
+    xsrf = request.headers.get("kbn-xsrf") or request.headers.get("kbn-version")
     if not xsrf:
         raise HTTPException(
             status_code=400,
-            detail=build_es_error_response(
-                400, "bad_request",
+            detail=_auth_error(
+                request, 400, "bad_request",
                 "Request must contain a kbn-xsrf header.",
             ),
         )

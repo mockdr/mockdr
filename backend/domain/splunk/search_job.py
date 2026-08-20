@@ -23,6 +23,10 @@ class SearchJob:
     scan_count: int = 0
 
     results: list[dict[str, object]] = field(default_factory=list)
+    # Pre-transform events. /events must return what the search matched
+    # before the pipeline reshaped it, so eventCount can differ from
+    # resultCount the way it does in real Splunk.
+    events: list[dict[str, object]] = field(default_factory=list)
     messages: list[dict[str, str]] = field(default_factory=list)
     field_list: list[str] = field(default_factory=list)
 

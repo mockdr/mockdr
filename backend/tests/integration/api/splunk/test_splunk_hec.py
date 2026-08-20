@@ -91,13 +91,36 @@ class TestHecHealth:
 class TestHecAck:
     """Tests for POST /services/collector/ack."""
 
-    def test_ack_check(self, client: TestClient) -> None:
+    def test_ack_requires_a_data_channel(self, client: TestClient) -> None:
+        # Real HEC ties acknowledgement ids to a channel; without one it
+        # answers code 10 rather than acknowledging anything.
         resp = client.post(
             f"{SPLUNK_PREFIX}/services/collector/ack",
-            json={"acks": [0, 1, 2]},
+            json={"acks": [0]},
             headers=_hec_auth(),
         )
+        assert resp.status_code == 400
+        assert resp.json()["code"] == 10
+
+    def test_only_issued_ids_are_acknowledged(self, client: TestClient) -> None:
+        channel = {"X-Splunk-Request-Channel": "test-channel"}
+
+        submitted = client.post(
+            f"{SPLUNK_PREFIX}/services/collector/event",
+            json={"event": "hello"},
+            params={"useACK": "true"},
+            headers={**_hec_auth(), **channel},
+        ).json()
+        issued = submitted["ackId"]
+
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/collector/ack",
+            json={"acks": [issued, 9999]},
+            headers={**_hec_auth(), **channel},
+        )
+
         assert resp.status_code == 200
         acks = resp.json()["acks"]
-        assert acks["0"] is True
-        assert acks["1"] is True
+        assert acks[str(issued)] is True
+        # An id this channel was never given must not come back acknowledged.
+        assert acks["9999"] is False

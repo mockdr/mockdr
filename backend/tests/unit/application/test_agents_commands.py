@@ -39,10 +39,15 @@ class TestResolveIds:
         result = execute_action("connect", {"ids": [aid]})
         assert result["data"]["affected"] == 1
 
-    def test_no_ids_applies_to_all_non_decommissioned(self) -> None:
-        non_decom = [a for a in agent_repo.list_all() if not a.isDecommissioned]
-        result = execute_action("connect", {})
-        assert result["data"]["affected"] == len(non_decom)
+    def test_no_filter_is_refused_rather_than_applied_to_all(self) -> None:
+        """The fleet-wide fallback is the bug, not the feature."""
+        with pytest.raises(ValueError, match="filter is required"):
+            execute_action("connect", {})
+
+    def test_non_id_filter_selects_the_same_set_as_a_query(self) -> None:
+        windows = [a for a in agent_repo.list_all() if a.osType == "windows"]
+        result = execute_action("connect", {"filter": {"osTypes": ["windows"]}})
+        assert result["data"]["affected"] == len(windows)
 
 
 # ── Unknown action ──────────────────────────────────────────────────────────

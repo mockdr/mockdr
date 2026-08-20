@@ -9,6 +9,39 @@ from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata
 from utils.mde_response import build_mde_list_response
 
 
+def _machine_refs_for(software_id: str) -> list[dict]:
+    """Return the machines associated with a software entry.
+
+    The single source of truth for that association. ``exposedMachines`` was a
+    free-floating random number from the seeder while the ``machineReferences``
+    sub-resource computed membership round-robin, so the count and the list
+    disagreed on every record — including entries reporting zero exposed
+    machines alongside four references.
+    """
+    all_software = mde_software_repo.list_all()
+    sw_idx = next(
+        (i for i, s in enumerate(all_software) if s.softwareId == software_id), -1,
+    )
+    if sw_idx < 0 or not all_software:
+        return []
+    return [
+        {
+            "id": machine.machineId,
+            "computerDnsName": machine.computerDnsName,
+            "osPlatform": machine.osPlatform,
+            "rbacGroupName": machine.rbacGroupName,
+        }
+        for i, machine in enumerate(mde_machine_repo.list_all())
+        if i % len(all_software) == sw_idx
+    ]
+
+
+def _with_exposed_count(record: dict) -> dict:
+    """Overwrite ``exposedMachines`` with the real membership count."""
+    record["exposedMachines"] = len(_machine_refs_for(record.get("softwareId", "")))
+    return record
+
+
 def list_software(
     filter_str: str | None,
     top: int,
@@ -28,7 +61,7 @@ def list_software(
     Returns:
         OData list response with paginated software records.
     """
-    records = [asdict(s) for s in mde_software_repo.list_all()]
+    records = [_with_exposed_count(asdict(s)) for s in mde_software_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -56,7 +89,7 @@ def get_software(software_id: str) -> dict | None:
     software = mde_software_repo.get(software_id)
     if not software:
         return None
-    return asdict(software)
+    return _with_exposed_count(asdict(software))
 
 
 def get_software_machine_references(software_id: str) -> dict | None:
@@ -75,19 +108,4 @@ def get_software_machine_references(software_id: str) -> dict | None:
     software = mde_software_repo.get(software_id)
     if not software:
         return None
-    # Associate software with machines round-robin by index
-    all_software = mde_software_repo.list_all()
-    sw_idx = next(
-        (i for i, s in enumerate(all_software) if s.softwareId == software_id), -1,
-    )
-    machines = mde_machine_repo.list_all()
-    refs = []
-    for i, machine in enumerate(machines):
-        if len(all_software) > 0 and i % len(all_software) == sw_idx:
-            refs.append({
-                "id": machine.machineId,
-                "computerDnsName": machine.computerDnsName,
-                "osPlatform": machine.osPlatform,
-                "rbacGroupName": machine.rbacGroupName,
-            })
-    return build_mde_list_response(refs)
+    return build_mde_list_response(_machine_refs_for(software_id))

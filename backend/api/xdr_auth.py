@@ -30,7 +30,7 @@ from fastapi import Depends, Header, HTTPException
 
 from domain.xdr_api_key import XdrApiKey
 from repository.xdr_api_key_repo import xdr_api_key_repo
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_UNAUTHORIZED, build_xdr_error
 
 # ── Role sets ────────────────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ async def require_xdr_auth(
             status_code=401,
             detail=build_xdr_error(
                 401,
-                "Missing required authentication headers",
+                XDR_ERR_UNAUTHORIZED,
                 "Provide x-xdr-auth-id and Authorization; advanced authentication "
                 "additionally requires x-xdr-nonce and x-xdr-timestamp",
             ),
@@ -81,7 +81,7 @@ async def require_xdr_auth(
     if not key_record:
         raise HTTPException(
             status_code=401,
-            detail=build_xdr_error(401, "Invalid API key ID"),
+            detail=build_xdr_error(401, XDR_ERR_UNAUTHORIZED, "Unknown API key id"),
         )
 
     # Standard authentication — the API key is sent verbatim.
@@ -91,12 +91,18 @@ async def require_xdr_auth(
     # Advanced authentication — SHA-256 over key + nonce + timestamp, plainly
     # concatenated in that order (Cortex XDR sends no delimiter).
     if not x_xdr_nonce or not x_xdr_timestamp:
+        # Reached when the key did not match verbatim, which is either a wrong
+        # standard-auth secret or an advanced-auth request missing its nonce.
+        # Naming only the second would misdirect a standard-auth caller at a
+        # mechanism they are not using.
         raise HTTPException(
             status_code=401,
             detail=build_xdr_error(
                 401,
-                "Authentication failed — invalid API key",
-                "Advanced authentication requires x-xdr-nonce and x-xdr-timestamp",
+                XDR_ERR_UNAUTHORIZED,
+                "Standard authentication requires the API key verbatim in "
+                "Authorization; advanced authentication additionally requires "
+                "x-xdr-nonce and x-xdr-timestamp",
             ),
         )
 
@@ -107,7 +113,7 @@ async def require_xdr_auth(
     if not hmac.compare_digest(expected, authorization):
         raise HTTPException(
             status_code=401,
-            detail=build_xdr_error(401, "Authentication failed — invalid signature"),
+            detail=build_xdr_error(401, XDR_ERR_UNAUTHORIZED, "Signature mismatch"),
         )
 
     return key_record

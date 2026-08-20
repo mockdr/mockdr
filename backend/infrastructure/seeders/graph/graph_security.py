@@ -17,7 +17,6 @@ from repository.graph.security_incident_repo import graph_security_incident_repo
 from repository.graph.ti_indicator_repo import graph_ti_indicator_repo
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_indicator_repo import mde_indicator_repo
-from repository.store import store
 
 _MITRE_TECHNIQUES: list[str] = ["T1059", "T1053", "T1071", "T1082", "T1105"]
 
@@ -88,13 +87,14 @@ def seed_graph_security(fake: Faker) -> None:
         created_dt = mde_alert.alertCreationTime or rand_ago(max_days=30)
         last_update_dt = mde_alert.lastUpdateTime or rand_ago(max_days=5)
 
-        # Build evidence with device cross-reference
-        evidence: list[dict] = []
-        mapping = store.get("edr_id_map", mde_alert.machineId) or {}
-        evidence.append({
+        # Build evidence with device cross-reference. edr_id_map is keyed by
+        # S1 agent id, so looking it up by an MDE machine id always missed and
+        # fell through to the `or {}` default — dead code that happened to
+        # produce the right value.
+        evidence: list[dict] = [{
             "type": "device",
-            "deviceId": mapping.get("mde_machine_id", mde_alert.machineId),
-        })
+            "deviceId": mde_alert.machineId,
+        }]
 
         # Classification / determination for resolved alerts
         classification: str | None = None

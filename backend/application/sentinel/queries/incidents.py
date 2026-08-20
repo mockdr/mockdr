@@ -9,6 +9,7 @@ from repository.sentinel.bookmark_repo import sentinel_bookmark_repo
 from repository.sentinel.entity_repo import sentinel_entity_repo
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
+from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.sentinel.pagination import build_next_link, parse_skip_token
 from utils.sentinel.response import build_arm_list, build_arm_resource
 
@@ -75,31 +76,39 @@ def list_incidents(
     Raises:
         HTTPException: 400 if the skip token was not issued by this service.
     """
-    all_incidents = sentinel_incident_repo.list_all()
+    # Filtering and ordering run over the ARM representation, which is what the
+    # caller's `$filter` and `$orderby` name. Matching against the stored
+    # dataclass meant `properties/...` paths resolved to nothing.
+    records = [
+        _incident_to_arm(inc)
+        for inc in sorted(
+            sentinel_incident_repo.list_all(),
+            key=lambda i: i.created_time_utc,
+            reverse=True,
+        )
+    ]
 
-    # Basic filter support: status eq 'New'
     if filter_expr:
-        all_incidents = _apply_filter(all_incidents, filter_expr)
+        # A single regex matched only the first clause, so every later one was
+        # discarded and `and`/`or` were ignored entirely.
+        records = apply_odata_filter(records, _normalise_paths(filter_expr))
 
-    # Sort
     if orderby:
-        field, _, direction = orderby.partition(" ")
-        attr = _odata_to_attr(field)
-        reverse = direction.lower() == "desc"
-        all_incidents.sort(key=lambda i: getattr(i, attr, ""), reverse=reverse)
-    else:
-        all_incidents.sort(key=lambda i: i.created_time_utc, reverse=True)
+        records = apply_odata_orderby(records, _normalise_paths(orderby))
 
-    # Pagination
     offset = parse_skip_token(skip_token)
-    page = all_incidents[offset:offset + top]
+    page = records[offset:offset + top]
 
-    items = [_incident_to_arm(inc) for inc in page]
     next_link = ""
-    if offset + top < len(all_incidents):
+    if offset + top < len(records):
         next_link = build_next_link(request_url, offset + top)
 
-    return build_arm_list(items, next_link=next_link)
+    return build_arm_list(page, next_link=next_link)
+
+
+def _normalise_paths(expression: str) -> str:
+    """Rewrite ARM's ``properties/x`` paths as the dotted paths the parser uses."""
+    return re.sub(r"\b(\w+)/(\w+)", r"\1.\2", expression)
 
 
 def get_incident(incident_id: str) -> dict | None:

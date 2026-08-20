@@ -18,7 +18,7 @@ router = APIRouter(tags=["MDE Investigations"])
 @router.get("/api/investigations")
 def list_investigations(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(50, alias="$top", le=1000),
+    top: int = Query(50, alias="$top", ge=1, le=1000),
     skip: int = Query(0, alias="$skip"),
     orderby: str = Query(None, alias="$orderby"),
     _: dict = Depends(require_mde_auth),
@@ -38,7 +38,7 @@ def get_investigation(
         raise HTTPException(
             status_code=404,
             detail=build_mde_error_response(
-                "NotFound", f"Investigation {investigation_id} not found",
+                "ResourceNotFound", f"Investigation {investigation_id} not found",
             ),
         )
     return result
@@ -55,7 +55,7 @@ def collect_investigation(
         raise HTTPException(
             status_code=404,
             detail=build_mde_error_response(
-                "NotFound", f"Investigation {investigation_id} not found",
+                "ResourceNotFound", f"Investigation {investigation_id} not found",
             ),
         )
     return result

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_actions import queries as action_queries
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
 
 router = APIRouter(tags=["XDR Actions"])
 
@@ -21,12 +21,15 @@ def get_action_status(
 ) -> dict:
     """Get the status of a response action."""
     request_data = body.get("request_data", {})
-    action_id = request_data.get("action_id", "")
+    # Cortex XDR names this parameter group_action_id; only `action_id` was
+    # read, so the documented request reached the handler with an empty id.
+    raw_id = request_data.get("group_action_id") or request_data.get("action_id") or ""
+    action_id = str(raw_id)
     result = action_queries.get_action_status(action_id)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Action {action_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Action {action_id} not found"),
         )
     return result
 
@@ -43,6 +46,6 @@ def get_file_retrieval_details(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Action {action_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Action {action_id} not found"),
         )
     return result

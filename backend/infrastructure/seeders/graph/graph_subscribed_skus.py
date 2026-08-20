@@ -75,8 +75,11 @@ def seed_graph_subscribed_skus(fake: Faker) -> None:
             skuId=SKU_ID_INTUNE_P1,
             skuPartNumber="INTUNE_A",
             capabilityStatus="Enabled",
-            consumedUnits=24,  # Near exhaustion — compliance warning
-            prepaidUnits={"enabled": 25, "suspended": 0, "warning": 1},
+            # consumedUnits is derived from the users who actually hold the
+            # licence, so the "near exhaustion" fixture is expressed as a
+            # seat count just above what the user seeder assigns.
+            consumedUnits=0,
+            prepaidUnits={"enabled": 16, "suspended": 0, "warning": 1},
             servicePlans=[
                 {"servicePlanId": graph_uuid(), "servicePlanName": "INTUNE_A"},
             ],

@@ -17,6 +17,8 @@ top-level search body.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import uuid
 from collections.abc import Callable
@@ -24,6 +26,20 @@ from fnmatch import fnmatch
 from typing import Any
 
 from utils.nested import get_nested as _get_nested
+
+_DEFAULT_SIZE = 10
+
+#: Mirrors Elasticsearch's indices.query.bool.max_nested_depth default.
+_MAX_CLAUSE_DEPTH = 30
+
+
+class ESQueryError(ValueError):
+    """Raised when a search body is not valid Elasticsearch query DSL.
+
+    Elasticsearch answers a malformed or unknown query with a 400 carrying
+    ``parsing_exception``; these previously escaped as bare ``ValueError`` and
+    surfaced as a plain-text 500.
+    """
 
 # ---------------------------------------------------------------------------
 # Range comparison helper
@@ -76,25 +92,52 @@ def _compare_range(field_val: Any, target: Any, op: str) -> bool:
 # Predicate builders — one per query type
 # ---------------------------------------------------------------------------
 
-def _build_predicate(clause: dict) -> Callable[[dict], bool]:
+def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
     """Recursively build a predicate function from an ES query clause.
 
     Args:
         clause: A single Elasticsearch query clause dict.
+        _depth: Recursion guard for nested ``bool`` clauses.
 
     Returns:
         A callable that accepts a record dict and returns ``True`` on match.
 
     Raises:
-        ValueError: If the clause contains an unsupported query type.
+        ESQueryError: If the clause is unsupported or nested too deeply.
     """
+    # Elasticsearch caps nesting at indices.query.bool.max_nested_depth for
+    # exactly this reason: without a bound, a deeply nested bool exhausts the
+    # stack and the RecursionError escapes as a 500.
+    if _depth > _MAX_CLAUSE_DEPTH:
+        msg = f"[bool] query is nested too deeply, max depth is {_MAX_CLAUSE_DEPTH}"
+        raise ESQueryError(msg)
+
     if not clause:
         return lambda _rec: True
+
+    if not isinstance(clause, dict):
+        msg = f"[query] malformed query, expected an object but found {type(clause).__name__}"
+        raise ESQueryError(msg)
+
+    # Elasticsearch allows exactly one query type per clause object. Returning
+    # on the first key silently discarded every later clause, so a body whose
+    # second clause excluded everything still matched.
+    if len(clause) > 1:
+        extra = sorted(clause)[1]
+        msg = f"[query] malformed query, expected [END_OBJECT] but found [{extra}]"
+        raise ESQueryError(msg)
 
     for query_type, body in clause.items():
         builder = _BUILDERS.get(query_type)
         if builder is None:
-            raise ValueError(f"Unsupported ES query type: {query_type}")
+            raise ESQueryError(f"no [query] registered for [{query_type}]")
+        if not isinstance(body, dict):
+            # A clause body of null or a scalar reached the builders as-is and
+            # raised AttributeError out of the handler as a plain-text 500.
+            msg = f"[{query_type}] query malformed, expected an object"
+            raise ESQueryError(msg)
+        if query_type == "bool":
+            return _build_bool(body, _depth + 1)
         return builder(body)
 
     # Empty dict → match all.
@@ -120,17 +163,18 @@ def _build_match(body: dict) -> Callable[[dict], bool]:
         query = str(spec)
         operator = "or"
 
-    query_lower = query.lower()
-    words = query_lower.split()
+    terms = _analyze(query)
 
     def predicate(rec: dict) -> bool:
         val = _get_nested(rec, field)
         if val is None:
             return False
-        val_lower = str(val).lower()
+        # Match against analysed tokens, not raw substrings: `match: "SERV"`
+        # used to hit "SERVER-KQEZSV", which no analyzer produces.
+        tokens = set(_analyze_value(val))
         if operator == "and":
-            return all(w in val_lower for w in words)
-        return any(w in val_lower for w in words)
+            return all(t in tokens for t in terms)
+        return any(t in tokens for t in terms)
 
     return predicate
 
@@ -140,14 +184,22 @@ def _build_match_phrase(body: dict) -> Callable[[dict], bool]:
 
     Exact phrase match (case-insensitive).
     """
-    field, query = next(iter(body.items()))
-    phrase = str(query).lower()
+    field, spec = next(iter(body.items()))
+    query = spec.get("query", "") if isinstance(spec, dict) else spec
+    phrase = _analyze(str(query))
 
     def predicate(rec: dict) -> bool:
         val = _get_nested(rec, field)
         if val is None:
             return False
-        return phrase in str(val).lower()
+        # A phrase is a contiguous run of tokens, not a substring.
+        tokens = _analyze_value(val)
+        if not phrase:
+            return False
+        span = len(phrase)
+        return any(
+            tokens[i : i + span] == phrase for i in range(len(tokens) - span + 1)
+        )
 
     return predicate
 
@@ -246,16 +298,22 @@ def _build_exists(body: dict) -> Callable[[dict], bool]:
     return predicate
 
 
-def _build_bool(body: dict) -> Callable[[dict], bool]:
+def _build_bool(body: dict, depth: int = 0) -> Callable[[dict], bool]:
     """Build predicate for ``bool`` query.
 
     Combines ``must``, ``filter``, ``should``, and ``must_not`` sub-clauses.
+    The depth is threaded through so nesting stays bounded.
     """
-    must_preds = [_build_predicate(c) for c in body.get("must", [])]
-    filter_preds = [_build_predicate(c) for c in body.get("filter", [])]
-    should_preds = [_build_predicate(c) for c in body.get("should", [])]
-    must_not_preds = [_build_predicate(c) for c in body.get("must_not", [])]
-    min_should = body.get("minimum_should_match", 1 if should_preds else 0)
+    must_preds = [build_predicate(c, depth) for c in body.get("must", [])]
+    filter_preds = [build_predicate(c, depth) for c in body.get("filter", [])]
+    should_preds = [build_predicate(c, depth) for c in body.get("should", [])]
+    must_not_preds = [build_predicate(c, depth) for c in body.get("must_not", [])]
+    # Per ES: should clauses only carry a match requirement when there is no
+    # must/filter to satisfy. Defaulting to 1 regardless meant adding a
+    # non-matching should — which should affect scoring only — emptied the
+    # result set.
+    _default_min = 1 if (should_preds and not must_preds and not filter_preds) else 0
+    min_should = body.get("minimum_should_match", _default_min)
 
     def predicate(rec: dict) -> bool:
         # must + filter: all must match.
@@ -505,12 +563,37 @@ def apply_es_sort(records: list[dict], sort_spec: list) -> list[dict]:
 
     result = list(records)
     for field, reverse in reversed(sort_keys):
+        # `_score` and `_doc` are metadata, not `_source` fields. Looking them
+        # up nested found nothing and bucketed every document equally, so the
+        # sort silently did nothing. Every document scores the same here, and
+        # `_doc` is index order, so both preserve the current order.
+        if field in ("_score", "_doc"):
+            continue
+
         def _make_key(f: str) -> Callable[[dict], tuple[int, Any]]:
             def key(rec: dict) -> tuple[int, Any]:
                 return _sort_key(_get_nested(rec, f))
             return key
         result.sort(key=_make_key(field), reverse=reverse)
     return result
+
+
+_TOKEN_SPLIT = re.compile(r"[^0-9A-Za-z_]+")
+
+
+def _analyze(text: str) -> list[str]:
+    """Split text the way Elasticsearch's standard analyzer would."""
+    return [t for t in _TOKEN_SPLIT.split(str(text).lower()) if t]
+
+
+def _analyze_value(value: Any) -> list[str]:
+    """Analyse a field value, flattening arrays as ES does."""
+    if isinstance(value, (list, tuple, set)):
+        tokens: list[str] = []
+        for item in value:
+            tokens.extend(_analyze(str(item)))
+        return tokens
+    return _analyze(str(value))
 
 
 def _sort_key(val: Any) -> tuple[int, Any]:
@@ -548,11 +631,109 @@ def wrap_as_hits(
     return [
         {
             "_index": index,
-            "_id": str(uuid.uuid4()),
+            "_id": hit_id(rec),
             "_score": 1.0,
             "_source": rec,
         }
         for rec in records
+    ]
+
+
+def hit_id(rec: dict) -> str:
+    """Derive a stable ``_id`` for a record.
+
+    A fresh UUID per response meant the same document came back under a
+    different ``_id`` every call, so search → get-by-id, dedup, and
+    alert-status updates could never round-trip. The document's own
+    identifier is used where it has one; anything else gets a digest of its
+    contents so the value is at least stable for identical input.
+    """
+    for field in ("id", "_id", "rule_id", "item_id", "list_id"):
+        val = rec.get(field)
+        if isinstance(val, str) and val:
+            return val
+    # ECS alert documents carry their identity nested.
+    for path in ("kibana.alert.uuid", "signal.rule.id"):
+        nested = _get_nested(rec, path)
+        if isinstance(nested, str) and nested:
+            return nested
+    digest = hashlib.sha256(json.dumps(rec, sort_keys=True, default=str).encode())
+    return str(uuid.UUID(digest.hexdigest()[:32]))
+
+
+def _as_bound(value: Any, name: str) -> int | None:
+    """Coerce a ``from``/``size`` bound, rejecting what Elasticsearch rejects."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        msg = f"[{name}] must be a number"
+        raise ESQueryError(msg)
+    try:
+        bound = int(value)
+    except (TypeError, ValueError) as exc:
+        msg = f"Failed to parse int parameter [{name}] with value [{value}]"
+        raise ESQueryError(msg) from exc
+    if bound < 0:
+        msg = f"[{name}] parameter cannot be negative, found [{bound}]"
+        raise ESQueryError(msg)
+    return bound
+
+
+# ---------------------------------------------------------------------------
+# _source filtering
+# ---------------------------------------------------------------------------
+
+def _as_patterns(spec: object) -> list[str]:
+    """Normalise a ``_source`` include/exclude spec to a list of patterns."""
+    if isinstance(spec, str):
+        return [spec]
+    if isinstance(spec, (list, tuple)):
+        return [str(p) for p in spec]
+    return []
+
+
+def _project(record: dict, includes: list[str], excludes: list[str]) -> dict:
+    """Keep the fields matching *includes* and drop those matching *excludes*.
+
+    Patterns may use ``*`` and may name a dotted path, matching Elasticsearch's
+    source-filtering syntax.
+    """
+    def keep(field: str) -> bool:
+        if includes and not any(fnmatch(field, p) for p in includes):
+            return False
+        return not any(fnmatch(field, p) for p in excludes)
+
+    return {field: value for field, value in record.items() if keep(field)}
+
+
+def apply_source_filter(hits: list[dict], spec: object) -> list[dict]:
+    """Apply a ``_search`` body's ``_source`` directive to built hits.
+
+    ``_source`` was read and ignored, so a client asking for two fields got
+    every field — the response was larger than it asked for and matched
+    nothing a real cluster would send.
+
+    ``false`` drops ``_source`` entirely; a list or string keeps only the
+    matching fields; a dict takes ``includes``/``excludes``.
+    """
+    if spec is None or spec is True:
+        return hits
+
+    if spec is False:
+        return [{k: v for k, v in hit.items() if k != "_source"} for hit in hits]
+
+    if isinstance(spec, dict):
+        includes = _as_patterns(spec.get("includes") or spec.get("include"))
+        excludes = _as_patterns(spec.get("excludes") or spec.get("exclude"))
+    else:
+        includes, excludes = _as_patterns(spec), []
+
+    if not includes and not excludes:
+        return hits
+
+    return [
+        {**hit, "_source": _project(hit.get("_source", {}), includes, excludes)}
+        for hit in hits
     ]
 
 
@@ -577,7 +758,7 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
     # Filter.
     query_clause = query_body.get("query")
     if query_clause:
-        predicate = _build_predicate(query_clause)
+        predicate = build_predicate(query_clause)
         records = [r for r in records if predicate(r)]
 
     # Sort.
@@ -586,8 +767,12 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
         records = apply_es_sort(records, sort_spec)
 
     # Paginate.
-    offset = query_body.get("from", 0)
-    size = query_body.get("size")
+    # ES rejects a non-numeric from/size; slicing by one raised TypeError out
+    # of the handler as a plain-text 500.
+    offset = _as_bound(query_body.get("from", 0), "from")
+    # ES defaults to 10; returning the whole index let a client that never sets
+    # size look like it worked against a seeded mock and then truncate in prod.
+    size = _as_bound(query_body.get("size", _DEFAULT_SIZE), "size")
     if offset:
         records = records[offset:]
     if size is not None:

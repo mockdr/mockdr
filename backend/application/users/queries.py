@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from repository.user_repo import user_repo
-from utils.filtering import FilterSpec, apply_filters
+from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import USER_INTERNAL_FIELDS
 from utils.pagination import USER_CURSOR, build_list_response, paginate
 from utils.strip import strip_fields
@@ -18,6 +18,7 @@ def list_users(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of users with internal fields stripped."""
     records = [asdict(u) for u in user_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)  # filter before strip
+    filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, USER_CURSOR)
     stripped = [strip_fields(r, USER_INTERNAL_FIELDS) for r in page]
     return build_list_response(stripped, next_cursor, total)

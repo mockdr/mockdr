@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.graph_auth import require_graph_auth
+from api.graph_auth import require_graph_auth, require_graph_write
 from application.graph.teams import queries as teams_queries
 
 router = APIRouter(tags=["Graph Teams"])
@@ -32,7 +32,7 @@ async def get_team(
         raise HTTPException(
             404,
             detail=build_graph_error_response(
-                "NotFound",
+                "Request_ResourceNotFound",
                 f"Team '{team_id}' not found",
             ),
         )
@@ -52,7 +52,7 @@ async def list_channels(
 async def list_channel_messages(
     team_id: str,
     channel_id: str,
-    top: int = Query(25, alias="$top", le=999),
+    top: int = Query(25, alias="$top", ge=1, le=999),
     skip: int = Query(0, alias="$skip"),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
@@ -62,7 +62,10 @@ async def list_channel_messages(
     )
 
 
-@router.post("/v1.0/teams/{team_id}/channels/{channel_id}/messages")
+@router.post(
+    "/v1.0/teams/{team_id}/channels/{channel_id}/messages",
+    dependencies=[Depends(require_graph_write)],
+)
 async def post_channel_message(
     team_id: str,
     channel_id: str,

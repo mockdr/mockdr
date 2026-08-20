@@ -2,6 +2,7 @@
 
 Implements the Elastic Security Cases API endpoints at ``/api/cases``.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -10,7 +11,7 @@ from fastapi.responses import Response
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_cases import commands as case_commands
 from application.es_cases import queries as case_queries
-from utils.es_response import build_es_error_response
+from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["ES Cases"])
 
@@ -25,13 +26,34 @@ def find_cases(
     owner: str = Query(None),
     page: int = Query(1),
     per_page: int = Query(20, ge=1, le=1000, alias="perPage"),
+    severity: str = Query(None),
+    search: str = Query(None),
+    reporters: str = Query(None, description="Comma-separated usernames"),
+    sort_field: str = Query(None, alias="sortField"),
+    sort_order: str = Query("desc", alias="sortOrder"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Find cases with optional filters and pagination."""
+    """Find cases with optional filters and pagination.
+
+    severity, search, reporters, sortField and sortOrder are documented on
+    this endpoint but were declared on no parameter, so FastAPI dropped them
+    and a filtered request returned the full unfiltered list.
+    """
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    reporter_list = (
+        [r.strip() for r in reporters.split(",") if r.strip()] if reporters else None
+    )
     return case_queries.find_cases(
-        status=status, tags=tag_list, owner=owner,
-        page=page, per_page=per_page,
+        status=status,
+        tags=tag_list,
+        owner=owner,
+        page=page,
+        per_page=per_page,
+        severity=severity,
+        search=search,
+        reporters=reporter_list,
+        sort_field=sort_field,
+        sort_order=sort_order,
     )
 
 
@@ -56,7 +78,7 @@ def get_case(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -70,20 +92,66 @@ def create_case(
     return case_commands.create_case(body)
 
 
-@router.patch("/api/cases/{case_id}", dependencies=[Depends(require_kbn_xsrf)])
-def update_case(
-    case_id: str,
+@router.patch("/api/cases", dependencies=[Depends(require_kbn_xsrf)])
+def update_cases(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
-) -> dict:
-    """Update an existing case (Kibana uses PATCH)."""
-    result = case_commands.update_case(case_id, body)
-    if result is None:
+) -> list[dict]:
+    """Update one or more cases.
+
+    This is the endpoint Kibana actually exposes: ``PATCH /api/cases`` with
+    ``{"cases": [{id, version, ...}]}``. The mock had it inverted — the bulk
+    path 405'd while ``PATCH /api/cases/{id}``, which exists in no Kibana,
+    worked. ``version`` is required and a stale one is a conflict, which was
+    not enforced at all.
+    """
+    patches = body.get("cases")
+    if not isinstance(patches, list) or not patches:
         raise HTTPException(
-            status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            status_code=400,
+            detail=build_kbn_error_response(400, "cases: expected a non-empty array"),
         )
-    return result
+
+    updated: list[dict] = []
+    for patch in patches:
+        if not isinstance(patch, dict):
+            raise HTTPException(
+                status_code=400,
+                detail=build_kbn_error_response(
+                    400, "cases: each entry must be an object",
+                ),
+            )
+        case_id = patch.get("id")
+        version = patch.get("version")
+        if not case_id or not version:
+            raise HTTPException(
+                status_code=400,
+                detail=build_kbn_error_response(
+                    400, "each case requires id and version",
+                ),
+            )
+
+        current = case_queries.get_case(case_id)
+        if current is None:
+            raise HTTPException(
+                status_code=404,
+                detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+            )
+        if current.get("version") != version:
+            raise HTTPException(
+                status_code=409,
+                detail=build_kbn_error_response(
+                    409,
+                    f"This case {case_id} has been updated. Please refresh before "
+                    f"saving additional updates.",
+                ),
+            )
+
+        changes = {k: v for k, v in patch.items() if k not in ("id", "version")}
+        result = case_commands.update_case(case_id, changes)
+        if result is not None:
+            updated.append(result)
+    return updated
 
 
 @router.delete("/api/cases", dependencies=[Depends(require_kbn_xsrf)])
@@ -110,7 +178,7 @@ def get_case_comments(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -126,7 +194,7 @@ def add_comment(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(404, "not_found", f"Case {case_id} not found"),
+            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
         )
     return result
 
@@ -146,8 +214,8 @@ def update_comment(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found",
+            detail=build_kbn_error_response(
+                404,
                 f"Comment {comment_id} not found on case {case_id}",
             ),
         )
@@ -168,8 +236,8 @@ def delete_comment(
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=build_es_error_response(
-                404, "not_found",
+            detail=build_kbn_error_response(
+                404,
                 f"Comment {comment_id} not found on case {case_id}",
             ),
         )

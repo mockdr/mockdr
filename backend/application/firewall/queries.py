@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from repository.firewall_repo import firewall_repo
-from utils.filtering import FilterSpec, apply_filters
+from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import FIREWALL_INTERNAL_FIELDS
 from utils.pagination import FIREWALL_CURSOR, build_list_response, paginate
 from utils.strip import strip_fields
@@ -19,6 +19,7 @@ def list_rules(params: dict, cursor: str | None, limit: int) -> dict:
     records = [asdict(r) for r in firewall_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)  # filter before strip
     filtered.sort(key=lambda r: r.get("order", 0))
+    filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, FIREWALL_CURSOR)
     stripped = [strip_fields(r, FIREWALL_INTERNAL_FIELDS) for r in page]
     return build_list_response(stripped, next_cursor, total)

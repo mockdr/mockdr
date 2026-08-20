@@ -1,6 +1,5 @@
 """Groups seeder — seeds a sample of groups per site and their default policies."""
 import random
-import uuid
 
 from faker import Faker
 
@@ -9,7 +8,7 @@ from infrastructure.seeders._shared import ago, make_policy, rand_ago
 from repository.group_repo import group_repo
 from repository.policy_repo import policy_repo
 from repository.site_repo import site_repo
-from utils.id_gen import new_id
+from utils.id_gen import new_id, new_uuid
 
 _GROUP_NAMES: list[str] = [
     "Default group", "Servers", "Workstations", "Contractors", "Executives",
@@ -56,7 +55,7 @@ def seed_groups(
                 description=fake.sentence(nb_words=6),
                 filterId=None,
                 filterName=None,
-                registrationToken=str(uuid.uuid4()),
+                registrationToken=str(new_uuid()),
                 creator=None,
                 creatorId=None,
                 # internal

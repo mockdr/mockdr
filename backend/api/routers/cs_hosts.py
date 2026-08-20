@@ -18,7 +18,7 @@ router = APIRouter(tags=["CrowdStrike Hosts"])
 def query_hosts(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, ge=1, le=1000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
@@ -30,7 +30,7 @@ def query_hosts(
 def query_hosts_scroll(
     filter: str = Query(None),
     offset: str = Query(None),
-    limit: int = Query(5000, le=5000),
+    limit: int = Query(5000, ge=1, le=5000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:

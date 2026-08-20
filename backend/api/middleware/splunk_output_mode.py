@@ -20,6 +20,11 @@ from utils.splunk.xml_output import render_splunk_xml
 
 _SPLUNK_PREFIX = "/splunk"
 _HEC_PREFIX = "/splunk/services/collector"
+# The KV Store *data* API is JSON-only in real Splunk — output_mode does not
+# apply to it. splunklib proves it: KVStoreCollectionData.query() calls
+# json.loads on the body and never sends output_mode. Rendering Atom XML
+# here broke every SDK KV Store call unconditionally.
+_KVSTORE_DATA_MARKER = "/storage/collections/data/"
 
 
 class SplunkOutputModeMiddleware(BaseHTTPMiddleware):
@@ -33,6 +38,8 @@ class SplunkOutputModeMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
         if not path.startswith(_SPLUNK_PREFIX) or path.startswith(_HEC_PREFIX):
+            return response
+        if _KVSTORE_DATA_MARKER in path:
             return response
         if request.query_params.get("output_mode", "").lower() == "json":
             return response

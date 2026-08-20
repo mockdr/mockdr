@@ -15,6 +15,7 @@ from infrastructure.seeders._shared import (
 )
 from repository.agent_repo import agent_repo
 from repository.alert_repo import alert_repo
+from repository.store import store
 from utils.id_gen import new_id
 
 
@@ -36,6 +37,9 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
         severity = random.choice(ALERT_SEVERITIES)
         category = random.choice(["Threat Intelligence", "Behavioral", "Network", "Endpoint"])
         tactic = random.choice(MITRE_TACTICS)
+        rule_name = f"STAR Rule: {fake.bs().title()}"
+        rule_description = f"Detects {category.lower()} activity via {tactic}"
+        rule_s1ql = f'EventType = "Process" AND TgtProcName Contains "{proc_name}"'
 
         alert_repo.save(Alert(
             alertInfo={
@@ -67,13 +71,13 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
             },
             ruleInfo={
                 "id": rule_id,
-                "name": f"STAR Rule: {fake.bs().title()}",
+                "name": rule_name,
                 "severity": severity,
-                "description": f"Detects {category.lower()} activity via {tactic}",
+                "description": rule_description,
                 "queryType": "events",
                 "queryLang": "1.0",
                 "scopeLevel": "site",
-                "s1ql": f'EventType = "Process" AND TgtProcName Contains "{proc_name}"',
+                "s1ql": rule_s1ql,
                 "treatAsThreat": "UNDEFINED",
             },
             sourceProcessInfo={
@@ -105,7 +109,7 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
                 "osRevision": agent.osRevision,
             },
             agentRealtimeInfo={
-                "id": agent.uuid,
+                "id": agent.id,
                 "agentComputerName": agent.computerName,
                 "os": agent.osType,
                 "agentVersion": agent.agentVersion,
@@ -114,3 +118,29 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
                 "accountId": agent.accountId,
             },
         ))
+
+        # Every alert embeds a ruleInfo.id, but nothing was ever written to the
+        # star_rules collection — so GET /cloud-detection/rules was empty and
+        # each alert pointed at a rule that existed nowhere.
+        store.save("star_rules", rule_id, {
+            "id": rule_id,
+            "name": rule_name,
+            "description": rule_description,
+            "queryType": "events",
+            "queryLang": "1.0",
+            "s1ql": rule_s1ql,
+            "severity": severity,
+            "scopeLevel": "site",
+            "siteIds": [agent.siteId],
+            "groupIds": [],
+            "accountIds": [agent.accountId],
+            "treatAsThreat": "UNDEFINED",
+            "status": "Active",
+            "expirationMode": "Permanent",
+            "expiration": None,
+            "networkQuarantine": False,
+            "createdAt": created,
+            "updatedAt": created,
+            "creator": "Admin User",
+            "creatorId": "",
+        })

@@ -52,6 +52,9 @@ def get_single_data_connector(
     if not dc:
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("NotFound", f"Data connector '{connector_id}' not found"),
+            detail=build_arm_error(
+                "ResourceNotFound",
+                f"Data connector '{connector_id}' not found",
+            ),
         )
     return _connector_to_arm(dc)

@@ -6,7 +6,7 @@ import random
 from faker import Faker
 
 from domain.cs_incident import CsIncident
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.cs_shared import (
     CS_CID,
     CS_DETECTION_TACTICS,
@@ -99,7 +99,7 @@ def seed_cs_incidents(
 
         created_ts = rand_ago(30)
         start_ts = created_ts
-        end_ts = rand_ago(5) if state == "closed" else ""
+        end_ts = rand_after(created_ts) if state == "closed" else ""
 
         name = random.choice(CS_INCIDENT_NAMES)
         description = (
@@ -126,7 +126,7 @@ def seed_cs_incidents(
             start=start_ts,
             end=end_ts,
             created=created_ts,
-            modified_timestamp=rand_ago(3),
+            modified_timestamp=rand_after(created_ts),
             assigned_to="" if status == 20 else fake.email(),
             assigned_to_name="" if status == 20 else fake.name(),
             objectives=[f"Falcon Detection Method - {tactics[0]}"] if tactics else [],

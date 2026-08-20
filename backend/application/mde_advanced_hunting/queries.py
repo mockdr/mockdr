@@ -1,93 +1,88 @@
 """Microsoft Defender for Endpoint Advanced Hunting query handler."""
 from __future__ import annotations
 
-from utils.dt import utc_now
+from datetime import datetime
+from typing import Any
+
+from application.mde_advanced_hunting.tables import TABLE_NAMES, get_table
+from utils.mde_kql import KqlError, evaluate_kql, parse_kql
+
+__all__ = ["run_query"]
+
+#: Column types Defender reports in the response Schema.
+_TYPE_NAMES: dict[type, str] = {
+    bool: "Boolean",
+    int: "Int64",
+    float: "Double",
+    str: "String",
+    list: "SByte",
+    dict: "SByte",
+}
 
 
 def run_query(body: dict) -> dict:
-    """Execute an advanced hunting KQL query and return canned results.
+    """Execute an Advanced Hunting KQL query against the seeded tables.
 
-    The real MDE Advanced Hunting API accepts a KQL query and returns a
-    ``Schema`` + ``Results`` structure.  This mock returns synthetic data
-    regardless of the query content.
+    The query used to be accepted and never evaluated — every request returned
+    the same three synthetic rows, so a query naming a nonexistent table, or
+    carrying a ``where`` that excludes everything, still came back with
+    results and told a detection engineer nothing.
 
     Args:
-        body: Request body containing ``Query`` (KQL string).
+        body: Request body containing ``Query`` (a KQL string).
 
     Returns:
-        Advanced hunting response with ``Schema`` and ``Results`` arrays.
+        Advanced hunting response with ``Schema``, ``Results`` and ``Stats``.
+
+    Raises:
+        KqlError: If the query cannot be parsed or names an unknown table.
     """
-    _query = body.get("Query", "")  # accepted but not evaluated
-    now = utc_now()
+    query = parse_kql(body.get("Query", ""))
 
-    schema = [
-        {"Name": "Timestamp", "Type": "DateTime"},
-        {"Name": "DeviceId", "Type": "String"},
-        {"Name": "DeviceName", "Type": "String"},
-        {"Name": "ActionType", "Type": "String"},
-        {"Name": "FileName", "Type": "String"},
-        {"Name": "FolderPath", "Type": "String"},
-        {"Name": "SHA256", "Type": "String"},
-        {"Name": "InitiatingProcessFileName", "Type": "String"},
-        {"Name": "InitiatingProcessCommandLine", "Type": "String"},
-        {"Name": "AccountName", "Type": "String"},
-    ]
+    rows = get_table(query.table)
+    if rows is None:
+        msg = (
+            f"A recognized table name is expected, found '{query.table}'. "
+            f"Tables available in this mock: {', '.join(TABLE_NAMES)}"
+        )
+        raise KqlError(msg)
 
-    results = [
-        {
-            "Timestamp": now,
-            "DeviceId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "DeviceName": "ws-fin-001.acmecorp.internal",
-            "ActionType": "ProcessCreated",
-            "FileName": "powershell.exe",
-            "FolderPath": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
-            "SHA256": "de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c",
-            "InitiatingProcessFileName": "cmd.exe",
-            "InitiatingProcessCommandLine": "cmd.exe /c powershell.exe -ep bypass",
-            "AccountName": "jsmith",
-        },
-        {
-            "Timestamp": now,
-            "DeviceId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-            "DeviceName": "srv-dc-01.acmecorp.internal",
-            "ActionType": "ConnectionSuccess",
-            "FileName": "",
-            "FolderPath": "",
-            "SHA256": "",
-            "InitiatingProcessFileName": "svchost.exe",
-            "InitiatingProcessCommandLine": "svchost.exe -k netsvcs",
-            "AccountName": "SYSTEM",
-        },
-        {
-            "Timestamp": now,
-            "DeviceId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-            "DeviceName": "ws-hr-042.acmecorp.internal",
-            "ActionType": "FileCreated",
-            "FileName": "report.docx",
-            "FolderPath": "C:\\Users\\ajones\\Documents",
-            "SHA256": "abc123def456789012345678901234567890123456789012345678901234abcd",
-            "InitiatingProcessFileName": "WINWORD.EXE",
-            "InitiatingProcessCommandLine": (  # noqa: E501
-                "\"C:\\Program Files\\Microsoft Office\\WINWORD.EXE\" /n"
-            ),
-            "AccountName": "ajones",
-        },
-    ]
-
+    results = evaluate_kql(rows, query)
     return {
-        "Schema": schema,
+        "Schema": _schema_for(results, rows),
         "Results": results,
         "Stats": {
-            "ExecutionTime": 0.023,
-            "resource_usage": {
-                "cache": {"memory": {"hits": 0, "misses": 1, "total": 1}},
-                "cpu": {
-                    "user": "00:00:00.0156250",
-                    "kernel": "00:00:00",
-                    "total cpu": "00:00:00.0156250",
-                },
-                "memory": {"peak_per_node": 1048576},
-            },
-            "dataset_statistics": [{"table_row_count": len(results), "table_size": 1024}],
+            "ExecutionTime": 0.05,
+            "resource_usage": {"cache": {"memory": {"hits": 0, "misses": 0}}},
+            "dataset_statistics": [{"table_row_count": len(results)}],
         },
     }
+
+
+def _schema_for(results: list[dict], source: list[dict]) -> list[dict[str, str]]:
+    """Describe the columns of *results*, falling back to the source table.
+
+    A query that filters everything out still has a schema, because the
+    projection is decided by the query rather than by what survived it.
+    """
+    sample = results[0] if results else {}
+    if not sample and source:
+        sample = source[0]
+    return [
+        {"Name": name, "Type": _type_name(value)}
+        for name, value in sample.items()
+    ]
+
+
+def _type_name(value: Any) -> str:
+    if isinstance(value, str) and _looks_like_datetime(value):
+        return "DateTime"
+    return _TYPE_NAMES.get(type(value), "String")
+
+
+def _looks_like_datetime(value: str) -> bool:
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True

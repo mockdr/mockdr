@@ -18,19 +18,19 @@ from fastapi import Depends, Header, HTTPException
 from repository.user_repo import user_repo
 from utils.token_expiry import is_token_expired
 
+# Real SentinelOne error bodies carry `errors` alone — the schemas backing every
+# error status in S1's own Swagger are named `_NoDataSchema_<status>` — and the
+# titles are S1's own wording, not the HTTP reason phrase.
 _UNAUTH: dict[str, Any] = {
-    "errors": [{"code": 4010010, "detail": "Token is invalid", "title": "Unauthorized"}],
-    "data": None,
+    "errors": [{"code": 4010010, "detail": None, "title": "Authentication Failed"}],
 }
 
 _EXPIRED: dict[str, Any] = {
-    "errors": [{"code": 4010011, "detail": "Token has expired", "title": "Unauthorized"}],
-    "data": None,
+    "errors": [{"code": 4010011, "detail": "Token has expired", "title": "Authentication Failed"}],
 }
 
 _FORBIDDEN: dict[str, Any] = {
-    "errors": [{"code": 4030010, "detail": "Insufficient permissions", "title": "Forbidden"}],
-    "data": None,
+    "errors": [{"code": 4030010, "detail": None, "title": "Insufficient permissions"}],
 }
 
 # ── Role hierarchy ────────────────────────────────────────────────────────────

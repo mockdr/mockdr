@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_xql import queries as xql_queries
-from utils.xdr_response import build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
 
 router = APIRouter(tags=["XDR XQL"])
 
@@ -37,7 +37,7 @@ def get_query_results(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, f"Query {query_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Query {query_id} not found"),
         )
     return result
 
