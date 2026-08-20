@@ -144,8 +144,11 @@ test('OS type filter: selecting Windows filters the agent list', async ({ page }
 // ── 7a. Splunk health check ───────────────────────────────────────────────────
 
 test('splunk server info returns valid JSON', async ({ request }) => {
-  const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:8001'
-  const response = await request.get(`${baseURL}/splunk/services/server/info?output_mode=json`)
+  // The backend gets its own variable: E2E_BASE_URL points at the frontend,
+  // so reusing it here sent this request to the dev server, which answers
+  // every unknown path with the SPA's index.html.
+  const apiURL = process.env.E2E_API_URL ?? 'http://localhost:8001'
+  const response = await request.get(`${apiURL}/splunk/services/server/info?output_mode=json`)
   expect(response.ok()).toBeTruthy()
   const body = await response.json()
   expect(body).toHaveProperty('entry')

@@ -41,12 +41,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   behaviour, and `exec_mode=blocking` still returns done, as real Splunk does.
   Results are readable at any state, since the search has in fact already run.
 
+### Changed
+
+- **Dependency majors taken deliberately rather than one Dependabot PR at a
+  time:** mypy 1.19 → 2.3, Vite 7 → 8, ESLint 10.0 → 10.8, vue-tsc 3.0 → 3.3,
+  Playwright 1.58 → 1.62, uvicorn 0.41 → 0.52, ruff 0.16.2 → 0.16.4,
+  pip-audit 2.10.0 → 2.10.1, pytest-asyncio 1.3 → 1.4, @vue/tsconfig 0.9.0 →
+  0.9.1. Both new majors were clean: mypy 2.3 reports no issues across 781
+  files under `--strict`, and all 9 end-to-end flows pass on Vite 8.
+
 ### Fixed
 
 - `_export` returned a `str`, so FastAPI serialised the NDJSON as one escaped
   JSON string that `_import` could not read.
 - The endpoint metadata list took only `per_page` where Kibana sends
   `pageSize`. Both spellings are accepted now.
+- The Splunk end-to-end check read `E2E_BASE_URL` — which points at the
+  *frontend* — to reach the backend, so overriding the frontend URL sent the
+  request to the dev server, which answers every unknown path with the SPA's
+  index.html. The backend now has its own `E2E_API_URL`.
 
 ## [2.0.1] - 2026-08-20
 
