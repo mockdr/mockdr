@@ -30,3 +30,24 @@ def status_counts(records: list[dict[str, Any]]) -> dict[str, int]:
         if status in counts:
             counts[status] += 1
     return counts
+
+
+#: Members every Kibana comment carries that the dataclass has no slot for.
+_COMMENT_DEFAULTS: dict[str, Any] = {
+    "owner": "securitySolution",
+    "pushed_at": None,
+    "pushed_by": None,
+}
+
+
+def serialise_comment(record: dict[str, Any]) -> dict[str, Any]:
+    """Render a case comment the way Kibana's ``CommentResponse`` does.
+
+    ``case_id`` is dropped — the case is identified by the request path, and no
+    real comment object carries it — and the members every comment has are
+    filled in.
+    """
+    rendered = {k: v for k, v in record.items() if k != "case_id"}
+    for key, value in _COMMENT_DEFAULTS.items():
+        rendered.setdefault(key, value)
+    return rendered

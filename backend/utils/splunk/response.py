@@ -154,16 +154,40 @@ def build_search_results(
         Search results envelope dict.
     """
     if fields is None:
-        if results:
-            fields = list(results[0].keys())
-        else:
-            fields = []
+        fields = list(results[0].keys()) if results else []
     return {
-        "results": results,
+        "results": [_render_row(row) for row in results],
         "fields": [{"name": f} for f in fields],
         "init_offset": init_offset,
         "messages": messages or [],
     }
+
+
+def _render_row(row: dict) -> dict:
+    """Render a result row the way splunkd does — every value a string.
+
+    Splunk results are strings, or lists of strings for multivalue fields;
+    JSON numbers and booleans leaked the mock's internal types through, so a
+    client doing ``int(row["count"])`` worked here and a client comparing
+    ``row["count"] == "38"`` — which is what real Splunk returns — did not.
+    """
+    return {key: _render_value(value) for key, value in row.items()}
+
+
+def _render_value(value: object) -> str | list[str]:
+    if isinstance(value, (list, tuple)):
+        return [_scalar(v) for v in value]
+    return _scalar(value)
+
+
+def _scalar(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
 
 # ---------------------------------------------------------------------------

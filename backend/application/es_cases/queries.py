@@ -5,7 +5,7 @@ from dataclasses import asdict
 
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
-from utils.es_case_serde import serialise_case, status_counts
+from utils.es_case_serde import serialise_case, serialise_comment, status_counts
 from utils.es_pagination import paginate_kibana
 from utils.es_response import build_kibana_cases_response
 
@@ -119,7 +119,7 @@ def get_case_comments(case_id: str) -> list[dict] | None:
     if not case:
         return None
     comments = es_case_comment_repo.get_by_case_id(case_id)
-    return [asdict(c) for c in comments]
+    return [serialise_comment(asdict(c)) for c in comments]
 
 
 def get_case_activity(case_id: str) -> list[dict] | None:

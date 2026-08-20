@@ -290,7 +290,9 @@ class TestCaseComments:
         body = resp.json()
         assert "id" in body
         assert body["comment"] == "New investigation note."
-        assert body["case_id"] == case_id
+        # No real comment object carries case_id — the case is in the path.
+        assert "case_id" not in body
+        assert body["owner"] == "securitySolution"
 
     def test_add_comment_increases_count(self, client: TestClient) -> None:
         """Adding a comment should increase the comment count on the case."""
@@ -313,14 +315,18 @@ class TestCaseComments:
         assert after == before + 1
 
     def test_comment_has_required_fields(self, client: TestClient) -> None:
-        """Each comment should have id, case_id, comment, type, and timestamps."""
+        """Each comment matches Kibana's CommentResponse."""
         case_id = _get_first_case_id(client)
         comments = client.get(
             f"/kibana/api/cases/{case_id}/comments",
             headers=ES_AUTH,
         ).json()
         comment = comments[0]
-        required = ["id", "case_id", "comment", "type", "created_at", "created_by"]
+        required = [
+            "id", "version", "comment", "type", "owner",
+            "created_at", "created_by", "updated_at", "updated_by",
+            "pushed_at", "pushed_by",
+        ]
         for field in required:
             assert field in comment, f"Missing comment field: {field}"
 

@@ -11,7 +11,7 @@ from domain.es_case_comment import EsCaseComment
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
 from utils.dt import utc_now
-from utils.es_case_serde import serialise_case
+from utils.es_case_serde import serialise_case, serialise_comment
 
 
 def create_case(data: dict) -> dict:
@@ -150,7 +150,7 @@ def add_comment(case_id: str, data: dict) -> dict | None:
     case.updated_at = now
     es_case_repo.save(case)
 
-    return asdict(comment)
+    return serialise_comment(asdict(comment))
 
 
 def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
@@ -181,7 +181,7 @@ def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
     )
 
     es_case_comment_repo.save(comment)
-    return asdict(comment)
+    return serialise_comment(asdict(comment))
 
 
 def delete_comment(case_id: str, comment_id: str) -> bool:

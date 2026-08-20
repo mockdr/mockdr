@@ -237,3 +237,43 @@ class TestJobControl:
             params={"output_mode": "json"},
         )
         assert resp.status_code == 404
+
+
+class TestResultValuesAreStrings:
+    """Every value in a Splunk result row is a string.
+
+    JSON numbers and booleans leaked the mock's internal types through, so a
+    client comparing ``row["count"] == "38"`` — which is what real Splunk
+    returns — did not match while ``int(row["count"])`` did.
+    """
+
+    def _results(self, client: TestClient, spl: str) -> list[dict]:
+        sid = client.post(
+            f"{SPLUNK_PREFIX}/services/search/jobs",
+            data={"search": spl}, headers=_auth(),
+            params={"output_mode": "json"},
+        ).json()["sid"]
+        return list(client.get(
+            f"{SPLUNK_PREFIX}/services/search/v2/jobs/{sid}/results",
+            headers=_auth(), params={"output_mode": "json", "count": 0},
+        ).json()["results"])
+
+    def test_aggregate_counts_are_strings(self, client: TestClient) -> None:
+        rows = self._results(client, "search index=sentinelone | stats count")
+        assert rows
+        assert isinstance(rows[0]["count"], str)
+
+    def test_every_scalar_is_a_string(self, client: TestClient) -> None:
+        rows = self._results(client, "search index=sentinelone | head 5")
+        for row in rows:
+            for name, value in row.items():
+                assert isinstance(value, (str, list)), f"{name} is {type(value).__name__}"
+
+    def test_multivalue_fields_are_lists_of_strings(self, client: TestClient) -> None:
+        rows = self._results(
+            client, "search index=sentinelone | stats values(sourcetype) as types",
+        )
+        assert rows
+        types = rows[0]["types"]
+        assert isinstance(types, list)
+        assert all(isinstance(t, str) for t in types)
