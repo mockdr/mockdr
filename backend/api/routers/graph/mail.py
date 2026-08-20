@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.graph_auth import require_graph_auth
+from api.graph_auth import require_graph_auth, require_graph_write
 from application.graph.mail import queries as mail_queries
 
 router = APIRouter(tags=["Graph Mail"])
@@ -43,7 +43,7 @@ async def get_message(
     return result
 
 
-@router.post("/v1.0/users/{user_id}/sendMail")
+@router.post("/v1.0/users/{user_id}/sendMail", dependencies=[Depends(require_graph_write)])
 async def send_mail(
     user_id: str,
     request: Request,

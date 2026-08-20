@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, Query
 
-from api.graph_auth import require_graph_auth, require_graph_feature
+from api.graph_auth import require_graph_auth, require_graph_feature, require_graph_write
 from application.graph.defender_office import queries as defender_queries
 
 router = APIRouter(tags=["Graph Defender for Office 365"])
@@ -33,7 +33,10 @@ async def list_threat_assessments(
     return defender_queries.list_threat_assessments(top=top, skip=skip)
 
 
-@router.post("/v1.0/informationProtection/threatAssessmentRequests")
+@router.post(
+    "/v1.0/informationProtection/threatAssessmentRequests",
+    dependencies=[Depends(require_graph_write)],
+)
 async def create_threat_assessment(
     body: dict = Body(...),
     _: dict = Depends(require_graph_auth),

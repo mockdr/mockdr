@@ -237,12 +237,11 @@ class TestGenerateApiToken:
 class TestGetApiTokenDetails:
     """Tests for the get_api_token_details command."""
 
-    def test_returns_token_details(self) -> None:
-        uid = _first_user_id()
-        result = get_api_token_details(uid)
+    def test_returns_metadata_without_the_token(self) -> None:
+        """Disclosing the token let any caller act as the user it belongs to."""
+        result = get_api_token_details(_first_user_id())
         assert result is not None
-        assert result["data"]["userId"] == uid
-        assert result["data"]["token"]
+        assert set(result["data"]) == {"createdAt", "expiresAt"}
 
     def test_nonexistent_user_returns_none(self) -> None:
         result = get_api_token_details("does-not-exist")

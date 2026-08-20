@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.graph_auth import require_graph_auth
+from api.graph_auth import require_graph_auth, require_graph_write
 from application.graph.teams import queries as teams_queries
 
 router = APIRouter(tags=["Graph Teams"])
@@ -62,7 +62,10 @@ async def list_channel_messages(
     )
 
 
-@router.post("/v1.0/teams/{team_id}/channels/{channel_id}/messages")
+@router.post(
+    "/v1.0/teams/{team_id}/channels/{channel_id}/messages",
+    dependencies=[Depends(require_graph_write)],
+)
 async def post_channel_message(
     team_id: str,
     channel_id: str,

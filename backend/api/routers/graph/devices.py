@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 
-from api.graph_auth import require_graph_feature
+from api.graph_auth import require_graph_feature, require_graph_write
 from application.graph.device_management import queries as device_queries
 from repository.graph.managed_device_repo import graph_managed_device_repo
 from utils.graph_response import build_graph_error_response
@@ -87,7 +87,10 @@ def _require_device(device_id: str) -> None:
         )
 
 
-@router.post("/v1.0/deviceManagement/managedDevices/{device_id}/wipe")
+@router.post(
+    "/v1.0/deviceManagement/managedDevices/{device_id}/wipe",
+    dependencies=[Depends(require_graph_write)],
+)
 async def wipe_device(
     device_id: str,
     _: dict = Depends(require_graph_feature("deviceManagement")),
@@ -97,7 +100,10 @@ async def wipe_device(
     return Response(status_code=204)
 
 
-@router.post("/v1.0/deviceManagement/managedDevices/{device_id}/retire")
+@router.post(
+    "/v1.0/deviceManagement/managedDevices/{device_id}/retire",
+    dependencies=[Depends(require_graph_write)],
+)
 async def retire_device(
     device_id: str,
     _: dict = Depends(require_graph_feature("deviceManagement")),
@@ -107,7 +113,10 @@ async def retire_device(
     return Response(status_code=204)
 
 
-@router.post("/v1.0/deviceManagement/managedDevices/{device_id}/syncDevice")
+@router.post(
+    "/v1.0/deviceManagement/managedDevices/{device_id}/syncDevice",
+    dependencies=[Depends(require_graph_write)],
+)
 async def sync_device(
     device_id: str,
     _: dict = Depends(require_graph_feature("deviceManagement")),
@@ -117,7 +126,10 @@ async def sync_device(
     return Response(status_code=204)
 
 
-@router.post("/v1.0/deviceManagement/managedDevices/{device_id}/rebootNow")
+@router.post(
+    "/v1.0/deviceManagement/managedDevices/{device_id}/rebootNow",
+    dependencies=[Depends(require_graph_write)],
+)
 async def reboot_device(
     device_id: str,
     _: dict = Depends(require_graph_feature("deviceManagement")),
@@ -127,7 +139,10 @@ async def reboot_device(
     return Response(status_code=204)
 
 
-@router.post("/v1.0/deviceManagement/managedDevices/{device_id}/windowsDefenderScan")
+@router.post(
+    "/v1.0/deviceManagement/managedDevices/{device_id}/windowsDefenderScan",
+    dependencies=[Depends(require_graph_write)],
+)
 async def windows_defender_scan(
     device_id: str,
     _: dict = Depends(require_graph_feature("deviceManagement")),
@@ -137,7 +152,10 @@ async def windows_defender_scan(
     return Response(status_code=204)
 
 
-@router.post("/v1.0/deviceManagement/managedDevices/{device_id}/windowsDefenderUpdateSignatures")
+@router.post(
+    "/v1.0/deviceManagement/managedDevices/{device_id}/windowsDefenderUpdateSignatures",
+    dependencies=[Depends(require_graph_write)],
+)
 async def windows_defender_update_signatures(
     device_id: str,
     _: dict = Depends(require_graph_feature("deviceManagement")),

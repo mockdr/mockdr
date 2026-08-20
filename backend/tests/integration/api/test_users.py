@@ -198,13 +198,26 @@ class TestGenerateApiToken:
 
 
 class TestGetApiTokenDetails:
-    def test_returns_token_details(self, client: TestClient, auth_headers: dict) -> None:
-        uid = client.get("/web/api/v2.1/users/login/by-token", headers=auth_headers).json()["data"]["id"]
+    def test_returns_metadata_only(self, client: TestClient, auth_headers: dict) -> None:
+        """The spec declares exactly createdAt and expiresAt — no token value."""
+        uid = client.get(
+            "/web/api/v2.1/users/login/by-token", headers=auth_headers,
+        ).json()["data"]["id"]
         resp = client.get(f"{BASE}/{uid}/api-token-details", headers=auth_headers)
         assert resp.status_code == 200
-        body = resp.json()["data"]
-        assert "token" in body
-        assert "expiresAt" in body
+        assert set(resp.json()["data"]) == {"createdAt", "expiresAt"}
+
+    def test_does_not_disclose_another_users_token(self, client: TestClient) -> None:
+        """A viewer could read the admin's token here and then act as admin."""
+        viewer = {"Authorization": "ApiToken viewer-token-0000-0000-000000000002"}
+        admin = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+        admin_id = client.get(
+            "/web/api/v2.1/users/login/by-token", headers=admin,
+        ).json()["data"]["id"]
+
+        body = client.get(f"{BASE}/{admin_id}/api-token-details", headers=viewer).json()
+        assert "admin-token-0000-0000-000000000001" not in str(body)
+        assert "token" not in body["data"]
 
     def test_unknown_user_returns_404(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.get(f"{BASE}/999999999999999999/api-token-details", headers=auth_headers)

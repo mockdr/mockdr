@@ -175,11 +175,11 @@ def get_api_token_details(user_id: str) -> dict | None:
     record = user_repo.get_token_record(user._apiToken)
     if not record:
         return None
+    # Metadata only. The spec's ApiTokenDetailSchema declares exactly
+    # `createdAt` and `expiresAt` — returning the token itself let any
+    # authenticated caller read the admin's credential and act as them, and no
+    # real console discloses it here.
     return {"data": {
-        "id": user_id,
-        "userId": user_id,
-        "token": user._apiToken,
-        "expiresAt": record.get("expiresAt"),
         "createdAt": user.dateJoined,
-        "updatedAt": user.dateJoined,
+        "expiresAt": record.get("expiresAt"),
     }}
