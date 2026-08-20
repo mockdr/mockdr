@@ -13,6 +13,7 @@ from fnmatch import fnmatch
 from repository.es_alert_repo import es_alert_repo
 from repository.es_endpoint_repo import es_endpoint_repo
 from utils.es_aggs import apply_aggregations
+from utils.es_ecs import to_ecs_document
 from utils.es_query import (
     _build_predicate,
     apply_es_query,
@@ -120,7 +121,10 @@ def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tupl
     names = [t.strip().lower() for t in idx.split(",") if t.strip()]
     records: list[dict] = []
     if any(_pattern_hits(n, _ALERT_PREFIXES) for n in names):
-        records += [asdict(a) for a in es_alert_repo.list_all()]
+        # Alerts are rendered as ECS here rather than at the response boundary,
+        # so a query written against the real field names (`host.name`,
+        # `kibana.alert.severity`) filters and aggregates correctly too.
+        records += [to_ecs_document(asdict(a), idx) for a in es_alert_repo.list_all()]
     if any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
         records += [asdict(ep) for ep in es_endpoint_repo.list_all()]
     return records, idx
@@ -271,6 +275,13 @@ def es_mget(index: str, body: dict) -> dict:
     return {"docs": docs}
 
 
+def _document_id(record: dict) -> str:
+    """The ``_id`` a record answers to, flat or ECS."""
+    from utils.es_query import _hit_id  # noqa: PLC0415 - avoids an import cycle
+
+    return _hit_id(record)
+
+
 def _index_uuid(index: str) -> str:
     """A stable pseudo-uuid for an index name."""
     digest = hashlib.sha256(index.encode()).hexdigest()
@@ -306,7 +317,9 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
     records, canonical_index = _resolve_collection(index)
 
     for rec in records:
-        if rec.get("id") == doc_id:
+        # An ECS document keeps its identity under kibana.alert.uuid or
+        # signal.rule.id rather than a top-level `id`.
+        if _document_id(rec) == doc_id:
             return {
                 "_index": canonical_index,
                 "_id": doc_id,

@@ -31,7 +31,7 @@ class TestTermsAggregation:
 
     def test_returns_buckets(self, client: TestClient) -> None:
         result = _aggregate(
-            client, {"by_sev": {"terms": {"field": "signal_rule_severity"}}},
+            client, {"by_sev": {"terms": {"field": "signal.rule.severity"}}},
         )
         buckets = result["by_sev"]["buckets"]
 
@@ -40,7 +40,7 @@ class TestTermsAggregation:
 
     def test_carries_the_bookkeeping_fields(self, client: TestClient) -> None:
         result = _aggregate(
-            client, {"by_sev": {"terms": {"field": "signal_rule_severity"}}},
+            client, {"by_sev": {"terms": {"field": "signal.rule.severity"}}},
         )
         assert "doc_count_error_upper_bound" in result["by_sev"]
         assert "sum_other_doc_count" in result["by_sev"]
@@ -49,7 +49,7 @@ class TestTermsAggregation:
         resp = client.post(
             SEARCH_URL,
             json={"size": 0, "aggs": {"s": {"terms": {
-                "field": "signal_rule_severity", "size": 100,
+                "field": "signal.rule.severity", "size": 100,
             }}}},
             headers=ES_AUTH,
         ).json()
@@ -59,14 +59,14 @@ class TestTermsAggregation:
 
     def test_size_limits_buckets(self, client: TestClient) -> None:
         result = _aggregate(
-            client, {"s": {"terms": {"field": "signal_rule_severity", "size": 1}}},
+            client, {"s": {"terms": {"field": "signal.rule.severity", "size": 1}}},
         )
         assert len(result["s"]["buckets"]) == 1
         assert result["s"]["sum_other_doc_count"] > 0
 
     def test_buckets_are_ordered_by_count(self, client: TestClient) -> None:
         result = _aggregate(
-            client, {"s": {"terms": {"field": "signal_rule_severity", "size": 100}}},
+            client, {"s": {"terms": {"field": "signal.rule.severity", "size": 100}}},
         )
         counts = [b["doc_count"] for b in result["s"]["buckets"]]
         assert counts == sorted(counts, reverse=True)
@@ -79,15 +79,15 @@ class TestMetricAggregations:
         "agg", ["min", "max", "avg", "sum", "cardinality", "value_count"],
     )
     def test_metric_returns_a_value(self, client: TestClient, agg: str) -> None:
-        result = _aggregate(client, {"m": {agg: {"field": "signal_rule_risk_score"}}})
+        result = _aggregate(client, {"m": {agg: {"field": "signal.rule.risk_score"}}})
         assert "value" in result["m"]
 
     def test_stats_reports_every_member(self, client: TestClient) -> None:
-        result = _aggregate(client, {"m": {"stats": {"field": "signal_rule_risk_score"}}})
+        result = _aggregate(client, {"m": {"stats": {"field": "signal.rule.risk_score"}}})
         assert {"count", "min", "max", "avg", "sum"} == set(result["m"])
 
     def test_min_does_not_exceed_max(self, client: TestClient) -> None:
-        result = _aggregate(client, {"m": {"stats": {"field": "signal_rule_risk_score"}}})
+        result = _aggregate(client, {"m": {"stats": {"field": "signal.rule.risk_score"}}})
         assert result["m"]["min"] <= result["m"]["max"]
 
     def test_top_hits_returns_documents(self, client: TestClient) -> None:
@@ -102,7 +102,7 @@ class TestBucketAggregations:
         result = _aggregate(
             client,
             {"over_time": {"date_histogram": {
-                "field": "timestamp", "fixed_interval": "1d",
+                "field": "@timestamp", "fixed_interval": "1d",
             }}},
         )
         buckets = result["over_time"]["buckets"]
@@ -111,21 +111,21 @@ class TestBucketAggregations:
 
     def test_range(self, client: TestClient) -> None:
         result = _aggregate(client, {"r": {"range": {
-            "field": "signal_rule_risk_score",
+            "field": "signal.rule.risk_score",
             "ranges": [{"to": 50}, {"from": 50}],
         }}})
         assert len(result["r"]["buckets"]) == 2
 
     def test_filter(self, client: TestClient) -> None:
         result = _aggregate(client, {"f": {"filter": {
-            "term": {"signal_rule_severity": "low"},
+            "term": {"signal.rule.severity": "low"},
         }}})
         assert "doc_count" in result["f"]
 
     def test_named_filters(self, client: TestClient) -> None:
         result = _aggregate(client, {"f": {"filters": {"filters": {
-            "low": {"term": {"signal_rule_severity": "low"}},
-            "high": {"term": {"signal_rule_severity": "high"}},
+            "low": {"term": {"signal.rule.severity": "low"}},
+            "high": {"term": {"signal.rule.severity": "high"}},
         }}}})
         assert set(result["f"]["buckets"]) == {"low", "high"}
 
@@ -135,8 +135,8 @@ class TestSubAggregations:
 
     def test_metric_inside_terms(self, client: TestClient) -> None:
         result = _aggregate(client, {"by_sev": {
-            "terms": {"field": "signal_rule_severity"},
-            "aggs": {"avg_risk": {"avg": {"field": "signal_rule_risk_score"}}},
+            "terms": {"field": "signal.rule.severity"},
+            "aggs": {"avg_risk": {"avg": {"field": "signal.rule.risk_score"}}},
         }})
         bucket = result["by_sev"]["buckets"][0]
 
@@ -150,7 +150,7 @@ class TestAggregationScope:
     def test_size_zero_still_aggregates_everything(self, client: TestClient) -> None:
         resp = client.post(
             SEARCH_URL,
-            json={"size": 0, "aggs": {"c": {"value_count": {"field": "id"}}}},
+            json={"size": 0, "aggs": {"c": {"value_count": {"field": "signal.rule.id"}}}},
             headers=ES_AUTH,
         ).json()
 
@@ -162,8 +162,8 @@ class TestAggregationScope:
             SEARCH_URL,
             json={
                 "size": 0,
-                "query": {"term": {"signal_rule_severity": "low"}},
-                "aggs": {"c": {"value_count": {"field": "id"}}},
+                "query": {"term": {"signal.rule.severity": "low"}},
+                "aggs": {"c": {"value_count": {"field": "signal.rule.id"}}},
             },
             headers=ES_AUTH,
         ).json()
@@ -235,7 +235,7 @@ class TestCountAndMget:
         assert counted == searched
 
     def test_count_honours_a_query(self, client: TestClient) -> None:
-        body = {"query": {"term": {"signal_rule_severity": "low"}}}
+        body = {"query": {"term": {"signal.rule.severity": "low"}}}
         counted = client.post(
             f"/elastic/{INDEX}/_count", json=body, headers=ES_AUTH,
         ).json()["count"]

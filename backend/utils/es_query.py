@@ -595,6 +595,11 @@ def _hit_id(rec: dict) -> str:
         val = rec.get(field)
         if isinstance(val, str) and val:
             return val
+    # ECS alert documents carry their identity nested.
+    for path in ("kibana.alert.uuid", "signal.rule.id"):
+        nested = _get_nested(rec, path)
+        if isinstance(nested, str) and nested:
+            return nested
     digest = hashlib.sha256(json.dumps(rec, sort_keys=True, default=str).encode())
     return str(uuid.UUID(digest.hexdigest()[:32]))
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from repository.es_alert_repo import es_alert_repo
+from utils.es_ecs import to_ecs_document
 from utils.es_query import apply_es_query, apply_source_filter, wrap_as_hits
 from utils.es_response import build_es_search_response
 
@@ -18,12 +19,15 @@ def search_alerts(body: dict) -> dict:
     Returns:
         Elasticsearch search response envelope with matching alerts.
     """
-    all_records = [asdict(a) for a in es_alert_repo.list_all()]
+    index = ".siem-signals-default"
+    all_records = [
+        to_ecs_document(asdict(a), index) for a in es_alert_repo.list_all()
+    ]
     total = len(all_records)
 
     filtered = apply_es_query(all_records, body)
     hits = apply_source_filter(
-        wrap_as_hits(filtered, index=".siem-signals-default"), body.get("_source"),
+        wrap_as_hits(filtered, index=index), body.get("_source"),
     )
 
     return build_es_search_response(hits, total=total)
