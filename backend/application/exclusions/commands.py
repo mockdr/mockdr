@@ -7,6 +7,10 @@ from utils.dt import utc_now
 from utils.id_gen import new_id
 
 
+class InvalidExclusionError(ValueError):
+    """Raised when an exclusion body is not a shape S1 accepts."""
+
+
 def create_exclusion(body: dict, user_id: str | None) -> dict:
     """Create and persist a new threat exclusion.
 
@@ -17,7 +21,13 @@ def create_exclusion(body: dict, user_id: str | None) -> dict:
     Returns:
         Dict with ``data`` as a single-element list containing the new exclusion.
     """
-    data = body.get("data") or body
+    payload = body.get("data") or body
+    # S1 accepts a list under `data` for bulk creation. Calling .get() on
+    # it raised AttributeError straight out of the handler as a 500.
+    data = payload[0] if isinstance(payload, list) and payload else payload
+    if not isinstance(data, dict):
+        msg = "data must be an object or a non-empty array of objects"
+        raise InvalidExclusionError(msg)
     eid = new_id()
     exclusion = Exclusion(
         id=eid,
@@ -55,7 +65,13 @@ def update_exclusion(exclusion_id: str, body: dict, user_id: str | None) -> dict
     existing = exclusion_repo.get(exclusion_id)
     if existing is None:
         return None
-    data = body.get("data") or body
+    payload = body.get("data") or body
+    # S1 accepts a list under `data` for bulk creation. Calling .get() on
+    # it raised AttributeError straight out of the handler as a 500.
+    data = payload[0] if isinstance(payload, list) and payload else payload
+    if not isinstance(data, dict):
+        msg = "data must be an object or a non-empty array of objects"
+        raise InvalidExclusionError(msg)
     updatable = (
         "type", "value", "osType", "mode", "source", "description",
         "scopeName", "scopePath", "scope", "actions", "pathExclusionType",

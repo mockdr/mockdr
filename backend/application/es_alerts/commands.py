@@ -12,7 +12,7 @@ def update_alert_status(alert_ids: list[str], status: str) -> dict:
         status:    New status — ``"open"``, ``"acknowledged"``, or ``"closed"``.
 
     Returns:
-        Summary dict with updated count.
+        The Elasticsearch ``update_by_query`` response Kibana proxies back.
     """
     updated = 0
     for alert_id in alert_ids:
@@ -22,7 +22,29 @@ def update_alert_status(alert_ids: list[str], status: str) -> dict:
             alert.signal_status = status
             es_alert_repo.save(alert)
             updated += 1
-    return {"updated": updated}
+    # Kibana proxies Elasticsearch's update_by_query and returns its whole
+    # response; `{"updated": N}` alone left a client with nothing to check for
+    # version conflicts or failures.
+    return _update_by_query_response(updated)
+
+
+def _update_by_query_response(updated: int, *, took: int = 5) -> dict:
+    """Build the ``update_by_query`` envelope Kibana returns for signal writes."""
+    return {
+        "took": took,
+        "timed_out": False,
+        "total": updated,
+        "updated": updated,
+        "deleted": 0,
+        "batches": 1 if updated else 0,
+        "version_conflicts": 0,
+        "noops": 0,
+        "retries": {"bulk": 0, "search": 0},
+        "throttled_millis": 0,
+        "requests_per_second": -1.0,
+        "throttled_until_millis": 0,
+        "failures": [],
+    }
 
 
 def update_alert_tags(

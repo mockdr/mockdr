@@ -16,6 +16,7 @@ from utils.pagination import (
     build_single_response,
     paginate,
 )
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Exclusions & Blocklist"])
 
@@ -62,7 +63,13 @@ def create_exclusion(body: dict, current_user: dict = Depends(require_admin)) ->
 
     Accepts both flat and wrapped (``{"data": {...}}``) payloads per real S1 API.
     """
-    return exclusion_commands.create_exclusion(body, current_user.get("userId"))
+    try:
+        return exclusion_commands.create_exclusion(body, current_user.get("userId"))
+    except exclusion_commands.InvalidExclusionError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
 
 
 @router.put("/exclusions/{exclusion_id}")

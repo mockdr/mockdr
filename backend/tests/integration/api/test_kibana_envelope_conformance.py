@@ -94,3 +94,68 @@ class TestEndpointMetadataEnvelope:
 
         assert "pageSize" in body
         assert "per_page" not in body
+
+
+class TestSignalStatusEnvelope:
+    """``signals/status`` proxies Elasticsearch's update_by_query response."""
+
+    def _alert_ids(self, client: TestClient, count: int = 1) -> list[str]:
+        hits = client.post(
+            "/kibana/api/detection_engine/signals/search",
+            headers=ES_AUTH, json={"size": count},
+        ).json()["hits"]["hits"]
+        return [h["_id"] for h in hits]
+
+    def test_response_carries_the_update_by_query_members(
+        self, client: TestClient,
+    ) -> None:
+        body = client.post(
+            "/kibana/api/detection_engine/signals/status",
+            headers={**ES_AUTH, "kbn-xsrf": "true"},
+            json={"signal_ids": self._alert_ids(client), "status": "closed"},
+        ).json()
+
+        # `{"updated": N}` alone left a client with nothing to check for
+        # version conflicts or failures.
+        for member in (
+            "took", "timed_out", "total", "updated", "deleted", "batches",
+            "version_conflicts", "noops", "retries", "failures",
+        ):
+            assert member in body, f"missing update_by_query member: {member}"
+
+    def test_updated_count_is_still_reported(self, client: TestClient) -> None:
+        ids = self._alert_ids(client, 2)
+        body = client.post(
+            "/kibana/api/detection_engine/signals/status",
+            headers={**ES_AUTH, "kbn-xsrf": "true"},
+            json={"signal_ids": ids, "status": "acknowledged"},
+        ).json()
+
+        assert body["updated"] == len(ids)
+        assert body["total"] == len(ids)
+
+
+class TestExclusionAndActionEdgeCases:
+    """Two bodies that used to raise straight through as 500s."""
+
+    def test_exclusion_list_body_is_accepted(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        # S1 accepts a list under `data` for bulk creation; calling .get() on
+        # it raised AttributeError out of the handler.
+        resp = client.post(
+            "/web/api/v2.1/exclusions",
+            json={"data": [{"value": "/tmp/probe", "type": "path", "osType": "linux"}]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    def test_exclusion_junk_body_is_a_400_not_a_500(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        resp = client.post(
+            "/web/api/v2.1/exclusions",
+            json={"data": "not-an-object"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 400
