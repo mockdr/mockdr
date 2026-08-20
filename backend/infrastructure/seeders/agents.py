@@ -268,7 +268,14 @@ def seed_agents(
             inRemoteShellSession=False,
             remoteProfilingState="disabled",
             remoteProfilingStateExpiration=None,
-            proxyStates={"console": False, "deepVisibility": False},
+            proxyStates={
+                "console": False,
+                "consoleProxyAddress": "",
+                "deepVisibility": False,
+                "deepVisibilityProxyAddress": "",
+                "pacFileUsage": False,
+                "proxyMethod": "",
+            },
             cloudProviders={},
             hasContainerizedWorkload=(
                 os_type == "linux" and random.random() > 0.5

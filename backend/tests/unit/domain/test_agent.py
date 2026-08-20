@@ -80,3 +80,39 @@ class TestAgentDataclass:
     def test_last_ip_matches_local_ip(self, seeded_agent: Agent) -> None:
         """'lastIpToMgmt' (public) must be set from 'localIp' during seed."""
         assert seeded_agent.lastIpToMgmt == seeded_agent.localIp
+
+
+class TestProxyStates:
+    """``proxyStates`` must carry every member the 2.1 spec defines.
+
+    Only ``console`` and ``deepVisibility`` were present, so a client reading
+    the addresses or the PAC fields off an agent got a KeyError against the
+    mock and a value against a real console. Caught by the field-drift check,
+    which had never run in CI because its spec was absent.
+    """
+
+    SPEC_MEMBERS = frozenset({  # noqa: RUF012
+        "console",
+        "consoleProxyAddress",
+        "deepVisibility",
+        "deepVisibilityProxyAddress",
+        "pacFileUsage",
+        "proxyMethod",
+    })
+
+    def _states(self) -> dict:
+        """Return proxyStates from a seeded agent, as the API would serve it."""
+        agents = agent_repo.list_all()
+        assert agents, "seed produced no agents"
+        return dict(agents[0].proxyStates)
+
+    def test_seeded_agent_carries_every_spec_member(self) -> None:
+        assert set(self._states()) == self.SPEC_MEMBERS
+
+    def test_member_types_match_the_spec(self) -> None:
+        """The spec types three of these as boolean and three as string."""
+        states = self._states()
+        for name in ("console", "deepVisibility", "pacFileUsage"):
+            assert isinstance(states[name], bool), name
+        for name in ("consoleProxyAddress", "deepVisibilityProxyAddress", "proxyMethod"):
+            assert isinstance(states[name], str), name

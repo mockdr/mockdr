@@ -17,6 +17,15 @@ LABEL org.opencontainers.image.description="Multi-EDR & SIEM mock server"
 LABEL org.opencontainers.image.licenses="LicenseRef-BSL-1.1"
 WORKDIR /app
 
+# The base image lags Debian's security updates, so it ships known-vulnerable
+# OS packages between tag refreshes — util-linux alone accounted for 36 HIGH
+# CVEs that already had fixes published. Upgrading at build time picks those up
+# without waiting for a new base tag.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

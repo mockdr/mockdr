@@ -383,6 +383,14 @@ def main() -> int:
         action="store_true",
         help="Auto-start the backend server before checking",
     )
+    parser.add_argument(
+        "--require-spec",
+        action="store_true",
+        help=(
+            "Fail instead of skipping when the Swagger spec is absent. CI passes "
+            "this so a missing spec cannot masquerade as a passing check."
+        ),
+    )
     args = parser.parse_args()
 
     server_proc = None
@@ -399,8 +407,15 @@ def main() -> int:
 
         spec = load_spec()
         if spec is None:
-            print(f"SKIPPED: Swagger spec not found at {SWAGGER_PATH}")
-            print("Field-drift check requires data/swagger_2_1.json (not committed).")
+            # Skipping quietly made this a check that could never fail: `data/`
+            # is gitignored, so the spec is never present in CI, and the job
+            # reported success without comparing anything.
+            print(f"Swagger spec not found at {SWAGGER_PATH}")
+            print("Fetch it with: scripts/fetch_swagger.sh")
+            if args.require_spec:
+                print("FAILED: --require-spec was given and no spec is available.")
+                return 1
+            print("SKIPPED: nothing was compared.")
             return 0
         has_drift = False
         total_endpoints = 0
