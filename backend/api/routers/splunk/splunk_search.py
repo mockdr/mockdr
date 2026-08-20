@@ -165,7 +165,7 @@ def get_job_results(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
     """Get transformed search results."""
-    count = min(count, 10_000)
+    count = min(count, 10_000) if count > 0 else 0
     result = get_results(sid, count, offset)
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
@@ -188,7 +188,7 @@ def get_job_events(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
     """Get raw events from search job."""
-    count = min(count, 10_000)
+    count = min(count, 10_000) if count > 0 else 0
     result = get_events(sid, count, offset)
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [

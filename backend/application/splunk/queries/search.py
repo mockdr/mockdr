@@ -75,12 +75,24 @@ def list_jobs() -> dict:
     return build_splunk_envelope(entries)
 
 
+def _page(rows: list[dict[str, object]], count: int, offset: int) -> list[dict[str, object]]:
+    """Slice *rows*, treating ``count=0`` as "everything".
+
+    Splunk documents zero as "return all available entries", and the SDK
+    encodes it too (``Collection.null_count = 0``). Slicing by it returned an
+    empty page, so the documented way to ask for a whole result set produced
+    nothing.
+    """
+    windowed = rows[offset:]
+    return windowed if count <= 0 else windowed[:count]
+
+
 def get_results(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     """Return search results for a job.
 
     Args:
         sid:    The search job SID.
-        count:  Maximum number of results to return.
+        count:  Maximum number of results to return; ``0`` means all.
         offset: Starting offset.
 
     Returns:
@@ -90,17 +102,33 @@ def get_results(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     if not job:
         return None
 
-    page = job.results[offset:offset + count]
     return build_search_results(
-        page,
+        _page(job.results, count, offset),
         fields=job.field_list,
         init_offset=offset,
+        messages=job.messages,
     )
 
 
 def get_events(sid: str, count: int = 100, offset: int = 0) -> dict | None:
-    """Return raw events for a job (same as results for mock)."""
-    return get_results(sid, count, offset)
+    """Return the events the search matched, before the pipeline reshaped them.
+
+    Real Splunk's ``/events`` returns pre-transform events, so a transforming
+    search makes eventCount and resultCount differ. This previously delegated
+    straight to ``get_results``, so the two were always identical.
+    """
+    job = search_job_repo.get(sid)
+    if not job:
+        return None
+
+    events = job.events or job.results
+    fields = list(events[0].keys()) if events else []
+    return build_search_results(
+        _page(events, count, offset),
+        fields=fields,
+        init_offset=offset,
+        messages=job.messages,
+    )
 
 
 def get_summary(sid: str) -> dict | None:

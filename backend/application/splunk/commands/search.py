@@ -9,6 +9,7 @@ from domain.splunk.search_job import SearchJob
 from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.search_job_repo import search_job_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
+from utils.splunk.spl_exec import execute_pipeline
 from utils.splunk.spl_parser import SPLQuery, parse_spl, resolve_relative_time
 
 
@@ -41,7 +42,7 @@ def create_search_job(
     if latest_time:
         parsed.latest_time = latest_time
 
-    results = _execute_query(parsed)
+    events, results, messages = _execute_query(parsed)
 
     job = SearchJob(
         sid=sid,
@@ -52,10 +53,14 @@ def create_search_job(
         status_buckets=status_buckets,
         dispatch_state="DONE",
         done_progress=1.0,
-        event_count=len(results),
+        # eventCount counts what the search matched; resultCount counts what
+        # the pipeline produced. A transforming search makes them differ.
+        event_count=len(events),
         result_count=len(results),
-        scan_count=len(results),
+        scan_count=len(events),
         results=results,
+        events=events,
+        messages=messages,
         field_list=list(results[0].keys()) if results else [],
         is_done=True,
         published_at=time.time(),
@@ -95,53 +100,24 @@ def delete_search_job(sid: str) -> bool:
     return search_job_repo.delete(sid)
 
 
-def _execute_query(parsed: SPLQuery) -> list[dict]:
+def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]]:
     """Execute a parsed SPL query against the event store.
 
     Args:
         parsed: The parsed SPL query.
 
     Returns:
-        List of result dicts.
+        ``(events, results, messages)`` — the matched events before the
+        pipeline ran, the rows the pipeline produced, and any diagnostics.
     """
-    # Notable macro queries return notable events
     if parsed.is_notable or parsed.index == "notable":
-        return _query_notables(parsed)
+        events = _query_notables(parsed)
+    else:
+        events = _query_events(parsed)
 
-    # Get events matching index/sourcetype filters
-    results = _query_events(parsed)
-
-    # Apply where clauses
-    for field_name, value in parsed.where_clauses:
-        results = [r for r in results if str(r.get(field_name, "")) == value]
-
-    # Apply stats
-    if parsed.stats_count_by:
-        results = _apply_stats(results, parsed.stats_count_by)
-
-    # Apply sort
-    if parsed.sort_field:
-        results = _apply_sort(results, parsed.sort_field, parsed.sort_descending)
-
-    # Apply renames
-    if parsed.renames:
-        results = _apply_renames(results, parsed.renames)
-
-    # Apply evals
-    if parsed.evals:
-        results = _apply_evals(results, parsed.evals)
-
-    # Apply table projection
-    if parsed.table_fields:
-        results = _apply_table(results, parsed.table_fields)
-
-    # Apply head/tail limits
-    if parsed.head > 0:
-        results = results[:parsed.head]
-    if parsed.tail > 0:
-        results = results[-parsed.tail:]
-
-    return results
+    results, texts = execute_pipeline(events, parsed)
+    messages = [{"type": "WARN", "text": text} for text in texts]
+    return events, results, messages
 
 
 def _query_events(parsed: SPLQuery) -> list[dict]:
@@ -165,16 +141,6 @@ def _query_events(parsed: SPLQuery) -> list[dict]:
         if earliest and event.time < earliest:
             continue
         if latest and event.time > latest:
-            continue
-
-        # Field filters from search clause
-        match = True
-        for key, value in parsed.field_filters.items():
-            event_val = str(event.fields.get(key, ""))
-            if event_val != value:
-                match = False
-                break
-        if not match:
             continue
 
         # Build result dict from event
@@ -231,14 +197,7 @@ def _query_notables(parsed: SPLQuery) -> list[dict]:
                 "description": n.description,
             }),
         }
-        # Apply field filters
-        match = True
-        for key, value in parsed.field_filters.items():
-            if str(result.get(key, "")) != value:
-                match = False
-                break
-        if match:
-            results.append(result)
+        results.append(result)
 
     # Sort by time descending
     results.sort(key=lambda r: float(str(r.get("_time", 0) or 0)), reverse=True)
