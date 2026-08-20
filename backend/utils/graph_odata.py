@@ -36,8 +36,12 @@ __all__ = [
 # Lambda pre-processor
 # ---------------------------------------------------------------------------
 
+# The leading \b matters for more than tidiness: without it the engine retries
+# the match at every offset inside a long word run, and each retry scans to the
+# end — quadratic. A 32KB filter took 2.8s to reject, so a handful of concurrent
+# requests could stall a worker. Anchoring to a word start makes it linear.
 _LAMBDA_RE = re.compile(
-    r"(\w[\w/]*)/any\s*\(\s*(\w+)\s*:\s*\2/(\w+)\s+"
+    r"\b(\w[\w/]*)/any\s*\(\s*(\w+)\s*:\s*\2/(\w+)\s+"
     r"(eq|ne|gt|ge|lt|le)\s+"
     r"'([^']*)'\s*\)",
     re.IGNORECASE,
