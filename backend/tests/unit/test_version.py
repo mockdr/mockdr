@@ -49,3 +49,26 @@ def test_ui_does_not_hardcode_a_version(path: str) -> None:
     assert not re.search(r"mockdr v\d+\.\d+\.\d+", source), (
         f"{path} hardcodes a version string"
     )
+
+
+def test_openapi_schema_has_no_duplicate_operation_ids() -> None:
+    """Every operation is addressable by a unique id.
+
+    Routes serving several methods from one ``api_route`` emitted the same
+    operationId for each, so an OpenAPI client generator collapses or rejects
+    them. FastAPI warns rather than failing, which is easy to miss.
+    """
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        from main import app
+
+        app.openapi_schema = None  # force a rebuild so the warnings fire
+        app.openapi()
+
+    duplicates = [
+        str(w.message) for w in caught
+        if "Duplicate Operation ID" in str(w.message)
+    ]
+    assert not duplicates, f"{len(duplicates)} duplicate operation ids: {duplicates[:3]}"

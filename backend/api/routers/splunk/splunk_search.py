@@ -214,12 +214,10 @@ _CONTROL_ACTIONS = frozenset({
 })
 
 
-@router.api_route(
-    "/services/search/v2/jobs/{sid}/results", methods=["GET", "POST"],
-)
-@router.api_route(
-    "/services/search/jobs/{sid}/results", methods=["GET", "POST"],
-)
+@router.get("/services/search/v2/jobs/{sid}/results", operation_id="splunk_results_v2_get")
+@router.post("/services/search/v2/jobs/{sid}/results", operation_id="splunk_results_v2_post")
+@router.get("/services/search/jobs/{sid}/results", operation_id="splunk_results_v1_get")
+@router.post("/services/search/jobs/{sid}/results", operation_id="splunk_results_v1_post")
 def get_job_results(
     sid: str,
     count: int = Query(default=100),
@@ -237,12 +235,10 @@ def get_job_results(
     return result
 
 
-@router.api_route(
-    "/services/search/v2/jobs/{sid}/events", methods=["GET", "POST"],
-)
-@router.api_route(
-    "/services/search/jobs/{sid}/events", methods=["GET", "POST"],
-)
+@router.get("/services/search/v2/jobs/{sid}/events", operation_id="splunk_events_v2_get")
+@router.post("/services/search/v2/jobs/{sid}/events", operation_id="splunk_events_v2_post")
+@router.get("/services/search/jobs/{sid}/events", operation_id="splunk_events_v1_get")
+@router.post("/services/search/jobs/{sid}/events", operation_id="splunk_events_v1_post")
 def get_job_events(
     sid: str,
     count: int = Query(default=100),

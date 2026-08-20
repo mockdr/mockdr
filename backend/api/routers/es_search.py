@@ -108,7 +108,8 @@ def authenticate(
 # ── Search ───────────────────────────────────────────────────────────────────
 
 
-@router.api_route("/{index}/_search", methods=["GET", "POST"])
+@router.get("/{index}/_search", operation_id="es_search_get")
+@router.post("/{index}/_search", operation_id="es_search_post")
 def es_search(
     index: str,
     body: dict = Body(default={}),
@@ -122,7 +123,8 @@ def es_search(
         raise _missing_index(exc) from exc
 
 
-@router.api_route("/{index}/_count", methods=["GET", "POST"])
+@router.get("/{index}/_count", operation_id="es_count_get")
+@router.post("/{index}/_count", operation_id="es_count_post")
 def es_count(
     index: str,
     body: dict = Body(default={}),
@@ -138,7 +140,8 @@ def es_count(
         raise _missing_index(exc) from exc
 
 
-@router.api_route("/{index}/_mget", methods=["GET", "POST"])
+@router.get("/{index}/_mget", operation_id="es_mget_get")
+@router.post("/{index}/_mget", operation_id="es_mget_post")
 def es_mget(
     index: str,
     body: dict = Body(default={}),
@@ -211,7 +214,8 @@ def get_doc(
     return result
 
 
-@router.api_route("/{index}/_doc/{doc_id}", methods=["POST", "PUT"])
+@router.post("/{index}/_doc/{doc_id}", operation_id="es_index_doc_post")
+@router.put("/{index}/_doc/{doc_id}", operation_id="es_index_doc_put")
 def index_doc(
     index: str,
     doc_id: str,
