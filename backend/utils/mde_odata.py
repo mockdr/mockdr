@@ -552,10 +552,30 @@ def apply_odata_orderby(records: list[dict], orderby: str | None) -> list[dict]:
     """
     if not orderby or not orderby.strip():
         return records
-    parts = orderby.strip().split()
-    field_name = parts[0]
-    desc = len(parts) > 1 and parts[1].lower() == "desc"
-    return sorted(records, key=lambda r: r.get(field_name, "") or "", reverse=desc)
+
+    ordered = list(records)
+    # OData allows several keys; a flat `r.get(name)` also missed every nested
+    # path, so `$orderby=properties/title` sorted nothing while reporting
+    # success. Least-significant key first so the leading key wins.
+    for clause in reversed([c.strip() for c in orderby.split(",") if c.strip()]):
+        parts = clause.split()
+        field_name = parts[0]
+        desc = len(parts) > 1 and parts[1].lower() == "desc"
+        ordered.sort(key=_orderby_key(field_name), reverse=desc)
+    return ordered
+
+
+def _orderby_key(field_name: str) -> Callable[[dict], tuple[int, float, str]]:
+    """Build a sort key that reads dotted paths and orders numbers numerically."""
+    def key(record: dict) -> tuple[int, float, str]:
+        value = _get_nested(record, field_name)
+        if value is None or value == "":
+            return (2, 0.0, "")
+        try:
+            return (0, float(value), "")
+        except (TypeError, ValueError):
+            return (1, 0.0, str(value))
+    return key
 
 
 def apply_odata_select(records: list[dict], select: str | None) -> list[dict]:
