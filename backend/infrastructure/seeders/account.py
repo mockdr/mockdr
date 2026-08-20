@@ -4,6 +4,7 @@ from faker import Faker
 from config import SEED_COUNT_AGENTS
 from domain.account import Account
 from infrastructure.seeders._shared import ago
+from infrastructure.seeders.users import SEED_USER_COUNT
 from repository.account_repo import account_repo
 from utils.id_gen import new_id
 
@@ -29,7 +30,7 @@ def seed_account(fake: Faker) -> tuple[str, str]:
         numberOfSites=3,
         numberOfAgents=SEED_COUNT_AGENTS,
         activeAgents=SEED_COUNT_AGENTS,
-        numberOfUsers=5,
+        numberOfUsers=SEED_USER_COUNT,
         accountType="Trial",
         isDefault=True,
     ))

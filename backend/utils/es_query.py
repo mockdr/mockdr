@@ -595,9 +595,7 @@ def _hit_id(rec: dict) -> str:
         val = rec.get(field)
         if isinstance(val, str) and val:
             return val
-    digest = hashlib.sha1(  # noqa: S324 - identity, not security
-        json.dumps(rec, sort_keys=True, default=str).encode()
-    )
+    digest = hashlib.sha256(json.dumps(rec, sort_keys=True, default=str).encode())
     return str(uuid.UUID(digest.hexdigest()[:32]))
 
 

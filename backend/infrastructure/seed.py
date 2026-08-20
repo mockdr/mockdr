@@ -136,7 +136,7 @@ def generate_all() -> None:
     seed_cs_iocs(fake)
     seed_cs_host_groups(fake, cs_host_ids)
     seed_cs_users(fake)
-    seed_cs_quarantine(fake, cs_host_ids)
+    seed_cs_quarantine(fake, cs_host_ids, cs_detection_ids)
     seed_cs_cases(fake, cs_detection_ids)
 
     # ── Microsoft Defender for Endpoint seeders ──────────────────────────────

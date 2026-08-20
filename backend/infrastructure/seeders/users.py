@@ -22,6 +22,10 @@ _TOKEN_CONFIGS: list[tuple[str, str, str, str]] = [
     ("soc-analyst-token-000-000000000003",  "SOC Analyst", "soc@acmecorp.com",   "SOC Analyst"),
 ]
 
+# Exported so the account record can report a user count that matches the
+# users actually seeded, rather than a hardcoded guess.
+SEED_USER_COUNT = len(_TOKEN_CONFIGS)
+
 
 def seed_users(fake: Faker, account_id: str, account_name: str) -> list[str]:
     """Create the preset users and their API tokens, then persist them.
