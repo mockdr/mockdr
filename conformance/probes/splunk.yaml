@@ -1,0 +1,193 @@
+# Splunk conformance probes.
+#
+# Weighted towards refusals rather than successes, on purpose. A success is
+# usually easy to get approximately right; it is the *rejections* that encode
+# a product's real contract, and they are where mockdr has been wrong. The
+# HEC query-string defect this harness was built after was a refusal that
+# mockdr turned into a success.
+#
+# Real target assumes the container described in ../README.md:
+#   management on 8089, HEC on 8088, self-signed certificates.
+platform: splunk
+
+endpoints:
+  management:
+    mock: http://localhost:5001/splunk
+    real: https://localhost:18089
+    verify_tls: false
+  hec:
+    mock: http://localhost:5001/splunk
+    real: https://localhost:18088
+    verify_tls: false
+
+# Splunk states its outcome in `code`, and the human-readable `text` beside
+# it. Both are compared by value: a client that branches on `code` is the
+# reason mockdr exists, and `text` is stable enough in splunkd to be worth
+# holding to.
+significant_keys:
+  - code
+  - text
+  - dispatchState
+  - isDone
+  - isFailed
+
+probes:
+  # ── HEC authentication ──────────────────────────────────────────────────
+  - id: hec-no-token
+    endpoint: hec
+    why: The credential-missing path. splunkd answers 401 code 2.
+    request:
+      method: POST
+      path: /services/collector
+      json: {event: conformance-probe}
+
+  - id: hec-invalid-token-header
+    endpoint: hec
+    why: An unknown token in the documented channel. 403 code 4.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk 00000000-0000-0000-0000-000000000000"}
+      json: {event: conformance-probe}
+
+  - id: hec-invalid-token-query
+    endpoint: hec
+    why: >
+      The ordering that is not obvious: splunkd validates the token before it
+      checks whether the query-string channel is allowed, so this is 403
+      code 4 and not the code 16 that a valid token would get.
+    request:
+      method: POST
+      path: /services/collector
+      query: {token: 00000000-0000-0000-0000-000000000000}
+      json: {event: conformance-probe}
+
+  - id: hec-valid-token-query
+    endpoint: hec
+    why: >
+      The defect that prompted this harness. A valid token by query string is
+      400 code 16 unless inputs.conf enables allowQueryStringAuth; mockdr
+      accepted it unconditionally through 2.0.2.
+    request:
+      method: POST
+      path: /services/collector
+      query: {token: "${hec_token}"}
+      json: {event: conformance-probe}
+
+  - id: hec-valid-token-header
+    endpoint: hec
+    why: The documented channel, which must succeed on both.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {event: conformance-probe}
+
+  - id: hec-event-field-missing
+    endpoint: hec
+    why: A body with no `event` key. splunkd answers code 12.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {sourcetype: conformance}
+
+  - id: hec-event-blank
+    endpoint: hec
+    why: An `event` present but empty, which is code 13 rather than 12.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {event: ""}
+
+  - id: hec-malformed-json
+    endpoint: hec
+    why: A body that is not JSON at all. code 6.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: "{not json"
+
+  # ── Management API authentication ───────────────────────────────────────
+  - id: mgmt-unauthenticated
+    endpoint: management
+    why: >
+      splunkd's management port refuses anonymous reads. The envelope it uses
+      differs from HEC's, which is itself worth holding mockdr to.
+    request:
+      method: GET
+      path: /services/server/info
+      query: {output_mode: json}
+
+  - id: mgmt-server-info
+    endpoint: management
+    why: >
+      The first call a client makes to establish it is talking to splunkd.
+      Compared structurally: versions and GUIDs are masked, the Atom envelope
+      around them is not.
+    request:
+      method: GET
+      path: /services/server/info
+      query: {output_mode: json}
+      auth: basic
+
+  - id: mgmt-unknown-endpoint
+    endpoint: management
+    why: What splunkd does with a path it does not serve.
+    request:
+      method: GET
+      path: /services/no/such/endpoint
+      query: {output_mode: json}
+      auth: basic
+
+  - id: mgmt-apps-local
+    endpoint: management
+    why: The app list a client reads to choose a namespace.
+    request:
+      method: GET
+      path: /services/apps/local
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: mgmt-unknown-app
+    endpoint: management
+    why: A named app that does not exist — 404, and in which envelope.
+    request:
+      method: GET
+      path: /services/apps/local/no_such_app
+      query: {output_mode: json}
+      auth: basic
+
+  # ── Search jobs ─────────────────────────────────────────────────────────
+  - id: search-missing-job
+    endpoint: management
+    why: >
+      A SID that was never dispatched. splunklib calls this constantly while
+      polling, so the shape of the refusal matters more than most successes.
+    request:
+      method: GET
+      path: /services/search/jobs/0000000000.000000
+      query: {output_mode: json}
+      auth: basic
+
+  - id: search-dispatch-no-query
+    endpoint: management
+    why: Dispatching with no search string at all.
+    request:
+      method: POST
+      path: /services/search/jobs
+      query: {output_mode: json}
+      auth: basic
+
+  - id: search-parse-invalid
+    endpoint: management
+    why: >
+      Service.parse() validating an unrunnable query. Reporting this as an
+      error rather than accepting it is the entire point of the endpoint.
+    request:
+      method: POST
+      path: /services/search/parse
+      query: {q: "search index=x | boguscmd y", output_mode: json}
+      auth: basic

@@ -1,0 +1,139 @@
+# Elasticsearch and Kibana conformance probes.
+#
+# The two have genuinely different error envelopes — Elasticsearch nests an
+# `error` object with a top-level `status`, Kibana serves Hapi/Boom with
+# `statusCode` and `error` as a title string, and Kibana's Security Solution
+# routes use a third shape again. A client moving between them cannot use one
+# parser, which is exactly the sort of thing a mock gets wrong quietly.
+platform: elastic
+
+endpoints:
+  search:
+    mock: http://localhost:5001/elastic
+    real: http://localhost:19200
+  kibana:
+    mock: http://localhost:5001/kibana
+    real: http://localhost:15601
+
+significant_keys:
+  - status
+  - statusCode
+  - error
+  - type
+  - reason
+  - status_code
+
+probes:
+  # ── Elasticsearch ───────────────────────────────────────────────────────
+  - id: es-unauthenticated
+    endpoint: search
+    why: Elasticsearch's refusal envelope, which is not Kibana's.
+    request:
+      method: GET
+      path: /_cluster/health
+
+  - id: es-cluster-health
+    endpoint: search
+    why: >
+      The health document a client polls. Compared structurally — node counts
+      and shard numbers legitimately differ, the keys reporting them must not.
+    request:
+      method: GET
+      path: /_cluster/health
+      auth: basic
+    ignore_paths:
+      - $.cluster_name
+
+  - id: es-missing-index
+    endpoint: search
+    why: >
+      index_not_found_exception, which carries a distinctive nested `error`
+      object with `root_cause`. A flattened imitation of it is the classic
+      way a mock breaks a client's error handling.
+    request:
+      method: GET
+      path: /no-such-index-conformance/_search
+      auth: basic
+
+  - id: es-malformed-query
+    endpoint: search
+    why: A syntactically invalid query body — parsing_exception.
+    request:
+      method: POST
+      path: /_search
+      json: {query: {not_a_real_clause: {}}}
+      auth: basic
+
+  - id: es-search-all
+    endpoint: search
+    why: >
+      The hit envelope itself: `hits.total.value`, `_shards`, `took`. Values
+      differ between a seeded mock and an empty install; the shape must not.
+    request:
+      method: POST
+      path: /_search
+      json: {size: 0}
+      auth: basic
+
+  # ── Kibana ──────────────────────────────────────────────────────────────
+  - id: kbn-status
+    endpoint: kibana
+    why: >
+      How a client establishes it is talking to Kibana. Unauthenticated on
+      both by design.
+    request:
+      method: GET
+      path: /api/status
+    ignore_paths:
+      - $.name
+      - $.status.core
+      - $.metrics
+      - $.mockdr
+
+  - id: kbn-missing-route
+    endpoint: kibana
+    why: Kibana's Boom envelope for an unserved path.
+    request:
+      method: GET
+      path: /api/no_such_route_conformance
+      auth: basic
+
+  - id: kbn-spaces
+    endpoint: kibana
+    why: The space list, which a client reads before it writes anything.
+    request:
+      method: GET
+      path: /api/spaces/space
+      auth: basic
+
+  - id: kbn-unknown-space
+    endpoint: kibana
+    why: >
+      A space id that does not exist. mockdr returned the default space with
+      a 200 here until 2.0.3, which told a client a typo had worked.
+    request:
+      method: GET
+      path: /api/spaces/space/no-such-space-conformance
+      auth: basic
+
+  - id: kbn-detection-rules-find
+    endpoint: kibana
+    why: >
+      The Security Solution list envelope — page/perPage/total/data — which
+      differs from the platform's own list shape.
+    request:
+      method: GET
+      path: /api/detection_engine/rules/_find
+      query: {per_page: 1}
+      auth: basic
+
+  - id: kbn-missing-xsrf
+    endpoint: kibana
+    why: >
+      A POST without the kbn-xsrf header. Kibana refuses it with a specific
+      message; accepting it would let a client omit a header it must send.
+    request:
+      method: POST
+      path: /api/detection_engine/rules
+      json: {name: conformance, description: probe, type: query, severity: low, risk_score: 1}
+      auth: basic

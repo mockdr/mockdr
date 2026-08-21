@@ -1,0 +1,87 @@
+# The real products, next to the mock of them.
+#
+# Only Splunk and Elastic appear here, because only they can be run at all:
+# SentinelOne, CrowdStrike, Defender, Graph, Sentinel and Cortex XDR are
+# SaaS-only with no self-hostable edition. That is a limit of the vendors,
+# not of this harness — and it is why mockdr's fidelity for those six rests
+# on published schemas and SDK source rather than on measurement.
+#
+# Splunk publishes amd64 images only. On an arm64 host this runs under
+# emulation: slow to boot, but correct. See README.md for the qemu caveats.
+name: mockdr-conformance
+
+services:
+  mockdr:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      # Left at its default of `false` on purpose: the harness compares
+      # mockdr's *default* posture against splunkd's default posture, and
+      # both refuse query-string auth until told otherwise.
+      - MOCKDR_SPLUNK_HEC_QUERY_STRING_AUTH=false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/web/api/v2.1/system/status')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  splunk:
+    image: splunk/splunk:latest
+    platform: linux/amd64
+    # splunkd's own provisioning uses sudo, which loses its setuid bit under
+    # qemu. Running as root sidesteps it; see README.md.
+    user: root
+    ports:
+      - "18088:8088"   # HTTP Event Collector
+      - "18089:8089"   # management API
+      - "18000:8000"   # web UI, for looking at what a probe actually did
+    environment:
+      - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-Probe-Passw0rd!}
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN:-11111111-1111-1111-1111-111111111111}
+    healthcheck:
+      test: ["CMD", "curl", "-skf", "https://localhost:8088/services/collector/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 300s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    ports:
+      - "19200:9200"
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-Probe-Passw0rd!}
+      # TLS off deliberately: this compares API semantics, and a self-signed
+      # chain adds a failure mode that says nothing about either product.
+      - xpack.security.http.ssl.enabled=false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -u elastic:$${ELASTIC_PASSWORD:-Probe-Passw0rd!} http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    ports:
+      - "15601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD:-Probe-Passw0rd!}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
