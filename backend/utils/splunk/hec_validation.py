@@ -19,6 +19,7 @@ __all__ = [
     "INVALID_FORMAT",
     "NO_CHANNEL",
     "NO_DATA",
+    "QUERY_STRING_AUTH_DISABLED",
     "HecError",
     "index_allowed",
     "parse_hec_payload",
@@ -33,6 +34,7 @@ INCORRECT_INDEX = (7, "Incorrect index")
 NO_CHANNEL = (10, "Data channel is missing")
 EVENT_REQUIRED = (12, "Event field is required")
 EVENT_BLANK = (13, "Event field cannot be blank")
+QUERY_STRING_AUTH_DISABLED = (16, "Query string authorization is not enabled")
 
 
 @dataclass

@@ -27,9 +27,11 @@ from typing import cast
 
 from fastapi import Depends, Header, HTTPException, Query, Request
 
+from config import SPLUNK_HEC_QUERY_STRING_AUTH
 from repository.splunk.hec_token_repo import hec_token_repo
 from repository.splunk.splunk_user_repo import splunk_user_repo
 from repository.store import store
+from utils.splunk.hec_validation import QUERY_STRING_AUTH_DISABLED
 from utils.splunk.response import build_splunk_error
 
 # ── Session token management ───────────────────────────────────────────────
@@ -178,9 +180,15 @@ async def require_hec_auth(
 ) -> dict:
     """Validate Splunk HEC token authentication.
 
-    HEC takes the token in the ``Authorization: Splunk <token>`` header, and
-    also accepts it as a ``?token=`` query parameter for clients that cannot
-    set headers — a form mockdr rejected outright.
+    HEC takes the token in the ``Authorization: Splunk <token>`` header. It
+    also reads a ``?token=`` query parameter, but only when ``inputs.conf``
+    sets ``allowQueryStringAuth``, which is off by default.
+
+    The ordering below is splunkd's, not the obvious one: the token is
+    validated *first*, so an invalid token sent by query string is a 403
+    ``Invalid token`` even when query-string auth is disabled, and only a
+    *valid* one reaches the 400 that reports the channel is not enabled.
+    Verified against Splunk 10.4.2 — see ``SPLUNK_HEC_QUERY_STRING_AUTH``.
 
     Args:
         authorization: The Authorization header value.
@@ -190,12 +198,15 @@ async def require_hec_auth(
         Dict with ``token_name``, ``index``, ``sourcetype`` from the token.
 
     Raises:
-        HTTPException: 401/403 if token is invalid or disabled.
+        HTTPException: 400/401/403 if the token is missing, invalid, disabled,
+            or arrived by a channel this instance does not accept.
     """
+    from_query = False
     if authorization and authorization.lower().startswith("splunk "):
         token_value = authorization[7:]
     elif token:
         token_value = token
+        from_query = True
     else:
         raise HTTPException(
             status_code=401, detail={"text": "Token is required", "code": 2},
@@ -203,6 +214,9 @@ async def require_hec_auth(
     record = hec_token_repo.get(token_value)
     if not record:
         raise HTTPException(status_code=403, detail={"text": "Invalid token", "code": 4})
+    if from_query and not SPLUNK_HEC_QUERY_STRING_AUTH:
+        code, text = QUERY_STRING_AUTH_DISABLED
+        raise HTTPException(status_code=400, detail={"text": text, "code": code})
     if record.disabled:
         raise HTTPException(status_code=403, detail={"text": "Token disabled", "code": 1})
 

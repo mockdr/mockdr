@@ -86,9 +86,19 @@ class TestSplunkSearchParse:
 
 
 class TestSplunkHecQueryToken:
-    """HEC accepts the token as a query parameter as well as a header."""
+    """HEC reads a ``?token=`` query parameter, but does not honour it by default.
 
-    def test_token_in_query_string_authenticates(self, client: TestClient) -> None:
+    This originally asserted that the query parameter authenticates outright.
+    Probing a real Splunk 10.4.2 showed that is wrong: splunkd reads the
+    parameter but refuses it with ``code 16`` unless ``inputs.conf`` sets
+    ``allowQueryStringAuth``, which is off by default. The full behaviour,
+    including the enabled case, is covered in
+    ``test_hec_query_string_auth.py``.
+    """
+
+    def test_token_in_query_string_is_read_but_not_honoured_by_default(
+        self, client: TestClient,
+    ) -> None:
         from repository.splunk.hec_token_repo import hec_token_repo
 
         token = hec_token_repo.list_all()[0].token
@@ -97,8 +107,8 @@ class TestSplunkHecQueryToken:
             content='{"event":"via-query"}',
             params={"token": token},
         )
-        assert resp.status_code == 200
-        assert resp.json()["code"] == 0
+        assert resp.status_code == 400
+        assert resp.json()["code"] == 16
 
     def test_no_token_at_all_is_still_refused(self, client: TestClient) -> None:
         resp = client.post(

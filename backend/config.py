@@ -32,6 +32,15 @@ PERSIST_PATH = os.getenv("MOCKDR_PERSIST", "")
 # needs in order to be exercised at all.
 SPLUNK_DISPATCH_SECONDS = float(os.getenv("MOCKDR_SPLUNK_DISPATCH_SECONDS", "0"))
 
+# Whether HEC accepts its token as ?token=, mirroring inputs.conf's
+# allowQueryStringAuth. Off by default, because that is splunkd's default:
+# verified against Splunk 10.4.2, which answers a valid token sent this way
+# with 400 {"text": "Query string authorization is not enabled", "code": 16}
+# unless the setting is turned on.
+SPLUNK_HEC_QUERY_STRING_AUTH = os.getenv(
+    "MOCKDR_SPLUNK_HEC_QUERY_STRING_AUTH", "false",
+).lower() in ("1", "true", "yes")
+
 # When true, a tenant segment in an Entra token URL must match the tenant the
 # credential belongs to. Set MOCKDR_STRICT_TENANT=false to accept any tenant,
 # e.g. when pointing a connector configured with a real tenant ID at the mock.

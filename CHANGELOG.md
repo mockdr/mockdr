@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **HEC no longer honours `?token=` by default, because splunkd does not.**
+  2.0.2 added query-string authentication and accepted it unconditionally.
+  Probing a real Splunk 10.4.2 showed that is wrong in a way that matters:
+  splunkd reads the parameter, but refuses it with
+  `400 {"text": "Query string authorization is not enabled", "code": 16}`
+  unless `inputs.conf` sets `allowQueryStringAuth` — which is off by default.
+  A client that authenticated this way against mockdr would have been rejected
+  by a stock indexer, which is the direction of error a mock must never take.
+  `MOCKDR_SPLUNK_HEC_QUERY_STRING_AUTH=true` mirrors the setting.
+
+  The probes also settled an ordering that is not the obvious one: the token
+  is validated *before* the channel is checked, so an invalid token sent by
+  query string is a `403 code 4`, and only a *valid* one ever reaches the
+  `400 code 16`. mockdr now reproduces all eight measured cases exactly.
+
 - **Credential-bearing query parameters are masked in the request audit log.**
   The `Authorization` header was already reduced to its last four characters,
   but Splunk HEC accepts its token as `?token=` — so the very credential that
