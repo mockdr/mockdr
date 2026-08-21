@@ -36,7 +36,17 @@ class SearchJob:
     is_done: bool = True
     is_failed: bool = False
 
+    # When the job was dispatched. This is the origin of the lifecycle clock,
+    # so it must not move once set — `touch` extends the TTL, not the search.
     published_at: float = 0.0  # epoch seconds
+    # When the TTL countdown last restarted, which is what `touch` updates.
+    touched_at: float = 0.0
+    # When the job was paused, so unpausing can resume the lifecycle where it
+    # stopped rather than jumping ahead by the wall-clock time spent paused.
+    paused_at: float = 0.0
+    # A control action fixed the reported state (cancel, finalize). A settled
+    # job reports what it was told to report, not what the clock would derive.
+    settled: bool = False
 
     @property
     def id(self) -> str:

@@ -6,6 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+A code review of the 2.0.2 work found eight routes answering `200` with
+something untrue. Every one is the failure mode this project exists to expose
+rather than manufacture, so every one now has a test that fails loudly if it
+returns.
+
+- **`_import` never read the request body.** It reported
+  `success: true, success_count: 0` for any input, so a client could export
+  its rules, import them into a fresh instance, be told it had worked, and
+  find nothing there — the export/import round trip a migration check exists
+  to prove was confirming a success it had not performed. It now parses the
+  NDJSON (raw or multipart, since Kibana's UI posts a file and scripted
+  clients post the body), creates each rule, reports a `409` per conflicting
+  `rule_id` unless `overwrite=true`, and skips `_export`'s trailing summary
+  line rather than counting it as a rule.
+- **A finalized search job went on reporting `QUEUED`.** `dispatchState` was
+  derived from elapsed time on every read, which overwrote whatever a control
+  action had just set, so with a dispatch window configured `finalize` and
+  `cancel` appeared to do nothing. A job whose state a control action fixed
+  now reports that state.
+- **`touch` sent a running job backwards.** It reset the same timestamp the
+  lifecycle clock reads, so touching a job rewound it from `RUNNING` to
+  `QUEUED`. Real Splunk's `touch` extends the TTL and leaves the search alone;
+  the TTL countdown now has its own field.
+- **A paused job kept running, and reported itself done.** Its clock now stops
+  while it is held and resumes where it stopped, and it reports `isDone: 0` —
+  a paused job has not finished.
+- **`/api/detection_engine/privileges` named the wrong user.** It read
+  `username` from an auth context that spells it `user`, so every caller was
+  reported as the built-in `elastic` superuser regardless of who authenticated
+  — including a `viewer`, whose actual privileges the same response then
+  correctly reported as read-only.
+- **`_bulk_create` rejected `risk_score: 0`.** A falsiness check reported a
+  supplied `0` as `Invalid value "undefined"`, so a rule the client did send
+  read as one it had omitted. Required fields are now checked for presence.
+- **`/api/spaces/space/{id}` returned the default space for any id.** An
+  unknown space read as success, so a typo or a deleted space sent the client
+  on to write into the wrong one. Unknown ids are now `404`.
+- **`action_status` filed every pending action under `isolate`.** A pending
+  `kill-process` was reported as a pending isolation. Counts are now per
+  action, as Kibana reports them.
+- **`action_log` documented newest-first and served oldest-first.** It handed
+  back repository insertion order, so page 1 held the stalest entry — the
+  reverse of what an operator checking "what just happened" needs.
+- **`/api/exception_lists/summary` answered without a `list_id`.** All-zero
+  counts with a `200` were indistinguishable from a list that genuinely has
+  no items; a request with nothing to summarise is now a `400`.
+
 ## [2.0.2] - 2026-08-20
 
 ### Added
@@ -54,8 +103,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `_export` returned a `str`, so FastAPI serialised the NDJSON as one escaped
-  JSON string that `_import` could not read.
+- `_export` returned a `str` while it was being written, so FastAPI
+  serialised the NDJSON as one escaped JSON string that `_import` could not
+  read. Both endpoints are new in this release; the round trip works.
 - The endpoint metadata list took only `per_page` where Kibana sends
   `pageSize`. Both spellings are accepted now.
 - The Splunk end-to-end check read `E2E_BASE_URL` — which points at the

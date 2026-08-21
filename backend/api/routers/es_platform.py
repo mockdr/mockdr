@@ -9,11 +9,12 @@ concluded the instance was not Kibana.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.es_auth import require_es_auth
 from application.es_endpoints import queries as endpoint_queries
 from config import APP_VERSION
+from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["Kibana Platform"])
 
@@ -132,9 +133,20 @@ def get_space(
     space_id: str,
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Return one space by id."""
+    """Return one space by id, or 404 if there is no such space.
+
+    Falling back to the default space told a client that whatever id it asked
+    for exists — so a typo, or a space that had been deleted, read as success
+    and the client went on to write into the wrong space.
+    """
     spaces = list_spaces(_)
-    return next((s for s in spaces if s["id"] == space_id), spaces[0])
+    space = next((s for s in spaces if s["id"] == space_id), None)
+    if space is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_kbn_error_response(404, f"Saved object [space/{space_id}] not found"),
+        )
+    return space
 
 
 @router.get("/api/fleet/agents")

@@ -35,6 +35,7 @@ def create_search_job(
     sid = str(uuid.uuid4()).replace("-", "")[:24]
     sid = f"1{int(time.time())}.{sid}"
 
+    now = time.time()
     parsed = parse_spl(search)
     # Override time from explicit params if provided
     if earliest_time:
@@ -63,7 +64,8 @@ def create_search_job(
         messages=messages,
         field_list=list(results[0].keys()) if results else [],
         is_done=True,
-        published_at=time.time(),
+        published_at=now,
+        touched_at=now,
     )
     search_job_repo.save(job)
     return sid
@@ -84,6 +86,7 @@ def cancel_search_job(sid: str) -> bool:
     job.dispatch_state = "FAILED"
     job.is_done = True
     job.is_failed = True
+    job.settled = True
     search_job_repo.save(job)
     return True
 
@@ -106,26 +109,41 @@ def apply_control_action(sid: str, action: str) -> bool:
     if not job:
         return False
 
+    now = time.time()
     if action == "cancel":
         job.dispatch_state = "FAILED"
         job.is_done = True
         job.is_failed = True
+        job.settled = True
     elif action == "pause":
+        if not job.is_paused:
+            job.paused_at = now
         job.is_paused = True
         job.dispatch_state = "PAUSED"
     elif action == "unpause":
+        # Resume where the job stopped. Shifting the dispatch origin forward
+        # by the paused duration is what keeps a paused job from silently
+        # completing while it was held.
+        if job.is_paused and job.paused_at:
+            job.published_at += now - job.paused_at
+        job.paused_at = 0.0
         job.is_paused = False
         job.dispatch_state = "DONE" if job.is_done else "RUNNING"
     elif action == "finalize":
+        # Stop the search early: whatever it had, it now reports as final.
         job.dispatch_state = "DONE"
         job.is_done = True
         job.done_progress = 1.0
+        job.settled = True
     elif action == "save":
         job.is_saved = True
     elif action == "unsave":
         job.is_saved = False
     elif action == "touch":
-        job.published_at = time.time()
+        # Restarts the TTL countdown. It deliberately leaves published_at
+        # alone: touching a job extends how long it is kept, it does not
+        # re-dispatch the search.
+        job.touched_at = now
     # setttl / setpriority / (dis|en)ablepreview are accepted and have no
     # observable effect on a mock that completes searches synchronously.
     search_job_repo.save(job)

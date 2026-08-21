@@ -9,7 +9,9 @@ though its central endpoint worked.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from collections import Counter
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
@@ -43,7 +45,9 @@ def detection_privileges(
 ) -> dict:
     """Report what the caller may do, which clients read before offering actions."""
     can_write = str(user.get("role", "")).lower() not in ("viewer", "read")
-    username = str(user.get("username", "elastic"))
+    # require_es_auth returns the caller under "user"; reading "username" here
+    # always missed and reported everyone as the built-in `elastic` superuser.
+    username = str(user.get("user") or "elastic")
     return {
         "username": username,
         "has_all_requested": can_write,
@@ -108,7 +112,10 @@ def bulk_create_rules(
                 "status_code": 400, "message": "each rule must be an object",
             }})
             continue
-        missing = [f for f in required if not entry.get(f)]
+        # Presence, not truthiness: `risk_score: 0` and `name: ""` are
+        # supplied values. Rejecting them as "undefined" turned a rule the
+        # client did send into one it appears to have omitted.
+        missing = [f for f in required if entry.get(f) is None]
         if missing:
             results.append({"error": {
                 "status_code": 400,
@@ -181,19 +188,76 @@ def export_rules(
 
 @router.post("/api/detection_engine/rules/_import", dependencies=[Depends(require_kbn_xsrf)])
 async def import_rules(
+    request: Request,
     overwrite: bool = Query(default=False),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Import rules from NDJSON.
+    """Import rules from NDJSON, creating them.
 
     The body is a multipart upload in Kibana; this accepts the NDJSON directly
     as well, which is what a scripted client usually sends.
+
+    An earlier version ignored the body entirely and reported
+    ``success: true`` with ``success_count: 0``. A client could export its
+    rules, import them into a fresh instance, be told it had worked, and find
+    nothing there — the export/import round trip a migration test exists to
+    prove was reporting a success it had not performed.
     """
+    import json
+
+    from application.es_rules import commands as rule_commands
+
+    payload = _import_payload(await request.body(), request.headers.get("content-type", ""))
+
+    errors: list[dict] = []
+    success_count = 0
+    rules_count = 0
+
+    for line in payload.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            entry = json.loads(text)
+        except ValueError:
+            rules_count += 1
+            errors.append({
+                "rule_id": "(unknown id)",
+                "error": {"status_code": 400, "message": "Invalid JSON on line"},
+            })
+            continue
+        if not isinstance(entry, dict):
+            continue
+        # `_export` ends with a summary line. It is not a rule, and Kibana's
+        # importer skips it rather than counting it as a failure.
+        if "exported_count" in entry or "rules_count" in entry:
+            continue
+
+        rules_count += 1
+        rule_id = str(entry.get("rule_id") or "")
+        existing = rule_queries.get_rule_by_rule_id(rule_id) if rule_id else None
+
+        if existing and not overwrite:
+            errors.append({
+                "rule_id": rule_id,
+                "error": {
+                    "status_code": 409,
+                    "message": f'rule_id: "{rule_id}" already exists',
+                },
+            })
+            continue
+
+        if existing:
+            rule_commands.update_rule(str(existing["id"]), entry)
+        else:
+            rule_commands.create_rule(entry)
+        success_count += 1
+
     return {
-        "success": True,
-        "success_count": 0,
-        "rules_count": 0,
-        "errors": [],
+        "success": not errors,
+        "success_count": success_count,
+        "rules_count": rules_count,
+        "errors": errors,
         "exceptions_errors": [],
         "exceptions_success": True,
         "exceptions_success_count": 0,
@@ -202,6 +266,36 @@ async def import_rules(
         "action_connectors_errors": [],
         "action_connectors_warnings": [],
     }
+
+
+def _import_payload(body: bytes, content_type: str) -> str:
+    """Return the NDJSON from an import body, multipart or raw.
+
+    Kibana's UI posts the file as ``multipart/form-data``; scripted clients
+    usually POST the NDJSON directly. Both have to work, so the multipart
+    wrapper is stripped when it is there and the body used as-is when it
+    is not.
+    """
+    text = body.decode("utf-8", errors="replace")
+    if "multipart/form-data" not in content_type.lower():
+        return text
+
+    boundary = ""
+    for part in content_type.split(";"):
+        name, _, value = part.strip().partition("=")
+        if name.lower() == "boundary":
+            boundary = value.strip('"')
+    if not boundary:
+        return text
+
+    lines: list[str] = []
+    for section in text.split(f"--{boundary}"):
+        head, sep, payload = section.partition("\r\n\r\n")
+        if not sep:
+            head, sep, payload = section.partition("\n\n")
+        if sep and "content-disposition" in head.lower():
+            lines.append(payload.rstrip("-\r\n"))
+    return "\n".join(lines)
 
 
 # ── Cases ────────────────────────────────────────────────────────────────────
@@ -330,10 +424,20 @@ def exception_list_summary(
     list_id: str = Query(default=""),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Summarise an exception list's items by operating system."""
+    """Summarise an exception list's items by operating system.
+
+    ``list_id`` identifies what to summarise, so a request without one has
+    nothing to answer. Returning all-zero counts with a 200 was indistinguishable
+    from a list that genuinely has no items.
+    """
+    if not list_id:
+        raise HTTPException(
+            status_code=400,
+            detail=build_security_solution_error(400, "list_id: Required"),
+        )
     items = exception_queries.find_items(
         list_id=list_id, page=1, per_page=10_000,
-    )["data"] if list_id else []
+    )["data"]
 
     counts = {"windows": 0, "linux": 0, "macos": 0}
     for item in items:
@@ -356,14 +460,15 @@ def endpoint_action_status(
 
     data = []
     for agent_id in wanted:
-        pending = [
-            a for a in endpoint_commands.list_actions(agent_id)
+        # Counted per action, as Kibana reports it. Filing every pending
+        # action under "isolate" told a client an endpoint was awaiting
+        # isolation when what it was actually awaiting was a kill-process.
+        pending: Counter[str] = Counter(
+            str(a.get("action") or "isolate")
+            for a in endpoint_commands.list_actions(agent_id)
             if a.get("status") == "pending"
-        ]
-        data.append({
-            "agent_id": agent_id,
-            "pending_actions": {"isolate": len(pending)} if pending else {},
-        })
+        )
+        data.append({"agent_id": agent_id, "pending_actions": dict(pending)})
     return {"data": data}
 
 
@@ -375,7 +480,14 @@ def endpoint_action_log(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Return the actions run against one endpoint, newest first."""
-    actions = endpoint_commands.list_actions(agent_id)
+    # Repository order is insertion order, so serving it unsorted put the
+    # *oldest* action on page 1 — the reverse of what this endpoint promises,
+    # and the reverse of what an operator checking "what just happened" needs.
+    actions = sorted(
+        endpoint_commands.list_actions(agent_id),
+        key=lambda a: str(a.get("started_at") or ""),
+        reverse=True,
+    )
     start = (page - 1) * page_size
     return {
         "data": actions[start : start + page_size],

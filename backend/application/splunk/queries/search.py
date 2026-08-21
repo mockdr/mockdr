@@ -37,14 +37,24 @@ def _progress(job: SearchJob) -> tuple[str, float, bool]:
     keeps every response deterministic. When a window is configured the job
     walks the states real Splunk walks, so a client polling ``isDone`` in the
     loop the SDK documents is actually exercised rather than short-circuited.
+
+    A job whose state a control action fixed — cancelled, finalized, paused —
+    reports that state. Deriving it from the clock regardless would let the
+    clock overwrite an explicit instruction: a finalized job would go back to
+    reporting QUEUED, so ``finalize`` would appear to do nothing at all.
     """
-    if job.is_failed or job.dispatch_state in ("FAILED", "PAUSED"):
+    if job.settled or job.is_failed:
         return job.dispatch_state, job.done_progress, job.is_done
     if SPLUNK_DISPATCH_SECONDS <= 0 or job.exec_mode == "blocking":
         return job.dispatch_state, job.done_progress, job.is_done
 
-    elapsed = time.time() - (job.published_at or 0.0)
+    # A paused job's clock stops, so it keeps reporting the progress it had
+    # reached rather than quietly completing while it was held.
+    now = job.paused_at if job.is_paused and job.paused_at else time.time()
+    elapsed = now - (job.published_at or 0.0)
     fraction = min(max(elapsed / SPLUNK_DISPATCH_SECONDS, 0.0), 1.0)
+    if job.is_paused:
+        return "PAUSED", round(fraction, 3), False
     state = next(
         name for threshold, name in reversed(_DISPATCH_STATES) if fraction >= threshold
     )
