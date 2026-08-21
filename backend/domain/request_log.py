@@ -11,10 +11,11 @@ class RequestLog:
         timestamp: ISO 8601 timestamp of when the request completed.
         method: HTTP method (GET, POST, etc.).
         path: URL path of the request.
-        query_string: Raw query string, empty string if none.
+        query_string: Raw query string with credential-bearing values
+            masked, empty string if none.
         status_code: HTTP response status code.
         duration_ms: Request duration in milliseconds.
-        token_hint: Last 8 characters of the ApiToken header value,
+        token_hint: Last 4 characters of the Authorization header value,
             or empty string if the request was unauthenticated.
     """
 

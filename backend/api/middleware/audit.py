@@ -12,6 +12,37 @@ from utils.id_gen import new_id
 
 _SKIP_PATH_SUFFIX = "/_dev/requests"
 
+#: Query parameters that carry a credential. Splunk HEC accepts its token as
+#: ``?token=``, so a credential the Authorization header path deliberately
+#: truncates would otherwise sit in the log in full, one field over.
+_CREDENTIAL_PARAMS = frozenset({
+    "token", "access_token", "api_key", "apikey", "key", "password", "secret",
+})
+
+
+def _last4(value: str) -> str:
+    """Keep only enough of a credential to tell two of them apart."""
+    return value[-4:] if len(value) >= 4 else value
+
+
+def _mask_query(query_string: str) -> str:
+    """Mask credential values in a raw query string, preserving its shape.
+
+    The parameter names stay readable — what was sent still needs to be
+    diagnosable from the log — but the values are reduced the same way the
+    Authorization header's are.
+    """
+    if not query_string:
+        return ""
+    parts = []
+    for pair in query_string.split("&"):
+        name, sep, value = pair.partition("=")
+        if sep and value and name.lower() in _CREDENTIAL_PARAMS:
+            parts.append(f"{name}=***{_last4(value)}")
+        else:
+            parts.append(pair)
+    return "&".join(parts)
+
 
 class RequestAuditMiddleware:
     """ASGI middleware that appends a ``RequestLog`` entry after each response.
@@ -48,14 +79,16 @@ class RequestAuditMiddleware:
 
         method: str = scope.get("method", "")
         query_bytes: bytes = scope.get("query_string", b"")
-        query_string: str = query_bytes.decode("utf-8", errors="replace") if query_bytes else ""
+        query_string: str = _mask_query(
+            query_bytes.decode("utf-8", errors="replace") if query_bytes else "",
+        )
 
         # Extract token hint from Authorization header
         token_hint = ""
         for header_name, header_value in scope.get("headers", []):
             if header_name.lower() == b"authorization":
                 raw = header_value.decode("utf-8", errors="replace")
-                token_hint = raw[-4:] if len(raw) >= 4 else raw
+                token_hint = _last4(raw)
                 break
 
         status_code = 0

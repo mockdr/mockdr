@@ -61,3 +61,7 @@ state.json
 git.sh
 # Generated test-coverage reports
 frontend/coverage/
+
+# Playwright writes these on every e2e run
+frontend/playwright-report/
+frontend/test-results/

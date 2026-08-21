@@ -76,3 +76,42 @@ class TestAuditLog:
             assert field in entry, f"Required field '{field}' missing from log entry"
         assert entry["method"] == "GET"
         assert entry["status_code"] == 200
+
+
+class TestCredentialMasking:
+    """A credential sent as a query parameter must not sit in the log in full.
+
+    The Authorization header is deliberately reduced to its last four
+    characters. Splunk HEC accepts its token as ``?token=``, so without the
+    same treatment the very credential the header path truncates was kept
+    verbatim one field over — and `/_dev/requests` serves it back.
+    """
+
+    def test_a_token_query_parameter_is_masked(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        secret = "11111111-1111-1111-1111-111111111111"
+        client.post(
+            "/splunk/services/collector",
+            params={"token": secret},
+            json={"event": "masked"},
+        )
+        body = client.get("/web/api/v2.1/_dev/requests", headers=auth_headers).json()
+        collector = [
+            e for e in body["data"] if e["path"].endswith("/services/collector")
+        ]
+        assert collector, "the request was not logged at all"
+        for entry in collector:
+            assert secret not in entry["query_string"]
+            # The parameter stays readable — what was sent must still be
+            # diagnosable — and the tail is kept to tell two tokens apart.
+            assert entry["query_string"] == "token=***1111"
+
+    def test_ordinary_parameters_are_untouched(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        client.get("/web/api/v2.1/agents", params={"limit": 3}, headers=auth_headers)
+        body = client.get("/web/api/v2.1/_dev/requests", headers=auth_headers).json()
+        agents = [e for e in body["data"] if e["path"].endswith("/agents")]
+        assert agents
+        assert any("limit=3" in e["query_string"] for e in agents)

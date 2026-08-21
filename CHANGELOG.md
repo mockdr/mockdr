@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Credential-bearing query parameters are masked in the request audit log.**
+  The `Authorization` header was already reduced to its last four characters,
+  but Splunk HEC accepts its token as `?token=` — so the very credential that
+  masking protects was kept verbatim one field over, and `/_dev/requests`
+  served it back. Parameter names stay readable, since what was sent still has
+  to be diagnosable from the log; only the values are reduced. This is
+  hardening, not a fix: `/_dev` is admin-gated and publishes tokens through
+  `/_dev/tokens` by design, so nothing was reachable here that was not already
+  reachable more directly.
+
 ### Fixed
 
 A code review of the 2.0.2 work found eight routes answering `200` with
