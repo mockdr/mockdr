@@ -44,7 +44,7 @@ class TestSplunkEnvelopeFormat:
             assert "content" in entry
 
     def test_server_info_envelope(self, client: TestClient) -> None:
-        resp = client.get(f"{SPLUNK_PREFIX}/services/server/info")
+        resp = client.get(f"{SPLUNK_PREFIX}/services/server/info", headers=_auth())
         self._assert_envelope(resp.json())
 
     def test_indexes_envelope(self, client: TestClient) -> None:
@@ -102,6 +102,6 @@ class TestSplunkEnvelopeFormat:
         """All endpoints should accept output_mode=json parameter."""
         resp = client.get(
             f"{SPLUNK_PREFIX}/services/server/info",
-            params={"output_mode": "json"},
+            params={"output_mode": "json"}, headers=_auth(),
         )
         assert resp.status_code == 200

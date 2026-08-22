@@ -14,9 +14,15 @@ def _auth() -> dict[str, str]:
 class TestServerInfo:
     """Tests for /services/server/* endpoints."""
 
-    def test_server_info_no_auth(self, client: TestClient) -> None:
-        """Server info should be accessible without auth (health check)."""
-        resp = client.get(f"{SPLUNK_PREFIX}/services/server/info")
+    def test_server_info_requires_auth(self, client: TestClient) -> None:
+        """This asserted the opposite — open 'for health checks'. splunkd
+        answers an anonymous caller 401 (measured on 10.4.2); its
+        unauthenticated health endpoint is HEC's /services/collector/health.
+        """
+        assert client.get(f"{SPLUNK_PREFIX}/services/server/info").status_code == 401
+
+    def test_server_info_content(self, client: TestClient) -> None:
+        resp = client.get(f"{SPLUNK_PREFIX}/services/server/info", headers=_auth())
         assert resp.status_code == 200
         body = resp.json()
         assert "entry" in body
@@ -36,7 +42,7 @@ class TestServerInfo:
 
     def test_response_envelope_format(self, client: TestClient) -> None:
         """Verify Splunk JSON envelope structure."""
-        resp = client.get(f"{SPLUNK_PREFIX}/services/server/info")
+        resp = client.get(f"{SPLUNK_PREFIX}/services/server/info", headers=_auth())
         body = resp.json()
         assert "links" in body
         assert "origin" in body

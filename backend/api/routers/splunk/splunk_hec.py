@@ -49,8 +49,9 @@ def _ingest(text: str, hec_info: dict, channel: str | None, use_ack: bool) -> di
     """Validate and store an HEC payload, returning the HEC envelope."""
     require_channel(use_ack, channel)
     events = parse_hec_payload(text)
-    for event in events:
-        validate_event(event, hec_info)
+    # The first failing event, in document order, is the one reported.
+    for position, event in enumerate(events):
+        validate_event(event, hec_info, position)
 
     if len(events) == 1:
         result = submit_event(
@@ -114,7 +115,8 @@ async def hec_raw(
             # An empty raw body is code 5, not a silent success.
             raise HecError(*NO_DATA)
         if index and not index_allowed(index, hec_info):
-            raise HecError(*INCORRECT_INDEX)
+            # A raw body is one event, at position 0.
+            raise HecError(*INCORRECT_INDEX, event_number=0)
     except HecError as exc:
         return _error_response(exc)
 

@@ -8,6 +8,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+The conformance harness sent sixteen requests to mockdr and to a real Splunk
+10.4.2 and reported 135 disagreements. As with Elasticsearch below, every
+item quotes what splunkd actually sends.
+
+- **`/services/search/parse` does not exist.** mockdr served it since 2.0.2;
+  splunkd has no such endpoint, and `splunklib`'s `Service.parse()` posts to
+  `search/parser` (and `search/v2/parser`). Both are served now, POST-only —
+  GET is `405` with `Allow: POST`, as on splunkd — and they answer what
+  splunkd answers: a **flat object**, not an Atom envelope. `commands` carries
+  one entry per stage with its `pipeline` and `streamType`, which is what a
+  client reads to decide whether a query can be streamed; `eventsSearch` and
+  `reportsSearch` split at the first reporting command. Errors are `FATAL`:
+  `Unknown search command 'boguscmd'.` and `Invalid query.`, with splunkd's
+  quoting and full stop.
+- **`GET /services/server/info` was open to anyone.** The docstring said "no
+  auth required for health checks". splunkd answers an anonymous caller
+  `401`; its unauthenticated health endpoint is HEC's
+  `/services/collector/health`. Thirty-five of the keys splunkd reports were
+  also missing — `kvStoreStatus`, `health_info`, `host_fqdn`,
+  `numberOfCores`, `physicalMemoryMB`, `startup_time`, `manager_uri` among
+  them — and the entry carried `fields` and `edit`/`remove` links that
+  splunkd's does not.
+- **One 401 envelope where splunkd has two.** A missing or wrong *password*
+  is `ERROR "Unauthorized"` with `WWW-Authenticate: Basic realm="/splunk"`;
+  a session or Bearer *token* splunkd does not recognise is `WARN "call not
+  properly authenticated"` and no challenge. mockdr sent the second shape for
+  every failure, so a client that retries on a challenge never saw one.
+- **App entries lacked what an app carries.** `can_change_perms` and the
+  three `can_share_*` ACL members, `_reload` and `package` links, and seven
+  content keys (`configured`, `core`, `show_in_nav`, …). The list does not
+  carry `fields`; a single app does. `name` no longer appears inside
+  `content` — it is the entry. An unknown app is `Could not find object
+  id=x`.
+- **Four refusal texts were paraphrases.** An unknown endpoint is `Not
+  Found`; an unknown job is `Unknown sid.`; a dispatch with no query is the
+  full `The required 'search' parameter for the Splunk platform REST API
+  search/jobs endpoint is not specified. …`. A client that string-matches
+  the refusal needs splunkd's words.
+- **Event-level HEC rejections now carry `invalid-event-number`.** It is the
+  zero-based position of the first failing event in the batch — measured:
+  `[ok, ok, bad]` reports `2`. Codes 6, 12 and 13 carry it; the auth codes
+  do not, because there was no event to point at. Code 7 (`Incorrect
+  index`) carries it too, and reports one *higher* than the others for the
+  same position — a splunkd quirk a client written against it has adapted
+  to, so mockdr reproduces it rather than correcting it.
+- **`output_mode` in a form body was ignored.** splunkd honours it in the
+  query string or the POST body; splunklib puts every parameter, including
+  this one, in the body. mockdr read only the query string, so every SDK
+  POST without a query parameter was answered in Atom XML. The harness
+  found it the moment a probe sent the parameter the way splunklib does.
+- **Message types are not interchangeable.** The search dispatcher answers
+  `FATAL` — for an unknown path under `/services/search/`
+  (`Unknown endpoint.`), an unknown job (`Unknown sid.`), the parser's
+  refusals, and a dispatch with no query — where the rest of splunkd
+  answers `ERROR` (`Not Found`). mockdr said `ERROR` for all of them, and
+  the harness compared the type as "a string" until it was told the value
+  matters.
+- **The parser reports what a reporting command will do.** `stats` carries a
+  structured `args` — `stat-specifiers` with function and output name, and
+  `groupby-fields` — and every report-stage command carries
+  `isStreamingOpRequired` and the `preStreamingOp` splunkd runs ahead of it
+  (`prestats count by host`, `prehead limit=5 null=false keeplast=false`).
+
 The conformance harness in `conformance/` sent eleven requests to mockdr and
 to a real Elasticsearch 8.15.0 and Kibana 8.15.0, and reported 55 ways the
 answers differed. After these fixes it reports none. Each item below quotes

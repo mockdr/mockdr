@@ -34,6 +34,10 @@ credentials:
 significant_keys:
   - code
   - text
+  # ERROR, WARN and FATAL are not interchangeable: splunkd's search
+  # dispatcher answers FATAL where the rest of the server answers ERROR, and
+  # comparing the type as "a string" let that slip through.
+  - type
   - dispatchState
   - isDone
   - isFailed
@@ -188,13 +192,120 @@ probes:
       query: {output_mode: json}
       auth: basic
 
-  - id: search-parse-invalid
+  - id: search-parse-does-not-exist
     endpoint: management
     why: >
-      Service.parse() validating an unrunnable query. Reporting this as an
-      error rather than accepting it is the entire point of the endpoint.
+      mockdr served /services/search/parse through 2.0.3. splunkd has no
+      such endpoint; splunklib's Service.parse() posts to search/parser.
+      A 404 here on both sides is the correct answer.
     request:
       method: POST
       path: /services/search/parse
-      query: {q: "search index=x | boguscmd y", output_mode: json}
+      query: {q: "search index=x", output_mode: json}
       auth: basic
+
+  - id: search-parser-valid
+    endpoint: management
+    why: >
+      The parser answers a flat object — commands, eventsSearch,
+      reportsSearch, normalizedSearch — not an Atom envelope. Each command
+      carries its pipeline stage and stream type, which is what a client
+      reads to decide whether a query is streamable.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | stats count by host | head 5&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths:
+      - $.remoteSearch
+      - $.normalizedSearch
+
+  - id: search-parser-invalid
+    endpoint: management
+    why: >
+      An unrunnable query. splunkd reports it as FATAL, with the command in
+      quotes and a full stop — "Unknown search command 'boguscmd'." — which
+      is the text splunklib surfaces to the caller.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | boguscmd y&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-parser-empty
+    endpoint: management
+    why: An empty query is "Invalid query.", also FATAL.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-parser-get-is-405
+    endpoint: management
+    why: "The parser is POST-only; GET is refused with Allow: POST."
+    request:
+      method: GET
+      path: /services/search/parser
+      query: {q: "search index=x", output_mode: json}
+      auth: basic
+
+  - id: search-v2-parser-valid
+    endpoint: management
+    why: search/v2/parser is the same endpoint under the newer prefix.
+    request:
+      method: POST
+      path: /services/search/v2/parser
+      content: "q=search index=x&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths:
+      - $.remoteSearch
+      - $.normalizedSearch
+
+  # ── The two 401 envelopes ───────────────────────────────────────────────
+  - id: mgmt-bad-basic
+    endpoint: management
+    why: >
+      Wrong Basic credentials. splunkd answers exactly as it does to no
+      credentials at all: ERROR "Unauthorized", with a WWW-Authenticate
+      challenge for realm "/splunk".
+    request:
+      method: GET
+      path: /services/server/status
+      query: {output_mode: json}
+      headers: {Authorization: "Basic YWRtaW46d3Jvbmc="}
+
+  - id: mgmt-bad-session-token
+    endpoint: management
+    why: >
+      A session token splunkd does not recognise gets a different envelope
+      from a bad password: WARN "call not properly authenticated", and no
+      challenge header. Two failures, two shapes.
+    request:
+      method: GET
+      path: /services/server/status
+      query: {output_mode: json}
+      headers: {Authorization: "Splunk deadbeef"}
+
+  # ── HEC codes not yet measured for invalid-event-number ─────────────────
+  - id: hec-no-data
+    endpoint: hec
+    why: An empty body. code 5 — does it carry invalid-event-number?
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: ""
+
+  - id: hec-incorrect-index
+    endpoint: hec
+    why: An index the token may not write to. code 7 — event-level or not?
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {event: conformance-probe, index: no_such_index_conformance}

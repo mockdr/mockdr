@@ -25,6 +25,15 @@ from application.splunk.queries.search import (
     list_jobs,
 )
 
+#: splunkd's exact wording, measured against Splunk 10.4.2. A client that
+#: string-matches the refusal — and some do, to distinguish "no query" from
+#: "bad query" — needs the words splunkd uses, not a paraphrase.
+_SEARCH_REQUIRED = (
+    "The required 'search' parameter for the Splunk platform REST API "
+    "search/jobs endpoint is not specified. Specify the required 'search' "
+    "parameter for the POST request on the endpoint and then retry your request."
+)
+
 router = APIRouter(tags=["Splunk Search"])
 
 
@@ -65,7 +74,7 @@ async def create_job(
 
     if not search:
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": "Search query is required"},
+            {"type": "FATAL", "text": _SEARCH_REQUIRED},
         ]})
 
     sid = create_search_job(
@@ -116,7 +125,7 @@ async def export_search(
     """One-shot blocking search export."""
     if not search:
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": "Search query is required"},
+            {"type": "FATAL", "text": _SEARCH_REQUIRED},
         ]})
 
     sid = create_search_job(
@@ -160,7 +169,7 @@ def get_search_job(
     result = get_job(sid)
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return result
 
@@ -189,7 +198,7 @@ async def control_job(
     # Control on a job that does not exist is a 404, not a cheerful 200.
     if get_job(sid) is None:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
 
     if action not in _CONTROL_ACTIONS:
@@ -230,7 +239,7 @@ def get_job_results(
     result = get_results(sid, count, offset)
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return result
 
@@ -251,7 +260,7 @@ def get_job_events(
     result = get_events(sid, count, offset)
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return result
 
@@ -267,7 +276,7 @@ def get_job_summary(
     result = get_summary(sid)
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return result
 
@@ -283,7 +292,7 @@ def get_job_timeline(
     result = get_timeline(sid)
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return result
 
@@ -297,6 +306,6 @@ def delete_job(
     """Delete a search job."""
     if not delete_search_job(sid):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Search job '{sid}' not found"},
+            {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return {"messages": [{"type": "INFO", "text": f"Search job '{sid}' deleted"}]}

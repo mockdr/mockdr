@@ -84,6 +84,13 @@ def _resolve_session(session_key: str) -> str | None:
 #: whether credentials were absent, malformed or simply wrong.
 _AUTH_FAILED = "call not properly authenticated"
 
+#: splunkd answers a missing or wrong *password* differently from a bad
+#: *token*: ERROR "Unauthorized" with a Basic challenge for the former, WARN
+#: "call not properly authenticated" and no challenge for the latter. Two
+#: failures, two shapes — measured on Splunk 10.4.2.
+_UNAUTHORIZED = {"messages": [{"type": "ERROR", "text": "Unauthorized"}]}
+_BASIC_CHALLENGE = {"WWW-Authenticate": 'Basic realm="/splunk"'}
+
 
 
 async def require_splunk_auth(
@@ -131,9 +138,9 @@ async def require_splunk_auth(
                     return {"username": user.username, "roles": user.roles}
             except Exception:
                 pass
-            raise HTTPException(status_code=401, detail=build_splunk_error(401, _AUTH_FAILED))
+            raise HTTPException(status_code=401, detail=_UNAUTHORIZED, headers=_BASIC_CHALLENGE)
 
-    raise HTTPException(status_code=401, detail=build_splunk_error(401, _AUTH_FAILED))
+    raise HTTPException(status_code=401, detail=_UNAUTHORIZED, headers=_BASIC_CHALLENGE)
 
 
 _ADMIN_ROLES: frozenset[str] = frozenset({"admin", "sc_admin"})

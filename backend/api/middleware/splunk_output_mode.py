@@ -27,6 +27,28 @@ _HEC_PREFIX = "/splunk/services/collector"
 _KVSTORE_DATA_MARKER = "/storage/collections/data/"
 
 
+async def _asked_for_json(request: Request) -> bool:
+    """Whether the caller asked for JSON, in the query or in a form body.
+
+    splunkd honours ``output_mode`` in either place, and splunklib relies on
+    the second: its ``post()`` puts every parameter, ``output_mode`` included,
+    into the form body. Reading only the query string rendered every SDK
+    POST that lacked a query parameter as Atom XML — which the harness
+    surfaced the moment a probe sent the parameter the way splunklib does.
+    """
+    if request.query_params.get("output_mode", "").lower() == "json":
+        return True
+    content_type = request.headers.get("content-type", "")
+    if request.method == "POST" and content_type.startswith("application/x-www-form-urlencoded"):
+        # body() first: it is what Starlette caches and replays to the route.
+        # form() alone streams straight from the socket, and the route then
+        # finds an empty form — every Splunk form POST broke at once.
+        await request.body()
+        form = await request.form()
+        return str(form.get("output_mode", "")).lower() == "json"
+    return False
+
+
 class SplunkOutputModeMiddleware(BaseHTTPMiddleware):
     """Render Splunk responses as XML unless ``output_mode=json`` was given."""
 
@@ -34,14 +56,20 @@ class SplunkOutputModeMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint,
     ) -> Response:
         """Convert a JSON Splunk response body to Atom XML when appropriate."""
+        path = request.url.path
+        splunk = path.startswith(_SPLUNK_PREFIX) and not path.startswith(_HEC_PREFIX)
+        # Read before the route runs: Starlette replays a body the middleware
+        # has consumed, so the route still sees its form. Only for a Splunk
+        # form POST — anything else is left untouched.
+        wants_json = splunk and await _asked_for_json(request)
+
         response = await call_next(request)
 
-        path = request.url.path
-        if not path.startswith(_SPLUNK_PREFIX) or path.startswith(_HEC_PREFIX):
+        if not splunk:
             return response
         if _KVSTORE_DATA_MARKER in path:
             return response
-        if request.query_params.get("output_mode", "").lower() == "json":
+        if wants_json:
             return response
         if not response.headers.get("content-type", "").startswith("application/json"):
             return response

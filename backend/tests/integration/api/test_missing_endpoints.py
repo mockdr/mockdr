@@ -55,32 +55,38 @@ class TestSplunkCatalogue:
         assert resp.status_code == 404
 
 
-class TestSplunkSearchParse:
-    """``Service.parse()`` validates a query without dispatching it."""
+class TestSplunkSearchParser:
+    """``Service.parse()`` validates a query without dispatching it.
+
+    This asserted ``/services/search/parse`` with an Atom envelope until the
+    conformance harness ran it against Splunk 10.4.2: that path does not
+    exist, the real one is ``search/parser``, it is POST-only, and it answers
+    a flat object. Fully transcribed in ``test_splunk_conformance.py``.
+    """
 
     def test_valid_query_reports_its_commands(self, client: TestClient) -> None:
         resp = client.post(
-            "/splunk/services/search/parse",
+            "/splunk/services/search/parser",
             headers=SPLUNK_AUTH,
-            params={"q": "search index=sentinelone | stats count by sourcetype",
-                    "output_mode": "json"},
+            data={"q": "search index=sentinelone | stats count by sourcetype",
+                  "output_mode": "json"},
         )
         assert resp.status_code == 200
-        assert "stats" in resp.json()["entry"][0]["content"]["commands"]
+        assert "stats" in [c["command"] for c in resp.json()["commands"]]
 
     def test_unrunnable_query_is_rejected(self, client: TestClient) -> None:
         # Reporting this is the entire point of the endpoint.
         resp = client.post(
-            "/splunk/services/search/parse",
+            "/splunk/services/search/parser",
             headers=SPLUNK_AUTH,
-            params={"q": "search index=x | boguscmd y", "output_mode": "json"},
+            data={"q": "search index=x | boguscmd y", "output_mode": "json"},
         )
         assert resp.status_code == 400
 
     def test_empty_query_is_rejected(self, client: TestClient) -> None:
         resp = client.post(
-            "/splunk/services/search/parse",
-            headers=SPLUNK_AUTH, params={"q": "", "output_mode": "json"},
+            "/splunk/services/search/parser",
+            headers=SPLUNK_AUTH, data={"q": "", "output_mode": "json"},
         )
         assert resp.status_code == 400
 

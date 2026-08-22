@@ -901,6 +901,19 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
         return FileResponse(_DIST / "index.html")
 
     if vendor is not None:
+        # splunkd says only "Not Found" (measured on 10.4.2); the method and
+        # path are something mockdr added for its own diagnostics, and a
+        # client matching on the text would not find what splunkd sends.
+        if vendor == "splunk":
+            # Two 404s, measured on 10.4.2: the search service has its own
+            # dispatcher and refuses an unknown path under it as FATAL
+            # "Unknown endpoint."; everywhere else splunkd says ERROR "Not
+            # Found". Neither carries the method or path mockdr used to add.
+            if "/services/search/" in path:
+                content: dict = {"messages": [{"type": "FATAL", "text": "Unknown endpoint."}]}
+            else:
+                content = build_vendor_error(vendor, 404, "Not Found")
+            return JSONResponse(status_code=404, content=content)
         return JSONResponse(
             status_code=404,
             content=build_vendor_error(

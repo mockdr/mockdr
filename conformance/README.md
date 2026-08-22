@@ -66,6 +66,13 @@ Expect a five-minute boot. On amd64 none of this applies.
 own; the harness reads the actual one back at bootstrap, which is what
 `${hec_token}` resolves to.
 
+The bootstrap makes one write to the real instance: if the HEC token has no
+index allow-list, it sets one (`index=main`, `indexes=main`). Without it the
+`hec-incorrect-index` probe compares different fixtures, not different
+software — an unrestricted HEC accepts any index name, even one that does
+not exist, with `200`, while mockdr's seeded token is restricted. A token
+that is already restricted is left alone.
+
 ## Credentials
 
 Each probe file declares the user every target recognises:
@@ -105,6 +112,11 @@ meaning (`code` and `text` for Splunk, `statusCode` and `error` for Kibana).
 Volatile values collapse to markers rather than being dropped, so a gap in the
 rules shows up as `<uuid>` where a real value was expected instead of
 disappearing.
+
+Choose `significant_keys` for what a client *branches on*, not for what looks
+important. Splunk's `type` — `ERROR`, `WARN`, `FATAL` — was left out at first
+because it looked like a label; comparing it as "a string" let every
+`FATAL`-versus-`ERROR` disagreement through until it was added.
 
 Four rules keep the noise down, each for a reason:
 

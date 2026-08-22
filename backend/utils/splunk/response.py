@@ -43,8 +43,17 @@ def build_splunk_entry(
     id_path: str = "",
     collection: str = "",
     updated: str = "",
+    links: tuple[str, ...] = ("alternate", "list", "edit", "remove"),
+    fields: dict | None | bool = True,
+    acl_extra: dict | None = None,
 ) -> dict:
     """Build a single Splunk ``entry`` object.
+
+    ``links``, ``fields`` and ``acl_extra`` exist because splunkd is not
+    uniform: ``server/info`` carries only ``alternate`` and ``list`` and no
+    ``fields`` block; an app carries ``_reload`` and ``package`` and four
+    extra ``can_share_*`` ACL members. The defaults are what most
+    collections use, and what every existing caller got before.
 
     Args:
         name:       Entry name / identifier.
@@ -55,6 +64,11 @@ def build_splunk_entry(
                     ``/services/{name}``, so a user entry claimed to live at
                     ``/services/admin`` rather than under its collection.
         updated:    ISO-8601 timestamp; defaults to now.
+        links:      Which link relations the entry offers. ``_reload`` and
+                    ``package`` get their own path suffix, as on splunkd.
+        fields:     ``True`` for the empty default block, ``False`` for none,
+                    or an explicit block.
+        acl_extra:  Members merged over the default ACL.
 
     Returns:
         A dict matching the Splunk entry structure.
@@ -63,7 +77,7 @@ def build_splunk_entry(
         updated = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
     prefix = f"{_BASE_URL}/services/{collection}" if collection else f"{_BASE_URL}/services"
     entry_id = id_path or f"{prefix}/{quote(name, safe='')}"
-    return {
+    entry: dict = {
         "name": name,
         "id": entry_id,
         "updated": updated,
@@ -71,18 +85,21 @@ def build_splunk_entry(
         # collection (client.py: `parse.unquote(state.links.alternate)`), so an
         # entry without links raised AttributeError on every `.list()` call.
         "links": {
-            "alternate": _rel_path(entry_id),
-            "list": _rel_path(entry_id),
-            "edit": _rel_path(entry_id),
-            "remove": _rel_path(entry_id),
+            rel: _rel_path(entry_id)
+            + ("/_reload" if rel == "_reload" else "/package" if rel == "package" else "")
+            for rel in links
         },
         # `_parse_atom_metadata` hoists these into Entity.access / Entity.fields;
         # Splunk's own reference says they apply to all endpoints.
         "author": "nobody",
-        "acl": _DEFAULT_ACL,
-        "fields": {"required": [], "optional": [], "wildcard": []},
+        "acl": {**_DEFAULT_ACL, **(acl_extra or {})},
         "content": content,
     }
+    if fields is True:
+        entry["fields"] = {"required": [], "optional": [], "wildcard": []}
+    elif fields:
+        entry["fields"] = fields
+    return entry
 
 
 def build_splunk_envelope(
@@ -92,8 +109,12 @@ def build_splunk_envelope(
     offset: int = 0,
     per_page: int = 30,
     origin: str = "",
+    links: dict[str, str] | None = None,
 ) -> dict:
     """Build the full Splunk JSON response envelope.
+
+    ``links`` replaces the default ``create``/``_reload`` pair when a
+    collection does not offer them — ``server/info`` has ``{}``.
 
     Args:
         entries:  List of entry dicts.
@@ -101,6 +122,7 @@ def build_splunk_envelope(
         offset:   Pagination offset.
         per_page: Page size.
         origin:   Origin URL for the response.
+        links:    Top-level link relations; ``None`` for the default pair.
 
     Returns:
         Complete Splunk REST API JSON response.
@@ -108,7 +130,9 @@ def build_splunk_envelope(
     if total is None:
         total = len(entries)
     return {
-        "links": {"create": "/services", "_reload": "/services/_reload"},
+        "links": (
+            {"create": "/services", "_reload": "/services/_reload"} if links is None else links
+        ),
         "origin": origin or f"{_BASE_URL}/services",
         "updated": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
         "generator": {"build": _SPLUNK_BUILD, "version": _SPLUNK_VERSION},

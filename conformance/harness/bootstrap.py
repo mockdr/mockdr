@@ -12,6 +12,8 @@ what lets one probe description address two differently-provisioned servers.
 """
 from __future__ import annotations
 
+import httpx
+
 from harness.clients import Clients
 from harness.spec import PlatformSpec
 
@@ -59,20 +61,50 @@ def bootstrap_splunk(
         )
     # The parent [http] stanza has no token of its own; only the child
     # inputs do, so an entry without one is not a failure.
-    tokens = {
-        str(entry.get("name", "")).removeprefix("http://"): str(entry["content"]["token"])
+    inputs = {
+        str(entry.get("name", "")).removeprefix("http://"): entry["content"]
         for entry in response.json().get("entry", [])
         if entry.get("content", {}).get("token")
     }
-    if PREFERRED_HEC_INPUT in tokens:
-        return {"hec_token": tokens[PREFERRED_HEC_INPUT]}
-    if tokens:
-        return {"hec_token": next(iter(tokens.values()))}
+    name = PREFERRED_HEC_INPUT if PREFERRED_HEC_INPUT in inputs else next(iter(inputs), None)
+    if name is not None:
+        _restrict_indexes(clients, spec, target, name, inputs[name])
+        return {"hec_token": str(inputs[name]["token"])}
 
     raise BootstrapError(
         "the real Splunk has no HEC token. Create one with:\n"
         "  splunk http-event-collector create conformance "
         "-uri https://localhost:8089 -auth admin:<password>",
+    )
+
+
+#: What the real token is allowed to write to. mockdr's seeded token is
+#: restricted to one index, and a probe for "an index the token may not
+#: write to" only means something if the real token is restricted too: an
+#: unrestricted HEC accepts any index name, even one that does not exist,
+#: with 200 (measured on 10.4.2). `main` because it exists on every install.
+_PROBE_INDEX = "main"
+
+
+def _restrict_indexes(
+    clients: Clients, spec: PlatformSpec, target: str, name: str, content: dict,
+) -> None:
+    """Give the real HEC token an index allow-list, if it has none.
+
+    The one write the bootstrap makes to a real instance. Idempotent: a token
+    that is already restricted is left alone, whatever its list says.
+    """
+    if content.get("indexes"):
+        return
+    clients.get("management", target).post(
+        f"/services/data/inputs/http/{name}",
+        # splunkd refuses `indexes` without `index`: "The indexes should be
+        # specified together with index."
+        data={"index": _PROBE_INDEX, "indexes": _PROBE_INDEX, "output_mode": "json"},
+        auth=(
+            spec.credentials[target].pair if target in spec.credentials
+            else httpx.USE_CLIENT_DEFAULT
+        ),
     )
 
 
