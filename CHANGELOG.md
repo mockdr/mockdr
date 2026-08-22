@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+The conformance harness in `conformance/` sent eleven requests to mockdr and
+to a real Elasticsearch 8.15.0 and Kibana 8.15.0, and reported 55 ways the
+answers differed. After these fixes it reports none. Each item below quotes
+what the real product sends, because that — not the documentation — is what
+the fix was measured against.
+
+- **`POST /_search` with no index answered 404.** The route did not exist,
+  so a search across all indices fell through to the not-found handler — and
+  a malformed query body never reached the parser at all, answering
+  `resource_not_found_exception` where Elasticsearch answers
+  `parsing_exception`. Both routes exist now.
+- **`parsing_exception` lacked `caused_by`, `line` and `col`.** Elasticsearch
+  reports where in the body the parser stood when it failed — the first
+  character of the unknown clause's *value*, not its key — and wraps the
+  cause as `named_object_not_found_exception`. The position is found in the
+  bytes the client actually sent, so a pretty-printed body reports its own
+  layout. The wording is also Elasticsearch 8's `unknown query [x]`; `no
+  [query] registered for [x]` was 6.x.
+- **`index_not_found_exception` lacked `resource.type` and `resource.id`.**
+  They are literal dotted keys, not a nested object, and a client reading
+  `error["resource.id"]` to name the missing index found nothing.
+- **`WWW-Authenticate` advertised `Bearer` first.** Elasticsearch 8.15 with
+  default security sends `Basic realm="security", charset="UTF-8"` then
+  `ApiKey`, and no `Bearer` — the token service only advertises itself when
+  enabled, which on a stock install without TLS it is not.
+- **A missing `kbn-xsrf` header was refused in the wrong envelope.** The
+  check is a platform pre-handler that fires before routing, so Kibana
+  answers in Boom — `{statusCode, error, message}` — on every route. mockdr
+  picked the envelope by path and sent `{status_code}` on detection-engine
+  routes.
+- **The default space carried fields Kibana omits.** `color: null`,
+  `initials` and `imageUrl` are gone; Kibana sends `color: "#00bfb3"` and
+  nothing it has no value for.
+- **`/api/status` served the full document to anyone.** Kibana answers an
+  anonymous caller with only `{"status":{"overall":{"level":...}}}` and
+  reserves name, uuid, version and metrics for a known user. `build_flavor`
+  is also `traditional` now, which is what a self-managed Kibana 8 reports.
+
 ## [2.0.3] - 2026-08-21
 
 ### Changed

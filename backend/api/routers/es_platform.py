@@ -9,9 +9,9 @@ concluded the instance was not Kibana.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from api.es_auth import require_es_auth
+from api.es_auth import optional_es_auth, require_es_auth
 from application.es_endpoints import queries as endpoint_queries
 from config import APP_VERSION
 from utils.es_response import build_kbn_error_response
@@ -22,8 +22,15 @@ _KIBANA_VERSION = "8.12.0"
 
 
 @router.get("/api/status")
-def kibana_status() -> dict:
-    """Report instance health, as ``/api/status`` does. No auth required."""
+async def kibana_status(request: Request) -> dict:
+    """Report instance health, as ``/api/status`` does.
+
+    Anyone may call it, but what they get depends on who they are. Kibana
+    8.15 answers an anonymous caller with only the overall level, and a known
+    user with the full document. This served the full document to everyone.
+    """
+    if await optional_es_auth(request) is None:
+        return {"status": {"overall": {"level": "available"}}}
     return {
         "name": "mockdr-kibana",
         "uuid": "mockdr-0000-0000-0000-000000000001",
@@ -32,13 +39,15 @@ def kibana_status() -> dict:
             "build_hash": "a1b2c3d4e5f6",
             "build_number": 68900,
             "build_snapshot": False,
-            "build_flavor": "default",
+            # "traditional" is what a self-managed Kibana 8 reports; the
+            # alternative is "serverless".
+            "build_flavor": "traditional",
             "build_date": "2026-01-01T00:00:00.000Z",
         },
         "status": {
             "overall": {
                 "level": "available",
-                "summary": "All services are available",
+                "summary": "All services and plugins are available",
             },
             "core": {
                 "elasticsearch": {"level": "available", "summary": "Elasticsearch is available"},
@@ -115,14 +124,18 @@ def list_features(
 def list_spaces(
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
-    """List Kibana spaces. This instance serves the default space only."""
+    """List Kibana spaces. This instance serves the default space only.
+
+    Exactly the document Kibana 8.15 returns for its default space. It used
+    to carry `color: null` and empty `initials`/`imageUrl`; Kibana omits a
+    field it has no value for rather than sending it null or blank, and the
+    default space does have a colour.
+    """
     return [{
         "id": "default",
         "name": "Default",
-        "description": "This is the default space",
-        "color": None,
-        "initials": "D",
-        "imageUrl": "",
+        "description": "This is your default space!",
+        "color": "#00bfb3",
         "disabledFeatures": [],
         "_reserved": True,
     }]

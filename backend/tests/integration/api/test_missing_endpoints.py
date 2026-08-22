@@ -151,9 +151,13 @@ class TestKibanaPlatform:
     """What a client probes before it trusts the instance."""
 
     def test_status_reports_available(self, client: TestClient) -> None:
+        # Anonymous callers get only the level, as Kibana 8.15 serves it;
+        # `version` is reserved for a known user. Measured by the
+        # conformance harness and asserted in test_elastic_conformance.py.
         body = client.get("/kibana/api/status").json()
         assert body["status"]["overall"]["level"] == "available"
-        assert body["version"]["number"]
+        assert "version" not in body
+        assert client.get("/kibana/api/status", headers=ES_AUTH).json()["version"]["number"]
 
     @pytest.mark.parametrize(
         "path",

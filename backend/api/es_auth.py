@@ -27,6 +27,7 @@ from utils.es_response import (
     ES_WWW_AUTHENTICATE,
     build_es_auth_error,
     build_es_error_response,
+    build_kbn_error_response,
     build_kibana_error,
 )
 
@@ -133,6 +134,24 @@ def _decode_api_key(header_value: str) -> dict | None:
 
 
 # ── Public dependencies ──────────────────────────────────────────────────────
+
+async def optional_es_auth(request: Request) -> dict | None:
+    """Return the caller's context if they authenticated, else ``None``.
+
+    For routes Kibana serves to anyone but answers more fully to a known
+    user. ``/api/status`` is the one that matters: unauthenticated it is
+    just ``{"status": {"overall": {"level": ...}}}``, authenticated it carries
+    name, uuid, version and metrics. Serving the full document to everyone
+    told an anonymous client things Kibana would not.
+    """
+    authorization = request.headers.get("authorization") or ""
+    scheme, _, value = authorization.partition(" ")
+    if scheme.lower() == "basic":
+        return _decode_basic(value)
+    if scheme.lower() == "apikey":
+        return _decode_api_key(value)
+    return None
+
 
 async def require_es_auth(
     request: Request,
@@ -243,10 +262,14 @@ async def require_kbn_xsrf(request: Request) -> None:
 
     xsrf = request.headers.get("kbn-xsrf") or request.headers.get("kbn-version")
     if not xsrf:
+        # Always Kibana's Boom envelope, never the Security Solution one.
+        # The xsrf check is a platform pre-handler that fires before the
+        # request is routed, so it has no idea which plugin owns the path —
+        # picking the envelope by path here reported `{status_code}` on
+        # detection-engine routes where Kibana 8.15 sends `{statusCode, error}`.
         raise HTTPException(
             status_code=400,
-            detail=_auth_error(
-                request, 400, "bad_request",
-                "Request must contain a kbn-xsrf header.",
+            detail=build_kbn_error_response(
+                400, "Request must contain a kbn-xsrf header.",
             ),
         )

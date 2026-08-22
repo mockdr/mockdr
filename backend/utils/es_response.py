@@ -147,11 +147,17 @@ def build_es_index_not_found(index: str) -> dict:
     Returns:
         Elasticsearch 404 error envelope.
     """
+    # `resource.type` and `resource.id` are literal dotted keys, not a nested
+    # object: Elasticsearch renders exception metadata flat, and a client that
+    # reads `error["resource.id"]` to name the missing index finds nothing if
+    # they are nested or absent. Measured against Elasticsearch 8.15.0.
     detail = {
         "type": "index_not_found_exception",
         "reason": f"no such index [{index}]",
-        "index": index,
+        "resource.type": "index_or_alias",
+        "resource.id": index,
         "index_uuid": "_na_",
+        "index": index,
     }
     return {
         "error": {"root_cause": [dict(detail)], **detail},
@@ -160,10 +166,12 @@ def build_es_index_not_found(index: str) -> dict:
 
 
 #: Challenges Elasticsearch offers on a 401, ordered by its own scheme priority.
+#: Measured against Elasticsearch 8.15.0 with default security: Basic first,
+#: then ApiKey, and no Bearer — the token service only advertises itself when
+#: it is enabled, which on a stock install without TLS it is not.
 ES_WWW_AUTHENTICATE: tuple[str, ...] = (
-    'Bearer realm="security"',
-    "ApiKey",
     'Basic realm="security", charset="UTF-8"',
+    "ApiKey",
 )
 
 

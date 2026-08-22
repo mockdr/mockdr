@@ -108,6 +108,23 @@ def authenticate(
 # ── Search ───────────────────────────────────────────────────────────────────
 
 
+@router.get("/_search", operation_id="es_search_all_get")
+@router.post("/_search", operation_id="es_search_all_post")
+def es_search_all(
+    body: dict = Body(default={}),
+    ignore_unavailable: bool = Query(default=False),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Search across every index, which is what ``/_search`` with no index means.
+
+    This route did not exist, so ``POST /_search`` fell through to the 404
+    handler — and a malformed query body never reached the parser at all,
+    answering ``resource_not_found_exception`` where Elasticsearch answers
+    ``parsing_exception``. Both measured against Elasticsearch 8.15.0.
+    """
+    return search_queries.es_search("_all", body, ignore_unavailable=ignore_unavailable)
+
+
 @router.get("/{index}/_search", operation_id="es_search_get")
 @router.post("/{index}/_search", operation_id="es_search_post")
 def es_search(

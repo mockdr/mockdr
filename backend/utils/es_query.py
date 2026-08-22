@@ -39,7 +39,16 @@ class ESQueryError(ValueError):
     Elasticsearch answers a malformed or unknown query with a 400 carrying
     ``parsing_exception``; these previously escaped as bare ``ValueError`` and
     surfaced as a plain-text 500.
+
+    ``clause`` names the unknown query type when that is the failure, so the
+    handler can render the ``caused_by`` and body position Elasticsearch
+    attaches to that case and no other.
     """
+
+    def __init__(self, message: str, *, clause: str | None = None) -> None:
+        """Record the message, and the offending clause name if there is one."""
+        super().__init__(message)
+        self.clause = clause
 
 # ---------------------------------------------------------------------------
 # Range comparison helper
@@ -130,7 +139,9 @@ def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
     for query_type, body in clause.items():
         builder = _BUILDERS.get(query_type)
         if builder is None:
-            raise ESQueryError(f"no [query] registered for [{query_type}]")
+            # Elasticsearch 8 says "unknown query"; "no [query] registered"
+            # was the 6.x/7.x wording.
+            raise ESQueryError(f"unknown query [{query_type}]", clause=query_type)
         if not isinstance(body, dict):
             # A clause body of null or a scalar reached the builders as-is and
             # raised AttributeError out of the handler as a plain-text 500.

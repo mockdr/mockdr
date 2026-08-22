@@ -219,7 +219,13 @@ class TestErrorEnvelopeConformance:
 
         error = resp.json()["error"]
         assert error["type"] == "security_exception"
-        assert "Bearer" in " ".join(error["header"]["WWW-Authenticate"])
+        # Elasticsearch 8.15 with default security: Basic, then ApiKey, and no
+        # Bearer — the token service only advertises itself when enabled.
+        # Measured by the conformance harness against the real product.
+        challenges = error["header"]["WWW-Authenticate"]
+        assert challenges[0].startswith('Basic realm="security"')
+        assert "ApiKey" in challenges
+        assert not any("Bearer" in c for c in challenges)
         # Present on the root cause as well as the top-level error.
         assert error["root_cause"][0]["type"] == "security_exception"
 

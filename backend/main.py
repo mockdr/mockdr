@@ -552,6 +552,24 @@ async def es_aggregation_exception_handler(
     )
 
 
+def _body_position(body: bytes, clause: str) -> tuple[int, int]:
+    """Line and column (1-based) where Elasticsearch would report the clause.
+
+    Not where the key starts: where the parser *stood* when it failed, which
+    is the first character of the clause's value. For
+    ``{"query":{"not_a_real_clause":{}}}`` that is the ``{`` at column 31,
+    and that is what Elasticsearch 8.15 reports.
+    """
+    text = body.decode("utf-8", errors="replace")
+    key = text.find(f'"{clause}"')
+    if key < 0:
+        return 1, 1
+    offset = key + len(clause) + 2
+    while offset < len(text) and text[offset] in ": \t\r\n":
+        offset += 1
+    return text.count("\n", 0, offset) + 1, offset - text.rfind("\n", 0, offset)
+
+
 @app.exception_handler(ESQueryError)
 async def es_query_exception_handler(
     _request: Request, exc: ESQueryError,
@@ -562,10 +580,21 @@ async def es_query_exception_handler(
     ``ValueError``, which reached the client as a plain-text ``500`` — an
     Elasticsearch client cannot tell that apart from the cluster falling over.
     """
-    return JSONResponse(
-        status_code=400,
-        content=build_es_error_response(400, "parsing_exception", str(exc)),
-    )
+    content = build_es_error_response(400, "parsing_exception", str(exc))
+    if exc.clause is not None:
+        # Elasticsearch reports where in the body the unknown clause sits and
+        # wraps the cause. The position is found in the bytes the client
+        # actually sent, not in a re-serialisation of them, so it points at
+        # what they will see when they look.
+        line, col = _body_position(await _request.body(), exc.clause)
+        for entry in (content["error"], *content["error"].get("root_cause", [])):
+            entry["line"] = line
+            entry["col"] = col
+        content["error"]["caused_by"] = {
+            "type": "named_object_not_found_exception",
+            "reason": f"[{line}:{col}] unknown field [{exc.clause}]",
+        }
+    return JSONResponse(status_code=400, content=content)
 
 
 # ── Metrics (no auth, no prefix — mounted at /metrics) ───────────────────────
