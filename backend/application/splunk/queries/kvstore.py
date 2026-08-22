@@ -1,25 +1,53 @@
 """Splunk KV Store query handlers (read-only)."""
+
 from __future__ import annotations
+
+import json
 
 from repository.splunk.kv_collection_repo import kv_collection_repo
 from utils.splunk.kvstore_query import apply_fields, apply_query, apply_sort
-from utils.splunk.response import build_splunk_entry, build_splunk_envelope
+from utils.splunk.response import (
+    build_splunk_entry,
+    build_splunk_envelope,
+    complete,
+    fixture_top_links,
+)
+
+#: A KV collection's ACL carries the four sharing capabilities (10.4.2).
+_KV_ACL = {
+    "can_change_perms": True,
+    "can_share_app": True,
+    "can_share_global": True,
+    "can_share_user": False,
+}
 
 
-def list_collections(app: str = "search") -> dict:
-    """Return all KV Store collections in Splunk envelope format."""
+def list_collections(app: str | None = "search") -> dict:
+    """Return the KV Store collections in Splunk envelope format.
+
+    ``app=None`` is the app-less ``/services`` namespace, which on splunkd
+    lists every app's collections.
+    """
     all_colls = kv_collection_repo.list_all()
-    colls = [c for c in all_colls if c.app == app]
+    colls = [c for c in all_colls if app is None or c.app == app]
     entries = []
     for coll in colls:
-        content = {
-            "field.types": coll.field_types,
-            "accelerated_fields": coll.accelerated_fields,
-        }
-        entries.append(build_splunk_entry(
-            coll.name, content, collection="storage/collections/config",
-        ))
-    return build_splunk_envelope(entries)
+        # splunkd flattens the collection schema into dotted keys:
+        # ``field.<name>: <type>`` and ``accelerated_fields.<name>: <json>``.
+        content: dict = {f"field.{k}": v for k, v in (coll.field_types or {}).items()}
+        for k, v in (coll.accelerated_fields or {}).items():
+            content[f"accelerated_fields.{k}"] = v if isinstance(v, str) else json.dumps(v)
+        entries.append(
+            build_splunk_entry(
+                coll.name,
+                complete(content, "kv_config"),
+                collection="storage/collections/config",
+                links=("_reload", "alternate", "disable", "edit", "list"),
+                fields=False,
+                acl_extra=_KV_ACL,
+            )
+        )
+    return build_splunk_envelope(entries, links=fixture_top_links("kv_config"))
 
 
 def collection_exists(name: str, app: str = "search") -> bool:

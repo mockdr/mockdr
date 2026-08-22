@@ -93,10 +93,6 @@ def seed_graph_defender_office(fake: Faker, user_ids: list[str]) -> None:
             expectedAssessment=assess_data["expectedAssessment"],
             status="completed",
             category=assess_data["category"],
-            result={
-                "resultType": "checkPolicy",
-                "message": f"This {assess_data['contentType']} has been assessed as {assess_data['category']}.",
-            },
             createdDateTime=rand_ago(max_days=45),
             requestSource="administrator",
         )

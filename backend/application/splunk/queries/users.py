@@ -1,23 +1,35 @@
 """Splunk user query handlers (read-only)."""
+
 from __future__ import annotations
 
 from repository.splunk.splunk_user_repo import splunk_user_repo
-from utils.splunk.response import build_splunk_entry, build_splunk_envelope
+from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
 
 # Splunk capability names for role-based access
 ADMIN_CAPABILITIES = [
-    "admin_all_objects", "change_own_password", "delete_by_keyword",
-    "edit_search_server", "edit_user", "list_inputs", "rest_apps_management",
-    "search", "schedule_search", "accelerate_search",
+    "admin_all_objects",
+    "change_own_password",
+    "delete_by_keyword",
+    "edit_search_server",
+    "edit_user",
+    "list_inputs",
+    "rest_apps_management",
+    "search",
+    "schedule_search",
+    "accelerate_search",
 ]
 
 SC_ADMIN_CAPABILITIES = [
-    "change_own_password", "delete_by_keyword", "edit_notable_events",
-    "search", "schedule_search",
+    "change_own_password",
+    "delete_by_keyword",
+    "edit_notable_events",
+    "search",
+    "schedule_search",
 ]
 
 USER_CAPABILITIES = [
-    "change_own_password", "search",
+    "change_own_password",
+    "search",
 ]
 
 
@@ -33,10 +45,16 @@ def list_users() -> dict:
             "defaultApp": user.default_app,
             "tz": user.tz,
         }
-        entries.append(build_splunk_entry(
-            user.username, content, collection="authentication/users",
-        ))
-    return build_splunk_envelope(entries)
+        entries.append(
+            build_splunk_entry(
+                user.username,
+                complete(content, "users"),
+                collection="authentication/users",
+                links=("alternate", "edit", "list"),
+                fields=False,
+            )
+        )
+    return build_splunk_envelope(entries, links={"create": "/services/authentication/users/_new"})
 
 
 def get_user(username: str) -> dict | None:
@@ -51,7 +69,12 @@ def get_user(username: str) -> dict | None:
         "defaultApp": user.default_app,
         "tz": user.tz,
     }
-    entry = build_splunk_entry(user.username, content, collection="authentication/users")
+    entry = build_splunk_entry(
+        user.username,
+        complete(content, "users"),
+        collection="authentication/users",
+        links=("alternate", "edit", "list"),
+    )
     return build_splunk_envelope([entry], total=1)
 
 
@@ -60,13 +83,25 @@ def get_current_context(username: str) -> dict:
     user = splunk_user_repo.get(username)
     if not user:
         return {}
-    return build_splunk_envelope([build_splunk_entry(
-        username, collection="authentication/users", content={
+    content = {
         "username": user.username,
         "realname": user.realname,
         "roles": user.roles,
         "defaultApp": user.default_app,
-    })], total=1)
+    }
+    return build_splunk_envelope(
+        [
+            build_splunk_entry(
+                username,
+                complete(content, "current_context"),
+                collection="authentication/users",
+                links=("alternate", "list"),
+                fields=False,
+            )
+        ],
+        total=1,
+        links={},
+    )
 
 
 def list_roles() -> dict:
@@ -77,18 +112,27 @@ def list_roles() -> dict:
         {"name": "user", "capabilities": USER_CAPABILITIES},
     ]
     entries = [
-        build_splunk_entry(str(r["name"]), r, collection="authorization/roles")
+        build_splunk_entry(
+            str(r["name"]),
+            complete({k: v for k, v in r.items() if k != "name"}, "roles"),
+            collection="authorization/roles",
+            links=("alternate", "edit", "list", "remove"),
+            fields=False,
+        )
         for r in roles
     ]
-    return build_splunk_envelope(entries)
+    return build_splunk_envelope(entries, links={"create": "/services/authorization/roles/_new"})
 
 
 def list_capabilities() -> dict:
     """Return available capabilities."""
     all_caps = sorted(set(ADMIN_CAPABILITIES + SC_ADMIN_CAPABILITIES + USER_CAPABILITIES))
     return build_splunk_envelope(
-        [build_splunk_entry(
-            "capabilities", {"capabilities": all_caps},
-            collection="authorization/capabilities",
-        )],
+        [
+            build_splunk_entry(
+                "capabilities",
+                {"capabilities": all_caps},
+                collection="authorization/capabilities",
+            )
+        ],
     )

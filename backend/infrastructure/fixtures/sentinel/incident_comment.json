@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "createdTimeUtc": "",
+    "lastModifiedTimeUtc": "",
+    "message": "",
+    "author": {
+      "email": "",
+      "name": "",
+      "objectId": "",
+      "userPrincipalName": ""
+    }
+  },
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

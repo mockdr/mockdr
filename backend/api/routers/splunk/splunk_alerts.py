@@ -24,7 +24,7 @@ def list_fired_alerts(
         build_splunk_entry(a.get("name", ""), a, collection="alerts/fired_alerts")
         for a in alerts
     ]
-    return build_splunk_envelope(entries)
+    return build_splunk_envelope(entries, links={})
 
 
 @router.get("/services/alerts/fired_alerts/{name}")

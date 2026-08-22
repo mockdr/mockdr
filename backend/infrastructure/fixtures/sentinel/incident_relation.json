@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "relatedResourceId": "",
+    "relatedResourceName": "",
+    "relatedResourceType": "",
+    "relatedResourceKind": ""
+  },
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

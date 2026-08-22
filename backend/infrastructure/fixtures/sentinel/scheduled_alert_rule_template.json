@@ -1,0 +1,44 @@
+{
+  "properties": {
+    "alertRulesCreatedByTemplateCount": 0,
+    "createdDateUTC": "",
+    "lastUpdatedDateUTC": "",
+    "description": "",
+    "displayName": "",
+    "requiredDataConnectors": [],
+    "status": "Installed",
+    "query": "",
+    "queryFrequency": "",
+    "queryPeriod": "",
+    "severity": "High",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "tactics": [],
+    "techniques": [],
+    "version": "",
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "customDetails": {},
+    "entityMappings": [],
+    "alertDetailsOverride": {
+      "alertDisplayNameFormat": "",
+      "alertDescriptionFormat": "",
+      "alertTacticsColumnName": "",
+      "alertSeverityColumnName": "",
+      "alertDynamicProperties": []
+    }
+  },
+  "kind": "Scheduled",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

@@ -52,4 +52,24 @@ _OPERATIONS: list[dict] = [
 @router.get("/providers/Microsoft.SecurityInsights/operations")
 def list_operations() -> dict:
     """Return available Sentinel operations metadata."""
-    return {"value": _OPERATIONS}
+    # ARM's operation list: every entry carries origin and isDataAction, the
+    # display block a description, and the envelope a nextLink — all absent
+    # here until the 2024-03-01 spec was compared against this route.
+    return {
+        "value": [
+            {
+                **op,
+                "origin": op.get("origin", "user,system"),
+                "isDataAction": op.get("isDataAction", False),
+                "display": {
+                    **op.get("display", {}),
+                    "description": op.get("display", {}).get(
+                        "description", op.get("display", {}).get("operation", ""),
+                    ),
+                },
+            }
+            for op in _OPERATIONS
+        ],
+        # No nextLink: ARM omits it when there is no next page, rather than
+        # sending null — the spec declares the property, practice leaves it out.
+    }

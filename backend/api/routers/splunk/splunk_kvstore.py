@@ -30,6 +30,15 @@ router = APIRouter(tags=["Splunk KV Store"])
 
 # ── Collection config ──────────────────────────────────────────────────────
 
+@router.get("/services/storage/collections/config")
+def list_all_kv_collections(
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """List every app's KV Store collections, as the app-less namespace does."""
+    return list_collections(None)
+
+
 @router.get("/servicesNS/{owner}/{app}/storage/collections/config")
 def list_kv_collections(
     owner: str,

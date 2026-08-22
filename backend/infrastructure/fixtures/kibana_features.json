@@ -1,0 +1,4751 @@
+[
+  {
+    "id": "enterpriseSearch",
+    "name": "Search",
+    "order": 0,
+    "category": {
+      "id": "enterpriseSearch",
+      "label": "Search",
+      "order": 2000,
+      "euiIconType": "logoEnterpriseSearch"
+    },
+    "app": [
+      "kibana",
+      "enterpriseSearch",
+      "enterpriseSearchContent",
+      "enterpriseSearchElasticsearch",
+      "enterpriseSearchAnalytics",
+      "appSearch",
+      "workplaceSearch",
+      "searchExperiences"
+    ],
+    "catalogue": [
+      "enterpriseSearch",
+      "enterpriseSearchContent",
+      "enterpriseSearchElasticsearch",
+      "enterpriseSearchAnalytics",
+      "appSearch",
+      "workplaceSearch",
+      "searchExperiences"
+    ],
+    "privileges": null
+  },
+  {
+    "id": "discover",
+    "name": "Discover",
+    "management": {
+      "kibana": [
+        "search_sessions"
+      ]
+    },
+    "order": 100,
+    "category": {
+      "id": "kibana",
+      "label": "Analytics",
+      "euiIconType": "logoKibana",
+      "order": 1000
+    },
+    "app": [
+      "discover",
+      "kibana"
+    ],
+    "catalogue": [
+      "discover"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "discover",
+          "kibana"
+        ],
+        "api": [
+          "fileUpload:analyzeFile"
+        ],
+        "catalogue": [
+          "discover"
+        ],
+        "savedObject": {
+          "all": [
+            "search",
+            "query",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "save",
+          "saveQuery"
+        ]
+      },
+      "read": {
+        "app": [
+          "discover",
+          "kibana"
+        ],
+        "catalogue": [
+          "discover"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "index-pattern",
+            "search",
+            "query",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Short URLs",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "url_create",
+                "name": "Create Short URLs",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "url"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "createShortUrl"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Store Search Sessions",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "store_search_session",
+                "name": "Store Search Sessions",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "search-session"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "storeSearchSession"
+                ],
+                "management": {
+                  "kibana": [
+                    "search_sessions"
+                  ]
+                },
+                "api": [
+                  "store_search_session"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dashboard",
+    "name": "Dashboard",
+    "management": {
+      "kibana": [
+        "search_sessions"
+      ]
+    },
+    "order": 200,
+    "category": {
+      "id": "kibana",
+      "label": "Analytics",
+      "euiIconType": "logoKibana",
+      "order": 1000
+    },
+    "app": [
+      "dashboards",
+      "kibana"
+    ],
+    "catalogue": [
+      "dashboard"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "dashboards",
+          "kibana"
+        ],
+        "catalogue": [
+          "dashboard"
+        ],
+        "savedObject": {
+          "all": [
+            "dashboard",
+            "query",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "search",
+            "visualization",
+            "canvas-workpad",
+            "lens",
+            "links",
+            "map",
+            "tag",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "createNew",
+          "show",
+          "showWriteControls",
+          "saveQuery"
+        ],
+        "api": [
+          "bulkGetUserProfiles"
+        ]
+      },
+      "read": {
+        "app": [
+          "dashboards",
+          "kibana"
+        ],
+        "catalogue": [
+          "dashboard"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "index-pattern",
+            "search",
+            "visualization",
+            "canvas-workpad",
+            "lens",
+            "links",
+            "map",
+            "dashboard",
+            "query",
+            "tag",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ],
+        "api": [
+          "bulkGetUserProfiles"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Short URLs",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "url_create",
+                "name": "Create Short URLs",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "url"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "createShortUrl"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Store Search Sessions",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "store_search_session",
+                "name": "Store Search Sessions",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "search-session"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "storeSearchSession"
+                ],
+                "management": {
+                  "kibana": [
+                    "search_sessions"
+                  ]
+                },
+                "api": [
+                  "store_search_session"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "canvas",
+    "name": "Canvas",
+    "order": 300,
+    "category": {
+      "id": "kibana",
+      "label": "Analytics",
+      "euiIconType": "logoKibana",
+      "order": 1000
+    },
+    "app": [
+      "canvas",
+      "kibana"
+    ],
+    "management": {},
+    "catalogue": [
+      "canvas"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "canvas",
+          "kibana"
+        ],
+        "catalogue": [
+          "canvas"
+        ],
+        "savedObject": {
+          "all": [
+            "canvas-workpad",
+            "canvas-element",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "save",
+          "show"
+        ]
+      },
+      "read": {
+        "app": [
+          "canvas",
+          "kibana"
+        ],
+        "catalogue": [
+          "canvas"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "index-pattern",
+            "canvas-workpad",
+            "canvas-element",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    },
+    "subFeatures": []
+  },
+  {
+    "id": "maps",
+    "name": "Maps",
+    "order": 400,
+    "category": {
+      "id": "kibana",
+      "label": "Analytics",
+      "euiIconType": "logoKibana",
+      "order": 1000
+    },
+    "app": [
+      "maps",
+      "kibana"
+    ],
+    "catalogue": [
+      "maps"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "maps",
+          "kibana"
+        ],
+        "catalogue": [
+          "maps"
+        ],
+        "savedObject": {
+          "all": [
+            "map",
+            "query",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "tag",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "save",
+          "show",
+          "saveQuery"
+        ]
+      },
+      "read": {
+        "app": [
+          "maps",
+          "kibana"
+        ],
+        "catalogue": [
+          "maps"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "map",
+            "index-pattern",
+            "query",
+            "tag",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    }
+  },
+  {
+    "id": "ml",
+    "name": "Machine Learning",
+    "order": 500,
+    "category": {
+      "id": "kibana",
+      "label": "Analytics",
+      "euiIconType": "logoKibana",
+      "order": 1000
+    },
+    "app": [
+      "ml",
+      "kibana"
+    ],
+    "catalogue": [
+      "ml",
+      "ml_file_data_visualizer"
+    ],
+    "privilegesTooltip": "Granting All or Read feature privilege for Machine Learning will also grant the equivalent feature privileges to certain types of Kibana saved objects, namely index patterns, dashboards, saved searches and visualizations as well as machine learning job, trained model and module saved objects.",
+    "management": {
+      "insightsAndAlerting": [
+        "jobsListLink",
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      "xpack.ml.anomaly_detection_alert",
+      "xpack.ml.anomaly_detection_jobs_health"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "ml",
+          "kibana"
+        ],
+        "excludeFromBasePrivileges": false,
+        "management": {
+          "insightsAndAlerting": [
+            "jobsListLink",
+            "triggersActions"
+          ]
+        },
+        "catalogue": [
+          "ml",
+          "ml_file_data_visualizer"
+        ],
+        "api": [
+          "fileUpload:analyzeFile",
+          "ml:isADEnabled",
+          "ml:isDFAEnabled",
+          "ml:isNLPEnabled",
+          "ml:canCreateJob",
+          "ml:canDeleteJob",
+          "ml:canOpenJob",
+          "ml:canCloseJob",
+          "ml:canResetJob",
+          "ml:canUpdateJob",
+          "ml:canForecastJob",
+          "ml:canCreateDatafeed",
+          "ml:canDeleteDatafeed",
+          "ml:canStartStopDatafeed",
+          "ml:canUpdateDatafeed",
+          "ml:canPreviewDatafeed",
+          "ml:canGetFilters",
+          "ml:canCreateCalendar",
+          "ml:canDeleteCalendar",
+          "ml:canCreateFilter",
+          "ml:canDeleteFilter",
+          "ml:canCreateDataFrameAnalytics",
+          "ml:canDeleteDataFrameAnalytics",
+          "ml:canStartStopDataFrameAnalytics",
+          "ml:canCreateMlAlerts",
+          "ml:canUseMlAlerts",
+          "ml:canViewMlNodes",
+          "ml:canCreateTrainedModels",
+          "ml:canDeleteTrainedModels",
+          "ml:canStartStopTrainedModels",
+          "ml:canCreateInferenceEndpoint",
+          "ml:canGetJobs",
+          "ml:canGetDatafeeds",
+          "ml:canGetCalendars",
+          "ml:canFindFileStructure",
+          "ml:canGetDataFrameAnalytics",
+          "ml:canGetAnnotations",
+          "ml:canCreateAnnotation",
+          "ml:canDeleteAnnotation",
+          "ml:canUseMlAlerts",
+          "ml:canGetTrainedModels",
+          "ml:canTestTrainedModels",
+          "ml:canGetFieldInfo",
+          "ml:canGetMlInfo",
+          "ml:canUseAiops"
+        ],
+        "ui": [
+          "isADEnabled",
+          "isDFAEnabled",
+          "isNLPEnabled",
+          "canCreateJob",
+          "canDeleteJob",
+          "canOpenJob",
+          "canCloseJob",
+          "canResetJob",
+          "canUpdateJob",
+          "canForecastJob",
+          "canCreateDatafeed",
+          "canDeleteDatafeed",
+          "canStartStopDatafeed",
+          "canUpdateDatafeed",
+          "canPreviewDatafeed",
+          "canGetFilters",
+          "canCreateCalendar",
+          "canDeleteCalendar",
+          "canCreateFilter",
+          "canDeleteFilter",
+          "canCreateDataFrameAnalytics",
+          "canDeleteDataFrameAnalytics",
+          "canStartStopDataFrameAnalytics",
+          "canCreateMlAlerts",
+          "canUseMlAlerts",
+          "canViewMlNodes",
+          "canCreateTrainedModels",
+          "canDeleteTrainedModels",
+          "canStartStopTrainedModels",
+          "canCreateInferenceEndpoint",
+          "canGetJobs",
+          "canGetDatafeeds",
+          "canGetCalendars",
+          "canFindFileStructure",
+          "canGetDataFrameAnalytics",
+          "canGetAnnotations",
+          "canCreateAnnotation",
+          "canDeleteAnnotation",
+          "canUseMlAlerts",
+          "canGetTrainedModels",
+          "canTestTrainedModels",
+          "canGetFieldInfo",
+          "canGetMlInfo",
+          "canUseAiops"
+        ],
+        "savedObject": {
+          "all": [
+            "index-pattern",
+            "dashboard",
+            "search",
+            "visualization",
+            "ml-job",
+            "ml-module",
+            "ml-trained-model",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "dashboard",
+            "search",
+            "visualization",
+            "ml-job",
+            "ml-module",
+            "ml-trained-model",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              "xpack.ml.anomaly_detection_alert",
+              "xpack.ml.anomaly_detection_jobs_health"
+            ]
+          },
+          "alert": {
+            "all": [
+              "xpack.ml.anomaly_detection_alert",
+              "xpack.ml.anomaly_detection_jobs_health"
+            ]
+          }
+        }
+      },
+      "read": {
+        "app": [
+          "ml",
+          "kibana"
+        ],
+        "excludeFromBasePrivileges": false,
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "catalogue": [
+          "ml"
+        ],
+        "api": [
+          "fileUpload:analyzeFile",
+          "ml:isADEnabled",
+          "ml:isDFAEnabled",
+          "ml:isNLPEnabled",
+          "ml:canGetJobs",
+          "ml:canGetDatafeeds",
+          "ml:canGetCalendars",
+          "ml:canFindFileStructure",
+          "ml:canGetDataFrameAnalytics",
+          "ml:canGetAnnotations",
+          "ml:canCreateAnnotation",
+          "ml:canDeleteAnnotation",
+          "ml:canUseMlAlerts",
+          "ml:canGetTrainedModels",
+          "ml:canTestTrainedModels",
+          "ml:canGetFieldInfo",
+          "ml:canGetMlInfo",
+          "ml:canUseAiops"
+        ],
+        "ui": [
+          "isADEnabled",
+          "isDFAEnabled",
+          "isNLPEnabled",
+          "canGetJobs",
+          "canGetDatafeeds",
+          "canGetCalendars",
+          "canFindFileStructure",
+          "canGetDataFrameAnalytics",
+          "canGetAnnotations",
+          "canCreateAnnotation",
+          "canDeleteAnnotation",
+          "canUseMlAlerts",
+          "canGetTrainedModels",
+          "canTestTrainedModels",
+          "canGetFieldInfo",
+          "canGetMlInfo",
+          "canUseAiops"
+        ],
+        "savedObject": {
+          "all": [
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "dashboard",
+            "search",
+            "visualization",
+            "ml-job",
+            "ml-module",
+            "ml-trained-model",
+            "config",
+            "config-global",
+            "url",
+            "telemetry"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "read": [
+              "xpack.ml.anomaly_detection_alert",
+              "xpack.ml.anomaly_detection_jobs_health"
+            ]
+          },
+          "alert": {
+            "read": [
+              "xpack.ml.anomaly_detection_alert",
+              "xpack.ml.anomaly_detection_jobs_health"
+            ]
+          }
+        }
+      }
+    },
+    "reserved": {
+      "description": "To grant users access, you should also assign either the machine_learning_user or machine_learning_admin role.",
+      "privileges": [
+        {
+          "id": "ml_user",
+          "privilege": {
+            "app": [
+              "ml",
+              "kibana"
+            ],
+            "excludeFromBasePrivileges": false,
+            "management": {
+              "insightsAndAlerting": [
+                "triggersActions"
+              ]
+            },
+            "catalogue": [
+              "ml"
+            ],
+            "api": [
+              "fileUpload:analyzeFile",
+              "ml:isADEnabled",
+              "ml:isDFAEnabled",
+              "ml:isNLPEnabled",
+              "ml:canGetJobs",
+              "ml:canGetDatafeeds",
+              "ml:canGetCalendars",
+              "ml:canFindFileStructure",
+              "ml:canGetDataFrameAnalytics",
+              "ml:canGetAnnotations",
+              "ml:canCreateAnnotation",
+              "ml:canDeleteAnnotation",
+              "ml:canUseMlAlerts",
+              "ml:canGetTrainedModels",
+              "ml:canTestTrainedModels",
+              "ml:canGetFieldInfo",
+              "ml:canGetMlInfo",
+              "ml:canUseAiops"
+            ],
+            "ui": [
+              "isADEnabled",
+              "isDFAEnabled",
+              "isNLPEnabled",
+              "canGetJobs",
+              "canGetDatafeeds",
+              "canGetCalendars",
+              "canFindFileStructure",
+              "canGetDataFrameAnalytics",
+              "canGetAnnotations",
+              "canCreateAnnotation",
+              "canDeleteAnnotation",
+              "canUseMlAlerts",
+              "canGetTrainedModels",
+              "canTestTrainedModels",
+              "canGetFieldInfo",
+              "canGetMlInfo",
+              "canUseAiops"
+            ],
+            "savedObject": {
+              "all": [
+                "telemetry"
+              ],
+              "read": [
+                "index-pattern",
+                "dashboard",
+                "search",
+                "visualization",
+                "ml-job",
+                "ml-module",
+                "ml-trained-model",
+                "config",
+                "config-global",
+                "url",
+                "telemetry"
+              ]
+            },
+            "alerting": {
+              "rule": {
+                "read": [
+                  "xpack.ml.anomaly_detection_alert",
+                  "xpack.ml.anomaly_detection_jobs_health"
+                ]
+              },
+              "alert": {
+                "read": [
+                  "xpack.ml.anomaly_detection_alert",
+                  "xpack.ml.anomaly_detection_jobs_health"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "ml_admin",
+          "privilege": {
+            "app": [
+              "ml",
+              "kibana"
+            ],
+            "excludeFromBasePrivileges": false,
+            "management": {
+              "insightsAndAlerting": [
+                "jobsListLink",
+                "triggersActions"
+              ]
+            },
+            "catalogue": [
+              "ml",
+              "ml_file_data_visualizer"
+            ],
+            "api": [
+              "fileUpload:analyzeFile",
+              "ml:isADEnabled",
+              "ml:isDFAEnabled",
+              "ml:isNLPEnabled",
+              "ml:canCreateJob",
+              "ml:canDeleteJob",
+              "ml:canOpenJob",
+              "ml:canCloseJob",
+              "ml:canResetJob",
+              "ml:canUpdateJob",
+              "ml:canForecastJob",
+              "ml:canCreateDatafeed",
+              "ml:canDeleteDatafeed",
+              "ml:canStartStopDatafeed",
+              "ml:canUpdateDatafeed",
+              "ml:canPreviewDatafeed",
+              "ml:canGetFilters",
+              "ml:canCreateCalendar",
+              "ml:canDeleteCalendar",
+              "ml:canCreateFilter",
+              "ml:canDeleteFilter",
+              "ml:canCreateDataFrameAnalytics",
+              "ml:canDeleteDataFrameAnalytics",
+              "ml:canStartStopDataFrameAnalytics",
+              "ml:canCreateMlAlerts",
+              "ml:canUseMlAlerts",
+              "ml:canViewMlNodes",
+              "ml:canCreateTrainedModels",
+              "ml:canDeleteTrainedModels",
+              "ml:canStartStopTrainedModels",
+              "ml:canCreateInferenceEndpoint",
+              "ml:canGetJobs",
+              "ml:canGetDatafeeds",
+              "ml:canGetCalendars",
+              "ml:canFindFileStructure",
+              "ml:canGetDataFrameAnalytics",
+              "ml:canGetAnnotations",
+              "ml:canCreateAnnotation",
+              "ml:canDeleteAnnotation",
+              "ml:canUseMlAlerts",
+              "ml:canGetTrainedModels",
+              "ml:canTestTrainedModels",
+              "ml:canGetFieldInfo",
+              "ml:canGetMlInfo",
+              "ml:canUseAiops"
+            ],
+            "ui": [
+              "isADEnabled",
+              "isDFAEnabled",
+              "isNLPEnabled",
+              "canCreateJob",
+              "canDeleteJob",
+              "canOpenJob",
+              "canCloseJob",
+              "canResetJob",
+              "canUpdateJob",
+              "canForecastJob",
+              "canCreateDatafeed",
+              "canDeleteDatafeed",
+              "canStartStopDatafeed",
+              "canUpdateDatafeed",
+              "canPreviewDatafeed",
+              "canGetFilters",
+              "canCreateCalendar",
+              "canDeleteCalendar",
+              "canCreateFilter",
+              "canDeleteFilter",
+              "canCreateDataFrameAnalytics",
+              "canDeleteDataFrameAnalytics",
+              "canStartStopDataFrameAnalytics",
+              "canCreateMlAlerts",
+              "canUseMlAlerts",
+              "canViewMlNodes",
+              "canCreateTrainedModels",
+              "canDeleteTrainedModels",
+              "canStartStopTrainedModels",
+              "canCreateInferenceEndpoint",
+              "canGetJobs",
+              "canGetDatafeeds",
+              "canGetCalendars",
+              "canFindFileStructure",
+              "canGetDataFrameAnalytics",
+              "canGetAnnotations",
+              "canCreateAnnotation",
+              "canDeleteAnnotation",
+              "canUseMlAlerts",
+              "canGetTrainedModels",
+              "canTestTrainedModels",
+              "canGetFieldInfo",
+              "canGetMlInfo",
+              "canUseAiops"
+            ],
+            "savedObject": {
+              "all": [
+                "index-pattern",
+                "dashboard",
+                "search",
+                "visualization",
+                "ml-job",
+                "ml-module",
+                "ml-trained-model",
+                "telemetry"
+              ],
+              "read": [
+                "index-pattern",
+                "dashboard",
+                "search",
+                "visualization",
+                "ml-job",
+                "ml-module",
+                "ml-trained-model",
+                "config",
+                "config-global",
+                "url"
+              ]
+            },
+            "alerting": {
+              "rule": {
+                "all": [
+                  "xpack.ml.anomaly_detection_alert",
+                  "xpack.ml.anomaly_detection_jobs_health"
+                ]
+              },
+              "alert": {
+                "all": [
+                  "xpack.ml.anomaly_detection_alert",
+                  "xpack.ml.anomaly_detection_jobs_health"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "ml_apm_user",
+          "privilege": {
+            "excludeFromBasePrivileges": true,
+            "app": [],
+            "catalogue": [],
+            "savedObject": {
+              "all": [
+                "telemetry"
+              ],
+              "read": [
+                "ml-job",
+                "config",
+                "config-global",
+                "url"
+              ]
+            },
+            "api": [
+              "ml:canGetJobs"
+            ],
+            "ui": [
+              "canGetJobs"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "logs",
+    "name": "Logs",
+    "order": 700,
+    "category": {
+      "id": "observability",
+      "label": "Observability",
+      "euiIconType": "logoObservability",
+      "order": 3000
+    },
+    "app": [
+      "infra",
+      "logs",
+      "kibana"
+    ],
+    "catalogue": [
+      "infralogging",
+      "logs"
+    ],
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      "logs.alert.document.count",
+      ".es-query",
+      "observability.rules.custom_threshold",
+      "xpack.ml.anomaly_detection_alert"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "infra",
+          "logs",
+          "kibana"
+        ],
+        "catalogue": [
+          "infralogging",
+          "logs"
+        ],
+        "api": [
+          "infra",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [
+            "infrastructure-ui-source",
+            "infrastructure-monitoring-log-view",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              "logs.alert.document.count",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          },
+          "alert": {
+            "all": [
+              "logs.alert.document.count",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "configureSource",
+          "save"
+        ]
+      },
+      "read": {
+        "app": [
+          "infra",
+          "logs",
+          "kibana"
+        ],
+        "catalogue": [
+          "infralogging",
+          "logs"
+        ],
+        "api": [
+          "infra",
+          "rac"
+        ],
+        "alerting": {
+          "rule": {
+            "read": [
+              "logs.alert.document.count",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          },
+          "alert": {
+            "read": [
+              "logs.alert.document.count",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "infrastructure-ui-source",
+            "infrastructure-monitoring-log-view",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    }
+  },
+  {
+    "id": "visualize",
+    "name": "Visualize Library",
+    "management": {},
+    "order": 700,
+    "category": {
+      "id": "kibana",
+      "label": "Analytics",
+      "euiIconType": "logoKibana",
+      "order": 1000
+    },
+    "app": [
+      "visualize",
+      "lens",
+      "kibana"
+    ],
+    "catalogue": [
+      "visualize"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "visualize",
+          "lens",
+          "kibana"
+        ],
+        "catalogue": [
+          "visualize"
+        ],
+        "savedObject": {
+          "all": [
+            "visualization",
+            "query",
+            "lens",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "search",
+            "tag",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "delete",
+          "save",
+          "saveQuery"
+        ]
+      },
+      "read": {
+        "app": [
+          "visualize",
+          "lens",
+          "kibana"
+        ],
+        "catalogue": [
+          "visualize"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "index-pattern",
+            "search",
+            "visualization",
+            "query",
+            "lens",
+            "tag",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Short URLs",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "url_create",
+                "name": "Create Short URLs",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "url"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "createShortUrl"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "infrastructure",
+    "name": "Infrastructure",
+    "order": 800,
+    "category": {
+      "id": "observability",
+      "label": "Observability",
+      "euiIconType": "logoObservability",
+      "order": 3000
+    },
+    "app": [
+      "infra",
+      "metrics",
+      "kibana"
+    ],
+    "catalogue": [
+      "infraops",
+      "metrics"
+    ],
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      "metrics.alert.threshold",
+      "metrics.alert.inventory.threshold",
+      ".es-query",
+      "observability.rules.custom_threshold",
+      "xpack.ml.anomaly_detection_alert"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "infra",
+          "metrics",
+          "kibana"
+        ],
+        "catalogue": [
+          "infraops",
+          "metrics"
+        ],
+        "api": [
+          "infra",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [
+            "infrastructure-ui-source",
+            "metrics-data-source",
+            "telemetry"
+          ],
+          "read": [
+            "index-pattern",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              "metrics.alert.threshold",
+              "metrics.alert.inventory.threshold",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          },
+          "alert": {
+            "all": [
+              "metrics.alert.threshold",
+              "metrics.alert.inventory.threshold",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "configureSource",
+          "save"
+        ]
+      },
+      "read": {
+        "app": [
+          "infra",
+          "metrics",
+          "kibana"
+        ],
+        "catalogue": [
+          "infraops",
+          "metrics"
+        ],
+        "api": [
+          "infra",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "infrastructure-ui-source",
+            "index-pattern",
+            "metrics-data-source",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "read": [
+              "metrics.alert.threshold",
+              "metrics.alert.inventory.threshold",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          },
+          "alert": {
+            "read": [
+              "metrics.alert.threshold",
+              "metrics.alert.inventory.threshold",
+              ".es-query",
+              "observability.rules.custom_threshold",
+              "xpack.ml.anomaly_detection_alert"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    }
+  },
+  {
+    "id": "apm",
+    "name": "APM and User Experience",
+    "order": 900,
+    "category": {
+      "id": "observability",
+      "label": "Observability",
+      "euiIconType": "logoObservability",
+      "order": 3000
+    },
+    "app": [
+      "apm",
+      "ux",
+      "kibana"
+    ],
+    "catalogue": [
+      "apm"
+    ],
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      "apm.error_rate",
+      "apm.transaction_error_rate",
+      "apm.transaction_duration",
+      "apm.anomaly"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "apm",
+          "ux",
+          "kibana"
+        ],
+        "api": [
+          "apm",
+          "apm_write",
+          "rac"
+        ],
+        "catalogue": [
+          "apm"
+        ],
+        "savedObject": {
+          "all": [
+            "telemetry"
+          ],
+          "read": [
+            "apm-indices",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "alert": {
+            "all": [
+              "apm.error_rate",
+              "apm.transaction_error_rate",
+              "apm.transaction_duration",
+              "apm.anomaly"
+            ]
+          },
+          "rule": {
+            "all": [
+              "apm.error_rate",
+              "apm.transaction_error_rate",
+              "apm.transaction_duration",
+              "apm.anomaly"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "save",
+          "alerting:show",
+          "alerting:save"
+        ]
+      },
+      "read": {
+        "app": [
+          "apm",
+          "ux",
+          "kibana"
+        ],
+        "api": [
+          "apm",
+          "rac"
+        ],
+        "catalogue": [
+          "apm"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "apm-indices",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "alerting": {
+          "alert": {
+            "read": [
+              "apm.error_rate",
+              "apm.transaction_error_rate",
+              "apm.transaction_duration",
+              "apm.anomaly"
+            ]
+          },
+          "rule": {
+            "read": [
+              "apm.error_rate",
+              "apm.transaction_error_rate",
+              "apm.transaction_duration",
+              "apm.anomaly"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "alerting:show"
+        ]
+      }
+    }
+  },
+  {
+    "id": "uptime",
+    "name": "Synthetics and Uptime",
+    "order": 1000,
+    "category": {
+      "id": "observability",
+      "label": "Observability",
+      "euiIconType": "logoObservability",
+      "order": 3000
+    },
+    "app": [
+      "uptime",
+      "kibana",
+      "synthetics"
+    ],
+    "catalogue": [
+      "uptime"
+    ],
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      "xpack.uptime.alerts.tls",
+      "xpack.uptime.alerts.tlsCertificate",
+      "xpack.uptime.alerts.monitorStatus",
+      "xpack.uptime.alerts.durationAnomaly",
+      "xpack.synthetics.alerts.monitorStatus",
+      "xpack.synthetics.alerts.tls"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "uptime",
+          "kibana",
+          "synthetics"
+        ],
+        "catalogue": [
+          "uptime"
+        ],
+        "api": [
+          "uptime-read",
+          "uptime-write",
+          "lists-all",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [
+            "synthetics-dynamic-settings",
+            "synthetics-monitor",
+            "uptime-synthetics-api-key",
+            "synthetics-privates-locations",
+            "synthetics-param",
+            "uptime-dynamic-settings",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              "xpack.uptime.alerts.tls",
+              "xpack.uptime.alerts.tlsCertificate",
+              "xpack.uptime.alerts.monitorStatus",
+              "xpack.uptime.alerts.durationAnomaly",
+              "xpack.synthetics.alerts.monitorStatus",
+              "xpack.synthetics.alerts.tls"
+            ]
+          },
+          "alert": {
+            "all": [
+              "xpack.uptime.alerts.tls",
+              "xpack.uptime.alerts.tlsCertificate",
+              "xpack.uptime.alerts.monitorStatus",
+              "xpack.uptime.alerts.durationAnomaly",
+              "xpack.synthetics.alerts.monitorStatus",
+              "xpack.synthetics.alerts.tls"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "save",
+          "configureSettings",
+          "show",
+          "alerting:save"
+        ]
+      },
+      "read": {
+        "app": [
+          "uptime",
+          "kibana",
+          "synthetics"
+        ],
+        "catalogue": [
+          "uptime"
+        ],
+        "api": [
+          "uptime-read",
+          "lists-read",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "synthetics-param",
+            "synthetics-dynamic-settings",
+            "synthetics-monitor",
+            "uptime-synthetics-api-key",
+            "synthetics-privates-locations",
+            "uptime-dynamic-settings",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "read": [
+              "xpack.uptime.alerts.tls",
+              "xpack.uptime.alerts.tlsCertificate",
+              "xpack.uptime.alerts.monitorStatus",
+              "xpack.uptime.alerts.durationAnomaly",
+              "xpack.synthetics.alerts.monitorStatus",
+              "xpack.synthetics.alerts.tls"
+            ]
+          },
+          "alert": {
+            "read": [
+              "xpack.uptime.alerts.tls",
+              "xpack.uptime.alerts.tlsCertificate",
+              "xpack.uptime.alerts.monitorStatus",
+              "xpack.uptime.alerts.durationAnomaly",
+              "xpack.synthetics.alerts.monitorStatus",
+              "xpack.synthetics.alerts.tls"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "alerting:save"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Synthetics",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "elastic_managed_locations_enabled",
+                "name": "Elastic managed locations enabled",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "elasticManagedLocationsEnabled"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "siem",
+    "name": "Security",
+    "order": 1100,
+    "category": {
+      "id": "securitySolution",
+      "label": "Security",
+      "order": 4000,
+      "euiIconType": "logoSecurity"
+    },
+    "app": [
+      "securitySolution",
+      "csp",
+      "cloudDefend",
+      "kibana"
+    ],
+    "catalogue": [
+      "securitySolution"
+    ],
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      "siem.notifications",
+      "siem.esqlRule",
+      "siem.eqlRule",
+      "siem.indicatorRule",
+      "siem.mlRule",
+      "siem.queryRule",
+      "siem.savedQueryRule",
+      "siem.thresholdRule",
+      "siem.newTermsRule"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "securitySolution",
+          "csp",
+          "cloudDefend",
+          "kibana"
+        ],
+        "catalogue": [
+          "securitySolution"
+        ],
+        "api": [
+          "securitySolution",
+          "lists-all",
+          "lists-read",
+          "lists-summary",
+          "rac",
+          "cloud-security-posture-all",
+          "cloud-security-posture-read",
+          "cloud-defend-all",
+          "cloud-defend-read",
+          "securitySolution-entity-analytics",
+          "securitySolution-threat-intelligence",
+          "securitySolution-showEndpointExceptions",
+          "securitySolution-crudEndpointExceptions"
+        ],
+        "savedObject": {
+          "all": [
+            "alert",
+            "exception-list",
+            "exception-list-agnostic",
+            "index-pattern",
+            "siem-ui-timeline-note",
+            "siem-ui-timeline-pinned-event",
+            "siem-detection-engine-rule-actions",
+            "security-rule",
+            "siem-ui-timeline",
+            "endpoint:user-artifact-manifest",
+            "endpoint:unified-user-artifact-manifest",
+            "security-solution-signals-migration",
+            "risk-engine-configuration",
+            "policy-settings-protection-updates-note",
+            "csp_rule",
+            "cloud-security-posture-settings",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              "siem.notifications",
+              "siem.esqlRule",
+              "siem.eqlRule",
+              "siem.indicatorRule",
+              "siem.mlRule",
+              "siem.queryRule",
+              "siem.savedQueryRule",
+              "siem.thresholdRule",
+              "siem.newTermsRule"
+            ]
+          },
+          "alert": {
+            "all": [
+              "siem.notifications",
+              "siem.esqlRule",
+              "siem.eqlRule",
+              "siem.indicatorRule",
+              "siem.mlRule",
+              "siem.queryRule",
+              "siem.savedQueryRule",
+              "siem.thresholdRule",
+              "siem.newTermsRule"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "crud",
+          "entity-analytics",
+          "investigation-guide",
+          "investigation-guide-interactions",
+          "threat-intelligence",
+          "showEndpointExceptions",
+          "crudEndpointExceptions"
+        ]
+      },
+      "read": {
+        "app": [
+          "securitySolution",
+          "csp",
+          "cloudDefend",
+          "kibana"
+        ],
+        "catalogue": [
+          "securitySolution"
+        ],
+        "api": [
+          "securitySolution",
+          "lists-read",
+          "rac",
+          "cloud-security-posture-read",
+          "cloud-defend-read",
+          "securitySolution-entity-analytics",
+          "securitySolution-threat-intelligence",
+          "securitySolution-showEndpointExceptions"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "exception-list",
+            "exception-list-agnostic",
+            "index-pattern",
+            "siem-ui-timeline-note",
+            "siem-ui-timeline-pinned-event",
+            "siem-detection-engine-rule-actions",
+            "security-rule",
+            "siem-ui-timeline",
+            "endpoint:user-artifact-manifest",
+            "endpoint:unified-user-artifact-manifest",
+            "security-solution-signals-migration",
+            "risk-engine-configuration",
+            "policy-settings-protection-updates-note",
+            "csp_rule",
+            "cloud-security-posture-settings",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "read": [
+              "siem.notifications",
+              "siem.esqlRule",
+              "siem.eqlRule",
+              "siem.indicatorRule",
+              "siem.mlRule",
+              "siem.queryRule",
+              "siem.savedQueryRule",
+              "siem.thresholdRule",
+              "siem.newTermsRule"
+            ]
+          },
+          "alert": {
+            "all": [
+              "siem.notifications",
+              "siem.esqlRule",
+              "siem.eqlRule",
+              "siem.indicatorRule",
+              "siem.mlRule",
+              "siem.queryRule",
+              "siem.savedQueryRule",
+              "siem.thresholdRule",
+              "siem.newTermsRule"
+            ]
+          }
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "ui": [
+          "show",
+          "entity-analytics",
+          "investigation-guide",
+          "investigation-guide-interactions",
+          "threat-intelligence",
+          "showEndpointExceptions"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Endpoint List access.",
+        "name": "Endpoint List",
+        "description": "Displays all hosts running Elastic Defend and their relevant integration details.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeEndpointList",
+                  "securitySolution-readEndpointList"
+                ],
+                "id": "endpoint_list_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeEndpointList",
+                  "readEndpointList"
+                ]
+              },
+              {
+                "api": [
+                  "securitySolution-readEndpointList"
+                ],
+                "id": "endpoint_list_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readEndpointList"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Trusted Applications access.",
+        "name": "Trusted Applications",
+        "description": "Helps mitigate conflicts with other software, usually other antivirus or endpoint security applications.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "lists-all",
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-writeTrustedApplications",
+                  "securitySolution-readTrustedApplications"
+                ],
+                "id": "trusted_applications_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "exception-list-agnostic"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "writeTrustedApplications",
+                  "readTrustedApplications"
+                ]
+              },
+              {
+                "api": [
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-readTrustedApplications"
+                ],
+                "id": "trusted_applications_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readTrustedApplications"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Host Isolation Exceptions access.",
+        "name": "Host Isolation Exceptions",
+        "description": "Add specific IP addresses that isolated hosts are still allowed to communicate with, even when isolated from the rest of the network.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "lists-all",
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-deleteHostIsolationExceptions",
+                  "securitySolution-readHostIsolationExceptions",
+                  "securitySolution-accessHostIsolationExceptions",
+                  "securitySolution-writeHostIsolationExceptions"
+                ],
+                "id": "host_isolation_exceptions_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "exception-list-agnostic"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "readHostIsolationExceptions",
+                  "deleteHostIsolationExceptions",
+                  "accessHostIsolationExceptions",
+                  "writeHostIsolationExceptions"
+                ]
+              },
+              {
+                "api": [
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-readHostIsolationExceptions",
+                  "securitySolution-accessHostIsolationExceptions"
+                ],
+                "id": "host_isolation_exceptions_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readHostIsolationExceptions",
+                  "accessHostIsolationExceptions"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Blocklist access.",
+        "name": "Blocklist",
+        "description": "Extend Elastic Defend’s protection against malicious processes and protect against potentially harmful applications.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "lists-all",
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-writeBlocklist",
+                  "securitySolution-readBlocklist"
+                ],
+                "id": "blocklist_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "exception-list-agnostic"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "writeBlocklist",
+                  "readBlocklist"
+                ]
+              },
+              {
+                "api": [
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-readBlocklist"
+                ],
+                "id": "blocklist_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readBlocklist"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Event Filters access.",
+        "name": "Event Filters",
+        "description": "Filter out endpoint events that you do not need or want stored in Elasticsearch.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "lists-all",
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-writeEventFilters",
+                  "securitySolution-readEventFilters"
+                ],
+                "id": "event_filters_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "exception-list-agnostic"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "writeEventFilters",
+                  "readEventFilters"
+                ]
+              },
+              {
+                "api": [
+                  "lists-read",
+                  "lists-summary",
+                  "securitySolution-readEventFilters"
+                ],
+                "id": "event_filters_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readEventFilters"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Policy Management access.",
+        "name": "Elastic Defend Policy Management",
+        "description": "Access the Elastic Defend integration policy to configure protections, event collection, and advanced policy features.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writePolicyManagement",
+                  "securitySolution-readPolicyManagement"
+                ],
+                "id": "policy_management_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "policy-settings-protection-updates-note"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "writePolicyManagement",
+                  "readPolicyManagement"
+                ]
+              },
+              {
+                "api": [
+                  "securitySolution-readPolicyManagement"
+                ],
+                "id": "policy_management_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": [
+                    "policy-settings-protection-updates-note"
+                  ]
+                },
+                "ui": [
+                  "readPolicyManagement"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Response Actions History access.",
+        "name": "Response Actions History",
+        "description": "Access the history of response actions performed on endpoints.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeActionsLogManagement",
+                  "securitySolution-readActionsLogManagement"
+                ],
+                "id": "actions_log_management_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeActionsLogManagement",
+                  "readActionsLogManagement"
+                ]
+              },
+              {
+                "api": [
+                  "securitySolution-readActionsLogManagement"
+                ],
+                "id": "actions_log_management_read",
+                "includeIn": "none",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readActionsLogManagement"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Host Isolation access.",
+        "name": "Host Isolation",
+        "description": "Perform the \"isolate\" and \"release\" response actions.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeHostIsolationRelease",
+                  "securitySolution-writeHostIsolation"
+                ],
+                "id": "host_isolation_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeHostIsolationRelease",
+                  "writeHostIsolation"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Process Operations access.",
+        "name": "Process Operations",
+        "description": "Perform process-related response actions in the response console.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeProcessOperations"
+                ],
+                "id": "process_operations_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeProcessOperations"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for File Operations access.",
+        "name": "File Operations",
+        "description": "Perform file-related response actions in the response console.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeFileOperations"
+                ],
+                "id": "file_operations_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeFileOperations"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Execute Operations access.",
+        "name": "Execute Operations",
+        "description": "Perform script execution response actions in the response console.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeExecuteOperations"
+                ],
+                "id": "execute_operations_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeExecuteOperations"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "requireAllSpaces": true,
+        "privilegesTooltip": "All Spaces is required for Scan Operations access.",
+        "name": "Scan Operations",
+        "description": "Perform folder scan response actions in the response console.",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolution-writeScanOperations"
+                ],
+                "id": "scan_operations_all",
+                "includeIn": "none",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeScanOperations"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "securitySolutionCases",
+    "name": "Cases",
+    "order": 1100,
+    "category": {
+      "id": "securitySolution",
+      "label": "Security",
+      "order": 4000,
+      "euiIconType": "logoSecurity"
+    },
+    "app": [
+      "securitySolutionCases",
+      "kibana"
+    ],
+    "catalogue": [
+      "securitySolution"
+    ],
+    "cases": [
+      "securitySolution"
+    ],
+    "privileges": {
+      "all": {
+        "api": [
+          "casesSuggestUserProfiles",
+          "bulkGetUserProfiles",
+          "securitySolutionFilesCasesCreate",
+          "securitySolutionFilesCasesRead",
+          "casesGetConnectorsConfigure"
+        ],
+        "app": [
+          "securitySolutionCases",
+          "kibana"
+        ],
+        "catalogue": [
+          "securitySolution"
+        ],
+        "cases": {
+          "create": [
+            "securitySolution"
+          ],
+          "read": [
+            "securitySolution"
+          ],
+          "update": [
+            "securitySolution"
+          ],
+          "push": [
+            "securitySolution"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "file",
+            "fileShare",
+            "telemetry"
+          ],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "create_cases",
+          "read_cases",
+          "update_cases",
+          "push_cases",
+          "cases_connectors"
+        ]
+      },
+      "read": {
+        "api": [
+          "casesSuggestUserProfiles",
+          "bulkGetUserProfiles",
+          "securitySolutionFilesCasesRead",
+          "casesGetConnectorsConfigure"
+        ],
+        "app": [
+          "securitySolutionCases",
+          "kibana"
+        ],
+        "catalogue": [
+          "securitySolution"
+        ],
+        "cases": {
+          "read": [
+            "securitySolution"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "read_cases",
+          "cases_connectors"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Delete",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "api": [
+                  "securitySolutionFilesCasesDelete"
+                ],
+                "id": "cases_delete",
+                "name": "Delete cases and comments",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "file",
+                    "fileShare"
+                  ],
+                  "read": [
+                    "file",
+                    "fileShare"
+                  ]
+                },
+                "cases": {
+                  "delete": [
+                    "securitySolution"
+                  ]
+                },
+                "ui": [
+                  "delete_cases"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Case settings",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "cases_settings",
+                "name": "Edit case settings",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "file",
+                    "fileShare"
+                  ],
+                  "read": [
+                    "file",
+                    "fileShare"
+                  ]
+                },
+                "cases": {
+                  "settings": [
+                    "securitySolution"
+                  ]
+                },
+                "ui": [
+                  "cases_settings"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "observabilityCases",
+    "name": "Cases",
+    "order": 1100,
+    "category": {
+      "id": "observability",
+      "label": "Observability",
+      "euiIconType": "logoObservability",
+      "order": 3000
+    },
+    "app": [
+      "observabilityCases",
+      "kibana"
+    ],
+    "catalogue": [
+      "observability"
+    ],
+    "cases": [
+      "observability"
+    ],
+    "privileges": {
+      "all": {
+        "api": [
+          "casesSuggestUserProfiles",
+          "bulkGetUserProfiles",
+          "casesGetConnectorsConfigure",
+          "observabilityFilesCasesCreate",
+          "observabilityFilesCasesRead"
+        ],
+        "app": [
+          "observabilityCases",
+          "kibana"
+        ],
+        "catalogue": [
+          "observability"
+        ],
+        "cases": {
+          "create": [
+            "observability"
+          ],
+          "read": [
+            "observability"
+          ],
+          "update": [
+            "observability"
+          ],
+          "push": [
+            "observability"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "file",
+            "fileShare",
+            "telemetry"
+          ],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "create_cases",
+          "read_cases",
+          "update_cases",
+          "push_cases",
+          "cases_connectors"
+        ]
+      },
+      "read": {
+        "api": [
+          "casesSuggestUserProfiles",
+          "bulkGetUserProfiles",
+          "casesGetConnectorsConfigure",
+          "observabilityFilesCasesRead"
+        ],
+        "app": [
+          "observabilityCases",
+          "kibana"
+        ],
+        "catalogue": [
+          "observability"
+        ],
+        "cases": {
+          "read": [
+            "observability"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "read_cases",
+          "cases_connectors"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Delete",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "api": [
+                  "observabilityFilesCasesDelete"
+                ],
+                "id": "cases_delete",
+                "name": "Delete cases and comments",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "file",
+                    "fileShare"
+                  ],
+                  "read": [
+                    "file",
+                    "fileShare"
+                  ]
+                },
+                "cases": {
+                  "delete": [
+                    "observability"
+                  ]
+                },
+                "ui": [
+                  "delete_cases"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Case settings",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "cases_settings",
+                "name": "Edit case settings",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "file",
+                    "fileShare"
+                  ],
+                  "read": [
+                    "file",
+                    "fileShare"
+                  ]
+                },
+                "cases": {
+                  "settings": [
+                    "observability"
+                  ]
+                },
+                "ui": [
+                  "cases_settings"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "slo",
+    "name": "SLOs",
+    "order": 1200,
+    "category": {
+      "id": "observability",
+      "label": "Observability",
+      "euiIconType": "logoObservability",
+      "order": 3000
+    },
+    "app": [
+      "slo",
+      "kibana"
+    ],
+    "catalogue": [
+      "slo",
+      "observability"
+    ],
+    "alerting": [
+      "slo.rules.burnRate"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "slo",
+          "kibana"
+        ],
+        "catalogue": [
+          "slo",
+          "observability"
+        ],
+        "api": [
+          "slo_write",
+          "slo_read",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [
+            "slo",
+            "slo-settings",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              "slo.rules.burnRate"
+            ]
+          },
+          "alert": {
+            "all": [
+              "slo.rules.burnRate"
+            ]
+          }
+        },
+        "ui": [
+          "read",
+          "write"
+        ]
+      },
+      "read": {
+        "app": [
+          "slo",
+          "kibana"
+        ],
+        "catalogue": [
+          "slo",
+          "observability"
+        ],
+        "api": [
+          "slo_read",
+          "rac"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "slo",
+            "slo-settings",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "read": [
+              "slo.rules.burnRate"
+            ]
+          },
+          "alert": {
+            "read": [
+              "slo.rules.burnRate"
+            ]
+          }
+        },
+        "ui": [
+          "read"
+        ]
+      }
+    }
+  },
+  {
+    "id": "dev_tools",
+    "name": "Dev Tools",
+    "order": 1300,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "dev_tools",
+      "kibana"
+    ],
+    "catalogue": [
+      "console",
+      "searchprofiler",
+      "grokdebugger"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "dev_tools",
+          "kibana"
+        ],
+        "catalogue": [
+          "console",
+          "searchprofiler",
+          "grokdebugger"
+        ],
+        "api": [
+          "console"
+        ],
+        "savedObject": {
+          "all": [
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "save"
+        ]
+      },
+      "read": {
+        "app": [
+          "dev_tools",
+          "kibana"
+        ],
+        "catalogue": [
+          "console",
+          "searchprofiler",
+          "grokdebugger"
+        ],
+        "api": [
+          "console"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    },
+    "privilegesTooltip": "User should also be granted the appropriate Elasticsearch cluster and index privileges"
+  },
+  {
+    "id": "advancedSettings",
+    "name": "Advanced Settings",
+    "order": 1500,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "kibana"
+    ],
+    "catalogue": [
+      "advanced_settings"
+    ],
+    "management": {
+      "kibana": [
+        "settings"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [
+          "advanced_settings"
+        ],
+        "management": {
+          "kibana": [
+            "settings"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "config",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "save"
+        ]
+      },
+      "read": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [
+          "advanced_settings"
+        ],
+        "management": {
+          "kibana": [
+            "settings"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": []
+      }
+    }
+  },
+  {
+    "id": "indexPatterns",
+    "name": "Data View Management",
+    "order": 1600,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "kibana"
+    ],
+    "catalogue": [
+      "indexPatterns"
+    ],
+    "management": {
+      "kibana": [
+        "indexPatterns"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [
+          "indexPatterns"
+        ],
+        "management": {
+          "kibana": [
+            "indexPatterns"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "index-pattern",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "save"
+        ]
+      },
+      "read": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [
+          "indexPatterns"
+        ],
+        "management": {
+          "kibana": [
+            "indexPatterns"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "index-pattern",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": []
+      }
+    }
+  },
+  {
+    "id": "filesManagement",
+    "name": "Files Management",
+    "order": 1600,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "kibana"
+    ],
+    "catalogue": [],
+    "management": {
+      "kibana": [
+        "filesManagement"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [
+          "kibana"
+        ],
+        "management": {
+          "kibana": [
+            "filesManagement"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "file",
+            "fileShare",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [],
+        "api": [
+          "files:manageFiles",
+          "files:defaultImage"
+        ]
+      },
+      "read": {
+        "app": [
+          "kibana"
+        ],
+        "management": {
+          "kibana": [
+            "filesManagement"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [],
+        "api": [
+          "files:manageFiles",
+          "files:defaultImage"
+        ]
+      }
+    }
+  },
+  {
+    "id": "filesSharedImage",
+    "name": "Shared images",
+    "order": 1600,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "kibana"
+    ],
+    "catalogue": [],
+    "privilegesTooltip": "Required to access images stored in Kibana.",
+    "privileges": {
+      "all": {
+        "app": [
+          "kibana"
+        ],
+        "savedObject": {
+          "all": [
+            "file",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [],
+        "api": [
+          "files:defaultImage"
+        ]
+      },
+      "read": {
+        "app": [
+          "kibana"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "file",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [],
+        "api": [
+          "files:defaultImage"
+        ]
+      }
+    }
+  },
+  {
+    "id": "savedObjectsManagement",
+    "name": "Saved Objects Management",
+    "order": 1700,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "kibana"
+    ],
+    "catalogue": [
+      "saved_objects"
+    ],
+    "management": {
+      "kibana": [
+        "objects"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [
+          "saved_objects"
+        ],
+        "management": {
+          "kibana": [
+            "objects"
+          ]
+        },
+        "api": [
+          "copySavedObjectsToSpaces"
+        ],
+        "savedObject": {
+          "all": [
+            "legacy-url-alias",
+            "config",
+            "config-global",
+            "url",
+            "usage-counters",
+            "ui-metric",
+            "application_usage_totals",
+            "application_usage_daily",
+            "index-pattern",
+            "sample-data-telemetry",
+            "exception-list-agnostic",
+            "exception-list",
+            "entity-definition",
+            "entity-discovery-api-key",
+            "query",
+            "kql-telemetry",
+            "search-telemetry",
+            "tag",
+            "graph-workspace",
+            "search",
+            "file-upload-usage-collection-telemetry",
+            "visualization",
+            "event-annotation-group",
+            "lens",
+            "lens-ui-telemetry",
+            "map",
+            "dashboard",
+            "cases-telemetry",
+            "metrics-data-source",
+            "infrastructure-monitoring-log-view",
+            "canvas-element",
+            "canvas-workpad",
+            "canvas-workpad-template",
+            "ml-job",
+            "ml-trained-model",
+            "ml-module",
+            "fleet-setup-lock",
+            "ingest_manager_settings",
+            "ingest-agent-policies",
+            "ingest-outputs",
+            "ingest-package-policies",
+            "epm-packages",
+            "epm-packages-assets",
+            "fleet-preconfiguration-deletion-record",
+            "ingest-download-sources",
+            "fleet-fleet-server-host",
+            "fleet-proxy",
+            "osquery-manager-usage-metric",
+            "osquery-saved-query",
+            "osquery-pack",
+            "osquery-pack-asset",
+            "enterprise_search_telemetry",
+            "app_search_telemetry",
+            "workplace_search_telemetry",
+            "csp-rule-template",
+            "siem-ui-timeline-note",
+            "siem-ui-timeline-pinned-event",
+            "siem-detection-engine-rule-actions",
+            "security-rule",
+            "siem-ui-timeline",
+            "endpoint:user-artifact-manifest",
+            "endpoint:unified-user-artifact-manifest",
+            "security-solution-signals-migration",
+            "risk-engine-configuration",
+            "policy-settings-protection-updates-note",
+            "threshold-explorer-view",
+            "uptime-dynamic-settings",
+            "synthetics-privates-locations",
+            "synthetics-monitor",
+            "synthetics-param",
+            "synthetics-dynamic-settings",
+            "slo",
+            "slo-settings",
+            "observability-onboarding-state",
+            "links",
+            "apm-indices",
+            "infrastructure-ui-source",
+            "inventory-view",
+            "infra-custom-dashboards",
+            "metrics-explorer-view",
+            "apm-telemetry",
+            "apm-server-schema",
+            "apm-service-group",
+            "apm-custom-dashboards",
+            "action",
+            "alert",
+            "cases-comments",
+            "cases",
+            "cases-user-actions",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "read",
+          "edit",
+          "delete",
+          "copyIntoSpace",
+          "shareIntoSpace"
+        ]
+      },
+      "read": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [
+          "saved_objects"
+        ],
+        "management": {
+          "kibana": [
+            "objects"
+          ]
+        },
+        "api": [
+          "copySavedObjectsToSpaces"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "legacy-url-alias",
+            "config",
+            "config-global",
+            "url",
+            "usage-counters",
+            "ui-metric",
+            "application_usage_totals",
+            "application_usage_daily",
+            "index-pattern",
+            "sample-data-telemetry",
+            "exception-list-agnostic",
+            "exception-list",
+            "entity-definition",
+            "entity-discovery-api-key",
+            "query",
+            "kql-telemetry",
+            "search-telemetry",
+            "tag",
+            "graph-workspace",
+            "search",
+            "file-upload-usage-collection-telemetry",
+            "visualization",
+            "event-annotation-group",
+            "lens",
+            "lens-ui-telemetry",
+            "map",
+            "dashboard",
+            "cases-telemetry",
+            "metrics-data-source",
+            "infrastructure-monitoring-log-view",
+            "canvas-element",
+            "canvas-workpad",
+            "canvas-workpad-template",
+            "ml-job",
+            "ml-trained-model",
+            "ml-module",
+            "fleet-setup-lock",
+            "ingest_manager_settings",
+            "ingest-agent-policies",
+            "ingest-outputs",
+            "ingest-package-policies",
+            "epm-packages",
+            "epm-packages-assets",
+            "fleet-preconfiguration-deletion-record",
+            "ingest-download-sources",
+            "fleet-fleet-server-host",
+            "fleet-proxy",
+            "osquery-manager-usage-metric",
+            "osquery-saved-query",
+            "osquery-pack",
+            "osquery-pack-asset",
+            "enterprise_search_telemetry",
+            "app_search_telemetry",
+            "workplace_search_telemetry",
+            "csp-rule-template",
+            "siem-ui-timeline-note",
+            "siem-ui-timeline-pinned-event",
+            "siem-detection-engine-rule-actions",
+            "security-rule",
+            "siem-ui-timeline",
+            "endpoint:user-artifact-manifest",
+            "endpoint:unified-user-artifact-manifest",
+            "security-solution-signals-migration",
+            "risk-engine-configuration",
+            "policy-settings-protection-updates-note",
+            "threshold-explorer-view",
+            "uptime-dynamic-settings",
+            "synthetics-privates-locations",
+            "synthetics-monitor",
+            "synthetics-param",
+            "synthetics-dynamic-settings",
+            "slo",
+            "slo-settings",
+            "observability-onboarding-state",
+            "links",
+            "apm-indices",
+            "infrastructure-ui-source",
+            "inventory-view",
+            "infra-custom-dashboards",
+            "metrics-explorer-view",
+            "apm-telemetry",
+            "apm-server-schema",
+            "apm-service-group",
+            "apm-custom-dashboards",
+            "action",
+            "alert",
+            "cases-comments",
+            "cases",
+            "cases-user-actions",
+            "telemetry"
+          ]
+        },
+        "ui": [
+          "read"
+        ]
+      }
+    }
+  },
+  {
+    "id": "savedQueryManagement",
+    "name": "Saved Query Management",
+    "order": 1750,
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "kibana"
+    ],
+    "catalogue": [],
+    "privilegesTooltip": "If set to \"All\", saved queries can be managed across Kibana in all applications that support them. If set to \"None\", saved query privileges will be determined independently by each application.",
+    "privileges": {
+      "all": {
+        "app": [
+          "kibana"
+        ],
+        "catalogue": [],
+        "savedObject": {
+          "all": [
+            "query",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "saveQuery"
+        ]
+      }
+    }
+  },
+  {
+    "id": "savedObjectsTagging",
+    "name": "Tag Management",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "order": 1800,
+    "app": [],
+    "management": {
+      "kibana": [
+        "tags"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "savedObject": {
+          "all": [
+            "tag",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "api": [],
+        "management": {
+          "kibana": [
+            "tags"
+          ]
+        },
+        "ui": [
+          "view",
+          "create",
+          "edit",
+          "delete",
+          "assign"
+        ]
+      },
+      "read": {
+        "savedObject": {
+          "all": [],
+          "read": [
+            "tag",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "management": {
+          "kibana": [
+            "tags"
+          ]
+        },
+        "api": [],
+        "ui": [
+          "view",
+          "assign"
+        ]
+      }
+    }
+  },
+  {
+    "id": "osquery",
+    "name": "Osquery",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "osquery",
+      "kibana"
+    ],
+    "catalogue": [
+      "osquery"
+    ],
+    "order": 2300,
+    "privileges": {
+      "all": {
+        "api": [
+          "osquery-read",
+          "osquery-write"
+        ],
+        "app": [
+          "osquery",
+          "kibana"
+        ],
+        "catalogue": [
+          "osquery"
+        ],
+        "savedObject": {
+          "all": [
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "read",
+          "write"
+        ]
+      },
+      "read": {
+        "api": [
+          "osquery-read"
+        ],
+        "app": [
+          "osquery",
+          "kibana"
+        ],
+        "catalogue": [
+          "osquery"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "read"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Live queries",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "osquery-writeLiveQueries",
+                  "osquery-readLiveQueries"
+                ],
+                "id": "live_queries_all",
+                "includeIn": "all",
+                "name": "All",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "writeLiveQueries",
+                  "readLiveQueries"
+                ]
+              },
+              {
+                "api": [
+                  "osquery-readLiveQueries"
+                ],
+                "id": "live_queries_read",
+                "includeIn": "read",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "readLiveQueries"
+                ]
+              }
+            ]
+          },
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "api": [
+                  "osquery-runSavedQueries"
+                ],
+                "id": "run_saved_queries",
+                "name": "Run Saved queries",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [],
+                  "read": []
+                },
+                "ui": [
+                  "runSavedQueries"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Saved queries",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "osquery-writeSavedQueries",
+                  "osquery-readSavedQueries"
+                ],
+                "id": "saved_queries_all",
+                "includeIn": "all",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "osquery-saved-query"
+                  ],
+                  "read": [
+                    "tag"
+                  ]
+                },
+                "ui": [
+                  "writeSavedQueries",
+                  "readSavedQueries"
+                ]
+              },
+              {
+                "api": [
+                  "osquery-readSavedQueries"
+                ],
+                "id": "saved_queries_read",
+                "includeIn": "read",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": [
+                    "osquery-saved-query",
+                    "tag"
+                  ]
+                },
+                "ui": [
+                  "readSavedQueries"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Packs",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "osquery-writePacks",
+                  "osquery-readPacks"
+                ],
+                "id": "packs_all",
+                "includeIn": "all",
+                "name": "All",
+                "savedObject": {
+                  "all": [
+                    "osquery-pack",
+                    "osquery-pack-asset"
+                  ],
+                  "read": [
+                    "tag"
+                  ]
+                },
+                "ui": [
+                  "writePacks",
+                  "readPacks"
+                ]
+              },
+              {
+                "api": [
+                  "osquery-readPacks"
+                ],
+                "id": "packs_read",
+                "includeIn": "read",
+                "name": "Read",
+                "savedObject": {
+                  "all": [],
+                  "read": [
+                    "osquery-pack",
+                    "tag"
+                  ]
+                },
+                "ui": [
+                  "readPacks"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "actions",
+    "name": "Actions and Connectors",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [],
+    "order": 3000,
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions",
+        "triggersActionsConnectors"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [],
+        "api": [
+          "actions:execute-advanced-connectors",
+          "actions:execute-basic-connectors"
+        ],
+        "catalogue": [],
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions",
+            "triggersActionsConnectors"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "action",
+            "action_task_params",
+            "connector_token",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "execute",
+          "save",
+          "delete"
+        ]
+      },
+      "read": {
+        "app": [],
+        "api": [
+          "actions:execute-basic-connectors"
+        ],
+        "catalogue": [],
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions",
+            "triggersActionsConnectors"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "action_task_params",
+            "connector_token"
+          ],
+          "read": [
+            "action",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "execute"
+        ]
+      }
+    }
+  },
+  {
+    "id": "generalCases",
+    "name": "Cases",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [],
+    "order": 3100,
+    "management": {
+      "insightsAndAlerting": [
+        "cases"
+      ]
+    },
+    "cases": [
+      "cases"
+    ],
+    "privileges": {
+      "all": {
+        "api": [
+          "casesSuggestUserProfiles",
+          "bulkGetUserProfiles",
+          "casesGetConnectorsConfigure",
+          "casesFilesCasesCreate",
+          "casesFilesCasesRead"
+        ],
+        "cases": {
+          "create": [
+            "cases"
+          ],
+          "read": [
+            "cases"
+          ],
+          "update": [
+            "cases"
+          ],
+          "push": [
+            "cases"
+          ]
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "cases"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "file",
+            "fileShare",
+            "telemetry"
+          ],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "create_cases",
+          "read_cases",
+          "update_cases",
+          "push_cases",
+          "cases_connectors"
+        ]
+      },
+      "read": {
+        "api": [
+          "casesSuggestUserProfiles",
+          "bulkGetUserProfiles",
+          "casesGetConnectorsConfigure",
+          "casesFilesCasesRead"
+        ],
+        "cases": {
+          "read": [
+            "cases"
+          ]
+        },
+        "management": {
+          "insightsAndAlerting": [
+            "cases"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "file",
+            "fileShare",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "read_cases",
+          "cases_connectors"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Delete",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "api": [
+                  "casesFilesCasesDelete"
+                ],
+                "id": "cases_delete",
+                "name": "Delete cases and comments",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "file",
+                    "fileShare"
+                  ],
+                  "read": [
+                    "file",
+                    "fileShare"
+                  ]
+                },
+                "cases": {
+                  "delete": [
+                    "cases"
+                  ]
+                },
+                "ui": [
+                  "delete_cases"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Case settings",
+        "privilegeGroups": [
+          {
+            "groupType": "independent",
+            "privileges": [
+              {
+                "id": "cases_settings",
+                "name": "Edit case settings",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "file",
+                    "fileShare"
+                  ],
+                  "read": [
+                    "file",
+                    "fileShare"
+                  ]
+                },
+                "cases": {
+                  "settings": [
+                    "cases"
+                  ]
+                },
+                "ui": [
+                  "cases_settings"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "guidedOnboardingFeature",
+    "name": "Setup guides",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "guidedOnboarding"
+    ],
+    "privileges": {
+      "all": {
+        "app": [
+          "guidedOnboarding"
+        ],
+        "savedObject": {
+          "all": [
+            "guided-onboarding-guide-state",
+            "guided-onboarding-plugin-state",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "enabled"
+        ]
+      },
+      "read": {
+        "disabled": true,
+        "savedObject": {
+          "all": [],
+          "read": [
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": []
+      }
+    }
+  },
+  {
+    "id": "rulesSettings",
+    "name": "Rules Settings",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [],
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [],
+        "api": [],
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "rules-settings",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "save"
+        ]
+      },
+      "read": {
+        "app": [],
+        "api": [],
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "rules-settings",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    },
+    "subFeatures": [
+      {
+        "name": "Flapping detection",
+        "privilegeGroups": [
+          {
+            "groupType": "mutually_exclusive",
+            "privileges": [
+              {
+                "api": [
+                  "read-flapping-settings",
+                  "write-flapping-settings"
+                ],
+                "name": "All",
+                "id": "allFlappingSettings",
+                "includeIn": "all",
+                "savedObject": {
+                  "all": [
+                    "rules-settings"
+                  ],
+                  "read": []
+                },
+                "ui": [
+                  "writeFlappingSettingsUI",
+                  "readFlappingSettingsUI"
+                ]
+              },
+              {
+                "api": [
+                  "read-flapping-settings"
+                ],
+                "name": "Read",
+                "id": "readFlappingSettings",
+                "includeIn": "read",
+                "savedObject": {
+                  "all": [],
+                  "read": [
+                    "rules-settings"
+                  ]
+                },
+                "ui": [
+                  "readFlappingSettingsUI"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maintenanceWindow",
+    "name": "Maintenance Windows",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [],
+    "management": {
+      "insightsAndAlerting": [
+        "maintenanceWindows"
+      ]
+    },
+    "privileges": {
+      "all": {
+        "app": [],
+        "api": [
+          "read-maintenance-window",
+          "write-maintenance-window"
+        ],
+        "management": {
+          "insightsAndAlerting": [
+            "maintenanceWindows"
+          ]
+        },
+        "savedObject": {
+          "all": [
+            "maintenance-window",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "show",
+          "save"
+        ]
+      },
+      "read": {
+        "app": [],
+        "api": [
+          "read-maintenance-window"
+        ],
+        "management": {
+          "insightsAndAlerting": [
+            "maintenanceWindows"
+          ]
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "maintenance-window",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "show"
+        ]
+      }
+    }
+  },
+  {
+    "id": "stackAlerts",
+    "name": "Stack Rules",
+    "app": [],
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "management": {
+      "insightsAndAlerting": [
+        "triggersActions"
+      ]
+    },
+    "alerting": [
+      ".index-threshold",
+      ".geo-containment",
+      ".es-query",
+      "transform_health"
+    ],
+    "privileges": {
+      "all": {
+        "app": [],
+        "catalogue": [],
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "all": [
+              ".index-threshold",
+              ".geo-containment",
+              ".es-query",
+              "transform_health"
+            ]
+          },
+          "alert": {
+            "all": [
+              ".index-threshold",
+              ".geo-containment",
+              ".es-query",
+              "transform_health"
+            ]
+          }
+        },
+        "savedObject": {
+          "all": [
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "api": [],
+        "ui": []
+      },
+      "read": {
+        "app": [],
+        "catalogue": [],
+        "management": {
+          "insightsAndAlerting": [
+            "triggersActions"
+          ]
+        },
+        "alerting": {
+          "rule": {
+            "read": [
+              ".index-threshold",
+              ".geo-containment",
+              ".es-query",
+              "transform_health"
+            ]
+          },
+          "alert": {
+            "read": [
+              ".index-threshold",
+              ".geo-containment",
+              ".es-query",
+              "transform_health"
+            ]
+          }
+        },
+        "savedObject": {
+          "all": [],
+          "read": [
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "api": [],
+        "ui": []
+      }
+    }
+  },
+  {
+    "id": "fleetv2",
+    "name": "Fleet",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "fleet"
+    ],
+    "catalogue": [
+      "fleet"
+    ],
+    "privilegesTooltip": "All Spaces is required for Fleet access.",
+    "reserved": {
+      "description": "Privilege to setup Fleet packages and configured policies. Intended for use by the elastic/fleet-server service account only.",
+      "privileges": [
+        {
+          "id": "fleet-setup",
+          "privilege": {
+            "excludeFromBasePrivileges": true,
+            "api": [
+              "fleet-setup"
+            ],
+            "savedObject": {
+              "all": [
+                "telemetry"
+              ],
+              "read": [
+                "config",
+                "config-global",
+                "url"
+              ]
+            },
+            "ui": []
+          }
+        }
+      ]
+    },
+    "subFeatures": [],
+    "privileges": {
+      "all": {
+        "api": [
+          "fleet-read",
+          "fleet-all"
+        ],
+        "app": [
+          "fleet"
+        ],
+        "requireAllSpaces": true,
+        "catalogue": [
+          "fleet"
+        ],
+        "savedObject": {
+          "all": [
+            "ingest-outputs",
+            "ingest-agent-policies",
+            "ingest-package-policies",
+            "epm-packages",
+            "epm-packages-assets",
+            "fleet-preconfiguration-deletion-record",
+            "ingest-download-sources",
+            "fleet-fleet-server-host",
+            "fleet-proxy",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "read",
+          "all"
+        ]
+      },
+      "read": {
+        "api": [
+          "fleet-read"
+        ],
+        "app": [
+          "fleet"
+        ],
+        "catalogue": [
+          "fleet"
+        ],
+        "requireAllSpaces": true,
+        "savedObject": {
+          "all": [],
+          "read": [
+            "ingest-outputs",
+            "ingest-agent-policies",
+            "ingest-package-policies",
+            "epm-packages",
+            "epm-packages-assets",
+            "fleet-preconfiguration-deletion-record",
+            "ingest-download-sources",
+            "fleet-fleet-server-host",
+            "fleet-proxy",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "read"
+        ]
+      }
+    }
+  },
+  {
+    "id": "fleet",
+    "name": "Integrations",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "integrations"
+    ],
+    "catalogue": [
+      "fleet"
+    ],
+    "privileges": {
+      "all": {
+        "api": [
+          "integrations-read",
+          "integrations-all"
+        ],
+        "app": [
+          "integrations"
+        ],
+        "catalogue": [
+          "fleet"
+        ],
+        "savedObject": {
+          "all": [
+            "ingest-outputs",
+            "ingest-agent-policies",
+            "ingest-package-policies",
+            "epm-packages",
+            "epm-packages-assets",
+            "fleet-preconfiguration-deletion-record",
+            "ingest-download-sources",
+            "fleet-fleet-server-host",
+            "fleet-proxy",
+            "telemetry"
+          ],
+          "read": [
+            "config",
+            "config-global",
+            "url"
+          ]
+        },
+        "ui": [
+          "read",
+          "all"
+        ]
+      },
+      "read": {
+        "api": [
+          "integrations-read"
+        ],
+        "app": [
+          "integrations"
+        ],
+        "catalogue": [
+          "fleet"
+        ],
+        "savedObject": {
+          "all": [],
+          "read": [
+            "ingest-outputs",
+            "ingest-agent-policies",
+            "ingest-package-policies",
+            "epm-packages",
+            "epm-packages-assets",
+            "fleet-preconfiguration-deletion-record",
+            "ingest-download-sources",
+            "fleet-fleet-server-host",
+            "fleet-proxy",
+            "config",
+            "config-global",
+            "telemetry",
+            "url"
+          ]
+        },
+        "ui": [
+          "read"
+        ]
+      }
+    },
+    "subFeatures": []
+  },
+  {
+    "id": "monitoring",
+    "name": "Stack Monitoring",
+    "category": {
+      "id": "management",
+      "label": "Management",
+      "order": 5000,
+      "euiIconType": "managementApp"
+    },
+    "app": [
+      "monitoring",
+      "kibana"
+    ],
+    "catalogue": [
+      "monitoring"
+    ],
+    "privileges": null,
+    "alerting": [
+      "monitoring_alert_license_expiration",
+      "monitoring_alert_cluster_health",
+      "monitoring_alert_cpu_usage",
+      "monitoring_alert_disk_usage",
+      "monitoring_alert_nodes_changed",
+      "monitoring_alert_elasticsearch_version_mismatch",
+      "monitoring_alert_kibana_version_mismatch",
+      "monitoring_alert_logstash_version_mismatch",
+      "monitoring_alert_jvm_memory_usage",
+      "monitoring_alert_missing_monitoring_data",
+      "monitoring_alert_thread_pool_search_rejections",
+      "monitoring_alert_thread_pool_write_rejections",
+      "monitoring_ccr_read_exceptions",
+      "monitoring_shard_size"
+    ],
+    "reserved": {
+      "description": "To grant users access, you should also assign the monitoring_user role.",
+      "privileges": [
+        {
+          "id": "monitoring",
+          "privilege": {
+            "app": [
+              "monitoring",
+              "kibana"
+            ],
+            "catalogue": [
+              "monitoring"
+            ],
+            "savedObject": {
+              "all": [
+                "telemetry"
+              ],
+              "read": [
+                "config",
+                "config-global",
+                "url"
+              ]
+            },
+            "alerting": {
+              "rule": {
+                "all": [
+                  "monitoring_alert_license_expiration",
+                  "monitoring_alert_cluster_health",
+                  "monitoring_alert_cpu_usage",
+                  "monitoring_alert_disk_usage",
+                  "monitoring_alert_nodes_changed",
+                  "monitoring_alert_elasticsearch_version_mismatch",
+                  "monitoring_alert_kibana_version_mismatch",
+                  "monitoring_alert_logstash_version_mismatch",
+                  "monitoring_alert_jvm_memory_usage",
+                  "monitoring_alert_missing_monitoring_data",
+                  "monitoring_alert_thread_pool_search_rejections",
+                  "monitoring_alert_thread_pool_write_rejections",
+                  "monitoring_ccr_read_exceptions",
+                  "monitoring_shard_size"
+                ]
+              },
+              "alert": {
+                "all": [
+                  "monitoring_alert_license_expiration",
+                  "monitoring_alert_cluster_health",
+                  "monitoring_alert_cpu_usage",
+                  "monitoring_alert_disk_usage",
+                  "monitoring_alert_nodes_changed",
+                  "monitoring_alert_elasticsearch_version_mismatch",
+                  "monitoring_alert_kibana_version_mismatch",
+                  "monitoring_alert_logstash_version_mismatch",
+                  "monitoring_alert_jvm_memory_usage",
+                  "monitoring_alert_missing_monitoring_data",
+                  "monitoring_alert_thread_pool_search_rejections",
+                  "monitoring_alert_thread_pool_write_rejections",
+                  "monitoring_ccr_read_exceptions",
+                  "monitoring_shard_size"
+                ]
+              }
+            },
+            "ui": []
+          }
+        }
+      ]
+    }
+  }
+]

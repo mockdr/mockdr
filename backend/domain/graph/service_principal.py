@@ -13,7 +13,6 @@ class GraphServicePrincipal:
     id: str  # noqa: A003 — GUID
     appId: str = ""  # noqa: N815
     displayName: str = ""  # noqa: N815
-    publisherName: str = ""  # noqa: N815
     verifiedPublisher: dict = field(default_factory=dict)  # noqa: N815 — {displayName: str | None}
     oauth2PermissionGrants: list[dict] = field(default_factory=list)  # noqa: N815
     servicePrincipalType: str = "Application"  # noqa: N815

@@ -330,6 +330,9 @@ probes:
   - id: job-list
     endpoint: management
     why: The job collection splunklib's jobs.list() reads.
+    ignore_paths:  # profile of the search that ran and the sourcetypes it touched: data, not shape
+      - $.entry[*].content.performance
+      - $.entry[*].content.searchTelemetry.desc.sourcetypes
     request:
       method: GET
       path: /services/search/jobs
@@ -501,6 +504,9 @@ probes:
   - id: kv-config-list
     endpoint: management
     why: storage/collections/config in the search app namespace.
+    ignore_paths:  # a collection's own schema fields: data, not shape
+      - $.entry[*].content.field
+      - $.entry[*].content.accelerated_fields
     request:
       method: GET
       path: /servicesNS/nobody/search/storage/collections/config

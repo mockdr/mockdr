@@ -1,0 +1,44 @@
+{
+  "properties": {
+    "watchlistId": "",
+    "displayName": "",
+    "provider": "",
+    "source": "",
+    "created": "",
+    "updated": "",
+    "createdBy": {
+      "email": "",
+      "name": "",
+      "objectId": ""
+    },
+    "updatedBy": {
+      "email": "",
+      "name": "",
+      "objectId": ""
+    },
+    "description": "",
+    "watchlistType": "",
+    "watchlistAlias": "",
+    "isDeleted": false,
+    "labels": [],
+    "defaultDuration": "",
+    "tenantId": "",
+    "numberOfLinesToSkip": 0,
+    "rawContent": "",
+    "itemsSearchKey": "",
+    "contentType": "",
+    "uploadStatus": ""
+  },
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

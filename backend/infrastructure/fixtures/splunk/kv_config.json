@@ -1,0 +1,42 @@
+{
+  "content": {
+    "disabled": false,
+    "eai:acl": null,
+    "eai:appName": "search",
+    "eai:userName": "nobody",
+    "profilingEnabled": "false",
+    "profilingThresholdMs": "1000",
+    "replicate": "false",
+    "replication_dump_maximum_file_size": "10240",
+    "replication_dump_strategy": "auto",
+    "type": "undefined"
+  },
+  "links": [
+    "_reload",
+    "alternate",
+    "disable",
+    "edit",
+    "list"
+  ],
+  "acl_keys": [
+    "app",
+    "can_change_perms",
+    "can_list",
+    "can_share_app",
+    "can_share_global",
+    "can_share_user",
+    "can_write",
+    "modifiable",
+    "owner",
+    "perms",
+    "removable",
+    "sharing"
+  ],
+  "has_fields": false,
+  "top_links": {
+    "create": "/servicesNS/nobody/search/storage/collections/config/_new",
+    "_reload": "/servicesNS/nobody/search/storage/collections/config/_reload",
+    "_acl": "/servicesNS/nobody/search/storage/collections/config/_acl"
+  },
+  "source": "Splunk 10.4.2, GET /services/kv/config?output_mode=json&count=1"
+}

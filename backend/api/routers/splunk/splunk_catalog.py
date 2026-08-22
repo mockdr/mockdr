@@ -280,10 +280,13 @@ def _command_args(name: str, arg: str) -> object:
                 if not spec:
                     continue
             func_part, _, rename = _partition_ci(spec, " as ")
-            specs.append({
-                "function": func_part.split("(")[0].strip(),
-                "rename": rename.strip() or func_part.strip(),
-            })
+            # dc(host) carries its field; a bare count does not (10.4.2).
+            field = func_part.partition("(")[2].rstrip(")").strip()
+            entry = {"function": func_part.split("(")[0].strip()}
+            if field:
+                entry["field"] = field
+            entry["rename"] = rename.strip() or func_part.strip()
+            specs.append(entry)
         if name == "stats":
             return {
                 "stat-specifiers": specs,
@@ -299,6 +302,7 @@ def _command_args(name: str, arg: str) -> object:
             "nullstr": "NULL",
             "useother": True,
             "otherstr": "OTHER",
+            "seriesfilter": "sum IN top10",
         }
     if name in ("top", "rare"):
         tokens = arg.split()

@@ -1,0 +1,23 @@
+{
+  "properties": {
+    "awsRoleArn": "",
+    "dataTypes": {
+      "logs": {
+        "state": "Enabled"
+      }
+    }
+  },
+  "kind": "AzureActiveDirectory",
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

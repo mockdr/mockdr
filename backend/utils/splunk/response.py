@@ -6,7 +6,9 @@ Splunk wraps all REST responses in an Atom-style JSON envelope with ``entry[]``,
 """
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 from urllib.parse import quote
 
 _SPLUNK_VERSION = "9.4.0"
@@ -36,6 +38,43 @@ def _rel_path(entry_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+_SELF_LINKS = frozenset({"alternate", "list", "edit", "remove"})
+
+_FIXTURES = Path(__file__).resolve().parents[2] / "infrastructure" / "fixtures" / "splunk"
+_FIXTURE_CACHE: dict[str, dict] = {}
+
+
+def _fixture(fixture: str) -> dict:
+    path = _FIXTURES / f"{fixture}.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def fixture_links(fixture: str) -> tuple[str, ...]:
+    """The link relations a real entry of this collection carries."""
+    return tuple(_fixture(fixture).get("links") or ())
+
+
+def fixture_top_links(fixture: str) -> dict[str, str]:
+    """The top-level links a real list of this collection carries."""
+    return dict(_fixture(fixture).get("top_links") or {})
+
+
+def complete(content: dict, fixture: str) -> dict:
+    """Fill a content block out to every key the real collection carries.
+
+    A real saved search has 217 content keys, an index 113, a job 34;
+    mockdr's builders produce a dozen. The rest come from a recorded entry
+    (``infrastructure/fixtures/splunk/<fixture>.json``, taken from Splunk
+    10.4.2 with volatile values neutralised), and the mock's own values win
+    wherever it has one. A client that reads ``defaultTTL`` or
+    ``maxTotalDataSizeMB`` finds the key, with a type-correct value.
+    """
+    if fixture not in _FIXTURE_CACHE:
+        path = _FIXTURES / f"{fixture}.json"
+        _FIXTURE_CACHE[fixture] = json.loads(path.read_text())["content"] if path.exists() else {}
+    return {**_FIXTURE_CACHE[fixture], **content}
+
+
 def build_splunk_entry(
     name: str,
     content: dict,
@@ -46,6 +85,8 @@ def build_splunk_entry(
     links: tuple[str, ...] = ("alternate", "list", "edit", "remove"),
     fields: dict | None | bool = True,
     acl_extra: dict | None = None,
+    acl: dict | None = None,
+    published: str | None = None,
 ) -> dict:
     """Build a single Splunk ``entry`` object.
 
@@ -69,6 +110,8 @@ def build_splunk_entry(
         fields:     ``True`` for the empty default block, ``False`` for none,
                     or an explicit block.
         acl_extra:  Members merged over the default ACL.
+        acl:        A complete ACL, for collections whose members differ (jobs).
+        published:  Creation timestamp; only jobs carry one.
 
     Returns:
         A dict matching the Splunk entry structure.
@@ -81,18 +124,22 @@ def build_splunk_entry(
         "name": name,
         "id": entry_id,
         "updated": updated,
+        **({"published": published} if published else {}),
         # splunklib reads `state.links.alternate` for every entity in a
         # collection (client.py: `parse.unquote(state.links.alternate)`), so an
         # entry without links raised AttributeError on every `.list()` call.
+        # Four relations point at the entity itself; every other one — control,
+        # events, results, dispatch, disable, embed, history, move, _reload,
+        # package — is a sub-path named after itself (measured across eight
+        # collections on 10.4.2).
         "links": {
-            rel: _rel_path(entry_id)
-            + ("/_reload" if rel == "_reload" else "/package" if rel == "package" else "")
+            rel: _rel_path(entry_id) + ("" if rel in _SELF_LINKS else f"/{rel}")
             for rel in links
         },
         # `_parse_atom_metadata` hoists these into Entity.access / Entity.fields;
         # Splunk's own reference says they apply to all endpoints.
         "author": "nobody",
-        "acl": {**_DEFAULT_ACL, **(acl_extra or {})},
+        "acl": acl if acl is not None else {**_DEFAULT_ACL, **(acl_extra or {})},
         "content": content,
     }
     if fields is True:
@@ -110,8 +157,13 @@ def build_splunk_envelope(
     per_page: int = 30,
     origin: str = "",
     links: dict[str, str] | None = None,
+    paging: bool = True,
+    messages: bool = True,
 ) -> dict:
     """Build the full Splunk JSON response envelope.
+
+    ``paging`` and ``messages`` are not universal: ``server/status`` carries
+    no paging block and the job list no messages array (measured on 10.4.2).
 
     ``links`` replaces the default ``create``/``_reload`` pair when a
     collection does not offer them — ``server/info`` has ``{}``.
@@ -123,13 +175,15 @@ def build_splunk_envelope(
         per_page: Page size.
         origin:   Origin URL for the response.
         links:    Top-level link relations; ``None`` for the default pair.
+        paging:   Emit the ``paging`` block.
+        messages: Emit the ``messages`` array.
 
     Returns:
         Complete Splunk REST API JSON response.
     """
     if total is None:
         total = len(entries)
-    return {
+    envelope: dict = {
         "links": (
             {"create": "/services", "_reload": "/services/_reload"} if links is None else links
         ),
@@ -139,13 +193,16 @@ def build_splunk_envelope(
         "entry": entries,
         # perPage must describe the page actually returned; it was hardcoded to
         # 30 and contradicted responses carrying 48 entries.
-        "paging": {
+    }
+    if paging:
+        envelope["paging"] = {
             "total": total,
             "perPage": per_page if per_page else len(entries),
             "offset": offset,
-        },
-        "messages": [],
-    }
+        }
+    if messages:
+        envelope["messages"] = []
+    return envelope
 
 
 def build_splunk_single(name: str, content: dict) -> dict:

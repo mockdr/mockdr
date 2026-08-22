@@ -19,4 +19,3 @@ class GraphAutopilotDevice:
     purchaseOrderIdentifier: str = ""  # noqa: N815
     enrollmentState: str = "notContacted"  # noqa: N815 — notContacted, enrolled, pendingReset
     lastContactedDateTime: str = ""  # noqa: N815
-    deploymentProfileAssignmentStatus: str = "notAssigned"  # noqa: N815 — assigned, notAssigned, pending

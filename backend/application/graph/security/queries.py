@@ -119,9 +119,10 @@ def list_incidents(
         records = apply_graph_filter(records, filter_str)
 
     # Expand alerts if requested
-    if expand and "alerts" in expand:
-        for rec in records:
+    for rec in records:
+        if expand and "alerts" in expand:
             rec["alerts"] = _expand_alerts(rec.get("alert_ids", []))
+        rec.pop("alert_ids", None)
 
     total = len(records)
     page = records[skip : skip + top]
@@ -157,6 +158,7 @@ def get_incident(
     result = asdict(incident)
     if expand and "alerts" in expand:
         result["alerts"] = _expand_alerts(result.get("alert_ids", []))
+    result.pop("alert_ids", None)
 
     return result
 

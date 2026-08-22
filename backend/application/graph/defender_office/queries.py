@@ -89,10 +89,6 @@ def create_threat_assessment(body: dict) -> dict:
         expectedAssessment=body.get("expectedAssessment", "block"),
         status="completed",
         category=body.get("category", "phishing"),
-        result={
-            "resultType": "checkPolicy",
-            "message": f"This {body.get('contentType', 'mail')} has been assessed.",
-        },
         createdDateTime=utc_now(),
         requestSource=body.get("requestSource", "administrator"),
     )

@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "alertRuleTemplateName": "",
+    "description": "",
+    "displayName": "",
+    "enabled": false,
+    "lastModifiedUtc": "",
+    "severity": "High",
+    "tactics": [],
+    "techniques": []
+  },
+  "kind": "Scheduled",
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

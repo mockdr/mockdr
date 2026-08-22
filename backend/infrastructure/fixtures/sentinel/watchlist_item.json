@@ -1,0 +1,34 @@
+{
+  "properties": {
+    "watchlistItemType": "",
+    "watchlistItemId": "",
+    "tenantId": "",
+    "isDeleted": false,
+    "created": "",
+    "updated": "",
+    "createdBy": {
+      "email": "",
+      "name": "",
+      "objectId": ""
+    },
+    "updatedBy": {
+      "email": "",
+      "name": "",
+      "objectId": ""
+    },
+    "itemsKeyValue": {},
+    "entityMapping": {}
+  },
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

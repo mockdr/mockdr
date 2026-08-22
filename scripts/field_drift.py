@@ -62,22 +62,23 @@ KNOWN_EXCEPTIONS: dict[str, set[str]] = {
 }
 
 ENDPOINTS: dict[str, tuple[str, str, str]] = {
-    "agents":           ("/web/api/v2.1/agents",                    "/agents",                    "list"),
-    "threats":          ("/web/api/v2.1/threats",                   "/threats",                   "list"),
-    "sites":            ("/web/api/v2.1/sites",                     "/sites",                     "sites"),
-    "groups":           ("/web/api/v2.1/groups",                    "/groups",                    "list"),
-    "exclusions":       ("/web/api/v2.1/exclusions",                "/exclusions",                "list"),
-    "users":            ("/web/api/v2.1/users",                     "/users",                     "list"),
-    "firewall":         ("/web/api/v2.1/firewall-control",          "/firewall-control",          "list"),
-    "alerts":           ("/web/api/v2.1/cloud-detection/alerts",    "/cloud-detection/alerts",    "list"),
-    "activities":       ("/web/api/v2.1/activities",                "/activities",                "list"),
-    "device-control":   ("/web/api/v2.1/device-control",            "/device-control",            "list"),
-    "iocs":             ("/web/api/v2.1/threat-intelligence/iocs",  "/threat-intelligence/iocs",  "list"),
-    "restrictions":     ("/web/api/v2.1/restrictions",              "/restrictions",              "list"),
+    "agents": ("/web/api/v2.1/agents", "/agents", "list"),
+    "threats": ("/web/api/v2.1/threats", "/threats", "list"),
+    "sites": ("/web/api/v2.1/sites", "/sites", "sites"),
+    "groups": ("/web/api/v2.1/groups", "/groups", "list"),
+    "exclusions": ("/web/api/v2.1/exclusions", "/exclusions", "list"),
+    "users": ("/web/api/v2.1/users", "/users", "list"),
+    "firewall": ("/web/api/v2.1/firewall-control", "/firewall-control", "list"),
+    "alerts": ("/web/api/v2.1/cloud-detection/alerts", "/cloud-detection/alerts", "list"),
+    "activities": ("/web/api/v2.1/activities", "/activities", "list"),
+    "device-control": ("/web/api/v2.1/device-control", "/device-control", "list"),
+    "iocs": ("/web/api/v2.1/threat-intelligence/iocs", "/threat-intelligence/iocs", "list"),
+    "restrictions": ("/web/api/v2.1/restrictions", "/restrictions", "list"),
 }
 
 
 # ── Swagger helpers ──────────────────────────────────────────────────────────
+
 
 def load_spec() -> dict[str, Any] | None:
     if not SWAGGER_PATH.exists():
@@ -180,6 +181,7 @@ def get_spec_keys(spec: dict[str, Any], swagger_path: str, data_layout: str) -> 
 
 # ── Mock response helpers ────────────────────────────────────────────────────
 
+
 def extract_keys_from_value(
     spec: dict[str, Any],
     value: Any,
@@ -202,7 +204,11 @@ def extract_keys_from_value(
 
         if isinstance(v, dict) and v:
             # Recurse into populated dict
-            child_schema = field_schema if field_schema and "properties" in field_schema else {"properties": {}}
+            child_schema = (
+                field_schema
+                if field_schema and "properties" in field_schema
+                else {"properties": {}}
+            )
             keys.update(extract_keys_from_value(spec, v, child_schema, full))
 
         elif isinstance(v, list) and v and isinstance(v[0], dict):
@@ -289,6 +295,7 @@ def get_mock_keys(
 
 # ── Server management ────────────────────────────────────────────────────────
 
+
 def wait_for_server(base_url: str, timeout: int = 30) -> bool:
     """Wait until the server is reachable."""
     deadline = time.time() + timeout
@@ -310,10 +317,14 @@ def start_server() -> subprocess.Popen[bytes]:
     backend_dir = Path(__file__).resolve().parent.parent / "backend"
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "uvicorn",
+            sys.executable,
+            "-m",
+            "uvicorn",
             "main:app",
-            "--host", "0.0.0.0",
-            "--port", "8001",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8001",
         ],
         cwd=str(backend_dir),
         stdout=subprocess.PIPE,
@@ -323,6 +334,7 @@ def start_server() -> subprocess.Popen[bytes]:
 
 
 # ── Reconciliation ───────────────────────────────────────────────────────────
+
 
 def _reconcile(spec_keys: set[str], mock_keys: set[str]) -> tuple[set[str], set[str]]:
     """Compute true missing/extra sets, accounting for depth mismatches.
@@ -366,8 +378,11 @@ def _reconcile(spec_keys: set[str], mock_keys: set[str]) -> tuple[set[str], set[
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Detect field drift between mock API and Swagger spec")
+    parser = argparse.ArgumentParser(
+        description="Detect field drift between mock API and Swagger spec"
+    )
     parser.add_argument(
         "--base-url",
         default="http://localhost:8001/web/api/v2.1",
@@ -431,7 +446,12 @@ def main() -> int:
 
             try:
                 mock_keys = get_mock_keys(
-                    spec, args.base_url, mock_path, args.token, layout, item_schema,
+                    spec,
+                    args.base_url,
+                    mock_path,
+                    args.token,
+                    layout,
+                    item_schema,
                 )
             except httpx.HTTPStatusError as exc:
                 print(f"  FAIL  {name}: HTTP {exc.response.status_code} from {mock_path}")

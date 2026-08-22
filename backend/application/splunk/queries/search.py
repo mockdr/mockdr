@@ -1,4 +1,5 @@
 """Splunk search job query handlers (read-only)."""
+
 from __future__ import annotations
 
 import time
@@ -10,7 +11,61 @@ from utils.splunk.response import (
     build_search_results,
     build_splunk_entry,
     build_splunk_envelope,
+    complete,
+    fixture_links,
 )
+
+#: A job's links are its sub-resources, not edit/remove; its ACL has a ttl (a string)
+#: and no can_list/removable; and neither a job nor the job list carries a
+#: fields block or top-level links. All measured on 10.4.2.
+_JOB_LINKS = fixture_links("search_jobs")
+
+
+def _retime(content: dict, job: SearchJob) -> dict:
+    """Anchor the fixture's search telemetry on this job's own start time.
+
+    The captured ``searchTelemetry.search_commands[*].span`` values are epoch
+    seconds from the capture run; shifted so the earliest span starts when
+    this job was dispatched, with their relative offsets kept. Whole seconds
+    are emitted as integers, as splunkd serialises them.
+    """
+    telemetry = content.get("searchTelemetry")
+    if not isinstance(telemetry, dict):
+        return content
+    commands = telemetry.get("search_commands")
+    if not isinstance(commands, list) or not commands:
+        return content
+    starts = [c["span"]["start"] for c in commands if isinstance(c.get("span"), dict)]
+    if not starts:
+        return content
+    shift = (job.published_at or time.time()) - min(starts)
+    content = {**content, "searchTelemetry": {**telemetry, "search_commands": []}}
+    for cmd in commands:
+        span = cmd.get("span")
+        if isinstance(span, dict):
+            span = {
+                k: _whole(round(v + shift, 3)) if isinstance(v, (int, float)) else v
+                for k, v in span.items()
+            }
+            cmd = {**cmd, "span": span}
+        content["searchTelemetry"]["search_commands"].append(cmd)
+    return content
+
+
+def _iso(epoch: float) -> str:
+    """A job's ``published`` timestamp, in splunkd's ``+00:00`` form."""
+    return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(epoch or time.time()))
+
+
+_JOB_ACL = {
+    "app": "search",
+    "can_write": True,
+    "modifiable": True,
+    "owner": "admin",
+    "perms": {"read": ["*"], "write": ["*"]},
+    "sharing": "global",
+    "ttl": "600",
+}
 
 #: The states a real search job passes through, as fractions of the dispatch
 #: window. A job reports the last state whose threshold it has passed.
@@ -49,9 +104,7 @@ def _progress(job: SearchJob) -> tuple[str, float, bool]:
     fraction = min(max(elapsed / SPLUNK_DISPATCH_SECONDS, 0.0), 1.0)
     if job.is_paused:
         return "PAUSED", round(fraction, 3), False
-    state = next(
-        name for threshold, name in reversed(_DISPATCH_STATES) if fraction >= threshold
-    )
+    state = next(name for threshold, name in reversed(_DISPATCH_STATES) if fraction >= threshold)
     return state, _whole(round(fraction, 3)), state == "DONE"
 
 
@@ -93,12 +146,18 @@ def get_job(sid: str) -> dict | None:
         "isSaved": job.is_saved,
         "ttl": job.ttl,
     }
+    # Every key a real job carries, and the eight sub-resource links a job
+    # has instead of edit/remove (measured on 10.4.2).
     entry = build_splunk_entry(
         job.sid,
-        content,
+        _retime(complete(content, "search_jobs"), job),
         id_path=f"https://localhost:8089/services/search/jobs/{job.sid}",
+        links=_JOB_LINKS,
+        fields=False,
+        acl=_JOB_ACL,
+        published=_iso(job.published_at),
     )
-    return build_splunk_envelope([entry], total=1)
+    return build_splunk_envelope([entry], total=1, links={}, messages=False)
 
 
 def list_jobs() -> dict:
@@ -120,8 +179,18 @@ def list_jobs() -> dict:
             "isDone": done,
             "isFailed": job.is_failed,
         }
-        entries.append(build_splunk_entry(job.sid, content, collection="search/jobs"))
-    return build_splunk_envelope(entries)
+        entries.append(
+            build_splunk_entry(
+                job.sid,
+                _retime(complete(content, "search_jobs"), job),
+                collection="search/jobs",
+                links=_JOB_LINKS,
+                fields=False,
+                acl=_JOB_ACL,
+                published=_iso(job.published_at),
+            )
+        )
+    return build_splunk_envelope(entries, links={}, messages=False)
 
 
 def _page(rows: list[dict[str, object]], count: int, offset: int) -> list[dict[str, object]]:

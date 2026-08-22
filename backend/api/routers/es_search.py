@@ -197,9 +197,8 @@ async def es_bulk(
         try:
             action = json.loads(lines[i])
         except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=build_es_error_response(
-                400, "x_content_parse_exception", _jackson_message(lines[i], exc, i + 1),
-            )) from exc
+            detail = _bulk_parse_error(lines[i], exc, i + 1)
+            raise HTTPException(status_code=400, detail=detail) from exc
         verb = next(iter(action), "") if isinstance(action, dict) and action else ""
         meta = action.get(verb) if isinstance(action, dict) else None
         if verb not in _BULK_VERBS or not isinstance(meta, dict):
@@ -245,6 +244,17 @@ def _jackson_message(line: str, exc: json.JSONDecodeError, line_no: int) -> str:
         f"was expecting double-quote to start field name\n at [Source: (byte[])\"{line}\"; "
         f"line: {line_no}, column: {col}]"
     )
+
+
+def _bulk_parse_error(line: str, exc: json.JSONDecodeError, line_no: int) -> dict:
+    """The x_content_parse_exception body, with the json_parse_exception it wraps."""
+    message = _jackson_message(line, exc, line_no)
+    content = build_es_error_response(400, "x_content_parse_exception", message)
+    # caused_by carries Jackson's message without the [line:col] prefix (measured).
+    content["error"]["caused_by"] = {
+        "type": "json_parse_exception", "reason": message.split("] ", 1)[1],
+    }
+    return content
 
 
 @router.get("/{index}/_search", operation_id="es_search_get")

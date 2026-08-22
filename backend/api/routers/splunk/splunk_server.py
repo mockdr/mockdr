@@ -85,19 +85,34 @@ def server_info(
     return build_splunk_envelope([entry], total=1, links={})
 
 
+_STATUS_RESOURCES = (
+    "conf-resource-usage", "dispatch-artifacts", "fishbucket", "installed-file-integrity",
+    "limits", "partitions-space", "resource-usage",
+)
+_RELOADABLE_STATUS = frozenset({"limits", "resource-usage"})
+
+
 @router.get("/services/server/status")
 def server_status(
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
-    """Return Splunk server status."""
-    status = {
-        "health": "green",
-        "splunkd": "running",
-        "kvstore": "ready",
-    }
-    entry = build_splunk_entry("server-status", status, acl_extra={"perms": None})
-    return build_splunk_envelope([entry], total=1)
+    """Return Splunk server status.
+
+    Not one status document: on splunkd, ``server/status`` is a collection of
+    seven sub-resources, each an entry whose only content is ``eai:acl`` and
+    whose links point at itself (measured on 10.4.2). Two of them can be
+    reloaded. This used to answer a single invented ``{health, splunkd}``.
+    """
+    entries = []
+    for name in _STATUS_RESOURCES:
+        reloadable = name in _RELOADABLE_STATUS
+        links = ("alternate", "list", "_reload") if reloadable else ("alternate", "list")
+        entries.append(build_splunk_entry(
+            name, {"eai:acl": None}, collection="server/status",
+            links=links, fields=False, acl_extra={"perms": None},
+        ))
+    return build_splunk_envelope(entries, links={}, paging=False)
 
 
 @router.get("/services/server/settings")

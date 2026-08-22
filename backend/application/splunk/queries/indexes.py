@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from repository.splunk.splunk_index_repo import splunk_index_repo
-from utils.splunk.response import build_splunk_entry, build_splunk_envelope
+from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
+
+_INDEX_LINKS = ("_reload", "alternate", "disable", "edit", "list")
 
 
 def list_indexes() -> dict:
@@ -21,10 +23,14 @@ def list_indexes() -> dict:
             "maxTime": idx.max_time,
         }
         entries.append(build_splunk_entry(
-            idx.name, content,
+            idx.name, complete(content, "indexes"),
             id_path=f"https://localhost:8089/services/data/indexes/{idx.name}",
+            links=_INDEX_LINKS, fields=False,
         ))
-    return build_splunk_envelope(entries)
+    return build_splunk_envelope(entries, links={
+        "create": "/services/data/indexes/_new", "_reload": "/services/data/indexes/_reload",
+        "_acl": "/services/data/indexes/_acl", "_validate": "/services/data/indexes/_validate",
+    })
 
 
 def get_index(name: str) -> dict | None:
@@ -40,5 +46,7 @@ def get_index(name: str) -> dict | None:
         "disabled": idx.disabled,
         "datatype": idx.data_type,
     }
-    entry = build_splunk_entry(idx.name, content, collection="data/indexes")
+    entry = build_splunk_entry(
+        idx.name, complete(content, "indexes"), collection="data/indexes", links=_INDEX_LINKS,
+    )
     return build_splunk_envelope([entry], total=1)

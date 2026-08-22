@@ -1,0 +1,29 @@
+{
+  "properties": {
+    "tenantId": "",
+    "dataTypes": {
+      "exchange": {
+        "state": "Enabled"
+      },
+      "sharePoint": {
+        "state": "Enabled"
+      },
+      "teams": {
+        "state": "Enabled"
+      }
+    }
+  },
+  "kind": "AzureActiveDirectory",
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

@@ -59,7 +59,8 @@ def get_endpoint(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
+            # Kibana's endpoint routes answer in Boom, with this wording (measured on 8.15).
+            detail=build_kbn_error_response(404, f"Endpoint with id {agent_id} not found"),
         )
     return result
 
@@ -186,6 +187,6 @@ def get_action(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(404, f"Action {action_id} not found"),
+            detail=build_kbn_error_response(404, f"Action with id '{action_id}' not found."),
         )
     return result

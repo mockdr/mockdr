@@ -22,6 +22,17 @@ _RULE_TYPE_LIST = (
     "| 'new_terms' | 'esql'"
 )
 
+#: The fields rules/_find sorts by, in the order zod lists them (measured).
+_SORTABLE = (
+    "created_at", "createdAt", "enabled", "execution_summary.last_execution.date",
+    "execution_summary.last_execution.metrics.execution_gap_duration_s",
+    "execution_summary.last_execution.metrics.total_indexing_duration_ms",
+    "execution_summary.last_execution.metrics.total_search_duration_ms",
+    "execution_summary.last_execution.status", "name", "risk_score", "riskScore",
+    "severity", "updated_at", "updatedAt",
+)
+_BULK_ACTIONS = ("delete", "disable", "enable", "export", "duplicate", "edit", "run")
+
 router = APIRouter(tags=["Elastic Detection Rules"])
 
 
@@ -173,6 +184,12 @@ def find_rules(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Find detection rules with optional filtering and pagination."""
+    if sort_field is not None and sort_field not in _SORTABLE:
+        # zod's enum message, verbatim (measured on 8.15).
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request query]: sort_field: Invalid enum value. Expected "
+            + " | ".join(f"'{f}'" for f in _SORTABLE) + f", received '{sort_field}'",
+        ))
     if sort_field and sort_field not in _ALLOWED_SORT_FIELDS:
         raise HTTPException(
             status_code=400,
@@ -205,6 +222,21 @@ def bulk_action(
     ``export``.
     """
     action = body.get("action")
+    ids = body.get("ids")
+    if action not in _BULK_ACTIONS or (isinstance(ids, list) and not ids):
+        # zod tries every member of the action union and reports each
+        # failure; Kibana shows the first five and counts the rest
+        # (measured: "… and 11 more" for an unknown action with empty ids).
+        issues: list[str] = []
+        for candidate in _BULK_ACTIONS:
+            if isinstance(ids, list) and not ids:
+                issues.append("ids: Array must contain at least 1 element(s)")
+            if action != candidate:
+                issues.append(f'action: Invalid literal value, expected "{candidate}"')
+        shown = issues[:5]
+        rest = len(issues) - len(shown)
+        text = "[request body]: " + ", ".join(shown) + (f", and {rest} more" if rest > 0 else "")
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(400, text))
     if not action:
         raise HTTPException(
             status_code=400,

@@ -19,7 +19,6 @@ def list_watchlists() -> dict:
             "created": wl.created,
             "updated": wl.updated,
             "numberOfLinesToSkip": 0,
-            "watchlistItemsCount": len(wl.items),
         }, etag=wl.etag))
     return build_arm_list(items)
 
@@ -38,7 +37,6 @@ def get_watchlist(alias: str) -> dict | None:
         "contentType": wl.content_type,
         "created": wl.created,
         "updated": wl.updated,
-        "watchlistItemsCount": len(wl.items),
     }, etag=wl.etag)
 
 
@@ -65,5 +63,5 @@ def get_watchlist_item(alias: str, item_id: str) -> dict | None:
         if item.get("_key") == item_id:
             return build_arm_resource("watchlistItems", item_id, {
                 "itemsKeyValue": {k: v for k, v in item.items() if k != "_key"},
-            })
+            }, etag=wl.etag)
     return None

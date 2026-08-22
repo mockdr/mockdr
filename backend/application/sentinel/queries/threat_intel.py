@@ -25,7 +25,7 @@ def _indicator_to_arm(ind: SentinelThreatIndicator) -> dict:
         "created": ind.created,
         "lastUpdatedTimeUtc": ind.last_updated,
         "revoked": ind.revoked,
-    }, etag=ind.etag)
+    }, etag=ind.etag, kind="indicator")
 
 
 def list_indicators(top: int = 50, skip_token: str = "", request_url: str = "") -> dict:

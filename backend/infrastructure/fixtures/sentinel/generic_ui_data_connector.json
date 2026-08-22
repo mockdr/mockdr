@@ -1,0 +1,37 @@
+{
+  "properties": {
+    "connectorUiConfig": {
+      "title": "",
+      "publisher": "",
+      "descriptionMarkdown": "",
+      "customImage": "",
+      "graphQueriesTableName": "",
+      "graphQueries": [],
+      "sampleQueries": [],
+      "dataTypes": [],
+      "connectivityCriteria": [],
+      "availability": {
+        "status": 0,
+        "isPreview": false
+      },
+      "permissions": {
+        "resourceProvider": [],
+        "customs": []
+      },
+      "instructionSteps": []
+    }
+  },
+  "kind": "AzureActiveDirectory",
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "properties": {
+    "alertDisplayName": "",
+    "alertType": "",
+    "compromisedEntity": "",
+    "confidenceLevel": "Unknown",
+    "confidenceReasons": [],
+    "confidenceScore": 0,
+    "confidenceScoreStatus": "NotApplicable",
+    "description": "",
+    "endTimeUtc": "",
+    "intent": "Unknown",
+    "providerAlertId": "",
+    "processingEndTime": "",
+    "productComponentName": "",
+    "productName": "",
+    "productVersion": "",
+    "remediationSteps": [],
+    "severity": null,
+    "startTimeUtc": "",
+    "status": "Unknown",
+    "systemAlertId": "",
+    "tactics": [],
+    "timeGenerated": "",
+    "vendorName": "",
+    "alertLink": "",
+    "resourceIdentifiers": [],
+    "additionalData": {},
+    "friendlyName": ""
+  },
+  "kind": "Account",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

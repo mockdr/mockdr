@@ -14,6 +14,16 @@ from utils.sentinel.pagination import build_next_link, parse_skip_token
 from utils.sentinel.response import build_arm_list, build_arm_resource
 
 
+def _label(label: object) -> dict:
+    """An incident label as the 2024-03-01 spec declares it: ``IncidentLabel``."""
+    if isinstance(label, dict):
+        return {
+            "labelName": label.get("labelName", ""),
+            "labelType": label.get("labelType", "User"),
+        }
+    return {"labelName": str(label), "labelType": "User"}
+
+
 def _incident_to_arm(inc: SentinelIncident) -> dict:
     """Convert a SentinelIncident to ARM resource format."""
     return build_arm_resource("incidents", inc.incident_id, {
@@ -31,7 +41,7 @@ def _incident_to_arm(inc: SentinelIncident) -> dict:
             "userPrincipalName": inc.owner_upn or None,
             "ownerType": inc.owner_type,
         },
-        "labels": inc.labels,
+        "labels": [_label(label) for label in inc.labels],
         "firstActivityTimeUtc": inc.first_activity_time_utc,
         "lastActivityTimeUtc": inc.last_activity_time_utc,
         "createdTimeUtc": inc.created_time_utc,
@@ -48,7 +58,6 @@ def _incident_to_arm(inc: SentinelIncident) -> dict:
             ),
             "alertProductNames": inc.alert_product_names,
             "tactics": inc.tactics,
-            "techniques": inc.techniques,
         },
         "relatedAnalyticRuleIds": inc.related_analytic_rule_ids,
     }, etag=inc.etag)

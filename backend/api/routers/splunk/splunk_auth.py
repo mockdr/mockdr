@@ -49,7 +49,7 @@ async def auth_login(
     result = login(username, password)
     if not result:
         raise HTTPException(status_code=401, detail={"messages": [
-            {"type": "WARN", "text": "Login failed"},
+            {"type": "WARN", "code": "incorrect_username_or_password", "text": "Login failed"},
         ]})
     return result
 

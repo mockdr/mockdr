@@ -136,7 +136,8 @@ class TestSplunkParserMeasuredClassification:
 
     def test_keywords_are_case_insensitive(self, client: TestClient) -> None:
         args = self._commands(client, "search index=x | stats dc(host) AS hosts BY a, b")["stats"]["args"]
-        assert args["stat-specifiers"] == [{"function": "dc", "rename": "hosts"}]
+        # An aggregation with an argument names its field (measured on 10.4.2).
+        assert args["stat-specifiers"] == [{"function": "dc", "field": "host", "rename": "hosts"}]
         assert args["groupby-fields"] == ["a", "b"]
 
 

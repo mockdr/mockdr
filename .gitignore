@@ -55,7 +55,9 @@ Desktop.ini
 *.swo
 *~
 
-data/
+# runtime data is local; the vendored vendor specs are the fidelity reference
+data/*
+!data/vendor-specs/
 state.json
 *.json.bak
 git.sh

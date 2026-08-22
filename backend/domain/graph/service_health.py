@@ -9,4 +9,3 @@ class GraphServiceHealth:
     id: str  # noqa: A003 — service name
     service: str = ""
     status: str = "serviceOperational"  # serviceOperational, etc.
-    isActive: bool = True  # noqa: N815

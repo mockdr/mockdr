@@ -1,0 +1,22 @@
+{
+  "content": {
+    "eai:acl": null
+  },
+  "links": [
+    "alternate",
+    "list"
+  ],
+  "acl_keys": [
+    "app",
+    "can_list",
+    "can_write",
+    "modifiable",
+    "owner",
+    "perms",
+    "removable",
+    "sharing"
+  ],
+  "has_fields": false,
+  "top_links": {},
+  "source": "Splunk 10.4.2, GET /services/server/status?output_mode=json&count=1"
+}

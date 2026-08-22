@@ -27,9 +27,7 @@ def _rule_to_arm(rule: SentinelAlertRule) -> dict:
     elif rule.kind == "MicrosoftSecurityIncidentCreation":
         props["productFilter"] = rule.product_filter
 
-    result = build_arm_resource("alertRules", rule.rule_id, props, etag=rule.etag)
-    result["kind"] = rule.kind
-    return result
+    return build_arm_resource("alertRules", rule.rule_id, props, etag=rule.etag, kind=rule.kind)
 
 
 def list_alert_rules() -> dict:

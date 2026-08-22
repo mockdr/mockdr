@@ -1,5 +1,5 @@
 """Domain model for Microsoft Graph Threat Assessment Request."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -11,6 +11,5 @@ class GraphThreatAssessment:
     expectedAssessment: str = "block"  # noqa: N815 — block, unblock
     status: str = "completed"  # completed, pending
     category: str = "phishing"  # spam, phishing, malware
-    result: dict = field(default_factory=dict)  # {resultType: "checkPolicy", message: "..."}
     createdDateTime: str = ""  # noqa: N815
     requestSource: str = "administrator"  # noqa: N815

@@ -1,0 +1,57 @@
+{
+  "properties": {
+    "alertRuleTemplateName": "",
+    "templateVersion": "",
+    "description": "",
+    "displayName": "",
+    "enabled": false,
+    "lastModifiedUtc": "",
+    "suppressionDuration": "",
+    "suppressionEnabled": false,
+    "tactics": [],
+    "techniques": [],
+    "incidentConfiguration": {
+      "createIncident": false,
+      "groupingConfiguration": {
+        "enabled": false,
+        "reopenClosedIncident": false,
+        "lookbackDuration": "",
+        "matchingMethod": "AllEntities",
+        "groupByEntities": [],
+        "groupByAlertDetails": [],
+        "groupByCustomDetails": []
+      }
+    },
+    "query": "",
+    "queryFrequency": "",
+    "queryPeriod": "",
+    "severity": "High",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "eventGroupingSettings": {
+      "aggregationKind": "SingleAlert"
+    },
+    "customDetails": {},
+    "entityMappings": [],
+    "alertDetailsOverride": {
+      "alertDisplayNameFormat": "",
+      "alertDescriptionFormat": "",
+      "alertTacticsColumnName": "",
+      "alertSeverityColumnName": "",
+      "alertDynamicProperties": []
+    }
+  },
+  "kind": "Scheduled",
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

@@ -1,4 +1,4 @@
-# ruff: noqa: ANN, D103, S311, E402
+# ruff: noqa: ANN001, ANN201, ANN202, ANN204, D103, E402, PLR0912, PLR0915, PLR2004, S101, S311, T201
 # A release tool, not library code: the random is for coverage, every function
 # is local to this file, and sys.path is set before the project imports on purpose.
 """Send hostile bodies and parameters to every route; flag anything that crashes.

@@ -6,6 +6,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+The response *shapes* are now measured rather than typed from memory. Every
+Splunk, Elasticsearch and Kibana list endpoint is compared key-for-key
+against the real product in the conformance harness, and every Sentinel and
+Graph resource against the vendor's published specification, fetched from
+the internet: the Azure REST API specs (`securityinsights` 2024-03-01 stable,
+plus the 2025-10-01 preview for the codeless connector kind) and the official
+Microsoft Graph v1.0 OpenAPI metadata. Measured before and after this
+release: Splunk 897 missing keys → 0 across 72 probes; Sentinel 276 drift
+findings → 0 across 19 routes; Graph 35 → 0 across 49 routes; Elastic and
+Kibana 0 across 57 probes.
+
+### Fixed
+
+**Splunk — an entry carried a tenth of the keys a real one does.** A real
+saved search has 217 content keys, an index 113, a finished job 67 (with its
+`performance` and `searchTelemetry` trees), a role 43, a user 23, the
+current context 24, a KV collection 10; the mock had 11, 12, 36, 5, 7, 7 and
+3. Each collection is now completed against a fixture captured from
+Splunk 10.4.2 (`backend/infrastructure/fixtures/splunk/`), the mock's own
+values winning. A client reading any field a real entry has now finds it.
+Also measured and fixed: the link relations per collection (a job's nine
+sub-resource links including `search_telemetry.json`, a saved search's ten,
+an index's five); the ACL members (saved searches and KV collections carry
+the four `can_share_*` capabilities, a job's ACL has a string `ttl` and no
+`can_list`); `published` on job entries; `paging` absent from `server/status`
+and `messages` absent from the job list; top-level links per collection
+(`_acl` on saved searches and KV config, none on jobs, current context or
+fired alerts); `server/status` itself, which is a collection of seven
+sub-resources, not one invented `{"health": "green"}` document; KV
+collection config as splunkd's flat `field.<name>` / `accelerated_fields.<name>`
+keys, and listable under `/services/` across apps; a wrong password answers
+with `code: incorrect_username_or_password` (a missing one does not); the
+parser names the field of `dc(host)`/`count(x)` and `timechart` carries its
+`seriesfilter: "sum IN top10"`. The job telemetry's timestamps are anchored on
+the job's own start, not the capture run's.
+
+**Kibana — `GET /api/features` returned 8 of 33 features.** All 33 of
+8.15, captured from the real Kibana.
+
+**Sentinel — every resource now has the shape the spec declares.** Fixtures
+are generated from the Azure spec (`scripts/gen_arm_fixtures.py`), one per
+resource and per `kind`, and deep-merged under the mock's values, so every
+declared property is present with a type-correct default. Measured drift that
+this fixed: `systemData` missing everywhere; `kind` inside the property bag
+instead of top-level on alert rules and data connectors; alert rule
+templates an empty list (now three Scheduled templates with a single-item
+route); incident labels as strings instead of `{labelName, labelType}`;
+`watchlistItemsCount` and `additionalData.techniques`, which 2024-03-01 does
+not declare; no `etag` on a single watchlist item; data connectors in one
+invented shape for every kind (now `tenantId` + the kind's own `dataTypes`
+tree for the eight stable kinds, and the codeless `connectorUiConfig` for
+`GenericUI` as the preview spec declares it); threat-intelligence indicators
+without their `kind: indicator` discriminator.
+
+**Graph — five properties v1.0 does not declare, and untyped members.**
+`alert_ids` (storage leaking out of `security/incidents`), `isActive` on
+service health, `publisherName` on service principals,
+`deploymentProfileAssignmentStatus` on Autopilot identities and `result` on
+threat assessment requests are gone. `groups/{id}/members` and
+`directoryRoles/{id}/members` return each member as its concrete type with
+`@odata.type: #microsoft.graph.user` and the user's full default property
+set, not an `{id, displayName}` stub.
+
+### Added
+
+- `scripts/schema_drift.py`: compares every mounted Sentinel/Graph route
+  against the vendored spec, resolving cross-file `$ref`s (the ARM
+  common types), `kind` discriminators scoped to the route's base type,
+  `@odata.type` derived types, preview-only definitions, free-form objects
+  and empty arrays (neither is drift), and walking parents to find a nested
+  collection that is not empty.
+- `data/vendor-specs/` is versioned: the reference the comparator and the
+  fixture generator run against.
+- Two harness probes declare data-dependent paths (a job's `performance`
+  profile and the sourcetypes it touched; a KV collection's own field
+  schema) as such, with the reason on the line.
+
+### Known limits
+
+CrowdStrike's swagger is not publicly downloadable (the public URL answers a
+CloudFront 403), and Defender for Endpoint and Cortex XDR publish docs pages
+only, so those four platforms are still compared by hand against the docs.
+Graph `/beta/` routes are served but cannot be judged by the v1.0 metadata.
+
 ## [2.0.5] - 2026-08-22
 
 A thoroughness pass before 2.0.5, run with every discovery tool that had

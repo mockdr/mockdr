@@ -7,7 +7,11 @@ concluded the instance was not Kibana.
 
 ``/api/fleet/agents`` is the Fleet inventory the Elastic Agent tooling reads.
 """
+
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -63,68 +67,23 @@ async def kibana_status(request: Request) -> dict:
     }
 
 
-def _feature(
-    fid: str, name: str, order: int, category: tuple[str, str, int, str], app: list[str],
-    catalogue: list[str], saved_all: list[str], api: list[str], ui: list[str],
-) -> dict:
-    """One feature in the shape Kibana 8.15 reports (measured via /api/features)."""
-    cat_id, label, cat_order, icon = category
-    def privilege(all_: bool) -> dict:
-        return {
-            "app": app, "catalogue": catalogue,
-            "api": (
-                api if all_ else [a for a in api if "read" in a] or api[:1]
-            ),
-            "savedObject": {"all": saved_all if all_ else [], "read": [] if all_ else saved_all},
-            "ui": ui if all_ else [u for u in ui if u in ("show", "read")] or ui[:1],
-            "alerting": {}, "management": {},
-        }
-    return {
-        "id": fid, "name": name, "order": order,
-        "category": {"id": cat_id, "label": label, "order": cat_order, "euiIconType": icon},
-        "app": app, "catalogue": catalogue, "management": {}, "alerting": [],
-        "privileges": {"all": privilege(True), "read": privilege(False)},
-        "subFeatures": [],
-    }
-
-
-_SECURITY = ("securitySolution", "Security", 4000, "logoSecurity")
-_MANAGEMENT = ("management", "Management", 5000, "managementApp")
+#: All thirty-three of Kibana 8.15's features, verbatim from a running
+#: instance. The feature catalogue is static configuration, and a client
+#: reads deep into it — reserved privileges, alerting and cases grants,
+#: management sections — so a hand-written subset kept missing whole
+#: subtrees that only some features carry. Two report `privileges: null`.
+_FEATURES: list[dict] = json.loads(
+    (Path(__file__).resolve().parents[2] / "infrastructure" / "fixtures" / "kibana_features.json")
+    .read_text(),
+)
 
 
 @router.get("/api/features")
 def list_features(
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
-    """List the Kibana features this instance exposes.
-
-    Three of Kibana's thirty-three, each in the full shape — order,
-    catalogue, management, alerting, subFeatures, and privileges carrying
-    api/ui/savedObject — so a client that reads any of those keys finds
-    them. Previously each feature carried a quarter of its keys.
-    """
-    return [
-        _feature("siem", "Security", 1100, _SECURITY, ["securitySolution", "kibana"],
-                 ["securitySolution"], ["alert", "exception-list", "exception-list-agnostic"],
-                 ["securitySolution", "lists-all", "lists-read", "rac"],
-                 ["show", "crud"]),
-        _feature("securitySolutionCases", "Cases", 1100, _SECURITY, ["securitySolution", "kibana"],
-                 ["securitySolution"], ["cases", "cases-comments", "cases-user-actions"],
-                 ["casesSuggestUserProfiles", "bulkGetUserProfiles"],
-                 ["create_cases", "read_cases", "update_cases", "delete_cases"]),
-        _feature("fleet", "Fleet", 9020, _MANAGEMENT, ["fleet", "kibana"], ["fleet"],
-                 ["ingest-agent-policies", "fleet-agents", "ingest-package-policies"],
-                 ["fleet-all", "fleet-read"], ["read", "all"]),
-        # Two of Kibana's features report no privileges at all (measured:
-        # enterpriseSearch and monitoring). A client must cope with null.
-        {
-            "id": "monitoring", "name": "Stack Monitoring", "order": 3500,
-            "category": {"id": "management", "label": "Management", "order": 5000,
-                         "euiIconType": "managementApp"},
-            "app": ["monitoring", "kibana"], "catalogue": ["monitoring"],
-            "management": {}, "alerting": [], "privileges": None, "subFeatures": [],
-        },
-    ]
+    """List the Kibana features this instance exposes, as Kibana shapes them."""
+    return _FEATURES
 
 
 @router.get("/api/spaces/space")
@@ -138,14 +97,16 @@ def list_spaces(
     field it has no value for rather than sending it null or blank, and the
     default space does have a colour.
     """
-    return [{
-        "id": "default",
-        "name": "Default",
-        "description": "This is your default space!",
-        "color": "#00bfb3",
-        "disabledFeatures": [],
-        "_reserved": True,
-    }]
+    return [
+        {
+            "id": "default",
+            "name": "Default",
+            "description": "This is your default space!",
+            "color": "#00bfb3",
+            "disabledFeatures": [],
+            "_reserved": True,
+        }
+    ]
 
 
 @router.get("/api/spaces/space/{space_id}")
@@ -179,8 +140,11 @@ def list_fleet_agents(
     listing = endpoint_queries.list_endpoints(page=page, per_page=per_page)
     entries = listing.get("data", [])
 
+    agents = [_fleet_agent(entry) for entry in entries]
     return {
-        "items": [_fleet_agent(entry) for entry in entries],
+        "items": agents,
+        # Fleet still sends `list`, the pre-8.x name, beside `items` (measured).
+        "list": agents,
         "total": listing.get("total", len(entries)),
         "page": page,
         "perPage": per_page,
@@ -206,8 +170,11 @@ def _fleet_agent(entry: dict) -> dict:
         "local_metadata": {
             "host": {"hostname": host.get("hostname", ""), "name": host.get("name", "")},
             "os": host.get("os", {}),
-            "elastic": {"agent": {
-                "id": agent.get("id", ""), "version": agent.get("version", ""),
-            }},
+            "elastic": {
+                "agent": {
+                    "id": agent.get("id", ""),
+                    "version": agent.get("version", ""),
+                }
+            },
         },
     }

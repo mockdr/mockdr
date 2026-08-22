@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.sentinel_auth import require_sentinel_auth
 from domain.sentinel.data_connector import SentinelDataConnector
 from repository.sentinel.data_connector_repo import sentinel_data_connector_repo
-from utils.sentinel.response import build_arm_error, build_arm_list, build_arm_resource
+from utils.sentinel.response import (
+    build_arm_error,
+    build_arm_list,
+    build_arm_resource,
+    fixture_properties,
+)
 
 router = APIRouter(tags=["Sentinel Data Connectors"])
 
@@ -17,12 +22,49 @@ _WS = (
 )
 
 
+_TENANT = "00000000-0000-0000-0000-000000000000"
+
+
+def _with_states(node: dict, state: str) -> dict:
+    """Every ``state`` leaf in a connector's ``dataTypes`` set to ``state``."""
+    return {
+        k: (state if k == "state" else _with_states(v, state) if isinstance(v, dict) else v)
+        for k, v in node.items()
+    }
+
+
 def _connector_to_arm(dc: SentinelDataConnector) -> dict:
-    return build_arm_resource("dataConnectors", dc.connector_id, {
-        "connectorUiConfig": {"title": dc.name},
-        "dataTypes": {"state": dc.data_types_state},
-        "kind": dc.kind,
-    }, etag=dc.etag)
+    """A data connector in the shape its kind declares in the 2024-03-01 spec.
+
+    The eight stable kinds carry ``tenantId`` and a kind-specific ``dataTypes``
+    tree (``{"alerts": {"state": ...}}`` for Defender, ``{"exchange", "sharePoint",
+    "teams"}`` for Office 365, …). ``GenericUI`` is preview-only and keeps its
+    ``connectorUiConfig``. This used to emit one invented shape for every kind.
+    """
+    declared = fixture_properties("dataConnectors", dc.kind)
+    if "connectorUiConfig" in declared:
+        # Codeless: the UI definition is the connector. Shape from the
+        # 2025-10-01-preview CodelessUiConnectorConfigProperties.
+        props = declared
+        props["connectorUiConfig"].update({
+            "title": dc.name,
+            "publisher": dc.name.split(" ")[0],
+            "descriptionMarkdown": f"Ingest {dc.name} events into Microsoft Sentinel.",
+            "graphQueriesTableName": f"{dc.name.replace(' ', '')}_CL",
+            "availability": {"status": 1, "isPreview": False},
+            "dataTypes": [{
+                "name": f"{dc.name.replace(' ', '')}_CL",
+                "lastDataReceivedQuery": (
+                    f"{dc.name.replace(' ', '')}_CL | summarize max(TimeGenerated)"
+                ),
+            }],
+        })
+    elif declared:
+        props = _with_states(declared, dc.data_types_state)
+        props["tenantId"] = _TENANT
+    else:
+        props = {"dataTypes": {"state": dc.data_types_state}}
+    return build_arm_resource("dataConnectors", dc.connector_id, props, etag=dc.etag, kind=dc.kind)
 
 
 @router.get(_WS + "/dataConnectors")

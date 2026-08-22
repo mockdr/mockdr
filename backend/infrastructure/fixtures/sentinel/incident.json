@@ -1,0 +1,48 @@
+{
+  "properties": {
+    "additionalData": {
+      "alertsCount": 0,
+      "bookmarksCount": 0,
+      "commentsCount": 0,
+      "alertProductNames": [],
+      "tactics": [],
+      "providerIncidentUrl": ""
+    },
+    "classification": "Undetermined",
+    "classificationComment": "",
+    "classificationReason": "SuspiciousActivity",
+    "createdTimeUtc": "",
+    "description": "",
+    "firstActivityTimeUtc": "",
+    "incidentUrl": "",
+    "providerName": "",
+    "providerIncidentId": "",
+    "incidentNumber": 0,
+    "labels": [],
+    "lastActivityTimeUtc": "",
+    "lastModifiedTimeUtc": "",
+    "owner": {
+      "email": "",
+      "assignedTo": "",
+      "objectId": "",
+      "userPrincipalName": "",
+      "ownerType": "Unknown"
+    },
+    "relatedAnalyticRuleIds": [],
+    "severity": "High",
+    "status": "New",
+    "title": ""
+  },
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

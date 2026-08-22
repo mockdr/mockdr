@@ -1,0 +1,42 @@
+{
+  "properties": {
+    "created": "",
+    "createdBy": {
+      "email": "",
+      "name": "",
+      "objectId": ""
+    },
+    "displayName": "",
+    "labels": [],
+    "notes": "",
+    "query": "",
+    "queryResult": "",
+    "updated": "",
+    "updatedBy": {
+      "email": "",
+      "name": "",
+      "objectId": ""
+    },
+    "eventTime": "",
+    "queryStartTime": "",
+    "queryEndTime": "",
+    "incidentInfo": {
+      "incidentId": "",
+      "severity": "High",
+      "title": "",
+      "relationName": ""
+    }
+  },
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

@@ -27,6 +27,5 @@ def seed_graph_service_health(fake: Faker) -> None:
             id=svc["id"],
             service=svc["service"],
             status=svc["status"],
-            isActive=True,
         )
         graph_service_health_repo.save(entry)

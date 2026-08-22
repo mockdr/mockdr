@@ -232,6 +232,8 @@ def es_cat_indices() -> list[dict]:
             "docs.count": str(len(records)),
             "docs.deleted": "0",
             "store.size": f"{max(len(records), 1) * 4}kb",
+            # Present on 8.15 beside store.size (measured).
+            "dataset.size": f"{max(len(records), 1) * 4}kb",
             "pri.store.size": f"{max(len(records), 1) * 4}kb",
         })
     return rows

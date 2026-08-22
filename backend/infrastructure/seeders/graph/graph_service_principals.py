@@ -20,7 +20,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="Microsoft Teams",
-            publisherName="Microsoft Corporation",
             verifiedPublisher={"displayName": "Microsoft Corporation"},
             oauth2PermissionGrants=[
                 {"scope": "User.Read"},
@@ -34,7 +33,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="Microsoft Graph Explorer",
-            publisherName="Microsoft Corporation",
             verifiedPublisher={"displayName": "Microsoft Corporation"},
             oauth2PermissionGrants=[
                 {"scope": "User.Read"},
@@ -49,7 +47,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="SOAR-Integration",
-            publisherName="AcmeCorp",
             verifiedPublisher={"displayName": "AcmeCorp"},
             oauth2PermissionGrants=[
                 {"scope": "SecurityEvents.Read.All"},
@@ -63,7 +60,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="SIEM-Connector",
-            publisherName="AcmeCorp",
             verifiedPublisher={"displayName": "AcmeCorp"},
             oauth2PermissionGrants=[
                 {"scope": "SecurityEvents.Read.All"},
@@ -78,7 +74,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="Shadow IT App",
-            publisherName="",
             verifiedPublisher={"displayName": None},
             oauth2PermissionGrants=[
                 {"scope": "User.Read"},
@@ -93,7 +88,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="Employee Expense Tool",
-            publisherName="",
             verifiedPublisher={"displayName": None},
             oauth2PermissionGrants=[
                 {"scope": "User.Read"},
@@ -109,7 +103,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="CRM Dashboard",
-            publisherName="Salesforce",
             verifiedPublisher={"displayName": "Salesforce"},
             oauth2PermissionGrants=[
                 {"scope": "User.Read"},
@@ -122,7 +115,6 @@ def seed_graph_service_principals(fake: Faker) -> None:
             id=graph_uuid(),
             appId=graph_uuid(),
             displayName="Backup Service",
-            publisherName="Veeam",
             verifiedPublisher={"displayName": "Veeam"},
             oauth2PermissionGrants=[
                 {"scope": "User.Read"},

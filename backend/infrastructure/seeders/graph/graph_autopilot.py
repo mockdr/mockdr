@@ -44,11 +44,6 @@ def seed_graph_autopilot(fake: Faker) -> None:
     random.shuffle(states)
 
     for device, state in zip(selected, states, strict=False):
-        profile_status = (
-            "assigned" if state == "enrolled"
-            else "pending" if state == "pendingReset"
-            else "notAssigned"
-        )
         graph_autopilot_device_repo.save(GraphAutopilotDevice(
             id=graph_uuid(),
             serialNumber=device.serialNumber,
@@ -58,7 +53,6 @@ def seed_graph_autopilot(fake: Faker) -> None:
             purchaseOrderIdentifier=fake.bothify("PO-####-????").upper(),
             enrollmentState=state,
             lastContactedDateTime=rand_ago(max_days=30) if state != "notContacted" else "",
-            deploymentProfileAssignmentStatus=profile_status,
         ))
 
     # -----------------------------------------------------------------

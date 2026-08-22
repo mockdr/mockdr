@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "alertRuleTemplateName": "",
+    "description": "",
+    "displayName": "",
+    "enabled": false,
+    "lastModifiedUtc": "",
+    "displayNamesFilter": [],
+    "displayNamesExcludeFilter": [],
+    "productFilter": "Microsoft Cloud App Security",
+    "severitiesFilter": []
+  },
+  "kind": "Scheduled",
+  "etag": "",
+  "id": "",
+  "name": "",
+  "type": "",
+  "systemData": {
+    "createdBy": "",
+    "createdByType": "User",
+    "createdAt": "",
+    "lastModifiedBy": "",
+    "lastModifiedByType": "User",
+    "lastModifiedAt": ""
+  }
+}

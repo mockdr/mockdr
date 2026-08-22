@@ -40,7 +40,8 @@ def get_role_members(role_id: str) -> dict:
         for uid in member_ids:
             user = graph_user_repo.get(uid)
             if user is not None:
-                members.append(asdict(user))
+                # A directoryObject collection names each item's concrete type.
+                members.append({"@odata.type": "#microsoft.graph.user", **asdict(user)})
 
     return build_graph_list_response(
         value=members,

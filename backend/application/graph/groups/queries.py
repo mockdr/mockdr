@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from repository.graph.group_repo import graph_group_repo
+from repository.graph.user_repo import graph_user_repo
 from repository.store import store
 from utils.graph_odata import (
     apply_graph_filter,
@@ -87,9 +88,19 @@ def get_group_members(group_id: str) -> dict:
     Returns:
         OData list response containing member dicts.
     """
-    members = store.get("graph_group_members", group_id)
-    if not isinstance(members, list):
-        members = []
+    stored = store.get("graph_group_members", group_id)
+    # Graph returns the member as its concrete directoryObject, typed by
+    # @odata.type — a user with its full default property set, not the
+    # {id, displayName} stub the store keeps.
+    members: list[dict] = []
+    for member in stored if isinstance(stored, list) else []:
+        if not isinstance(member, dict):
+            continue
+        user = graph_user_repo.get(str(member.get("id", "")))
+        if user is not None:
+            members.append({"@odata.type": "#microsoft.graph.user", **asdict(user)})
+        else:
+            members.append({"@odata.type": "#microsoft.graph.directoryObject", **member})
 
     return build_graph_list_response(
         value=members,
