@@ -125,7 +125,15 @@ curl -X POST http://localhost:8001/splunk/services/notable_update \
   -d '{"ruleUIDs": ["event-id"], "status": "2", "comment": "Investigating"}'
 ```
 
-### Server Info (Health Check)
+### Server Info
 ```bash
-curl http://localhost:8001/splunk/services/server/info?output_mode=json
+curl -u admin:mockdr-admin "http://localhost:8001/splunk/services/server/info?output_mode=json"
+```
+
+`server/info` requires authentication, as it does on splunkd.
+
+### Health Check
+The unauthenticated health endpoint is HEC's, as on a real Splunk:
+```bash
+curl http://localhost:8001/splunk/services/collector/health
 ```

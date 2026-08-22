@@ -13,3 +13,7 @@ get {
 params:query {
   output_mode: json
 }
+
+headers {
+  Authorization: Splunk {{splunk_session_key}}
+}

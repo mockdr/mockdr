@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "mockdr \u2014 Multi-Platform Security Mock API",
+    "name": "mockdr — Multi-Platform Security Mock API",
     "description": "Multi-platform EDR/SIEM mock API. Import this collection to test SOAR playbooks and automation scripts.\n\n**SentinelOne tokens:**\n- Admin:       admin-token-0000-0000-000000000001\n- Viewer:      viewer-token-0000-0000-000000000002\n- SOC Analyst: soc-analyst-token-000-000000000003\n\n**CrowdStrike credentials:**\n- Admin:   cs-mock-admin-client / cs-mock-admin-secret\n- Viewer:  cs-mock-viewer-client / cs-mock-viewer-secret\n- Analyst: cs-mock-analyst-client / cs-mock-analyst-secret\n\n**MDE credentials:**\n- Admin:   mde-mock-admin-client / mde-mock-admin-secret\n- Analyst: mde-mock-analyst-client / mde-mock-analyst-secret\n- Viewer:  mde-mock-viewer-client / mde-mock-viewer-secret\n- Tenant:  a1b2c3d4-e5f6-7890-abcd-ef1234567890\n\n**Elastic Security:**\n- Admin API key:   mock-es-admin-api-key\n- Analyst API key: mock-es-analyst-api-key\n- Viewer API key:  mock-es-viewer-api-key\n\n**Cortex XDR (HMAC auth):**\n- Admin key:   ID=1, secret=xdr-admin-secret\n- Analyst key: ID=2, secret=xdr-analyst-secret\n\n**Splunk:**\n- admin / mockdr-admin\n- analyst / mockdr-analyst\n- viewer / mockdr-viewer\n- HEC token (sentinelone): 11111111-1111-1111-1111-111111111111\n\n**Microsoft Sentinel:**\n- client_id: sentinel-mock-client-id\n- client_secret: sentinel-mock-client-secret\n\n**Microsoft Graph credentials:**\n- Admin:    graph-mock-admin-client / graph-mock-admin-secret\n- Security: graph-mock-security-client / graph-mock-security-secret\n- SMB:      graph-mock-smb-client / graph-mock-smb-secret\n- Plan 1:   graph-mock-p1-client / graph-mock-p1-secret\n- Intune:   graph-mock-intune-client / graph-mock-intune-secret\n- Mail:     graph-mock-mail-client / graph-mock-mail-secret",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -2674,7 +2674,7 @@
                   ],
                   "path": []
                 },
-                "description": "Available scenarios:\n- mass_infection   \u2192 infect 20 random agents\n- apt_campaign     \u2192 targeted attack on 10 agents\n- agent_offline    \u2192 take 30% of agents offline\n- quiet_day        \u2192 resolve all threats & heal agents",
+                "description": "Available scenarios:\n- mass_infection   → infect 20 random agents\n- apt_campaign     → targeted attack on 10 agents\n- agent_offline    → take 30% of agents offline\n- quiet_day        → resolve all threats & heal agents",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"scenario\": \"mass_infection\"\n}",
@@ -8365,7 +8365,12 @@
               "name": "Server info",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Splunk {{splunk_session_key}}"
+                  }
+                ],
                 "url": {
                   "raw": "{{splunk_base_url}}/services/server/info?output_mode=json",
                   "host": [
@@ -8385,7 +8390,12 @@
               "name": "Server status",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Splunk {{splunk_session_key}}"
+                  }
+                ],
                 "url": {
                   "raw": "{{splunk_base_url}}/services/server/status?output_mode=json",
                   "host": [
