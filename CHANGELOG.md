@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-08-22
+
 A thoroughness pass before 2.0.5, run with every discovery tool that had
 found bugs *after* a release now running *before* one: the full local CI
 mirror including e2e and the Docker smoke test, the conformance harness with
