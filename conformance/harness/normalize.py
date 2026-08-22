@@ -24,7 +24,9 @@ _VOLATILE: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("<uuid>", re.compile(
         r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I,
     )),
-    ("<timestamp>", re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}")),
+    ("<timestamp>", re.compile(
+        r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$",
+    )),
     ("<epoch>", re.compile(r"^\d{10}(\.\d+)?$")),
     ("<version>", re.compile(r"^\d+\.\d+\.\d+([.\-+][\w.\-]+)?$")),
     ("<hex>", re.compile(r"^[0-9a-f]{12,}$", re.I)),
@@ -55,7 +57,13 @@ def strip_prefix(value: Any, prefix: str) -> Any:
     if not prefix:
         return value
     if isinstance(value, str):
-        return value.replace(prefix, "")
+        # Only where the prefix begins a path: at the start of the string or
+        # after a delimiter, and followed by a slash or the end. A blind
+        # replace also rewrote "/Documentation/elastic/x", which is a word,
+        # not a mount point.
+        return re.sub(
+            rf"(?<![\w/.]){re.escape(prefix)}(?=/|$|[\s\]\)\"'])", "", value,
+        )
     if isinstance(value, dict):
         return {k: strip_prefix(v, prefix) for k, v in value.items()}
     if isinstance(value, list):
@@ -119,7 +127,23 @@ def skeleton(
     elif isinstance(body, list):
         out[path] = "array"
         for item in body:
-            out.update(skeleton(item, significant_keys, f"{path}[*]", depth + 1))
+            _merge(out, skeleton(item, significant_keys, f"{path}[*]", depth + 1))
     else:
         out[path] = type_name(body)
     return out
+
+
+def _merge(into: dict[str, str], element: dict[str, str]) -> None:
+    """Fold one array element's skeleton into the array's, keeping every type.
+
+    With a plain ``update`` the last element won: a ``null`` in element 0 was
+    overwritten by a ``string`` in element 9, and a hit that was genuinely
+    malformed on one side compared as fine. A path seen with several types
+    now reads ``null|string``, which is both honest and a finding in itself.
+    """
+    for path, kind in element.items():
+        seen = into.get(path)
+        if seen is None or seen == kind:
+            into[path] = kind
+        else:
+            into[path] = "|".join(sorted(set(seen.split("|")) | {kind}))

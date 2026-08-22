@@ -71,9 +71,19 @@ def _ignored(path: str, ignore_paths: tuple[str, ...]) -> bool:
 
 
 def _empty_arrays(skel: dict[str, str]) -> set[str]:
-    """Array paths that this side reported with no elements at all."""
-    arrays = {p for p, kind in skel.items() if kind == "array"}
-    return {a for a in arrays if not any(p.startswith(f"{a}[*]") for p in skel)}
+    """Paths this side reported as a collection with nothing in it.
+
+    ``null`` counts: a fresh install that says ``"data": null`` where the
+    seeded mock says ``"data": [...]`` has still shown no element to compare
+    against. The ``null``-versus-``array`` difference at the path itself is
+    reported separately — it is the *element* shape that is uncomparable.
+    """
+    empty: set[str] = set()
+    for path, kind in skel.items():
+        no_elements = not any(p.startswith(f"{path}[*]") for p in skel)
+        if (kind == "array" and no_elements) or kind == "null":
+            empty.add(path)
+    return empty
 
 
 def _under_empty_array(path: str, empty: set[str]) -> bool:

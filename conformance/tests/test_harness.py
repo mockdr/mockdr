@@ -16,8 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from harness.diff import Response, compare
 from harness.normalize import mask, skeleton, strip_prefix
-from harness.spec import SpecError, load_spec, substitute
+from harness.spec import SpecError, load_spec, resolve_env, substitute
 
+ROOT = Path(__file__).resolve().parents[1]
 SIGNIFICANT = frozenset({"code", "text", "status"})
 
 
@@ -47,6 +48,16 @@ class TestMasking:
         """The values a client branches on must never be masked away."""
         assert mask(value) == value
 
+    def test_a_message_that_merely_starts_with_a_timestamp_is_not_a_timestamp(self) -> None:
+        """An unanchored pattern masked the diagnostic that followed the date."""
+        assert mask("2026-01-01T00:00:00 search failed: quota") != "<timestamp>"
+
+    @pytest.mark.parametrize("value", [
+        "2026-01-01T00:00:00Z", "2026-01-01T00:00:00.123+00:00", "2026-01-01 00:00:00",
+    ])
+    def test_timestamp_variants_still_mask(self, value: str) -> None:
+        assert mask(value) == "<timestamp>"
+
 
 class TestSkeleton:
     """Shape and type, plus the values that carry meaning."""
@@ -65,6 +76,11 @@ class TestSkeleton:
         one = skeleton({"rows": [{"a": 1}]}, SIGNIFICANT)
         many = skeleton({"rows": [{"a": 1}, {"a": 2}, {"a": 3}]}, SIGNIFICANT)
         assert one == many
+
+    def test_array_elements_merge_their_types_rather_than_overwriting(self) -> None:
+        """The last element used to win, hiding a malformed first one."""
+        out = skeleton({"hits": [{"f": None}, {"f": "x"}]}, SIGNIFICANT)
+        assert out["$.hits[*].f"] == "null|string"
 
     def test_recursion_is_bounded(self) -> None:
         deep: dict = {}
@@ -121,6 +137,18 @@ class TestCompare:
         )
         assert findings == []
 
+    def test_a_null_collection_suppresses_element_shape_like_an_empty_one(self) -> None:
+        """A fresh install may say `null` where the mock says `[...]`."""
+        findings = compare(
+            "p",
+            _response(200, {"data": [{"a": 1, "b": 2}]}),
+            _response(200, {"data": None}),
+            SIGNIFICANT,
+        )
+        # The null-versus-array difference at the path is real and reported;
+        # the element fields beneath it were never comparable and are not.
+        assert [(f.kind, f.path) for f in findings] == [("type", "$.data")]
+
     def test_a_non_json_body_is_itself_a_finding(self) -> None:
         mock = Response(200, {}, None, body_error="non-json (text/html)")
         findings = compare("p", mock, _response(200, {"ok": True}), SIGNIFICANT)
@@ -153,6 +181,11 @@ class TestPrefixStripping:
             "error": {"reason": "no handler for [/_cat]"},
         }
 
+    def test_only_a_mount_point_is_stripped_not_a_word(self) -> None:
+        """A blind replace rewrote `/Documentation/elastic/x`, which is a word."""
+        text = "see /Documentation/elastic/x and /elastic/_cat [/elastic]"
+        assert strip_prefix(text, "/elastic") == "see /Documentation/elastic/x and /_cat []"
+
     def test_an_empty_prefix_changes_nothing(self) -> None:
         assert strip_prefix({"a": "/elastic/x"}, "") == {"a": "/elastic/x"}
 
@@ -173,6 +206,27 @@ class TestSpecLoading:
         spec = load_spec(Path(__file__).resolve().parents[1] / "probes" / f"{name}.yaml")
         assert spec.probes
         assert all(p.endpoint in spec.endpoints for p in spec.probes)
+
+    def test_env_references_resolve_with_defaults(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("CONF_PROBE_X", raising=False)
+        assert resolve_env("${env:CONF_PROBE_X:-fallback}") == "fallback"
+        monkeypatch.setenv("CONF_PROBE_X", "set")
+        assert resolve_env("${env:CONF_PROBE_X:-fallback}") == "set"
+
+    def test_an_env_reference_with_no_value_and_no_default_is_an_error(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("CONF_PROBE_MISSING", raising=False)
+        with pytest.raises(SpecError, match="CONF_PROBE_MISSING"):
+            resolve_env("${env:CONF_PROBE_MISSING}")
+
+    @pytest.mark.parametrize("name", ["splunk", "elastic"])
+    def test_the_shipped_specs_carry_credentials_for_both_targets(self, name: str) -> None:
+        """A spec without them would fall back to nothing and 401 on both sides."""
+        spec = load_spec(ROOT / "probes" / f"{name}.yaml")
+        assert set(spec.credentials) == {"mock", "real"}
 
     def test_an_unknown_endpoint_is_rejected(self, tmp_path: Path) -> None:
         path = tmp_path / "bad.yaml"
@@ -200,10 +254,46 @@ class TestSpecLoading:
 class TestExitStatus:
     """"Nothing differed" and "nothing ran" must not look the same."""
 
-    def test_an_unreachable_target_is_not_a_clean_bill(self) -> None:
-        """The distinction the exit codes exist to make."""
+    def test_an_unreachable_target_is_not_a_clean_bill(self, tmp_path: Path) -> None:
+        """The distinction the exit codes exist to make.
+
+        Points at a port nothing can be listening on, rather than assuming
+        the shipped spec's ports are free: they are exactly the ones the
+        compose file binds, and a Splunk left running from a fidelity check
+        would have made this pass or fail on host state.
+        """
         from harness.runner import main
 
-        spec = Path(__file__).resolve().parents[1] / "probes" / "splunk.yaml"
-        # Nothing is listening on the real ports in a unit-test run.
+        spec = tmp_path / "dead.yaml"
+        spec.write_text(
+            "platform: x\n"
+            "endpoints: {a: {mock: 'http://127.0.0.1:1', real: 'http://127.0.0.1:1'}}\n"
+            "probes: [{id: p, endpoint: a, request: {path: /}}]\n",
+        )
         assert main([str(spec)]) == 2
+
+
+class TestFixturesAgreeWithTheBackend:
+    """The harness names mockdr's seeded values; the seeder defines them.
+
+    Read as text rather than imported, so the harness stays a separate
+    project that needs no mockdr source on its path — while still failing
+    the moment the seeded value and the harness's copy of it diverge.
+    """
+
+    def test_the_mock_hec_token_is_the_seeded_one(self) -> None:
+        from harness.bootstrap import MOCK_HEC_TOKEN
+
+        seeder = (ROOT.parent / "backend/infrastructure/seeders/splunk/splunk_seeder.py")
+        assert MOCK_HEC_TOKEN in seeder.read_text()
+
+    @pytest.mark.parametrize(("name", "source"), [
+        ("splunk", "backend/infrastructure/seeders/splunk/splunk_seeder.py"),
+        ("elastic", "backend/api/es_auth.py"),
+    ])
+    def test_the_mock_credential_is_one_the_backend_accepts(
+        self, name: str, source: str,
+    ) -> None:
+        spec = load_spec(ROOT / "probes" / f"{name}.yaml")
+        text = (ROOT.parent / source).read_text()
+        assert spec.credentials["mock"].password in text

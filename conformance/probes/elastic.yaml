@@ -15,6 +15,10 @@ endpoints:
     mock: http://localhost:5001/kibana
     real: http://localhost:15601
 
+credentials:
+  mock: {user: elastic, password: mock-elastic-password}
+  real: {user: elastic, password: "${env:ELASTIC_PASSWORD:-Probe-Passw0rd!}"}
+
 significant_keys:
   - status
   - statusCode

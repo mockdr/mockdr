@@ -12,6 +12,7 @@ supplies a context per target and the runner substitutes into both.
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,10 @@ from typing import Any
 import yaml
 
 _PLACEHOLDER = re.compile(r"\$\{([a-z0-9_]+)\}")
+#: ``${env:NAME}`` or ``${env:NAME:-default}``, resolved at load time from the
+#: environment. This is how a spec shares one password with compose.yml
+#: without either file copying the other's literal.
+_ENV_REF = re.compile(r"\$\{env:([A-Z0-9_]+)(?::-([^}]*))?\}")
 
 
 class SpecError(Exception):
@@ -36,10 +41,22 @@ class Endpoint:
     stays in the config instead of leaking into every probe.
     """
 
-    name: str
     mock: str
     real: str
     verify_tls: bool = True
+
+
+@dataclass(frozen=True)
+class Credential:
+    """A username and password for one target."""
+
+    user: str
+    password: str
+
+    @property
+    def pair(self) -> tuple[str, str]:
+        """The form httpx's ``auth=`` takes."""
+        return (self.user, self.password)
 
 
 @dataclass(frozen=True)
@@ -77,11 +94,17 @@ class Probe:
 
 @dataclass(frozen=True)
 class PlatformSpec:
-    """Every probe for one vendor, plus where to send them."""
+    """Every probe for one vendor, plus where and how to send them."""
 
     platform: str
     endpoints: dict[str, Endpoint]
     probes: tuple[Probe, ...]
+    #: Per target. These live in the spec rather than on the command line
+    #: because they are a property of the platform: the user Elasticsearch
+    #: recognises is not the one splunkd does, and a single global default
+    #: silently authenticates one of them wrong. Both sides then answer 401,
+    #: which compares as agreement — and real findings vanish.
+    credentials: dict[str, Credential] = field(default_factory=dict)
     #: Keys whose *values* are compared, not merely their presence and type.
     #: This is where a platform's semantics live: Splunk's `code`, Kibana's
     #: `statusCode`. Everything else is compared structurally, because values
@@ -113,6 +136,32 @@ def substitute(value: Any, context: dict[str, str]) -> Any:
     return value
 
 
+def resolve_env(value: str) -> str:
+    """Expand ``${env:NAME:-default}`` references from the environment."""
+    def _lookup(match: re.Match[str]) -> str:
+        name, default = match.group(1), match.group(2)
+        found = os.environ.get(name)
+        if found is not None:
+            return found
+        if default is not None:
+            return default
+        raise SpecError(f"environment variable {name} is not set and has no default")
+    return _ENV_REF.sub(_lookup, value)
+
+
+def _load_credentials(raw: Any, path: Path) -> dict[str, Credential]:
+    out: dict[str, Credential] = {}
+    for target, entry in (raw or {}).items():
+        try:
+            out[str(target)] = Credential(
+                user=resolve_env(str(entry["user"])),
+                password=resolve_env(str(entry["password"])),
+            )
+        except (KeyError, TypeError) as exc:
+            raise SpecError(f"{path}: credentials.{target}: {exc}") from exc
+    return out
+
+
 def load_spec(path: Path) -> PlatformSpec:
     """Read and validate one platform's probe file."""
     raw = yaml.safe_load(path.read_text())
@@ -123,7 +172,6 @@ def load_spec(path: Path) -> PlatformSpec:
         platform = str(raw["platform"])
         endpoints = {
             name: Endpoint(
-                name=name,
                 mock=str(cfg["mock"]),
                 real=str(cfg["real"]),
                 verify_tls=bool(cfg.get("verify_tls", True)),
@@ -174,4 +222,5 @@ def load_spec(path: Path) -> PlatformSpec:
         endpoints=endpoints,
         probes=tuple(probes),
         significant_keys=frozenset(raw.get("significant_keys") or ()),
+        credentials=_load_credentials(raw.get("credentials"), path),
     )

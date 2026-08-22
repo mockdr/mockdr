@@ -12,9 +12,8 @@ what lets one probe description address two differently-provisioned servers.
 """
 from __future__ import annotations
 
-import httpx
-
-from harness.spec import Endpoint, PlatformSpec
+from harness.clients import Clients
+from harness.spec import PlatformSpec
 
 #: mockdr's seeded HEC token. Fixed on purpose — reproducibility is a feature
 #: of the mock, and a probe that had to discover it would be testing the
@@ -26,13 +25,15 @@ class BootstrapError(Exception):
     """A target could not be prepared, so its probes cannot mean anything."""
 
 
-def _client(endpoint: Endpoint, target: str) -> httpx.Client:
-    base = endpoint.mock if target == "mock" else endpoint.real
-    return httpx.Client(base_url=base, verify=endpoint.verify_tls, timeout=30.0)
+#: The HEC input the README tells an operator to create. Preferred over
+#: whatever else is on the box, because a stale token from an earlier run
+#: or an unrelated input may carry different index permissions — and then
+#: the probes would be measuring that input's configuration, not splunkd.
+PREFERRED_HEC_INPUT = "conformance"
 
 
 def bootstrap_splunk(
-    spec: PlatformSpec, target: str, admin: tuple[str, str],
+    spec: PlatformSpec, target: str, clients: Clients,
 ) -> dict[str, str]:
     """Ensure both targets have a usable HEC token, and report which.
 
@@ -43,27 +44,30 @@ def bootstrap_splunk(
     if target == "mock":
         return {"hec_token": MOCK_HEC_TOKEN}
 
-    management = spec.endpoints.get("management")
-    if management is None:
+    if "management" not in spec.endpoints:
         raise BootstrapError("splunk spec has no 'management' endpoint")
 
-    with _client(management, target) as client:
-        response = client.get(
-            "/services/data/inputs/http",
-            params={"output_mode": "json"},
-            auth=admin,
+    response = clients.get("management", target).get(
+        "/services/data/inputs/http",
+        params={"output_mode": "json"},
+        auth=spec.credentials[target].pair if target in spec.credentials else None,
+    )
+    if response.status_code != 200:
+        raise BootstrapError(
+            f"cannot list HEC tokens on the real Splunk: "
+            f"HTTP {response.status_code} {response.text[:200]}",
         )
-        if response.status_code != 200:
-            raise BootstrapError(
-                f"cannot list HEC tokens on the real Splunk: "
-                f"HTTP {response.status_code} {response.text[:200]}",
-            )
-        for entry in response.json().get("entry", []):
-            token = entry.get("content", {}).get("token")
-            # The parent [http] stanza has no token of its own; only the
-            # child inputs do, so an entry without one is not a failure.
-            if token:
-                return {"hec_token": str(token)}
+    # The parent [http] stanza has no token of its own; only the child
+    # inputs do, so an entry without one is not a failure.
+    tokens = {
+        str(entry.get("name", "")).removeprefix("http://"): str(entry["content"]["token"])
+        for entry in response.json().get("entry", [])
+        if entry.get("content", {}).get("token")
+    }
+    if PREFERRED_HEC_INPUT in tokens:
+        return {"hec_token": tokens[PREFERRED_HEC_INPUT]}
+    if tokens:
+        return {"hec_token": next(iter(tokens.values()))}
 
     raise BootstrapError(
         "the real Splunk has no HEC token. Create one with:\n"
@@ -73,7 +77,7 @@ def bootstrap_splunk(
 
 
 def bootstrap_elastic(
-    spec: PlatformSpec, target: str, admin: tuple[str, str],
+    spec: PlatformSpec, target: str, clients: Clients,
 ) -> dict[str, str]:
     """Report an index that exists on this target.
 
@@ -81,33 +85,34 @@ def bootstrap_elastic(
     does, and which index exists differs: mockdr seeds its own names, a fresh
     Elasticsearch has only what Kibana created for itself.
     """
-    endpoint = spec.endpoints.get("search")
-    if endpoint is None:
+    if "search" not in spec.endpoints:
         raise BootstrapError("elastic spec has no 'search' endpoint")
 
-    with _client(endpoint, target) as client:
-        response = client.get("/_cat/indices", params={"format": "json"}, auth=admin)
-        if response.status_code != 200:
-            raise BootstrapError(
-                f"cannot list indices on {target}: HTTP {response.status_code} "
-                f"{response.text[:200]}",
-            )
-        try:
-            rows = response.json()
-        except ValueError as exc:
-            # A target answering non-JSON here usually means the base URL is
-            # wrong, and saying so beats a traceback from deep inside a parse.
-            raise BootstrapError(
-                f"{target} answered non-JSON at /_cat/indices "
-                f"({response.headers.get('content-type', 'unknown')}) — "
-                f"check the endpoint's base URL",
-            ) from exc
-        if not isinstance(rows, list):
-            raise BootstrapError(f"{target}: expected an array from /_cat/indices")
-        names = [
-            str(row["index"]) for row in rows
-            if isinstance(row, dict) and not str(row.get("index", "")).startswith(".")
-        ]
+    response = clients.get("search", target).get(
+        "/_cat/indices", params={"format": "json"},
+        auth=spec.credentials[target].pair if target in spec.credentials else None,
+    )
+    if response.status_code != 200:
+        raise BootstrapError(
+            f"cannot list indices on {target}: HTTP {response.status_code} "
+            f"{response.text[:200]}",
+        )
+    try:
+        rows = response.json()
+    except ValueError as exc:
+        # A target answering non-JSON here usually means the base URL is
+        # wrong, and saying so beats a traceback from deep inside a parse.
+        raise BootstrapError(
+            f"{target} answered non-JSON at /_cat/indices "
+            f"({response.headers.get('content-type', 'unknown')}) — "
+            f"check the endpoint's base URL",
+        ) from exc
+    if not isinstance(rows, list):
+        raise BootstrapError(f"{target}: expected an array from /_cat/indices")
+    names = [
+        str(row["index"]) for row in rows
+        if isinstance(row, dict) and not str(row.get("index", "")).startswith(".")
+    ]
     return {"index": names[0] if names else "_all"}
 
 

@@ -20,6 +20,13 @@ endpoints:
     real: https://localhost:18088
     verify_tls: false
 
+# Which user each target recognises. The password for the real instance is
+# the one compose.yml sets, read from the same variable so neither file has
+# to copy the other's literal.
+credentials:
+  mock: {user: admin, password: mockdr-admin}
+  real: {user: admin, password: "${env:SPLUNK_PASSWORD:-Probe-Passw0rd!}"}
+
 # Splunk states its outcome in `code`, and the human-readable `text` beside
 # it. Both are compared by value: a client that branches on `code` is the
 # reason mockdr exists, and `text` is stable enough in splunkd to be worth

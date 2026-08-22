@@ -38,12 +38,15 @@ curl -u elastic:'Probe-Passw0rd!' -X POST \
   -H 'Content-Type: application/json' -d '{"password":"Probe-Passw0rd!"}'
 docker compose up -d kibana mockdr
 
-python -m harness.runner probes/elastic.yaml \
-  --real-auth 'elastic:Probe-Passw0rd!' --mock-auth 'elastic:mock-elastic-password'
+python -m harness.runner probes/elastic.yaml
 ```
 
-Exit status is `0` for no findings, `1` for findings, and `2` when a target
-could not be reached — because "nothing differed" and "nothing ran" must not
+Credentials live in each probe file, not on the command line — see
+[Credentials](#credentials) for why.
+
+Exit status is `0` for no findings, `1` for findings, and `2` when any probe
+could not be run — a target unreachable, or a bootstrap that failed to supply
+a placeholder the probe needed. "Nothing differed" and "nothing ran" must not
 look the same.
 
 ### Splunk on arm64
@@ -62,6 +65,33 @@ Expect a five-minute boot. On amd64 none of this applies.
 `http-event-collector create` ignores a requested token value and mints its
 own; the harness reads the actual one back at bootstrap, which is what
 `${hec_token}` resolves to.
+
+## Credentials
+
+Each probe file declares the user every target recognises:
+
+```yaml
+credentials:
+  mock: {user: elastic, password: mock-elastic-password}
+  real: {user: elastic, password: "${env:ELASTIC_PASSWORD:-Probe-Passw0rd!}"}
+```
+
+They are per platform because they are a property of the platform: the user
+Elasticsearch recognises is not the one splunkd does. An earlier version took
+a single global default on the command line, and running both specs at once
+authenticated Elastic with Splunk's user. Both sides then answered 401 —
+which compares as *agreement*, and three real findings vanished from the
+report. The harness was doing to itself exactly what it exists to catch.
+
+`${env:NAME:-default}` reads the environment at load time, so a spec shares
+one password with `compose.yml` without either file copying the other's
+literal. A reference with no value and no default is an error at load, not a
+401 at runtime.
+
+The mock-side values are mockdr's seeded ones. A test reads the backend's
+seeder and auth module as text and fails if they ever diverge, so the harness
+stays a separate project while still being held to what mockdr actually
+seeds.
 
 ## How a difference is judged
 
@@ -82,10 +112,16 @@ Four rules keep the noise down, each for a reason:
 - **Array elements collapse onto one `[*]` path.** A seeded mock returns
   twenty rules where a fresh install returns none; the *shape* of a rule is
   the question, not how many there are.
-- **An empty array suppresses its element shape entirely.** If one side has no
-  elements, the shapes were never compared, and reporting every field as
-  missing would be true and useless. Probes needing both sides populated
+- **An empty collection suppresses its element shape entirely.** If one side
+  has no elements — an empty array, or `null` where the other side has a
+  list — the shapes were never compared, and reporting every field as
+  missing would be true and useless. The `null`-versus-array difference at
+  the path itself is still reported. Probes needing both sides populated
   declare `needs_seed`.
+- **Array elements merge their types.** A path seen as `null` in one element
+  and `string` in another reads `null|string`. With a plain overwrite the
+  last element won, and a hit that was malformed on one side compared as
+  fine.
 - **The mount prefix is stripped.** mockdr serves Elasticsearch under
   `/elastic` and echoes that back in error messages. That is an artefact of
   hosting eight products on one port, not a disagreement.
