@@ -33,39 +33,3 @@ def insert_iocs(iocs: list[dict]) -> dict:
         xdr_ioc_repo.save(ioc)
 
     return build_xdr_reply({"validation_errors": []})  # XDR_iocs.py reads reply.validation_errors
-
-
-def enable_iocs(ioc_ids: list[str]) -> dict:
-    """Enable one or more IOCs.
-
-    Args:
-        ioc_ids: List of IOC identifiers to enable.
-
-    Returns:
-        XDR reply confirming success.
-    """
-    for ioc_id in ioc_ids:
-        ioc = xdr_ioc_repo.get(ioc_id)
-        if ioc:
-            ioc.status = "enabled"
-            xdr_ioc_repo.save(ioc)
-
-    return build_xdr_reply(True)
-
-
-def disable_iocs(ioc_ids: list[str]) -> dict:
-    """Disable one or more IOCs.
-
-    Args:
-        ioc_ids: List of IOC identifiers to disable.
-
-    Returns:
-        XDR reply confirming success.
-    """
-    for ioc_id in ioc_ids:
-        ioc = xdr_ioc_repo.get(ioc_id)
-        if ioc:
-            ioc.status = "disabled"
-            xdr_ioc_repo.save(ioc)
-
-    return build_xdr_reply(True)

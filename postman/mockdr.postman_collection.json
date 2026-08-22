@@ -304,11 +304,19 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/agents/{{agent_id}}",
+                  "raw": "{{s1_base_url}}/agents?ids={{agent_id}}",
                   "host": [
                     "{{s1_base_url}}/agents/{{agent_id}}"
                   ],
-                  "path": []
+                  "path": [
+                    "agents"
+                  ],
+                  "query": [
+                    {
+                      "key": "ids",
+                      "value": "{{agent_id}}"
+                    }
+                  ]
                 }
               }
             },
@@ -370,15 +378,18 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/agents/{{agent_id}}/applications?limit=50",
+                  "raw": "{{s1_base_url}}/agents/applications?ids={{agent_id}}",
                   "host": [
                     "{{s1_base_url}}/agents/{{agent_id}}/applications"
                   ],
-                  "path": [],
+                  "path": [
+                    "agents",
+                    "applications"
+                  ],
                   "query": [
                     {
-                      "key": "limit",
-                      "value": "50"
+                      "key": "ids",
+                      "value": "{{agent_id}}"
                     }
                   ]
                 }
@@ -395,11 +406,20 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/agents/{{agent_id}}/processes",
+                  "raw": "{{s1_base_url}}/agents/processes?ids={{agent_id}}",
                   "host": [
                     "{{s1_base_url}}/agents/{{agent_id}}/processes"
                   ],
-                  "path": []
+                  "path": [
+                    "agents",
+                    "processes"
+                  ],
+                  "query": [
+                    {
+                      "key": "ids",
+                      "value": "{{agent_id}}"
+                    }
+                  ]
                 }
               }
             },
@@ -414,11 +434,20 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/agents/{{agent_id}}/passphrase",
+                  "raw": "{{s1_base_url}}/agents/passphrases?ids={{agent_id}}",
                   "host": [
                     "{{s1_base_url}}/agents/{{agent_id}}/passphrase"
                   ],
-                  "path": []
+                  "path": [
+                    "agents",
+                    "passphrases"
+                  ],
+                  "query": [
+                    {
+                      "key": "ids",
+                      "value": "{{agent_id}}"
+                    }
+                  ]
                 }
               }
             },
@@ -880,11 +909,20 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/cloud-detection/alerts/{{alert_id}}",
+                  "raw": "{{s1_base_url}}/cloud-detection/alerts?ids={{alert_id}}",
                   "host": [
                     "{{s1_base_url}}/cloud-detection/alerts/{{alert_id}}"
                   ],
-                  "path": []
+                  "path": [
+                    "cloud-detection",
+                    "alerts"
+                  ],
+                  "query": [
+                    {
+                      "key": "ids",
+                      "value": "{{alert_id}}"
+                    }
+                  ]
                 }
               }
             },
@@ -1400,22 +1438,16 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/policies?siteId={{site_id}}",
+                  "raw": "{{s1_base_url}}/sites/{{site_id}}/policy",
                   "host": [
                     "{{s1_base_url}}/policies"
                   ],
-                  "path": [],
-                  "query": [
-                    {
-                      "key": "siteId",
-                      "value": "{{site_id}}"
-                    },
-                    {
-                      "key": "groupId",
-                      "value": "{{group_id}}",
-                      "disabled": true
-                    }
-                  ]
+                  "path": [
+                    "sites",
+                    "{{site_id}}",
+                    "policy"
+                  ],
+                  "query": []
                 }
               }
             },
@@ -1430,11 +1462,16 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/policies",
+                  "raw": "{{s1_base_url}}/sites/{{site_id}}/policy",
                   "host": [
                     "{{s1_base_url}}/policies"
                   ],
-                  "path": []
+                  "path": [
+                    "sites",
+                    "{{site_id}}",
+                    "policy"
+                  ],
+                  "query": []
                 },
                 "body": {
                   "mode": "raw",
@@ -1863,11 +1900,15 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/webhooks",
+                  "raw": "{{s1_base_url}}/_dev/webhooks",
                   "host": [
                     "{{s1_base_url}}/webhooks"
                   ],
-                  "path": []
+                  "path": [
+                    "_dev",
+                    "webhooks"
+                  ],
+                  "query": []
                 }
               }
             },
@@ -1882,11 +1923,16 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/webhooks/{{webhook_id}}",
+                  "raw": "{{s1_base_url}}/_dev/webhooks/{{webhook_id}}",
                   "host": [
                     "{{s1_base_url}}/webhooks/{{webhook_id}}"
                   ],
-                  "path": []
+                  "path": [
+                    "_dev",
+                    "webhooks",
+                    "{{webhook_id}}"
+                  ],
+                  "query": []
                 }
               }
             },
@@ -1901,11 +1947,15 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/webhooks",
+                  "raw": "{{s1_base_url}}/_dev/webhooks",
                   "host": [
                     "{{s1_base_url}}/webhooks"
                   ],
-                  "path": []
+                  "path": [
+                    "_dev",
+                    "webhooks"
+                  ],
+                  "query": []
                 },
                 "body": {
                   "mode": "raw",
@@ -1929,11 +1979,16 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/webhooks/{{webhook_id}}",
+                  "raw": "{{s1_base_url}}/_dev/webhooks/{{webhook_id}}",
                   "host": [
                     "{{s1_base_url}}/webhooks/{{webhook_id}}"
                   ],
-                  "path": []
+                  "path": [
+                    "_dev",
+                    "webhooks",
+                    "{{webhook_id}}"
+                  ],
+                  "query": []
                 }
               }
             },
@@ -1948,11 +2003,16 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/webhooks/fire",
+                  "raw": "{{s1_base_url}}/_dev/webhooks/fire",
                   "host": [
                     "{{s1_base_url}}/webhooks/fire"
                   ],
-                  "path": []
+                  "path": [
+                    "_dev",
+                    "webhooks",
+                    "fire"
+                  ],
+                  "query": []
                 },
                 "body": {
                   "mode": "raw",
@@ -2344,11 +2404,16 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{s1_base_url}}/hashes/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/reputation",
+                  "raw": "{{s1_base_url}}/hashes/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/verdict",
                   "host": [
                     "{{s1_base_url}}/hashes/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/reputation"
                   ],
-                  "path": []
+                  "path": [
+                    "hashes",
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "verdict"
+                  ],
+                  "query": []
                 }
               }
             }
@@ -3268,92 +3333,6 @@
           ]
         },
         {
-          "name": "Incidents",
-          "item": [
-            {
-              "name": "Query incidents",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{cs_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{cs_base_url}}/incidents/queries/incidents/v1?limit=25",
-                  "host": [
-                    "{{cs_base_url}}/incidents/queries/incidents/v1"
-                  ],
-                  "path": [],
-                  "query": [
-                    {
-                      "key": "limit",
-                      "value": "25"
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "name": "Get incident details",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{cs_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{cs_base_url}}/incidents/entities/incidents/GET/v1",
-                  "host": [
-                    "{{cs_base_url}}/incidents/entities/incidents/GET/v1"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"ids\": [\n    \"{{cs_incident_id}}\"\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "Update incident",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{cs_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{cs_base_url}}/incidents/entities/incident-actions/v1",
-                  "host": [
-                    "{{cs_base_url}}/incidents/entities/incident-actions/v1"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"action_parameters\": [\n    {\n      \"name\": \"update_status\",\n      \"value\": \"20\"\n    }\n  ],\n  \"ids\": [\n    \"{{cs_incident_id}}\"\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "Host Groups",
           "item": [
             {
@@ -3698,101 +3677,22 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{cs_base_url}}/alerts/queries/cases/v1?limit=25",
+                  "raw": "{{cs_base_url}}/cases/queries/cases/v1?limit=25",
                   "host": [
                     "{{cs_base_url}}/alerts/queries/cases/v1"
                   ],
-                  "path": [],
+                  "path": [
+                    "cases",
+                    "queries",
+                    "cases",
+                    "v1"
+                  ],
                   "query": [
                     {
                       "key": "limit",
                       "value": "25"
                     }
                   ]
-                }
-              }
-            },
-            {
-              "name": "Get case details",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{cs_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{cs_base_url}}/alerts/entities/cases/GET/v1",
-                  "host": [
-                    "{{cs_base_url}}/alerts/entities/cases/GET/v1"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"ids\": [\n    \"case-id-here\"\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "Create case",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{cs_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{cs_base_url}}/alerts/entities/cases/v1",
-                  "host": [
-                    "{{cs_base_url}}/alerts/entities/cases/v1"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"resources\": [\n    {\n      \"name\": \"New Case\",\n      \"description\": \"IR case\",\n      \"type\": \"incident\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "Update case",
-              "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{cs_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{cs_base_url}}/alerts/entities/cases/v1",
-                  "host": [
-                    "{{cs_base_url}}/alerts/entities/cases/v1"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"resources\": [\n    {\n      \"id\": \"case-id-here\",\n      \"status\": \"in_progress\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
                 }
               }
             }
@@ -3885,9 +3785,9 @@
               }
             },
             {
-              "name": "Get quarantined file",
+              "name": "Get quarantined files (by ids)",
               "request": {
-                "method": "GET",
+                "method": "POST",
                 "header": [
                   {
                     "key": "Authorization",
@@ -3895,17 +3795,26 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{cs_base_url}}/quarantine/entities/quarantined-files/v1?ids=file-id-here",
+                  "raw": "{{cs_base_url}}/quarantine/entities/quarantined-files/GET/v1",
                   "host": [
-                    "{{cs_base_url}}/quarantine/entities/quarantined-files/v1"
+                    "{{cs_base_url}}"
                   ],
-                  "path": [],
-                  "query": [
-                    {
-                      "key": "ids",
-                      "value": "file-id-here"
-                    }
+                  "path": [
+                    "quarantine",
+                    "entities",
+                    "quarantined-files",
+                    "GET",
+                    "v1"
                   ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"ids\": [\"file-id-here\"]}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -4536,25 +4445,6 @@
               }
             },
             {
-              "name": "Get indicator",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{mde_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{mde_base_url}}/api/indicators/{{mde_indicator_id}}",
-                  "host": [
-                    "{{mde_base_url}}/api/indicators/{{mde_indicator_id}}"
-                  ],
-                  "path": []
-                }
-              }
-            },
-            {
               "name": "Create indicator",
               "request": {
                 "method": "POST",
@@ -4574,34 +4464,6 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"indicatorValue\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"indicatorType\": \"FileSha256\",\n  \"action\": \"Alert\",\n  \"severity\": \"High\",\n  \"title\": \"Known malware hash\",\n  \"description\": \"Detected in Lazarus campaign\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "Update indicator",
-              "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{mde_token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{mde_base_url}}/api/indicators/{{mde_indicator_id}}",
-                  "host": [
-                    "{{mde_base_url}}/api/indicators/{{mde_indicator_id}}"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"action\": \"Block\",\n  \"severity\": \"High\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -6327,46 +6189,6 @@
               }
             },
             {
-              "name": "Update alerts",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "x-xdr-auth-id",
-                    "value": "{{xdr_auth_id}}"
-                  },
-                  {
-                    "key": "x-xdr-nonce",
-                    "value": "{{xdr_nonce}}"
-                  },
-                  {
-                    "key": "x-xdr-timestamp",
-                    "value": "{{xdr_timestamp}}"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "{{xdr_auth_header}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{xdr_base_url}}/alerts/update_alerts",
-                  "host": [
-                    "{{xdr_base_url}}/alerts/update_alerts"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"request_data\": {\n    \"alert_id_list\": [\n      \"alert-id-here\"\n    ],\n    \"update_data\": {\n      \"status\": \"reviewed\"\n    }\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
               "name": "Add alert exclusion",
               "request": {
                 "method": "POST",
@@ -6900,132 +6722,12 @@
                   }
                 }
               }
-            },
-            {
-              "name": "Enable IOCs",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "x-xdr-auth-id",
-                    "value": "{{xdr_auth_id}}"
-                  },
-                  {
-                    "key": "x-xdr-nonce",
-                    "value": "{{xdr_nonce}}"
-                  },
-                  {
-                    "key": "x-xdr-timestamp",
-                    "value": "{{xdr_timestamp}}"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "{{xdr_auth_header}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{xdr_base_url}}/indicators/enable_iocs",
-                  "host": [
-                    "{{xdr_base_url}}/indicators/enable_iocs"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"request_data\": {\n    \"indicator_list\": [\n      {\n        \"indicator\": \"192.168.1.100\",\n        \"type\": \"IP\"\n      }\n    ]\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "Disable IOCs",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "x-xdr-auth-id",
-                    "value": "{{xdr_auth_id}}"
-                  },
-                  {
-                    "key": "x-xdr-nonce",
-                    "value": "{{xdr_nonce}}"
-                  },
-                  {
-                    "key": "x-xdr-timestamp",
-                    "value": "{{xdr_timestamp}}"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "{{xdr_auth_header}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{xdr_base_url}}/indicators/disable_iocs",
-                  "host": [
-                    "{{xdr_base_url}}/indicators/disable_iocs"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"request_data\": {\n    \"indicator_list\": [\n      {\n        \"indicator\": \"192.168.1.100\",\n        \"type\": \"IP\"\n      }\n    ]\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
             }
           ]
         },
         {
           "name": "Hash Exceptions",
           "item": [
-            {
-              "name": "Get blocklist",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "x-xdr-auth-id",
-                    "value": "{{xdr_auth_id}}"
-                  },
-                  {
-                    "key": "x-xdr-nonce",
-                    "value": "{{xdr_nonce}}"
-                  },
-                  {
-                    "key": "x-xdr-timestamp",
-                    "value": "{{xdr_timestamp}}"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "{{xdr_auth_header}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{xdr_base_url}}/hash_exceptions/blocklist/get/",
-                  "host": [
-                    "{{xdr_base_url}}/hash_exceptions/blocklist/get/"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"request_data\": {}\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
             {
               "name": "Add to blocklist",
               "request": {
@@ -7058,46 +6760,6 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"request_data\": {\n    \"hash_list\": [\n      \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\n    ]\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "Get allowlist",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "x-xdr-auth-id",
-                    "value": "{{xdr_auth_id}}"
-                  },
-                  {
-                    "key": "x-xdr-nonce",
-                    "value": "{{xdr_nonce}}"
-                  },
-                  {
-                    "key": "x-xdr-timestamp",
-                    "value": "{{xdr_timestamp}}"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "{{xdr_auth_header}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{xdr_base_url}}/hash_exceptions/allowlist/get/",
-                  "host": [
-                    "{{xdr_base_url}}/hash_exceptions/allowlist/get/"
-                  ],
-                  "path": []
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"request_data\": {}\n}",
                   "options": {
                     "raw": {
                       "language": "json"

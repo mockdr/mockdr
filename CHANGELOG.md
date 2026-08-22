@@ -6,26 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-The response *shapes* are now measured rather than typed from memory. Every
-Splunk, Elasticsearch and Kibana list endpoint is compared key-for-key
-against the real product in the conformance harness, and every Sentinel and
-Graph resource against the vendor's published specification, fetched from
-the internet: the Azure REST API specs (`securityinsights` 2024-03-01 stable,
-plus the 2025-10-01 preview for the codeless connector kind) and the official
-Microsoft Graph v1.0 OpenAPI metadata. Measured before and after this
-release: Splunk 897 missing keys → 0 across 72 probes; Sentinel 276 drift
-findings → 0 across 19 routes; Graph 35 → 0 across 49 routes; Elastic and
-Kibana 0 across 57 probes.
+Response *shapes* are now measured, not typed from memory. Every mounted
+route of every platform is compared against a public reference, each used
+for what it can prove: Splunk, Elasticsearch and Kibana against the real
+products in the conformance harness; Sentinel and Graph against the
+published specs (Azure REST API specs 2024-03-01 stable + 2025-10-01
+preview, Microsoft Graph v1.0 and beta OpenAPI metadata); SentinelOne
+against its 2.1 swagger (generated from the product's schemas — absence
+and surplus both count); CrowdStrike against the `gofalcon` SDK (generated
+from the swagger; `omitempty` models, so only surplus counts); Defender for
+Endpoint against `MicrosoftDocs/defender-docs` and Cortex XDR against
+recorded responses, transcriptions and connector code (presence only).
 
-### Fixed
+Before → after: Splunk 897 missing keys → 0 (72 probes); Elastic and Kibana
+0 (57 probes); Sentinel 276 → 0 (20 routes); Graph 35 → 0 (51 routes, beta
+included); SentinelOne 342 → 0 (35); CrowdStrike 61 → 0 (23); Defender
+642 → 0 (36); Cortex XDR 277 → 0 (33). No mounted route is without a
+reference, except Defender's two Azure AD token endpoints.
+
+### Changed
 
 **Splunk — an entry carried a tenth of the keys a real one does.** A real
 saved search has 217 content keys, an index 113, a finished job 67 (with its
 `performance` and `searchTelemetry` trees), a role 43, a user 23, the
 current context 24, a KV collection 10; the mock had 11, 12, 36, 5, 7, 7 and
-3. Each collection is now completed against a fixture captured from
-Splunk 10.4.2 (`backend/infrastructure/fixtures/splunk/`), the mock's own
-values winning. A client reading any field a real entry has now finds it.
+3. Each collection is completed against a fixture captured from Splunk 10.4.2
+(`backend/infrastructure/fixtures/splunk/`), the mock's own values winning.
 Also measured and fixed: the link relations per collection (a job's nine
 sub-resource links including `search_telemetry.json`, a saved search's ten,
 an index's five); the ACL members (saved searches and KV collections carry
@@ -33,162 +39,145 @@ the four `can_share_*` capabilities, a job's ACL has a string `ttl` and no
 `can_list`); `published` on job entries; `paging` absent from `server/status`
 and `messages` absent from the job list; top-level links per collection
 (`_acl` on saved searches and KV config, none on jobs, current context or
-fired alerts); `server/status` itself, which is a collection of seven
-sub-resources, not one invented `{"health": "green"}` document; KV
-collection config as splunkd's flat `field.<name>` / `accelerated_fields.<name>`
-keys, and listable under `/services/` across apps; a wrong password answers
-with `code: incorrect_username_or_password` (a missing one does not); the
-parser names the field of `dc(host)`/`count(x)` and `timechart` carries its
-`seriesfilter: "sum IN top10"`. The job telemetry's timestamps are anchored on
-the job's own start, not the capture run's.
+fired alerts); `server/status` as the collection of seven sub-resources it
+is, not an invented `{"health": "green"}` document; KV collection config as
+splunkd's flat `field.<name>` / `accelerated_fields.<name>` keys, listable
+under `/services/` across apps; a wrong password answers with
+`code: incorrect_username_or_password` (a missing one does not); the parser
+names the field of `dc(host)`/`count(x)` and `timechart` carries its
+`seriesfilter: "sum IN top10"`. Job telemetry timestamps are anchored on the
+job's own start, not the capture run's.
 
-**Kibana — `GET /api/features` returned 8 of 33 features.** All 33 of
-8.15, captured from the real Kibana.
+**Kibana** — `GET /api/features` returned 8 of 33 features; all 33 of 8.15
+now, captured from the real Kibana.
 
-**Sentinel — every resource now has the shape the spec declares.** Fixtures
-are generated from the Azure spec (`scripts/gen_arm_fixtures.py`), one per
-resource and per `kind`, and deep-merged under the mock's values, so every
-declared property is present with a type-correct default. Measured drift that
-this fixed: `systemData` missing everywhere; `kind` inside the property bag
-instead of top-level on alert rules and data connectors; alert rule
-templates an empty list (now three Scheduled templates with a single-item
-route); incident labels as strings instead of `{labelName, labelType}`;
-`watchlistItemsCount` and `additionalData.techniques`, which 2024-03-01 does
-not declare; no `etag` on a single watchlist item; data connectors in one
-invented shape for every kind (now `tenantId` + the kind's own `dataTypes`
-tree for the eight stable kinds, and the codeless `connectorUiConfig` for
-`GenericUI` as the preview spec declares it); threat-intelligence indicators
-without their `kind: indicator` discriminator.
+**Sentinel** — every resource has the shape the spec declares: fixtures are
+generated from the Azure spec (`scripts/gen_arm_fixtures.py`), one per
+resource and per `kind`, and deep-merged under the mock's values. Fixed on
+the way: `systemData` missing everywhere; `kind` inside the property bag on
+alert rules and data connectors; alert rule templates an empty list (three
+Scheduled templates now, with a single-item route); incident labels as
+strings instead of `{labelName, labelType}`; `watchlistItemsCount` and
+`additionalData.techniques`, which 2024-03-01 does not declare; no `etag` on
+a single watchlist item; data connectors in one invented shape for every
+kind (now `tenantId` + the kind's own `dataTypes` tree for the eight stable
+kinds, and the codeless `connectorUiConfig` for `GenericUI` as the preview
+spec declares it); threat-intelligence indicators without `kind: indicator`.
 
-**Graph — five properties v1.0 does not declare, and untyped members.**
-`alert_ids` (storage leaking out of `security/incidents`), `isActive` on
-service health, `publisherName` on service principals,
-`deploymentProfileAssignmentStatus` on Autopilot identities and `result` on
-threat assessment requests are gone. `groups/{id}/members` and
-`directoryRoles/{id}/members` return each member as its concrete type with
-`@odata.type: #microsoft.graph.user` and the user's full default property
-set, not an `{id, displayName}` stub.
+**Graph** — five properties v1.0 does not declare are gone (`alert_ids`
+leaking out of `security/incidents`, `isActive` on service health,
+`publisherName` on service principals, `deploymentProfileAssignmentStatus`
+on Autopilot identities, `result` on threat assessment requests);
+`groups/{id}/members` and `directoryRoles/{id}/members` return each member
+as its concrete type with `@odata.type` and the user's full default
+property set; `/beta/` routes are judged by the beta metadata.
+
+**SentinelOne** — every list and single resource is completed to, and
+restricted to, the swagger's fields (`fixtures/sentinelone/`, one per
+response definition; `null` where the swagger says `x-nullable`, the
+vendor's own `example` otherwise): a user has 33 fields, not 11;
+`system/info` answers `build/patch/release/version`, not an invented
+`serverVersion/buildTime`; agent processes carry `processName`,
+`executablePath`, `cpuUsage`, `memoryUsage`, `startTime` and no
+`pagination`; exclusion scopes are `{tenant, accountIds, siteIds, groupIds}`;
+`activities/types` has its `descriptionTemplate`; a hash verdict is a
+verdict without an invented `confidence`; cloud-detection alerts lose an
+`agentRealtimeInfo` the schema never had; policies are served by scope
+(`/sites/{id}/policy`, `/groups/{id}/policy`, `/accounts/{id}/policy`,
+`/tenant/policy`) in `EnrichedPolicySchema` shape. `/agents/passphrases`
+honoured no `ids` filter and answered every agent's passphrase.
+
+**CrowdStrike** — an alert (v2) carried the legacy detection's `behaviors`,
+`hostinfo`, `max_severity`… and lacked `severity`/`severity_name`; users
+lose `customer`/`roles`, devices the retired
+`slow_changing_modified_timestamp`; PATCHes answer meta-only as
+`MsaReplyMetaOnly` does; the current `/cases/queries/cases/v1`,
+`/cases/entities/case-tags/v1` and `POST …/quarantined-files/GET/v1` paths
+are served.
+
+**Defender for Endpoint** — machines, alerts, vulnerabilities, machine
+actions, software, investigations, indicators and logon users are completed
+from the docs (`fixtures/mde/`, honouring the docs' own spelling:
+`/api/Software`, `CreateAlertByReference`, `Delete https://…`): an alert has
+its `evidence` items with 20 fields each, a machine `deviceValue`,
+`osArchitecture`, `version`; `groupName`, `loggedOnUsers` and `agentVersion`
+were not documented machine fields; live-response actions carry the
+documented `commands` fields; file statistics carry the global view; domain
+and IP statistics say `organizationPrevalence`, not `orgPrevalence`; the
+batch delete lives at its documented `POST /api/indicators/BatchDelete`
+with `IndicatorIds`.
+
+**Cortex XDR** — replies are completed to the recorded shape (`fixtures/xdr/`,
+one per route, list replies item by item): an alert has its `alert_fields`,
+an incident its `hosts`/`users`/`incident_sources`; `rbac/*` and
+`alerts_exclusion/` answer a bare list in `reply`, not an invented paged
+envelope; `alerts_exclusion/add` answers `{rule_id}` and `delete`
+`{rule_id: [...]}`; `quarantine/status` is a bare list; `healthcheck`
+answers `{status}` without a `reply` envelope; `tim_insert_jsons` answers
+`{validation_errors}`; `insert_cef_alerts` takes CEF *lines* as the product
+does — a string used to crash it with `AttributeError`.
+
+### Removed
+
+No evidence, no route: a mock that serves a path nobody can document
+invents the product, and a UI that leans on such a path proves nothing.
+
+- *SentinelOne*: twelve routes the 2.1 API does not have (`/agents/{id}`,
+  `/agents/{id}/passphrase|processes|applications`, `/threats/{id}`,
+  `/threats/{id}/fetch-file`, `/cloud-detection/alerts/{id}`,
+  `/hashes/{hash}/reputation`, `/policies`, `/webhooks`). The UI reads
+  single entities as the product does (`?ids=` lists), policies by scope,
+  the fetched file via `/threats/{id}/download-from-cloud`; the outbound
+  webhooks — a mockdr feature, not a SentinelOne API — live under
+  `/_dev/webhooks` with the rest of the control surface.
+- *Defender for Endpoint*: `GET /api/domains/{domain}`, `GET /api/ips/{ip}`,
+  `GET`/`PATCH /api/indicators/{id}`, `POST /api/investigations/{id}/collect`
+  — none documented.
+- *CrowdStrike*: the sixteen routes the current API no longer has — the
+  legacy Incidents API (`/incidents/*`), the legacy IOC API
+  (`/indicators/*/iocs/v1`), the cases shape under `/alerts/*/cases`, the GET
+  variants of `…/GET/v1` POSTs — with the incidents and cases views and the
+  dashboard's incident widget.
+- *Cortex XDR*: `alerts/update_alerts`, `hash_exceptions/allowlist|blocklist/get`,
+  `indicators/enable_iocs|disable_iocs` — no public evidence of their reply
+  shape — with the hash-exceptions view (add/remove stay).
+- The Postman collection follows: 15 requests moved to the documented
+  routes, 13 dropped.
 
 ### Added
 
-- `scripts/schema_drift.py`: compares every mounted Sentinel/Graph route
-  against the vendored spec, resolving cross-file `$ref`s (the ARM
-  common types), `kind` discriminators scoped to the route's base type,
-  `@odata.type` derived types, preview-only definitions, free-form objects
-  and empty arrays (neither is drift), and walking parents to find a nested
-  collection that is not empty.
-- `data/vendor-specs/` is versioned: the reference the comparator and the
-  fixture generator run against.
+- `scripts/schema_drift.py`: compares every mounted route of a platform
+  against its reference — swagger/OpenAPI (cross-file `$ref`s, `kind` and
+  `@odata.type` polymorphism, preview-only definitions, free-form objects
+  and empty arrays as not-drift, exact or suffix path matching) or a
+  route → key-path map with request bodies and id resolution; lists the
+  routes the reference does not describe.
+- Reference reducers: `gofalcon_spec.py` (CrowdStrike), `mde_docs_spec.py`
+  (Defender docs tree), `xsoar_samples_spec.py` (recorded responses from the
+  XSOAR packs, MIT), `cortex_openapi_spec.py` (per-endpoint transcriptions
+  of the Cortex reference; unlicensed, so only derived key paths are kept),
+  and a Graph beta extraction.
+- Fixture generators: `gen_arm_fixtures.py` (Sentinel), `gen_s1_fixtures.py`,
+  `gen_mde_fixtures.py`, `gen_xdr_fixtures.py`; fixtures under
+  `backend/infrastructure/fixtures/{splunk,sentinel,sentinelone,mde,xdr}`
+  and `kibana_features.json`.
+- `data/vendor-specs/` is versioned (Azure specs, Graph metadata, the
+  reduced references, `xsoar-samples/` with provenance, and
+  `xdr_connector_reduced.json` with one cited source per route).
 - Two harness probes declare data-dependent paths (a job's `performance`
   profile and the sourcetypes it touched; a KV collection's own field
   schema) as such, with the reason on the line.
 
-**The four EDR platforms, against public references after all.** The
-vendor sites gate their specs, but the references exist in the open:
-CrowdStrike's `gofalcon` SDK is generated from the swagger and versions
-every operation, 200 payload and model (`scripts/gofalcon_spec.py`);
-Microsoft's Defender docs are Markdown in `MicrosoftDocs/defender-docs`
-with request blocks, property tables and response examples
-(`scripts/mde_docs_spec.py`); Cortex XDR has no spec anywhere, but the
-XSOAR content pack ships responses recorded from the real product
-(`data/vendor-specs/xsoar-samples/`, MIT); SentinelOne's 2.1 swagger, which
-`scripts/fetch_swagger.sh` already fetched, is generated from the product's
-own response schemas. Each reference is used for what it can prove: an
-`omitempty` SDK model only for surplus fields, a recording or a docs
-example only for absent ones, the SentinelOne swagger for both. Measured
-before → after: SentinelOne 342 → 0 on 31 routes; CrowdStrike 61 → 0 on 23;
-Defender for Endpoint 642 → 0 on 30; Cortex XDR 277 → 0 on 20.
-
-- *SentinelOne*: every list and single resource is completed to — and
-  restricted to — the swagger's fields (`backend/infrastructure/fixtures/sentinelone/`,
-  one per response definition): a user has 33 fields, not 11; `system/info`
-  answers `build/patch/release/version`, not an invented
-  `serverVersion/buildTime`; agent processes carry `processName`,
-  `executablePath`, `cpuUsage`, `memoryUsage`, `startTime` and no
-  `pagination`; exclusion scopes are `{tenant, accountIds, siteIds, groupIds}`;
-  `activities/types` has its `descriptionTemplate`; a hash verdict is a
-  verdict, without an invented `confidence`; cloud-detection alerts lose a
-  `agentRealtimeInfo` the schema never had. Twelve routes the 2.1 API does
-  not have (`/agents/{id}`, `/threats/{id}`, `/webhooks`, …) are listed by the
-  comparator as mock-only.
-- *CrowdStrike*: an alert (v2) carried the legacy detection's `behaviors`,
-  `hostinfo`, `max_severity`… — gone; users lose `customer`/`roles`; devices
-  the retired `slow_changing_modified_timestamp`; PATCHes answer meta-only as
-  `MsaReplyMetaOnly` does; the current `/cases/queries/cases/v1`,
-  `/cases/entities/case-tags/v1` and `POST …/quarantined-files/GET/v1` paths
-  are served. Sixteen routes the current API no longer has (legacy
-  `/indicators/*/iocs`, `/incidents/*`, `/alerts/*/cases`) are still served
-  and listed as such.
-- *Defender for Endpoint*: machines, alerts, vulnerabilities, machine
-  actions, software, investigations, indicators and logon users are
-  completed from the docs (`fixtures/mde/`): an alert has its `evidence`
-  items with 20 fields each, a machine `deviceValue`, `osArchitecture`,
-  `version`; `groupName`, `loggedOnUsers` and `agentVersion` were not
-  documented machine fields; file statistics carry the global view; domain
-  and IP statistics say `organizationPrevalence`, not `orgPrevalence`.
-- *Cortex XDR*: replies are completed to the recorded shape
-  (`fixtures/xdr/`, one per route): an alert has its `alert_fields`, an
-  incident its `hosts`/`users`/`incident_sources`; `quarantine/status` is a
-  bare list, not a paged envelope; `insert_cef_alerts` takes CEF *lines* as
-  the product does — a string used to crash it with `AttributeError`.
-
-**No more mock-only SentinelOne routes — the UI runs on the real API.** The
-mock served twelve routes the 2.1 API does not have (`/agents/{id}`,
-`/agents/{id}/passphrase|processes|applications`, `/threats/{id}`,
-`/threats/{id}/fetch-file`, `/cloud-detection/alerts/{id}`,
-`/hashes/{hash}/reputation`, `/policies`, `/webhooks`) and its own frontend
-depended on them, which proved nothing. They are gone: the UI reads single
-entities as the product does (`/agents?ids=`, `/threats?ids=`,
-`/cloud-detection/alerts?ids=`, `/agents/passphrases|processes|applications?ids=`),
-policies through their scopes (`/sites/{id}/policy`, `/groups/{id}/policy`,
-`/accounts/{id}/policy`, `/tenant/policy`), the fetched file through
-`/threats/{id}/download-from-cloud`; and the outbound webhooks — a mockdr
-feature, not a SentinelOne API — live under `/_dev/webhooks` with the rest
-of the control surface. Every mounted SentinelOne route now has a spec path
-(35 compared, 0 drift).
-
-**Shaking the internet for the rest.** Graph `/beta/` routes are now
-judged by the beta metadata (`data/vendor-specs/graph_beta_reduced.json`,
-from `microsoftgraph/msgraph-metadata`'s beta OpenAPI). Every Defender
-route has a documented reference once the docs' own spelling is honoured
-(`/api/Software`, `CreateAlertByReference`, `Delete https://…`, pages without
-a `## HTTP request` heading): five routes the docs do not know
-(`GET /api/domains/{domain}`, `GET /api/ips/{ip}`, `GET`/`PATCH
-/api/indicators/{id}`, `POST /api/investigations/{id}/collect`) are gone,
-and the batch delete is served at its documented path
-`POST /api/indicators/BatchDelete` with `IndicatorIds`. Cortex XDR gains
-three more references, each used for presence only: the endpoint-by-endpoint
-OpenAPI transcriptions of the official reference (124 routes, read from a
-local clone — the repository carries no licence, so only the derived key
-paths are kept), the shared `CoreIRApiModule` recordings of the XSOAR pack
-(`rbac/get_users`, `get_user_group`, `alerts_exclusion/*`, …), and reply
-shapes read from MIT-licensed connector code, one cited source per route
-(`xdr_connector_reduced.json`). Against them: `rbac/*` and
-`alerts_exclusion/` answer a bare list in `reply`, not an invented paged
-envelope; `alerts_exclusion/add` answers `{rule_id}` and `delete`
-`{rule_id: [...]}`; `healthcheck` answers `{status}` without a `reply`
-envelope; roles, groups and users carry their recorded fields.
-
-**No evidence, no route.** A mock that serves a path nobody can document
-invents the product. Removed, with the UI that leaned on them: the five
-Cortex XDR routes with no public evidence of their reply shape
-(`alerts/update_alerts`, `hash_exceptions/allowlist|blocklist/get`,
-`indicators/enable_iocs|disable_iocs`; the hash-exceptions view went with
-them, add/remove stay), and the sixteen CrowdStrike routes the current API
-no longer has — the legacy Incidents API (`/incidents/*`), the legacy IOC
-API (`/indicators/*/iocs/v1`), the cases shape under `/alerts/*/cases` and
-the GET variants of `…/GET/v1` POSTs. The CrowdStrike incidents and cases
-views and the dashboard's incident widget are gone with them; cases keep
-the documented `/cases/queries/cases/v1` and `/cases/entities/case-tags/v1`.
-Every mounted CrowdStrike and Cortex XDR route now has a reference
-(23 and 33 compared, 0 drift, 0 unjudged).
-
 ### Known limits
 
-A recording or a transcription proves what a real reply carries, never
-what it does not: for Cortex XDR and Defender, surplus fields are listed as
-undocumented, not counted as drift. The two Defender OAuth token endpoints
-are Azure AD, not the product API, and are not compared.
+A recording, a docs example or a transcription proves what a real reply
+carries, never what it does not: for Cortex XDR and Defender, surplus
+fields are listed as undocumented, not counted as drift. Fields a fixture
+adds carry type-correct defaults or the vendor's documented example, not
+real data. The current CrowdStrike cases model
+(`OperationsGetCasesByIDsResponseVM`) is not modelled; only the documented
+query and tag routes are served. Defender's two OAuth token endpoints are
+Azure AD, not the product API, and are not compared.
 
 ## [2.0.5] - 2026-08-22
 

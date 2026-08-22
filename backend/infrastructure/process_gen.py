@@ -32,7 +32,7 @@ def generate_processes_for_agent(agent_id: str) -> list[dict]:
         agent_id: The agent to associate each process entry with.
 
     Returns:
-        List of process dicts matching the real S1 ``/agents/{id}/processes``
+        List of process dicts matching the real S1 ``/agents/processes?ids=``
         response shape.
     """
     return [

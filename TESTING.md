@@ -132,7 +132,6 @@ backend/tests/
 │       ├── test_cs_auth.py            # OAuth2 client-credentials token exchange
 │       ├── test_cs_hosts.py           # GET /devices/queries/devices/v1 + entities
 │       ├── test_cs_detections.py      # GET /detects/queries/detects/v1 + entities
-│       ├── test_cs_incidents.py       # GET /incidents/queries/incidents/v1 + entities
 │       ├── test_cs_host_groups.py     # GET /devices/queries/host-groups/v1 + CRUD
 │       ├── test_cs_iocs.py            # Custom IOC CRUD
 │       ├── test_cs_legacy_iocs.py     # Legacy IOC endpoints

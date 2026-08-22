@@ -293,7 +293,7 @@ def _cs_prepare(client: TestClient, headers: dict) -> dict:
         "quarantine_ids": "/cs/quarantine/queries/quarantined-files/v1",
         "user_uuids": "/cs/user-management/queries/users/v1",
         "group_ids": "/cs/devices/combined/host-groups/v1",
-        "case_ids": "/cs/alerts/queries/cases/v1",
+        "case_ids": "/cs/cases/queries/cases/v1",
     }.items():
         r = client.get(url, headers=headers, params={"limit": 3})
         resources = r.json().get("resources", []) if r.status_code == 200 else []
@@ -341,7 +341,6 @@ PLATFORMS = {
             "POST /quarantine/entities/quarantined-files/GET/v1": {
                 "json": {"ids": "{quarantine_ids}"}
             },
-            "POST /alerts/entities/cases/GET/v1": {"json": {"ids": "{case_ids}"}},
         },
     },
     "xdr": {

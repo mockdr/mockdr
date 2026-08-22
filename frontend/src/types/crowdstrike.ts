@@ -85,25 +85,6 @@ export interface CsDetection {
   date_updated: string
 }
 
-/** CrowdStrike Incident record. */
-export interface CsIncident {
-  incident_id: string
-  cid: string
-  host_ids: string[]
-  hosts: Array<{ device_id: string; hostname: string; platform_name: string; os_version: string }>
-  name: string
-  description: string
-  status: number   // 20=New, 25=Reopened, 30=InProgress, 40=Closed
-  state: string
-  tags: string[]
-  fine_score: number
-  start: string
-  end: string
-  created: string
-  tactics: string[]
-  techniques: string[]
-  assigned_to_name: string
-}
 
 /** CrowdStrike Custom IOC record. */
 export interface CsIoc {
@@ -122,19 +103,6 @@ export interface CsIoc {
   created_by: string
 }
 
-/** CrowdStrike Case record. */
-export interface CsCase {
-  id: string
-  title: string
-  status: string
-  type: string
-  body: string
-  tags: string[]
-  detections: Array<{ id: string }>
-  created_time: string
-  last_modified_time: string
-  created_by: string
-}
 
 /** CrowdStrike Host Group record. */
 export interface CsHostGroup {

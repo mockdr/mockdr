@@ -118,33 +118,6 @@ def insert_cef_alerts(alerts: list[dict]) -> dict:
     return build_xdr_reply(True)
 
 
-def update_alerts(alert_ids: list[str], update_data: dict) -> dict:
-    """Update status/severity on one or more alerts.
-
-    Args:
-        alert_ids: List of alert identifiers to update.
-        update_data: Dict with fields to update (``status``, ``severity``,
-            ``starred``, ``comment``).
-
-    Returns:
-        XDR reply confirming success.
-    """
-    allowed = {"severity", "starred", "alert_action_status"}
-    # Map common incoming keys to domain fields
-    if "status" in update_data:
-        update_data["alert_action_status"] = update_data.pop("status")
-
-    for aid in alert_ids:
-        alert = xdr_alert_repo.get(aid)
-        if alert:
-            for key, value in update_data.items():
-                if key in allowed and hasattr(alert, key):
-                    setattr(alert, key, value)
-            xdr_alert_repo.save(alert)
-
-    return build_xdr_reply(True)
-
-
 def _epoch_ms() -> int:
     """Return current time as epoch milliseconds."""
     from datetime import UTC, datetime

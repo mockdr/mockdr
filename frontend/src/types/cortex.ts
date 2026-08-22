@@ -85,14 +85,6 @@ export interface XdrScript {
   is_high_risk: boolean
 }
 
-/** Cortex XDR Hash Exception (blocklist/allowlist entry). */
-export interface XdrHashException {
-  exception_id: string
-  hash: string
-  list_type: string
-  comment: string
-  created_at: number
-}
 
 /** Cortex XDR incident extra data (detail endpoint). */
 export interface XdrIncidentExtraData {
