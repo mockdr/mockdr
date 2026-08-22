@@ -341,14 +341,12 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | Auth        | `POST /oauth2/token` (client credentials flow)               |
 | Hosts       | List, get, actions (contain, lift_containment, hide, unhide) |
 | Detections  | List, get, update status                                     |
-| Incidents   | List, get, update, perform actions                           |
 | IOCs        | CRUD (custom indicators)                                     |
-| Legacy IOCs | Legacy indicator API                                         |
 | Host Groups | CRUD + member management                                     |
-| Users       | List, get                                                    |
+| Users       | Query ids, get by ids (`POST …/users/GET/v1`)                |
 | Processes   | Process detail lookup                                        |
-| Quarantine  | List, get, actions                                           |
-| Cases       | List, get, create, update                                    |
+| Quarantine  | Query ids, get by ids (`POST …/GET/v1`), actions             |
+| Cases       | Query ids, add/remove tags (the documented routes)           |
 
 ### Microsoft Defender for Endpoint (prefix: `/mde`)
 
@@ -357,9 +355,9 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | Auth             | `POST /oauth2/v2.0/token` (client credentials flow) |
 | Machines         | List, get, actions (isolate, unisolate, scan, more) |
 | Alerts           | List, get, update, create                           |
-| Indicators       | List, get, create, update, delete                   |
+| Indicators       | List, create, delete, batch delete                  |
 | Machine Actions  | List, get, submit actions                           |
-| Investigations   | List, get, start, collect                           |
+| Investigations   | List, get, start                                    |
 | Advanced Hunting | Run KQL queries — evaluated, not canned              |
 | Software         | List, get (TVM)                                     |
 | Vulnerabilities  | List, get (TVM CVEs)                                |
@@ -384,12 +382,12 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | --------------- | ------------------------------------------------------------ |
 | Auth            | Standard API key or advanced SHA-256 digest (`x-xdr-auth-id`) |
 | Incidents       | List, get, update, extra data                                |
-| Alerts          | List, get, update, multi-events                              |
+| Alerts          | List by filter, original alerts, insert (parsed, CEF)        |
 | Endpoints       | List, get, isolate, unisolate, scan, policy                  |
 | Scripts         | List, get, execute, execution status/results                 |
-| IOCs            | CRUD (indicators of compromise)                              |
+| IOCs            | Insert (`tim_insert_jsons`)                                  |
 | Actions         | Action center — list, get, status                            |
-| Hash Exceptions | Allowlist/blocklist list + CRUD                              |
+| Hash Exceptions | Allowlist/blocklist add, remove                              |
 | Audit           | Management + agent audit logs                                |
 | Distributions   | Distribution list                                            |
 | XQL             | Start query, get results, quota                              |
