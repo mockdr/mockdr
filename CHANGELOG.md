@@ -117,6 +117,19 @@ answers `{status}` without a `reply` envelope; `tim_insert_jsons` answers
 `{validation_errors}`; `insert_cef_alerts` takes CEF *lines* as the product
 does — a string used to crash it with `AttributeError`.
 
+**Splunk EDR bridge — CrowdStrike events in the shape Event Streams emits.**
+The bridge wrote a `DetectionSummaryEvent` with a hand-picked subset and an
+`IncidentSummaryEvent` that was the mock's whole incident model. Measured
+against events recorded from the Falcon Event Streams API
+(`data/vendor-specs/cs_event_streams_reduced.json`, key paths from Elastic's
+`crowdstrike/falcon` pipeline test data): detections are now the current
+`EppDetectionSummaryEvent` with its recorded fields (agent, aggregate and
+composite ids, file, hashes, parent, disposition flags, tactic/technique,
+source product), and an incident carries exactly its nine fields
+(`IncidentID`, `HostID`, `IncidentStartTime`/`EndTime`, `FineScore`, `State`,
+`IncidentType`, `LateralMovement`, `FalconHostLink`). A test keeps every
+bridge event within the recorded key set.
+
 ### Removed
 
 No evidence, no route: a mock that serves a path nobody can document

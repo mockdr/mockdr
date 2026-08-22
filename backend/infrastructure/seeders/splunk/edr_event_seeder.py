@@ -3,11 +3,13 @@
 Reads entities from all 5 EDR vendor repositories and creates Splunk events
 with the correct sourcetypes and field schemas.
 """
+
 from __future__ import annotations
 
 import json
 import random
 from dataclasses import asdict
+from datetime import datetime
 
 from domain.splunk.notable_event import NotableEvent
 from domain.splunk.splunk_event import SplunkEvent
@@ -43,7 +45,9 @@ def _seed_s1_events() -> None:
         # Generate notable for malicious/suspicious threats
         threat_info = d.get("threatInfo", {})
         agent_info = d.get("agentDetectionInfo", {})
-        confidence = str(threat_info.get("confidenceLevel", threat_info.get("classification", ""))).lower()
+        confidence = str(
+            threat_info.get("confidenceLevel", threat_info.get("classification", ""))
+        ).lower()
         if confidence in ("malicious", "suspicious"):
             _save_notable(
                 rule_name="SentinelOne - Threat Detected",
@@ -52,9 +56,9 @@ def _seed_s1_events() -> None:
                 dest=str(agent_info.get("computerName", agent_info.get("agentComputerName", ""))),
                 user=str(threat_info.get("processUser", d.get("username", ""))),
                 description=f"Threat: {threat_info.get('threatName', threat_info.get('classification', 'Unknown'))} "
-                            f"on {agent_info.get('computerName', agent_info.get('agentComputerName', 'Unknown'))}",
-                drilldown_search=f'search index=sentinelone sourcetype=sentinelone:channel:threats '
-                                 f'id="{d.get("id", "")}"',
+                f"on {agent_info.get('computerName', agent_info.get('agentComputerName', 'Unknown'))}",
+                drilldown_search=f"search index=sentinelone sourcetype=sentinelone:channel:threats "
+                f'id="{d.get("id", "")}"',
                 edr_vendor="sentinelone",
                 edr_entity_id=str(d.get("id", "")),
                 event_time=event_time,
@@ -70,55 +74,125 @@ def _seed_s1_events() -> None:
     # Activities → sentinelone:channel:activities (sample)
     activities = store.get_all("activities")
     for activity in activities[:20]:
-        d = asdict(activity) if hasattr(activity, "__dataclass_fields__") else activity.__dict__.copy()
+        d = (
+            asdict(activity)
+            if hasattr(activity, "__dataclass_fields__")
+            else activity.__dict__.copy()
+        )
         event_time = _SEED_EPOCH - random.uniform(0, 86400)
-        _save_event("sentinelone", "sentinelone:channel:activities", "sentinelone:api", d, event_time)
+        _save_event(
+            "sentinelone", "sentinelone:channel:activities", "sentinelone:api", d, event_time
+        )
 
 
 def _seed_cs_events() -> None:
-    """Generate Splunk events from CrowdStrike entities."""
+    """Generate Splunk events from CrowdStrike entities, as Event Streams emits them.
+
+    The shapes are the ones recorded from the Falcon Event Streams API
+    (``data/vendor-specs/cs_event_streams_reduced.json``): a detection is an
+    ``EppDetectionSummaryEvent`` (the current type; ``DetectionSummaryEvent``
+    is the legacy one), an incident an ``IncidentSummaryEvent`` with exactly
+    nine fields. This used to dump the mock's whole incident model.
+    """
     detections = store.get_all("cs_detections")
     for det in detections:
         d = asdict(det) if hasattr(det, "__dataclass_fields__") else det.__dict__.copy()
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        behavior = (d.get("behaviors") or [{}])[0]
+        device = d.get("device") or {}
+        parent = behavior.get("parent_details") or {}
+        disposition = behavior.get("pattern_disposition_details") or {}
+        severity = d.get("max_severity", 50)
+        composite_id = d.get("composite_id", "")
         cs_event = {
             "metadata": {
                 "customerIDString": "3061c7ff3b634e22b38274d4b586558e",
                 "offset": int(event_time * 1000),
-                "eventType": "DetectionSummaryEvent",
+                "eventType": "EppDetectionSummaryEvent",
                 "eventCreationTime": int(event_time * 1000),
                 "version": "1.0",
             },
             "event": {
-                "ProcessStartTime": int(event_time),
-                "ComputerName": d.get("hostname", d.get("device", {}).get("hostname", "")),
-                "UserName": d.get("user_name", ""),
-                "DetectName": d.get("detect_name", d.get("max_severity_displayname", "")),
-                "DetectDescription": d.get("detect_description", ""),
-                "Severity": d.get("max_severity", 3),
+                "AgentId": device.get("device_id", ""),
+                "AggregateId": f"aggind:{device.get('device_id', '')}:{int(event_time)}",
+                "CompositeId": composite_id,
+                "Hostname": device.get("hostname", ""),
+                "UserName": behavior.get("user_name", ""),
+                "LogonDomain": device.get("machine_domain", ""),
+                "LocalIP": device.get("local_ip", ""),
+                "LocalIPv6": "",
+                "MACAddress": device.get("mac_address", ""),
+                "HostGroups": ",".join(device.get("groups") or []),
+                "Name": behavior.get("scenario", "NGAV"),
+                "Description": behavior.get("description", behavior.get("display_name", "")),
+                "Objective": behavior.get("objective", "Falcon Detection Method"),
+                "Tactic": behavior.get("tactic", ""),
+                "Technique": behavior.get("technique", ""),
+                "Severity": severity,
                 "SeverityName": d.get("max_severity_displayname", "Medium"),
-                "FileName": d.get("filename", ""),
-                "FilePath": d.get("filepath", ""),
-                "CommandLine": d.get("cmdline", ""),
-                "SHA256String": d.get("sha256", ""),
-                "MachineDomain": d.get("machine_domain", ""),
-                "FalconHostLink": f"https://falcon.crowdstrike.com/activity/detections/detail/{d.get('detection_id', '')}",
+                "FileName": behavior.get("filename", ""),
+                "FilePath": behavior.get("filepath", ""),
+                "AssociatedFile": behavior.get("filepath", ""),
+                "CommandLine": behavior.get("cmdline", ""),
+                "SHA256String": behavior.get("sha256", ""),
+                "MD5String": behavior.get("md5", ""),
+                "SHA1String": behavior.get("sha1", "0" * 40),
+                "IOCType": behavior.get("ioc_type", ""),
+                "IOCValue": behavior.get("ioc_value", ""),
+                "ParentCommandLine": parent.get("parent_cmdline", ""),
+                "ParentImageFileName": parent.get("parent_cmdline", "")
+                .split("\\")[-1]
+                .split(" ")[0],
+                "ParentProcessId": parent.get("parent_process_graph_id", ""),
+                "ProcessId": behavior.get("control_graph_id", ""),
+                "ProcessStartTime": int(event_time),
+                "ProcessEndTime": int(event_time),
+                "PatternDispositionDescription": behavior.get(
+                    "pattern_disposition_description", ""
+                ),
+                "PatternDispositionFlags": {
+                    "Indicator": bool(disposition.get("indicator", False)),
+                    "Detect": bool(disposition.get("detect", False)),
+                    "InddetMask": bool(disposition.get("inddet_mask", False)),
+                    "SensorOnly": bool(disposition.get("sensor_only", False)),
+                    "Rooting": bool(disposition.get("rooting", False)),
+                    "KillProcess": bool(disposition.get("kill_process", False)),
+                    "KillSubProcess": bool(disposition.get("kill_subprocess", False)),
+                    "QuarantineMachine": bool(disposition.get("quarantine_machine", False)),
+                    "QuarantineFile": bool(disposition.get("quarantine_file", False)),
+                    "PolicyDisabled": bool(disposition.get("policy_disabled", False)),
+                    "KillParent": bool(disposition.get("kill_parent", False)),
+                    "OperationBlocked": bool(disposition.get("operation_blocked", False)),
+                    "ProcessBlocked": bool(disposition.get("process_blocked", False)),
+                },
+                "PatternDispositionValue": behavior.get("pattern_disposition", 0),
+                "PatternId": behavior.get("pattern_id", 0),
+                "Type": "ldt",
+                "DataDomains": "Endpoint",
+                "SourceProducts": "Falcon Insight",
+                "SourceVendors": "CrowdStrike",
+                "FalconHostLink": f"https://falcon.crowdstrike.com/activity-v2/detections/{composite_id}",
             },
         }
-        _save_event("crowdstrike", "CrowdStrike:Event:Streams:JSON", "CrowdStrike:Event:Streams", cs_event, event_time)
+        _save_event(
+            "crowdstrike",
+            "CrowdStrike:Event:Streams:JSON",
+            "CrowdStrike:Event:Streams",
+            cs_event,
+            event_time,
+        )
 
-        severity = d.get("max_severity", 0)
-        if isinstance(severity, int) and severity >= 3:
+        if isinstance(severity, int) and severity >= 50:
             _save_notable(
                 rule_name="CrowdStrike - Detection Alert",
                 rule_title="CrowdStrike Detection Alert",
-                severity="critical" if severity >= 5 else "high" if severity >= 4 else "medium",
-                dest=d.get("hostname", d.get("device", {}).get("hostname", "")),
-                user=d.get("user_name", ""),
-                description=f"CS Detection: {d.get('detect_name', 'Unknown')}",
+                severity="critical" if severity >= 90 else "high" if severity >= 70 else "medium",
+                dest=device.get("hostname", ""),
+                user=behavior.get("user_name", ""),
+                description=f"CS Detection: {behavior.get('scenario', 'Unknown')}",
                 drilldown_search='search index=crowdstrike sourcetype="CrowdStrike:Event:Streams:JSON"',
                 edr_vendor="crowdstrike",
-                edr_entity_id=str(d.get("detection_id", "")),
+                edr_entity_id=str(composite_id),
                 event_time=event_time,
             )
 
@@ -126,6 +200,7 @@ def _seed_cs_events() -> None:
     for inc in incidents:
         d = asdict(inc) if hasattr(inc, "__dataclass_fields__") else inc.__dict__.copy()
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        host_ids = d.get("host_ids") or []
         cs_event = {
             "metadata": {
                 "customerIDString": "3061c7ff3b634e22b38274d4b586558e",
@@ -134,9 +209,37 @@ def _seed_cs_events() -> None:
                 "eventCreationTime": int(event_time * 1000),
                 "version": "1.0",
             },
-            "event": d,
+            "event": {
+                "IncidentID": d.get("incident_id", ""),
+                "HostID": host_ids[0] if host_ids else "",
+                "IncidentStartTime": _epoch(d.get("start")) or int(event_time),
+                "IncidentEndTime": _epoch(d.get("end")) or int(event_time),
+                "FineScore": d.get("fine_score", 0),
+                "State": d.get("state", "open"),
+                "IncidentType": 1,
+                "LateralMovement": 1 if d.get("lm_host_ids") else 0,
+                "FalconHostLink": f"https://falcon.crowdstrike.com/crowdscore/incidents/details/{d.get('incident_id', '')}",
+            },
         }
-        _save_event("crowdstrike", "CrowdStrike:Event:Streams:JSON", "CrowdStrike:Event:Streams", cs_event, event_time)
+        _save_event(
+            "crowdstrike",
+            "CrowdStrike:Event:Streams:JSON",
+            "CrowdStrike:Event:Streams",
+            cs_event,
+            event_time,
+        )
+
+
+def _epoch(value: object) -> int:
+    """An ISO-8601 timestamp (or epoch) as whole epoch seconds; 0 when absent."""
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str) and value:
+        try:
+            return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
+        except ValueError:
+            return 0
+    return 0
 
 
 def _seed_mde_events() -> None:
@@ -145,7 +248,9 @@ def _seed_mde_events() -> None:
     for alert in alerts:
         d = asdict(alert) if hasattr(alert, "__dataclass_fields__") else alert.__dict__.copy()
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
-        _save_event("msdefender", "ms:defender:endpoint:alerts", "ms:defender:endpoint", d, event_time)
+        _save_event(
+            "msdefender", "ms:defender:endpoint:alerts", "ms:defender:endpoint", d, event_time
+        )
 
         severity = str(d.get("severity", "")).lower()
         if severity in ("medium", "high", "critical"):
@@ -166,7 +271,9 @@ def _seed_mde_events() -> None:
     for machine in machines:
         d = asdict(machine) if hasattr(machine, "__dataclass_fields__") else machine.__dict__.copy()
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 3)
-        _save_event("msdefender", "ms:defender:endpoint:machines", "ms:defender:endpoint", d, event_time)
+        _save_event(
+            "msdefender", "ms:defender:endpoint:machines", "ms:defender:endpoint", d, event_time
+        )
 
 
 def _seed_es_events() -> None:
@@ -175,12 +282,16 @@ def _seed_es_events() -> None:
     for alert in alerts:
         d = asdict(alert) if hasattr(alert, "__dataclass_fields__") else alert.__dict__.copy()
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
-        _save_event("elastic_security", "elastic:security:alerts", "elastic:security", d, event_time)
+        _save_event(
+            "elastic_security", "elastic:security:alerts", "elastic:security", d, event_time
+        )
 
         _save_notable(
             rule_name="Elastic Security - Detection Rule Alert",
             rule_title="Elastic Security Detection Rule Alert",
-            severity=str(d.get("severity", d.get("signal", {}).get("rule", {}).get("severity", "medium"))).lower(),
+            severity=str(
+                d.get("severity", d.get("signal", {}).get("rule", {}).get("severity", "medium"))
+            ).lower(),
             dest=str(d.get("host_name", "")),
             user=str(d.get("user_name", "")),
             description=f"Elastic Alert: {d.get('rule_name', d.get('signal', {}).get('rule', {}).get('name', 'Unknown'))}",
@@ -194,7 +305,9 @@ def _seed_es_events() -> None:
     for ep in endpoints:
         d = asdict(ep) if hasattr(ep, "__dataclass_fields__") else ep.__dict__.copy()
         event_time = _SEED_EPOCH - random.uniform(0, 86400 * 3)
-        _save_event("elastic_security", "elastic:security:endpoints", "elastic:security", d, event_time)
+        _save_event(
+            "elastic_security", "elastic:security:endpoints", "elastic:security", d, event_time
+        )
 
 
 def _seed_xdr_events() -> None:
@@ -232,6 +345,7 @@ def _seed_xdr_events() -> None:
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
+
 
 def _save_event(index: str, sourcetype: str, source: str, payload: dict, event_time: float) -> None:
     """Create and persist a Splunk event."""
