@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/alerts_exclusion/delete/",
+ "reply": {
+  "rule_id": []
+ }
+}

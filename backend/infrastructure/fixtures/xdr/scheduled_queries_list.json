@@ -1,0 +1,23 @@
+{
+ "route": "POST /public_api/v1/scheduled_queries/list",
+ "reply": {
+  "data": [
+   {
+    "enable": "",
+    "query_def_id": "",
+    "query_definition_name": "",
+    "schedule": {
+     "run_date": "",
+     "trigger_type": ""
+    },
+    "tenants": "",
+    "timeframe": {
+     "relativeTime": ""
+    },
+    "xql": ""
+   }
+  ],
+  "filter_count": "",
+  "total_count": ""
+ }
+}

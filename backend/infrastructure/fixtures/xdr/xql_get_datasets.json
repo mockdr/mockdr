@@ -1,0 +1,26 @@
+{
+ "route": "POST /public_api/v1/xql/get_datasets",
+ "reply": [
+  {
+   "average_daily_size": "",
+   "average_event_size": "",
+   "cold_range": {
+    "from": "",
+    "to": ""
+   },
+   "dataset_name": "",
+   "default_query_target": "",
+   "hot_range": {
+    "from": "",
+    "to": ""
+   },
+   "last_updated": "",
+   "log_update_type": "",
+   "total_days_stored": "",
+   "total_events": "",
+   "total_size_stored": "",
+   "ttl": "",
+   "type": ""
+  }
+ ]
+}

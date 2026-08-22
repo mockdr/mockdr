@@ -1,0 +1,14 @@
+{
+ "route": "POST /public_api/v1/xql/get_quota",
+ "reply": {
+  "additional_purchased_quota": "",
+  "current_concurrent_active_queries": "",
+  "current_concurrent_active_queries_count": "",
+  "eval_quota": "",
+  "license_quota": "",
+  "max_daily_concurrent_active_query_count": "",
+  "total_daily_concurrent_rejected_queries": "",
+  "total_daily_running_queries": "",
+  "used_quota": ""
+ }
+}

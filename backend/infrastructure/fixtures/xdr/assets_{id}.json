@@ -1,0 +1,4 @@
+{
+ "route": "GET /public_api/v1/assets/{id}",
+ "reply": {}
+}

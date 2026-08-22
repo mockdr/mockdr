@@ -21,6 +21,39 @@
   "enabled_host_insights": 0,
   "purchased_host_insights": 0,
   "forensics_expiration": "",
-  "purchased_forensics": 0
+  "purchased_forensics": 0,
+  "attack_surface_management_expiration": "",
+  "data_enabled_pro_cloud": "",
+  "enabled_forensics": "",
+  "identity_threat_expiration": "",
+  "installed_pro_cloud": "",
+  "installed_pro_gb": "",
+  "pro_cloud_expiration": "",
+  "pro_gb_expiration": "",
+  "purchased_attack_surface_management": "",
+  "purchased_pro_cloud": {
+   "agents": ""
+  },
+  "purchased_pro_gb": {
+   "gb": ""
+  },
+  "purchased_threat_intelligence_management": "",
+  "purchased_xsiam_ep_cold": "",
+  "purchased_xsiam_ep_hot": "",
+  "purchased_xsiam_gb_cold": "",
+  "purchased_xsiam_gb_hot": "",
+  "purchased_xsiam_premium": {
+   "agents": "",
+   "gb": "",
+   "users": ""
+  },
+  "purchased_xth": "",
+  "threat_intelligence_management_expiration": "",
+  "xsiam_ep_cold_expiration": "",
+  "xsiam_ep_hot_expiration": "",
+  "xsiam_gb_cold_expiration": "",
+  "xsiam_gb_hot_expiration": "",
+  "xsiam_premium_expiration": "",
+  "xth_expiration": ""
  }
 }

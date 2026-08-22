@@ -1,0 +1,8 @@
+{
+ "route": "GET /public_api/v1/case/artifacts/{case-id}",
+ "reply": {
+  "DATA": "",
+  "FILTER_COUNT": "",
+  "TOTAL_COUNT": ""
+ }
+}

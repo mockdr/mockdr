@@ -1,0 +1,4 @@
+{
+ "route": "POST /public_api/v1/profiles/add_signer_cn_to_allowlist",
+ "reply": {}
+}

@@ -58,6 +58,7 @@ def remove_from_blocklist(
 
 
 @router.post("/hash_exceptions/allowlist/")
+@xdr_shape("hash_exceptions_allowlist")
 def add_to_allowlist(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),

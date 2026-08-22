@@ -1,0 +1,4 @@
+{
+ "route": "POST /public_api/v1/widgets/delete",
+ "reply": {}
+}

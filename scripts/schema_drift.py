@@ -349,6 +349,13 @@ PLATFORMS = {
         "missing_only": True,
         "mount": "/xdr",
         "reduced": SPECS / "xdr_samples_reduced.json",
+        # Response shapes transcribed from the official reference (see
+        # scripts/cortex_openapi_spec.py); presence only, like a recording.
+        "reduced_extra": [
+            SPECS / "xdr_openapi_reduced.json",
+            SPECS / "xdr_core_samples_reduced.json",
+            SPECS / "xdr_connector_reduced.json",
+        ],
         "auth": lambda c: {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"},
         "prepare": _xdr_prepare,
         "default_body": {"request_data": {}},
@@ -612,16 +619,23 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
     for source in [cfg["reduced"], *cfg.get("reduced_extra", [])]:
         doc = json.load(open(source))
         for key, entry in (doc.get("routes") or doc).items():
-            if isinstance(entry, dict) and "paths" in entry:
+            if isinstance(entry, dict) and "paths" in entry and " " in key:
                 declared_by_route.setdefault(key, set()).update(entry["paths"])
     entities = {}
     for source in [cfg["reduced"], *cfg.get("reduced_extra", [])]:
         entities.update(json.load(open(source)).get("entities") or {})
-    norm = lambda p: re.sub(r"\{[^}]+\}", "{id}", p)  # noqa: E731
+    # Docs spell paths with their own casing (/api/Software, CreateAlertByReference);
+    # the API is case-insensitive, so keys are matched lower-cased.
+    norm = lambda p: re.sub(r"\{[^}]+\}", "{id}", p).lower().rstrip("/") or "/"  # noqa: E731
     mock = {(m, norm(r)): r for m, r in routes}
+    declared_by_route = {
+        f"{k.split(' ', 1)[0]} {norm(k.split(' ', 1)[1])}": v for k, v in declared_by_route.items()
+    }
     ctx = cfg["prepare"](client, headers) if "prepare" in cfg else {}
     findings = checked = 0
-    unjudged = sorted(f"{m} {r}" for (m, r) in mock if f"{m} {r}" not in declared_by_route)
+    unjudged = sorted(
+        f"{m} {mock[(m, r)]}" for (m, r) in mock if f"{m} {r}" not in declared_by_route
+    )
     for key in sorted(declared_by_route):
         method, route = key.split(" ", 1)
         if (method, route) not in mock:
@@ -630,6 +644,7 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
             print(f"  -  {method} {route}: {cfg['skip'][key]} (skipped)")
             continue
         real_route = mock[(method, route)]
+        route = real_route
         url = _fill(client, real_route, headers, cfg.get("params", {}), cfg.get("fill", {}), mount)
         req = _substitute(cfg.get("requests", {}).get(key, {}), ctx)
         params = {**cfg.get("params", {}), **req.get("params", {})}
@@ -740,13 +755,18 @@ def main(platform: str) -> int:
         return _compare_paths(platform, cfg, client, headers, routes)
     if "reduced" in cfg:
         reduced = json.load(open(cfg["reduced"]))
+        # Beta routes are judged by the beta metadata where it was reduced
+        # (data/vendor-specs/graph_beta_reduced.json); the rest are skipped.
+        beta = SPECS / "graph_beta_reduced.json"
+        if beta.exists():
+            reduced.update(json.load(open(beta)))
         for key, entry in sorted(reduced.items()):
             if not entry.get("spec"):
                 continue
             method, route = key.split(" ", 1)
             if method != "GET":
                 continue
-            if route.startswith("/beta/"):
+            if route.startswith("/beta/") and entry.get("spec") != "beta":
                 print(f"  -  {method} {route}: beta route, v1.0 metadata cannot judge it (skipped)")
                 continue
             url = _fill(client, route, headers, cfg["params"], cfg["fill"], mount)

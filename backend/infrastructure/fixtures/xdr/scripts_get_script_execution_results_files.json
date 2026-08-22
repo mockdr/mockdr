@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/scripts/get_script_execution_results_files",
+ "reply": {
+  "data": ""
+ }
+}

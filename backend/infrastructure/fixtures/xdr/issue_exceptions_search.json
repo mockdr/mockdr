@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/v1/issue_exceptions/search/",
+ "reply": {
+  "exceptions": "",
+  "filter_count": "",
+  "total_count": ""
+ }
+}

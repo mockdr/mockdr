@@ -21,8 +21,35 @@
     "install_date": 0,
     "endpoint_version": "",
     "is_isolated": "",
-    "group_name": ""
+    "group_name": "",
+    "assigned_extensions_policy": "",
+    "assigned_prevention_policy": "",
+    "cloud_id": "",
+    "cloud_instance_id": "",
+    "cloud_provider": "",
+    "cloud_provider_account_id": "",
+    "cloud_region": "",
+    "content_release_timestamp": "",
+    "content_status": "",
+    "endpointTags": "",
+    "ipv6": "",
+    "isolated_date": "",
+    "last_content_update_time": "",
+    "mac_address": "",
+    "operating_system": "",
+    "operational_status": "",
+    "operational_status_description": "",
+    "operational_status_details": [
+     {
+      "reason": "",
+      "title": ""
+     }
+    ],
+    "os_version": "",
+    "public_ip": "",
+    "scan_status": ""
    }
-  ]
+  ],
+  "total_count": ""
  }
 }

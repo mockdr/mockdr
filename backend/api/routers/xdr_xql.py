@@ -9,12 +9,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_xql import queries as xql_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR XQL"])
 
 
 @router.post("/xql/start_xql_query")
+@xdr_shape("xql_start_xql_query")
 def start_xql_query(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -26,6 +28,7 @@ def start_xql_query(
 
 
 @router.post("/xql/get_query_results")
+@xdr_shape("xql_get_query_results")
 def get_query_results(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -43,6 +46,7 @@ def get_query_results(
 
 
 @router.post("/xql/get_quota")
+@xdr_shape("xql_get_quota")
 def get_quota(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),

@@ -17,8 +17,19 @@
     "AUDIT_ENTITY_SUBTYPE": "",
     "AUDIT_SESSION_ID": "",
     "AUDIT_CASE_ID": "",
-    "AUDIT_INSERT_TIME": 0
+    "AUDIT_INSERT_TIME": 0,
+    "AUDIT_ADDITIONAL_INFORMATION": {
+     "endpoint_count": "",
+     "endpoint_names": ""
+    },
+    "AUDIT_LINK": "",
+    "AUDIT_OBJECT_ID": "",
+    "AUDIT_SEVERITY": "",
+    "AUDIT_SOURCE_IP": "",
+    "AUDIT_USER_AGENT": "",
+    "AUDIT_USER_ROLES": ""
    }
-  ]
+  ],
+  "total_count": ""
  }
 }

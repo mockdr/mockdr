@@ -28,24 +28,6 @@ def list_indicators(
     return indicator_queries.list_indicators(filter_str, top, skip, orderby, select)
 
 
-@router.get("/api/indicators/{indicator_id}")
-def get_indicator(
-    indicator_id: str,
-    _: dict = Depends(require_mde_auth),
-) -> dict:
-    """Get a single indicator by its indicator ID."""
-    result = indicator_queries.get_indicator(indicator_id)
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=build_mde_error_response(
-                "ResourceNotFound",
-                f"Indicator {indicator_id} not found",
-            ),
-        )
-    return result
-
-
 _REQUIRED_INDICATOR_FIELDS = ("indicatorValue", "indicatorType", "action", "title")
 
 
@@ -71,25 +53,6 @@ def create_indicator(
     return indicator_commands.create_indicator(body)
 
 
-@router.patch("/api/indicators/{indicator_id}")
-def update_indicator(
-    indicator_id: str,
-    body: dict = Body(...),
-    _: dict = Depends(require_mde_write),
-) -> dict:
-    """Update an existing indicator (PATCH semantics)."""
-    result = indicator_commands.update_indicator(indicator_id, body)
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=build_mde_error_response(
-                "ResourceNotFound",
-                f"Indicator {indicator_id} not found",
-            ),
-        )
-    return result
-
-
 @router.delete("/api/indicators/{indicator_id}")
 def delete_indicator(
     indicator_id: str,
@@ -108,7 +71,8 @@ def delete_indicator(
     return Response(status_code=204)
 
 
-@router.post("/api/indicators/batchUpdate")
+# "Delete Indicators by IDs": POST /api/indicators/BatchDelete in the docs.
+@router.post("/api/indicators/BatchDelete")
 def batch_update_indicators(
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),

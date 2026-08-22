@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/rbac/set_user_role",
+ "reply": {
+  "update_count": ""
+ }
+}

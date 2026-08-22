@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/issue_exceptions/",
+ "reply": {
+  "exception_id": ""
+ }
+}

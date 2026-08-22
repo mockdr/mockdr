@@ -28,7 +28,7 @@ def _fixture(slug: str) -> dict:
         return {}
     with path.open(encoding="utf-8") as fh:
         data = json.load(fh)
-    return data.get("reply", {}) if isinstance(data, dict) else {}
+    return data.get("reply", {}) if isinstance(data, dict) else {}  # dict or list template
 
 
 def deep_complete(defaults: Any, actual: Any) -> Any:
@@ -76,6 +76,16 @@ def xdr_shape(slug: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
 
 
 def _shaped(result: Any, slug: str) -> Any:
-    if isinstance(result, dict) and isinstance(result.get("reply"), dict):
-        return {**result, "reply": complete_xdr(result["reply"], slug)}
+    """Complete a dict reply, or each item of a list reply, to the recorded shape."""
+    if not isinstance(result, dict) or "reply" not in result:
+        return result
+    reply = result["reply"]
+    defaults = _fixture(slug)
+    if isinstance(reply, dict) and isinstance(defaults, dict):
+        return {**result, "reply": deep_complete(defaults, reply)}
+    if isinstance(reply, list) and isinstance(defaults, list) and defaults:
+        return {
+            **result,
+            "reply": [deep_complete(defaults[0], i) if isinstance(i, dict) else i for i in reply],
+        }
     return result

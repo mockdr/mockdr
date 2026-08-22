@@ -1,0 +1,26 @@
+{
+ "route": "POST /public_api/xql_library/get",
+ "reply": {
+  "queries_count": "",
+  "xql_queries": [
+   {
+    "created_at": "",
+    "created_by": "",
+    "created_by_pretty": "",
+    "description": "",
+    "id": "",
+    "is_private": "",
+    "labels": "",
+    "name": "",
+    "query_metadata": {
+     "is_datamodel": "",
+     "is_valid": "",
+     "query_calls": "",
+     "query_presets": "",
+     "query_tables": ""
+    },
+    "query_text": ""
+   }
+  ]
+ }
+}

@@ -1,0 +1,4 @@
+{
+ "route": "POST /public_api/v1/authentication-settings/delete",
+ "reply": {}
+}

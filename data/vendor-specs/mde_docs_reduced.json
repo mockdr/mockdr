@@ -1,5 +1,9 @@
 {
  "routes": {
+  "DELETE /api/indicators/{id}": {
+   "page": "delete-ti-indicator-by-id.md",
+   "paths": []
+  },
   "DELETE /api/libraryfiles/script1.ps1": {
    "page": "delete-library.md",
    "paths": []
@@ -55,6 +59,14 @@
     "value[*].target",
     "value[*].targetType"
    ]
+  },
+  "GET /api/Machines/BrowserExtensionsInventoryByMachine": {
+   "page": "get-assessment-browser-extensions.md",
+   "paths": []
+  },
+  "GET /api/Machines/InfoGatheringExport": {
+   "page": "get-assessment-information-gathering.md",
+   "paths": []
   },
   "GET /api/Software": {
    "page": "get-software.md",
@@ -205,6 +217,70 @@
     "value[*].title"
    ]
   },
+  "GET /api/alerts/da637472900382838869_1364969609": {
+   "page": "alerts.md",
+   "paths": [
+    "aadTenantId",
+    "alertCreationTime",
+    "assignedTo",
+    "category",
+    "classification",
+    "comments",
+    "comments[*].comment",
+    "comments[*].createdBy",
+    "comments[*].createdTime",
+    "computerDnsName",
+    "description",
+    "detectionSource",
+    "detectorId",
+    "determination",
+    "evidence",
+    "evidence[*].aadUserId",
+    "evidence[*].accountName",
+    "evidence[*].detectionStatus",
+    "evidence[*].domainName",
+    "evidence[*].entityType",
+    "evidence[*].evidenceCreationTime",
+    "evidence[*].fileName",
+    "evidence[*].filePath",
+    "evidence[*].ipAddress",
+    "evidence[*].parentProcessCreationTime",
+    "evidence[*].parentProcessFileName",
+    "evidence[*].parentProcessFilePath",
+    "evidence[*].parentProcessId",
+    "evidence[*].processCommandLine",
+    "evidence[*].processCreationTime",
+    "evidence[*].processId",
+    "evidence[*].registryHive",
+    "evidence[*].registryKey",
+    "evidence[*].registryValue",
+    "evidence[*].registryValueType",
+    "evidence[*].sha1",
+    "evidence[*].sha256",
+    "evidence[*].url",
+    "evidence[*].userPrincipalName",
+    "evidence[*].userSid",
+    "firstEventTime",
+    "id",
+    "incidentId",
+    "investigationId",
+    "investigationState",
+    "lastEventTime",
+    "lastUpdateTime",
+    "machineId",
+    "mitreTechniques",
+    "rbacGroupName",
+    "relatedUser",
+    "relatedUser.domainName",
+    "relatedUser.userName",
+    "resolvedTime",
+    "severity",
+    "status",
+    "threatFamilyName",
+    "threatName",
+    "title"
+   ]
+  },
   "GET /api/alerts/{id}": {
    "page": "get-alert-info-by-id.md",
    "paths": []
@@ -293,6 +369,14 @@
     "mostPrevalentMachineId"
    ]
   },
+  "GET /api/baselineConfigurations": {
+   "page": "get-security-baselines-assessment-configurations.md",
+   "paths": []
+  },
+  "GET /api/baselineProfiles": {
+   "page": "get-security-baselines-assessment-profiles.md",
+   "paths": []
+  },
   "GET /api/configurationScore": {
    "page": "get-device-secure-score.md",
    "paths": [
@@ -300,6 +384,10 @@
     "score",
     "time"
    ]
+  },
+  "GET /api/deviceavinfo": {
+   "page": "device-health-export-antivirus-health-report-api.md",
+   "paths": []
   },
   "GET /api/domains/{id}/alerts": {
    "page": "get-domain-related-alerts.md",
@@ -413,6 +501,21 @@
     "organizationPrevalence"
    ]
   },
+  "GET /api/libraryfiles": {
+   "page": "list-library-files.md",
+   "paths": [
+    "\\@odata.context",
+    "value",
+    "value[*].createdBy",
+    "value[*].creationTime",
+    "value[*].description",
+    "value[*].fileName",
+    "value[*].hasParameters",
+    "value[*].lastUpdatedTime",
+    "value[*].parametersDescription",
+    "value[*].sha256"
+   ]
+  },
   "GET /api/machineactions": {
    "page": "get-machineactions-collection.md",
    "paths": []
@@ -434,10 +537,21 @@
     "type"
    ]
   },
-  "GET /api/machineactions/{machine": {
+  "GET /api/machineactions/{id}/getPackageUri": {
    "page": "get-package-sas-uri.md",
    "paths": [
     "@odata.context",
+    "value"
+   ]
+  },
+  "GET /api/machineactions/{machine action": {
+   "page": "get-live-response-result.md",
+   "paths": [
+    "@odata.context",
+    "exit_code",
+    "script_errors",
+    "script_name",
+    "script_output",
     "value"
    ]
   },
@@ -465,6 +579,82 @@
     "value[*].riskScore",
     "value[*].version"
    ]
+  },
+  "GET /api/machines/BaselineComplianceAssessmentByMachine": {
+   "page": "export-security-baseline-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/BaselineComplianceAssessmentExport": {
+   "page": "export-security-baseline-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/CertificateAssessmentByMachine": {
+   "page": "export-certificate-inventory-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/HardwareFirmwareInventoryByMachine": {
+   "page": "export-firmware-hardware-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/HardwareFirmwareInventoryExport": {
+   "page": "export-firmware-hardware-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/InfoGatheringExport": {
+   "page": "device-health-export-antivirus-health-report-api.md",
+   "paths": []
+  },
+  "GET /api/machines/SecureConfigurationsAssessmentByMachine": {
+   "page": "get-assessment-secure-config.md",
+   "paths": []
+  },
+  "GET /api/machines/SecureConfigurationsAssessmentExport": {
+   "page": "get-assessment-secure-config.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareInventoryByMachine": {
+   "page": "get-assessment-software-inventory.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareInventoryExport": {
+   "page": "get-assessment-software-inventory.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareInventoryNoProductCodeByMachine": {
+   "page": "get-assessment-non-cpe-software-inventory.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareInventoryNonCpeExport": {
+   "page": "get-assessment-non-cpe-software-inventory.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareVulnerabilitiesByMachine": {
+   "page": "get-assessment-software-vulnerabilities.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareVulnerabilitiesExport": {
+   "page": "get-assessment-software-vulnerabilities.md",
+   "paths": []
+  },
+  "GET /api/machines/SoftwareVulnerabilityChangesByMachine": {
+   "page": "get-assessment-software-vulnerabilities.md",
+   "paths": []
+  },
+  "GET /api/machines/baselineComplianceAssessmentByMachine": {
+   "page": "export-security-baseline-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/browserextensionsinventoryExport": {
+   "page": "get-assessment-browser-extensions.md",
+   "paths": []
+  },
+  "GET /api/machines/certificateAssessmentByMachine": {
+   "page": "export-certificate-inventory-assessment.md",
+   "paths": []
+  },
+  "GET /api/machines/certificateAssessmentExport": {
+   "page": "export-certificate-inventory-assessment.md",
+   "paths": []
   },
   "GET /api/machines/find(timestamp={id},key={id})": {
    "page": "find-machine-info-by-ip.md",
@@ -708,6 +898,86 @@
     "value[*].updatedOn"
    ]
   },
+  "GET /api/remediationtasks/": {
+   "page": "get-remediation-all-activities.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].category",
+    "value[*].completerEmail",
+    "value[*].completerId",
+    "value[*].completionMethod",
+    "value[*].createdOn",
+    "value[*].description",
+    "value[*].dueOn",
+    "value[*].fixedDevices",
+    "value[*].id",
+    "value[*].nameId",
+    "value[*].priority",
+    "value[*].productId",
+    "value[*].productivityImpactRemediationType",
+    "value[*].rbacGroupNames",
+    "value[*].recommendedProgram",
+    "value[*].recommendedVendor",
+    "value[*].recommendedVersion",
+    "value[*].relatedComponent",
+    "value[*].requesterEmail",
+    "value[*].requesterId",
+    "value[*].requesterNotes",
+    "value[*].scid",
+    "value[*].status",
+    "value[*].statusLastModifiedOn",
+    "value[*].targetDevices",
+    "value[*].title",
+    "value[*].type",
+    "value[*].vendorId"
+   ]
+  },
+  "GET /api/remediationtasks/aaaabbbb-0000-cccc-1111-dddd2222eeee": {
+   "page": "get-remediation-one-activity.md",
+   "paths": [
+    "@odata.context",
+    "category",
+    "completerEmail",
+    "completerId",
+    "completionMethod",
+    "createdOn",
+    "description",
+    "dueOn",
+    "fixedDevices",
+    "id",
+    "nameId",
+    "priority",
+    "productId",
+    "productivityImpactRemediationType",
+    "rbacGroupNames",
+    "recommendedProgram",
+    "recommendedVendor",
+    "recommendedVersion",
+    "relatedComponent",
+    "requesterEmail",
+    "requesterId",
+    "requesterNotes",
+    "scid",
+    "status",
+    "statusLastModifiedOn",
+    "targetDevices",
+    "title",
+    "type",
+    "vendorId"
+   ]
+  },
+  "GET /api/remediationtasks/aaaabbbb-0000-cccc-1111-dddd2222eeee/machinereferences": {
+   "page": "get-remediation-exposed-devices-activities.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].computerDnsName",
+    "value[*].id",
+    "value[*].osPlatform",
+    "value[*].rbacGroupName"
+   ]
+  },
   "GET /api/users/{id}/alerts": {
    "page": "get-user-related-alerts.md",
    "paths": []
@@ -812,6 +1082,41 @@
    "page": "update-machine-method.md",
    "paths": []
   },
+  "POST /API/machines/{id}/runliveresponse": {
+   "page": "run-live-response.md",
+   "paths": [
+    "@odata.context",
+    "command",
+    "command.params",
+    "command.type",
+    "commandStatus",
+    "commands",
+    "commands[*].command",
+    "commands[*].command.params",
+    "commands[*].command.params[*].key",
+    "commands[*].command.params[*].value",
+    "commands[*].command.type",
+    "commands[*].commandStatus",
+    "commands[*].endTime",
+    "commands[*].errors",
+    "commands[*].index",
+    "commands[*].startTime",
+    "computerDnsName",
+    "creationDateTimeUtc",
+    "endTime",
+    "errorHResult",
+    "errors",
+    "id",
+    "index",
+    "lastUpdateDateTimeUtc",
+    "machineId",
+    "requestor",
+    "requestorComment",
+    "startTime",
+    "status",
+    "type"
+   ]
+  },
   "POST /api/DeviceAuthenticatedScanDefinitions": {
    "page": "add-a-new-scan-definition.md",
    "paths": [
@@ -902,7 +1207,11 @@
     "value[*].isFailed"
    ]
   },
-  "POST /api/machineactions/<machineactionid>/cancel": {
+  "POST /api/libraryfiles": {
+   "page": "upload-library.md",
+   "paths": []
+  },
+  "POST /api/machineactions/{id}/cancel": {
    "page": "cancel-machine-action.md",
    "paths": []
   },

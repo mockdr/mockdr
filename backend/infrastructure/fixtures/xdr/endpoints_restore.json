@@ -1,0 +1,7 @@
+{
+ "route": "POST /public_api/v1/endpoints/restore",
+ "reply": {
+  "action_id": "",
+  "endpoints_count": ""
+ }
+}

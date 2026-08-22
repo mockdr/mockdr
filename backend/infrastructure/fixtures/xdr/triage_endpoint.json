@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/v1/triage_endpoint",
+ "reply": {
+  "group_action_id": "",
+  "successful_agent_ids": "",
+  "unsuccessful_agent_ids": ""
+ }
+}

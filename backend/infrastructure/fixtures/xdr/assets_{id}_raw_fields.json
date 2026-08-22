@@ -1,0 +1,28 @@
+{
+ "route": "GET /public_api/v1/assets/{id}/raw_fields",
+ "reply": {
+  "data": [
+   {
+    "xdm__asset__raw_fields": {
+     "Platform Discovery": {
+      "Adjustable": "",
+      "Description": "",
+      "GlobalQuota": "",
+      "QuotaAppliedAtLevel": "",
+      "QuotaArn": "",
+      "QuotaCode": "",
+      "QuotaName": "",
+      "ServiceCode": "",
+      "ServiceName": "",
+      "Unit": "",
+      "Value": ""
+     }
+    }
+   }
+  ],
+  "metadata": {
+   "filter_count": "",
+   "total_count": ""
+  }
+ }
+}

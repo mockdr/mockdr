@@ -1,0 +1,21 @@
+{
+ "route": "POST /public_api/v1/get_risky_hosts",
+ "reply": [
+  {
+   "id": "",
+   "norm_risk_score": "",
+   "reasons": [
+    {
+     "date created": "",
+     "description": "",
+     "points": "",
+     "severity": "",
+     "status": ""
+    }
+   ],
+   "risk_level": "",
+   "score": "",
+   "type": ""
+  }
+ ]
+}

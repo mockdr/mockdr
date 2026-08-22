@@ -37,15 +37,6 @@ def get_file_stats(
 # ── Domains ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/api/domains/{domain}")
-def get_domain_info(
-    domain: str,
-    _: dict = Depends(require_mde_auth),
-) -> dict:
-    """Get domain information."""
-    return file_queries.get_domain_info(domain)
-
-
 @router.get("/api/domains/{domain}/stats")
 def get_domain_stats(
     domain: str,
@@ -56,15 +47,6 @@ def get_domain_stats(
 
 
 # ── IP Addresses ─────────────────────────────────────────────────────────────
-
-
-@router.get("/api/ips/{ip}")
-def get_ip_info(
-    ip: str,
-    _: dict = Depends(require_mde_auth),
-) -> dict:
-    """Get IP address information."""
-    return file_queries.get_ip_info(ip)
 
 
 @router.get("/api/ips/{ip}/stats")

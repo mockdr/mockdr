@@ -1,0 +1,25 @@
+{
+ "route": "POST /public_api/v1/legacy_exceptions/get_modules",
+ "reply": [
+  {
+   "conditions_definition": {
+    "remoteIpsWhitelist": {
+     "description": "",
+     "schema": {
+      "items": {
+       "type": ""
+      },
+      "minItems": "",
+      "type": ""
+     }
+    }
+   },
+   "label": "",
+   "module_id": "",
+   "platforms": "",
+   "pretty_name": "",
+   "profile_type": "",
+   "title": ""
+  }
+ ]
+}

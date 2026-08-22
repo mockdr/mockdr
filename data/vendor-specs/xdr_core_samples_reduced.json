@@ -1,0 +1,139 @@
+{
+ "POST /public_api/v1/actions/get_action_status/": {
+  "samples": [
+   "action_status_get.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data.23a86310665d413a958926fce5b794b3",
+   "reply.data.5a763600a3e44928a94ba84b6088380f",
+   "reply.data.aeec6a2cc92e46fab3b6f621722e9916",
+   "reply.errorReasons",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f.errorData",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f.errorDescription",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f.terminate_result",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f.terminate_result[*].path",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f.terminate_result[*].status",
+   "reply.errorReasons.5a763600a3e44928a94ba84b6088380f.terminated_by"
+  ]
+ },
+ "POST /public_api/v1/alerts_exclusion/": {
+  "samples": [
+   "get_exclusion_response.json"
+  ],
+  "paths": [
+   "reply",
+   "reply[*].ALERT_WHITELIST_BACKWARDS_SCAN_STATUS",
+   "reply[*].ALERT_WHITELIST_BACKWARDS_SCAN_TIMESTAMP",
+   "reply[*].ALERT_WHITELIST_COMMENT",
+   "reply[*].ALERT_WHITELIST_HITS",
+   "reply[*].ALERT_WHITELIST_ID",
+   "reply[*].ALERT_WHITELIST_INDICATOR",
+   "reply[*].ALERT_WHITELIST_INDICATOR.filter",
+   "reply[*].ALERT_WHITELIST_INDICATOR.filter.AND",
+   "reply[*].ALERT_WHITELIST_INDICATOR.filter.AND[*].SEARCH_FIELD",
+   "reply[*].ALERT_WHITELIST_INDICATOR.filter.AND[*].SEARCH_TYPE",
+   "reply[*].ALERT_WHITELIST_INDICATOR.filter.AND[*].SEARCH_VALUE",
+   "reply[*].ALERT_WHITELIST_INDICATOR_TEXT",
+   "reply[*].ALERT_WHITELIST_INDICATOR_TEXT[*].data_type",
+   "reply[*].ALERT_WHITELIST_INDICATOR_TEXT[*].dml_type",
+   "reply[*].ALERT_WHITELIST_INDICATOR_TEXT[*].entity_map",
+   "reply[*].ALERT_WHITELIST_INDICATOR_TEXT[*].pretty_name",
+   "reply[*].ALERT_WHITELIST_INDICATOR_TEXT[*].render_type",
+   "reply[*].ALERT_WHITELIST_MIGRATED_FROM_ANALYTICS",
+   "reply[*].ALERT_WHITELIST_MODIFY_TIME",
+   "reply[*].ALERT_WHITELIST_NAME",
+   "reply[*].ALERT_WHITELIST_PRETTY_USER",
+   "reply[*].ALERT_WHITELIST_STATUS",
+   "reply[*].ALERT_WHITELIST_USER"
+  ]
+ },
+ "POST /public_api/v1/alerts_exclusion/add/": {
+  "samples": [
+   "add_exclusion_response.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.rule_id"
+  ]
+ },
+ "POST /public_api/v1/alerts_exclusion/delete/": {
+  "samples": [
+   "delete_exclusion_response.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.rule_id"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_endpoint/": {
+  "samples": [
+   "get_endpoints_windows_response.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.endpoints",
+   "reply.endpoints[*].active_directory",
+   "reply.endpoints[*].alias",
+   "reply.endpoints[*].content_version",
+   "reply.endpoints[*].domain",
+   "reply.endpoints[*].endpoint_id",
+   "reply.endpoints[*].endpoint_name",
+   "reply.endpoints[*].endpoint_status",
+   "reply.endpoints[*].endpoint_type",
+   "reply.endpoints[*].endpoint_version",
+   "reply.endpoints[*].first_seen",
+   "reply.endpoints[*].group_name",
+   "reply.endpoints[*].install_date",
+   "reply.endpoints[*].installation_package",
+   "reply.endpoints[*].ip",
+   "reply.endpoints[*].is_isolated",
+   "reply.endpoints[*].last_seen",
+   "reply.endpoints[*].os_type",
+   "reply.endpoints[*].users"
+  ]
+ },
+ "POST /public_api/v1/hash_exceptions/blocklist/": {
+  "samples": [
+   "add_blocklist_files_detailed_response.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.added_hashes",
+   "reply.excluded_hashes"
+  ]
+ },
+ "POST /public_api/v1/rbac/get_user_group/": {
+  "samples": [
+   "get_list_user_groups.json"
+  ],
+  "paths": [
+   "reply",
+   "reply[*].description",
+   "reply[*].group_name",
+   "reply[*].insert_time",
+   "reply[*].pretty_name",
+   "reply[*].source",
+   "reply[*].update_time",
+   "reply[*].user_email"
+  ]
+ },
+ "POST /public_api/v1/rbac/get_users/": {
+  "samples": [
+   "get_list_users.json"
+  ],
+  "paths": [
+   "reply",
+   "reply[*].groups",
+   "reply[*].last_logged_in",
+   "reply[*].role_name",
+   "reply[*].scope",
+   "reply[*].user_email",
+   "reply[*].user_first_name",
+   "reply[*].user_last_name",
+   "reply[*].user_type"
+  ]
+ }
+}

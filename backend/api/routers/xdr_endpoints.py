@@ -28,6 +28,7 @@ def get_endpoints(
 
 
 @router.post("/endpoints/isolate")
+@xdr_shape("endpoints_isolate")
 def isolate_endpoint(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -45,6 +46,7 @@ def isolate_endpoint(
 
 
 @router.post("/endpoints/unisolate")
+@xdr_shape("endpoints_unisolate")
 def unisolate_endpoint(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -91,6 +93,7 @@ def delete_endpoints(
 
 
 @router.post("/endpoints/get_policy/")
+@xdr_shape("endpoints_get_policy")
 def get_policy(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -108,6 +111,7 @@ def get_policy(
 
 
 @router.post("/endpoints/update_agent_name/")
+@xdr_shape("endpoints_update_agent_name")
 def update_agent_name(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -161,6 +165,7 @@ def quarantine_file(
 
 
 @router.post("/endpoints/restore/")
+@xdr_shape("endpoints_restore")
 def restore_file(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -178,6 +183,7 @@ def restore_file(
 
 
 @router.post("/endpoints/file_retrieval/")
+@xdr_shape("endpoints_file_retrieval")
 def file_retrieval(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),

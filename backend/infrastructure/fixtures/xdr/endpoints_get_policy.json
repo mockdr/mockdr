@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/endpoints/get_policy",
+ "reply": {
+  "policy_name": ""
+ }
+}

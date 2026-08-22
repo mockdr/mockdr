@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/v1/scheduled_queries/delete",
+ "reply": [
+  {
+   "scheduled_query_id": ""
+  }
+ ]
+}

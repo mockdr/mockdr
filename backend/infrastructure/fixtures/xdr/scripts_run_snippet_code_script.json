@@ -1,0 +1,7 @@
+{
+ "route": "POST /public_api/v1/scripts/run_snippet_code_script",
+ "reply": {
+  "action_id": "",
+  "endpoints_count": ""
+ }
+}

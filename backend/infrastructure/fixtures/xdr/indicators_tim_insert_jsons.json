@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/indicators/tim_insert_jsons/",
+ "reply": {
+  "validation_errors": ""
+ }
+}

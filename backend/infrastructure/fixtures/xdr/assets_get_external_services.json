@@ -1,0 +1,31 @@
+{
+ "route": "POST /public_api/v1/assets/get_external_services",
+ "reply": {
+  "external_services": [
+   {
+    "active_classifications": "",
+    "business_units": "",
+    "cloud_management_status": "",
+    "discovery_type": "",
+    "domain": "",
+    "externally_detected_providers": "",
+    "externally_inferred_cves": "",
+    "externally_inferred_vulnerability_score": "",
+    "first_observed": "",
+    "inactive_classifications": "",
+    "inferred_cves_observed": "",
+    "ip_address": "",
+    "is_active": "",
+    "last_observed": "",
+    "port": "",
+    "protocol": "",
+    "service_id": "",
+    "service_name": "",
+    "service_type": "",
+    "tls_versions": ""
+   }
+  ],
+  "result_count": "",
+  "total_count": ""
+ }
+}

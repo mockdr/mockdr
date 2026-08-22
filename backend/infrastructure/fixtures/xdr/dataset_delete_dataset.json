@@ -1,0 +1,4 @@
+{
+ "route": "POST /public_api/v1/dataset/delete_dataset",
+ "reply": {}
+}

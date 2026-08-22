@@ -106,11 +106,14 @@ def batch_update_indicators(body: dict) -> dict:
     Returns:
         Summary dict with count of deleted indicators.
     """
+    # The docs' body is {"IndicatorIds": [...]}; indicatorValues is kept for
+    # clients that delete by value.
     indicator_values: list[str] = body.get("indicatorValues", [])
+    indicator_ids: list[str] = [str(i) for i in body.get("IndicatorIds", [])]
     deleted_count = 0
     all_indicators = mde_indicator_repo.list_all()
     for indicator in all_indicators:
-        if indicator.indicatorValue in indicator_values:
+        if indicator.indicatorValue in indicator_values or str(indicator.id) in indicator_ids:
             mde_indicator_repo.delete(indicator.indicatorId)
             deleted_count += 1
     return {"value": deleted_count}

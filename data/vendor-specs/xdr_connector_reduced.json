@@ -1,0 +1,41 @@
+{
+ "_provenance": "Reply shapes read from MIT-licensed connector code and test fixtures, one source per route; a reading proves presence only.",
+ "POST /public_api/v1/alerts/insert_parsed_alerts/": {
+  "source": "PaloAltoNetworks/pan-cortex-xdr-nodejs lib/alert_insert_parsed.d.ts: InsertParsedAlertsResponse = { reply: true }",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/endpoints/terminate_process/": {
+  "source": "demisto/content Packs/ApiModules/Scripts/CoreIRApiModule/CoreIRApiModule_test.py: {\"reply\": {\"group_action_id\": 1}}",
+  "paths": [
+   "reply",
+   "reply.group_action_id"
+  ]
+ },
+ "POST /public_api/v1/hash_exceptions/allowlist/remove/": {
+  "source": "demisto/content CoreIRApiModule/test_data/remove_blocklist_files.json: {\"reply\": 1}",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/hash_exceptions/blocklist/remove/": {
+  "source": "demisto/content CoreIRApiModule/test_data/remove_blocklist_files.json: {\"reply\": 1}",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/indicators/tim_insert_jsons/": {
+  "source": "demisto/content Packs/CortexXDR/Integrations/XDR_iocs/XDR_iocs.py: response.get(\"reply\", {}).get(\"validation_errors\")",
+  "paths": [
+   "reply",
+   "reply.validation_errors"
+  ]
+ },
+ "POST /public_api/v1/endpoints/delete/": {
+  "source": "demisto/content CoreIRApiModule.py: returns reply.get(\"reply\") \u2014 members unknown",
+  "paths": [
+   "reply"
+  ]
+ }
+}

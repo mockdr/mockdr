@@ -1,0 +1,34 @@
+{
+ "route": "POST /public_api/v1/endpoints/get_endpoints/",
+ "reply": [
+  {
+   "endpoint_id": "",
+   "endpoint_name": "",
+   "endpoint_type": "",
+   "endpoint_status": "",
+   "os_type": "",
+   "ip": [],
+   "users": [],
+   "domain": "",
+   "alias": "",
+   "first_seen": 0,
+   "last_seen": 0,
+   "content_version": "",
+   "installation_package": "",
+   "active_directory": "",
+   "install_date": 0,
+   "endpoint_version": "",
+   "is_isolated": "",
+   "group_name": "",
+   "agent_id": "",
+   "agent_status": "",
+   "agent_type": "",
+   "host_name": "",
+   "operational_status": "",
+   "tags": {
+    "endpoint_tags": "",
+    "server_tags": ""
+   }
+  }
+ ]
+}

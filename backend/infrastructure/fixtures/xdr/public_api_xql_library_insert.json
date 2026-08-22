@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/xql_library/insert",
+ "reply": {
+  "errors": "",
+  "xql_queries_added": "",
+  "xql_queries_updated": ""
+ }
+}

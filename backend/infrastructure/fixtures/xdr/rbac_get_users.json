@@ -1,0 +1,15 @@
+{
+ "route": "POST /public_api/v1/rbac/get_users/",
+ "reply": [
+  {
+   "user_email": "",
+   "user_first_name": "",
+   "user_last_name": "",
+   "role_name": "",
+   "last_logged_in": 0,
+   "user_type": "",
+   "groups": [],
+   "scope": []
+  }
+ ]
+}

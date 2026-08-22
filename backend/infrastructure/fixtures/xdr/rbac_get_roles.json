@@ -1,0 +1,15 @@
+{
+ "route": "POST /public_api/v1/rbac/get_roles",
+ "reply": [
+  {
+   "created_by": "",
+   "description": "",
+   "groups": "",
+   "insert_time": "",
+   "permissions": "",
+   "pretty_name": "",
+   "update_time": "",
+   "users": ""
+  }
+ ]
+}

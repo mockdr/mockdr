@@ -1,0 +1,38 @@
+{
+ "route": "POST /public_api/v1/alerts_exclusion/",
+ "reply": [
+  {
+   "ALERT_WHITELIST_ID": 0,
+   "ALERT_WHITELIST_MODIFY_TIME": 0,
+   "ALERT_WHITELIST_NAME": "",
+   "ALERT_WHITELIST_INDICATOR_TEXT": [
+    {
+     "pretty_name": "",
+     "data_type": "",
+     "render_type": "",
+     "entity_map": "",
+     "dml_type": ""
+    }
+   ],
+   "ALERT_WHITELIST_INDICATOR": {
+    "filter": {
+     "AND": [
+      {
+       "SEARCH_FIELD": "",
+       "SEARCH_TYPE": "",
+       "SEARCH_VALUE": ""
+      }
+     ]
+    }
+   },
+   "ALERT_WHITELIST_HITS": 0,
+   "ALERT_WHITELIST_COMMENT": "",
+   "ALERT_WHITELIST_USER": "",
+   "ALERT_WHITELIST_PRETTY_USER": "",
+   "ALERT_WHITELIST_STATUS": "",
+   "ALERT_WHITELIST_BACKWARDS_SCAN_STATUS": "",
+   "ALERT_WHITELIST_BACKWARDS_SCAN_TIMESTAMP": "",
+   "ALERT_WHITELIST_MIGRATED_FROM_ANALYTICS": 0
+  }
+ ]
+}

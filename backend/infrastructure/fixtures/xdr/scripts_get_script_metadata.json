@@ -10,8 +10,20 @@
   "modification_date": 0,
   "name": "",
   "script_id": 0,
-  "script_input": "",
-  "script_output_dictionary_definitions": "",
+  "script_input": [
+   {
+    "friendly_name": "",
+    "name": "",
+    "type": ""
+   }
+  ],
+  "script_output_dictionary_definitions": [
+   {
+    "friendly_name": "",
+    "name": "",
+    "type": ""
+   }
+  ],
   "script_output_type": "",
   "script_uid": "",
   "windows_supported": false

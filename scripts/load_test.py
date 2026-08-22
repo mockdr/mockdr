@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import argparse
 import random
-import statistics
 import sys
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
@@ -301,7 +301,7 @@ def print_report(report: ScenarioReport) -> None:
     print(f"  {'Error rate':<30} {report.error_rate:>14.2f}%")
     print(f"  {'Total errors':<30} {report.error_count:>15d}")
     print()
-    print(f"  Status code distribution:")
+    print("  Status code distribution:")
     for code, count in report.status_distribution.items():
         label = f"    HTTP {code}" if code > 0 else "    Connection error"
         print(f"  {label:<30} {count:>15d}")

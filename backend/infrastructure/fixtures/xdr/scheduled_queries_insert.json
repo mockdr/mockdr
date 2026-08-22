@@ -1,0 +1,16 @@
+{
+ "route": "POST /public_api/v1/scheduled_queries/insert",
+ "reply": {
+  "<query_id>": {
+   "query_definition_name": "",
+   "schedule": {
+    "run_date": "",
+    "trigger_type": ""
+   },
+   "timeframe": {
+    "relativeTime": ""
+   },
+   "xql": ""
+  }
+ }
+}

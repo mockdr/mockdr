@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/xql_library/delete",
+ "reply": {
+  "errors": "",
+  "queries_count": "",
+  "xql_query_names": ""
+ }
+}

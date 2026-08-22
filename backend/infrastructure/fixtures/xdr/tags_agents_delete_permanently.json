@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/tags/agents/delete_permanently",
+ "reply": {
+  "message": ""
+ }
+}

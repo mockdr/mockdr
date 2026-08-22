@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/endpoints/terminate_process/",
+ "reply": {
+  "group_action_id": ""
+ }
+}

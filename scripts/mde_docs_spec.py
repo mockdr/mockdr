@@ -27,8 +27,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "vendor-specs" / "mde_docs_reduced.json"
 
-_REQUEST = re.compile(r"## HTTP request.*?```http\n(.*?)```", re.S)
-_VERB = re.compile(r"^(GET|POST|PATCH|PUT|DELETE)\s+(\S+)", re.M)
+_REQUEST = re.compile(r"## HTTP request.*?```[A-Za-z]*\n(.*?)```", re.S)
+# a path may carry spaces inside its placeholder: {machine action id}
+_VERB = re.compile(
+    r"^(GET|POST|PATCH|PUT|DELETE)\s+(\S[^\n]*?)\s*$", re.M | re.I
+)  # "Delete https://…"
 # Fences vary: ```json, ```JSON, or bare ``` in a response section.
 _JSON_BLOCK = re.compile(r"```(?:json|JSON|http|HTTP)?[^\n]*\n(.*?)```", re.S)
 _PROPS = re.compile(r"## Properties[^\n]*\n\s*(\|.*?)(?:\n\n|\n##|\Z)", re.S)
@@ -112,6 +115,7 @@ def _route(path: str) -> str:
     """Normalise ``/api/alerts/{id}`` and ``/api/alerts/123`` alike."""
     path = path.split("?")[0]
     path = re.sub(r"https?://[^/]+", "", path)
+    path = re.sub(r"<[^>]+>", "{id}", path)  # <machineactionid>
     return re.sub(r"\{[^}]+\}", "{id}", path)
 
 
@@ -131,9 +135,18 @@ def main(repo: Path) -> int:
             if names:
                 entities[page.stem] = names
         req = _REQUEST.search(text)
-        if not req:
-            continue
-        verbs = _VERB.findall(req.group(1))
+        # A few pages (the assessment exports) have no "## HTTP request"
+        # section: their request lines sit in fences under numbered headings.
+        verbs = (
+            _VERB.findall(req.group(1))
+            if req
+            else [
+                v
+                for block in re.findall(r"```[A-Za-z]*\n(.*?)```", text, re.S)
+                for v in _VERB.findall(block)
+                if "/api/" in v[1]
+            ]
+        )
         if not verbs:
             continue
         # The page's response examples are its shape; the request examples
@@ -147,7 +160,7 @@ def main(repo: Path) -> int:
         # A page documents one operation; its examples belong to the first
         # request line (a second line is a variant such as a query option).
         for i, (verb, path) in enumerate(verbs):
-            key = f"{verb} {_route(path)}"
+            key = f"{verb.upper()} {_route(path)}"
             entry = routes.setdefault(key, {"page": page.name, "paths": set()})
             if i == 0:
                 entry["paths"] |= paths

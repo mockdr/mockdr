@@ -1,0 +1,51 @@
+{
+ "route": "POST /public_api/v1/assets",
+ "reply": {
+  "data": [
+   {
+    "cases_breakdown": {
+     "critical": "",
+     "high": "",
+     "low": "",
+     "medium": ""
+    },
+    "cases_critical": "",
+    "issues_breakdown": {
+     "critical": "",
+     "high": "",
+     "low": "",
+     "medium": ""
+    },
+    "issues_critical": "",
+    "xdm": {
+     "asset": {
+      "cloud": {
+       "region": ""
+      },
+      "first_observed": "",
+      "group_ids": "",
+      "id": "",
+      "last_observed": "",
+      "name": "",
+      "provider": "",
+      "realm": "",
+      "strong_id": "",
+      "type": {
+       "category": "",
+       "class": "",
+       "id": "",
+       "name": ""
+      }
+     },
+     "host": {
+      "ipv4_addresses": ""
+     }
+    }
+   }
+  ],
+  "metadata": {
+   "filter_count": "",
+   "total_count": ""
+  }
+ }
+}

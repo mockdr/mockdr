@@ -278,7 +278,9 @@ class TestAlertExclusions:
         )
         assert resp.status_code == 200
         reply = resp.json()["reply"]
-        assert "total_count" in reply
+        # recorded (XSOAR CoreIRApiModule): a bare list of ALERT_WHITELIST_* rows
+        assert isinstance(reply, list) and reply
+        assert "ALERT_WHITELIST_ID" in reply[0]
 
     def test_add_exclusion(self, client: TestClient) -> None:
         resp = client.post(
@@ -291,17 +293,16 @@ class TestAlertExclusions:
         )
         assert resp.status_code == 200
         reply = resp.json()["reply"]
-        assert "exclusion_id" in reply
-        assert reply["name"] == "Test Exclusion"
+        assert isinstance(reply["rule_id"], int)  # recorded: {"reply": {"rule_id": 42}}
 
     def test_delete_exclusion(self, client: TestClient) -> None:
         resp = client.post(
             f"{XDR_PREFIX}/alerts_exclusion/delete/",
-            json={"request_data": {"exclusion_id": "excl-001"}},
+            json={"request_data": {"alert_exclusion_id": 1}},  # the API names it so
             headers=_xdr_headers(),
         )
         assert resp.status_code == 200
-        assert resp.json()["reply"] is True
+        assert resp.json()["reply"] == {"rule_id": [1]}  # recorded: {"reply": {"rule_id": [42]}}
 
 
 class TestDeviceControl:

@@ -112,16 +112,6 @@ class TestInvestigations:
         assert resp.status_code == 200
         assert resp.json()["id"] == inv_id
 
-    def test_collect_investigation(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        list_resp = client.get("/mde/api/investigations", headers=headers, params={"$top": 1})
-        investigations = list_resp.json()["value"]
-        if not investigations:
-            return
-        inv_id = investigations[0]["id"]
-        resp = client.post(f"/mde/api/investigations/{inv_id}/collect", headers=headers)
-        assert resp.status_code == 200
-
     def test_nonexistent_investigation_returns_404(self, client: TestClient) -> None:
         headers = _mde_auth(client)
         resp = client.get("/mde/api/investigations/nonexistent-id", headers=headers)
@@ -275,11 +265,6 @@ class TestFileInfo:
 class TestDomainInfo:
     """Tests for /mde/api/domains endpoints."""
 
-    def test_get_domain_info(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        resp = client.get("/mde/api/domains/example.com", headers=headers)
-        assert resp.status_code == 200
-
     def test_get_domain_stats(self, client: TestClient) -> None:
         headers = _mde_auth(client)
         resp = client.get("/mde/api/domains/example.com/stats", headers=headers)
@@ -293,11 +278,6 @@ class TestDomainInfo:
 
 class TestIpInfo:
     """Tests for /mde/api/ips endpoints."""
-
-    def test_get_ip_info(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        resp = client.get("/mde/api/ips/10.0.0.1", headers=headers)
-        assert resp.status_code == 200
 
     def test_get_ip_stats(self, client: TestClient) -> None:
         headers = _mde_auth(client)

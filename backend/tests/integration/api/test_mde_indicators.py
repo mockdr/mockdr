@@ -54,18 +54,6 @@ class TestListIndicators:
 class TestGetIndicator:
     """Tests for GET /mde/api/indicators/{indicator_id}."""
 
-    def test_get_single_indicator(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        indicator_id = _get_first_indicator_id(client, headers)
-        resp = client.get(f"/mde/api/indicators/{indicator_id}", headers=headers)
-        assert resp.status_code == 200
-        assert resp.json()["id"] == indicator_id
-
-    def test_nonexistent_indicator_returns_404(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        resp = client.get("/mde/api/indicators/nonexistent-id", headers=headers)
-        assert resp.status_code == 404
-
 
 class TestCreateIndicator:
     """Tests for POST /mde/api/indicators."""
@@ -106,35 +94,13 @@ class TestCreateIndicator:
         )
         new_id = create_resp.json()["id"]
 
-        get_resp = client.get(f"/mde/api/indicators/{new_id}", headers=headers)
-        assert get_resp.status_code == 200
-        assert get_resp.json()["indicatorValue"] == "10.99.99.99"
+        # the API has no GET by id: the new indicator shows in the listing
+        listing = client.get("/mde/api/indicators", headers=headers, params={"$top": 500}).json()["value"]
+        assert any(i["id"] == new_id for i in listing)
 
 
 class TestUpdateIndicator:
     """Tests for PATCH /mde/api/indicators/{indicator_id}."""
-
-    def test_update_indicator(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        indicator_id = _get_first_indicator_id(client, headers)
-        resp = client.patch(
-            f"/mde/api/indicators/{indicator_id}",
-            headers=headers,
-            json={"severity": "High", "title": "Updated Title"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["severity"] == "High"
-        assert body["title"] == "Updated Title"
-
-    def test_update_nonexistent_indicator_returns_404(self, client: TestClient) -> None:
-        headers = _mde_auth(client)
-        resp = client.patch(
-            "/mde/api/indicators/nonexistent-id",
-            headers=headers,
-            json={"severity": "Low"},
-        )
-        assert resp.status_code == 404
 
 
 class TestDeleteIndicator:
@@ -147,8 +113,9 @@ class TestDeleteIndicator:
         assert resp.status_code == 204
 
         # Verify deletion
-        get_resp = client.get(f"/mde/api/indicators/{indicator_id}", headers=headers)
-        assert get_resp.status_code == 404
+        # the API has no GET by id: absence shows in the listing
+        listing = client.get("/mde/api/indicators", headers=headers).json()["value"]
+        assert all(i["id"] != indicator_id for i in listing)
 
     def test_delete_nonexistent_indicator_returns_404(self, client: TestClient) -> None:
         headers = _mde_auth(client)
@@ -167,7 +134,7 @@ class TestBatchUpdateIndicators:
         indicator_values = [i["indicatorValue"] for i in indicators]
 
         resp = client.post(
-            "/mde/api/indicators/batchUpdate",
+            "/mde/api/indicators/BatchDelete",
             headers=headers,
             json={
                 "indicatorValues": indicator_values,

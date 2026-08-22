@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/alerts_exclusion/add/",
+ "reply": {
+  "rule_id": 0
+ }
+}

@@ -32,7 +32,7 @@ def insert_iocs(iocs: list[dict]) -> dict:
         )
         xdr_ioc_repo.save(ioc)
 
-    return build_xdr_reply(True)
+    return build_xdr_reply({"validation_errors": []})  # XDR_iocs.py reads reply.validation_errors
 
 
 def enable_iocs(ioc_ids: list[str]) -> dict:

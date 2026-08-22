@@ -1,0 +1,14 @@
+{
+ "route": "POST /public_api/v1/rbac/get_user_group/",
+ "reply": [
+  {
+   "group_name": "",
+   "description": "",
+   "pretty_name": "",
+   "insert_time": 0,
+   "update_time": 0,
+   "user_email": [],
+   "source": ""
+  }
+ ]
+}

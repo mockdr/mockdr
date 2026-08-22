@@ -147,15 +147,38 @@ feature, not a SentinelOne API — live under `/_dev/webhooks` with the rest
 of the control surface. Every mounted SentinelOne route now has a spec path
 (35 compared, 0 drift).
 
+**Shaking the internet for the rest.** Graph `/beta/` routes are now
+judged by the beta metadata (`data/vendor-specs/graph_beta_reduced.json`,
+from `microsoftgraph/msgraph-metadata`'s beta OpenAPI). Every Defender
+route has a documented reference once the docs' own spelling is honoured
+(`/api/Software`, `CreateAlertByReference`, `Delete https://…`, pages without
+a `## HTTP request` heading): five routes the docs do not know
+(`GET /api/domains/{domain}`, `GET /api/ips/{ip}`, `GET`/`PATCH
+/api/indicators/{id}`, `POST /api/investigations/{id}/collect`) are gone,
+and the batch delete is served at its documented path
+`POST /api/indicators/BatchDelete` with `IndicatorIds`. Cortex XDR gains
+three more references, each used for presence only: the endpoint-by-endpoint
+OpenAPI transcriptions of the official reference (124 routes, read from a
+local clone — the repository carries no licence, so only the derived key
+paths are kept), the shared `CoreIRApiModule` recordings of the XSOAR pack
+(`rbac/get_users`, `get_user_group`, `alerts_exclusion/*`, …), and reply
+shapes read from MIT-licensed connector code, one cited source per route
+(`xdr_connector_reduced.json`). Against them: `rbac/*` and
+`alerts_exclusion/` answer a bare list in `reply`, not an invented paged
+envelope; `alerts_exclusion/add` answers `{rule_id}` and `delete`
+`{rule_id: [...]}`; `healthcheck` answers `{status}` without a `reply`
+envelope; roles, groups and users carry their recorded fields.
+
 ### Known limits
 
-Graph `/beta/` routes are served but cannot be judged by the v1.0 metadata.
-Cortex XDR has no specification at all: 28 of its routes have no recorded
-response to compare against, and a recording cannot prove a field absent.
-Sixteen Defender routes have no documented example. The CrowdStrike cases
-model changed shape in the current API (`OperationsGetCasesByIDsResponseVM`);
-the mock still models the legacy shape and does not alias the new create
-and update paths.
+Six Cortex XDR routes have no public evidence of their reply shape at all
+(`alerts/update_alerts`, `hash_exceptions/allowlist|blocklist/get`,
+`indicators/enable_iocs|disable_iocs`, and the members of `endpoints/delete`);
+they stay listed as unjudged. A recording or a transcription proves what a
+real reply carries, never what it does not. The CrowdStrike cases model
+changed shape in the current API (`OperationsGetCasesByIDsResponseVM`); the
+mock still models the legacy shape and does not alias the new create and
+update paths.
 
 ## [2.0.5] - 2026-08-22
 

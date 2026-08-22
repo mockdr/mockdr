@@ -10,6 +10,7 @@
   "endpoints_completed_successfully": 0,
   "endpoints_pending_abort": 0,
   "endpoints_aborted": 0,
-  "endpoints_expired": 0
+  "endpoints_expired": 0,
+  "error_message": ""
  }
 }

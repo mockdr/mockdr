@@ -1,0 +1,19 @@
+{
+ "route": "POST /public_api/v1/api_keys/get_api_keys",
+ "reply": {
+  "data": [
+   {
+    "comment": "",
+    "created_by": "",
+    "creation_time": "",
+    "expiration": "",
+    "id": "",
+    "roles": "",
+    "security_level": "",
+    "user_name": ""
+   }
+  ],
+  "filter_count": "",
+  "total_count": ""
+ }
+}

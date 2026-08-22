@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/v1/endpoints/file_retrieval",
+ "reply": {
+  "action_id": "",
+  "endpoints_count": "",
+  "status": ""
+ }
+}

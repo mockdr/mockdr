@@ -1,0 +1,130 @@
+{
+ "route": "POST /public_api/v1/assets/get_external_service",
+ "reply": {
+  "details": [
+   {
+    "active_classifications": "",
+    "business_units": "",
+    "details": {
+     "businessUnits": [
+      {
+       "name": ""
+      }
+     ],
+     "certificates": [
+      {
+       "activityStatus": "",
+       "certificate": {
+        "formattedIssuerOrg": "",
+        "issuer": "",
+        "issuerAlternativeNames": "",
+        "issuerCountry": "",
+        "issuerEmail": "",
+        "issuerLocality": "",
+        "issuerName": "",
+        "issuerOrg": "",
+        "issuerOrgUnit": "",
+        "issuerState": "",
+        "md5Fingerprint": "",
+        "publicKey": "",
+        "publicKeyAlgorithm": "",
+        "publicKeyBits": "",
+        "publicKeyModulus": "",
+        "publicKeyRsaExponent": "",
+        "publicKeySpki": "",
+        "serialNumber": "",
+        "sha1Fingerprint": "",
+        "sha256Fingerprint": "",
+        "signatureAlgorithm": "",
+        "subject": "",
+        "subjectAlternativeNames": "",
+        "subjectCountry": "",
+        "subjectEmail": "",
+        "subjectLocality": "",
+        "subjectName": "",
+        "subjectOrg": "",
+        "subjectOrgUnit": "",
+        "subjectState": "",
+        "validNotAfter": "",
+        "validNotBefore": "",
+        "version": ""
+       },
+       "firstObserved": "",
+       "lastObserved": ""
+      }
+     ],
+     "classifications": [
+      {
+       "activityStatus": "",
+       "firstObserved": "",
+       "lastObserved": "",
+       "name": "",
+       "values": [
+        {
+         "firstObserved": "",
+         "jsonValue": "",
+         "lastObserved": ""
+        }
+       ]
+      }
+     ],
+     "domains": "",
+     "enrichedObservationSource": "",
+     "inferredCvesObserved": "",
+     "ip_ranges": "",
+     "ips": [
+      {
+       "activityStatus": "",
+       "firstObserved": "",
+       "geolocation": {
+        "city": "",
+        "countryCode": "",
+        "latitude": "",
+        "longitude": "",
+        "regionCode": "",
+        "timeZone": ""
+       },
+       "ip": "",
+       "lastObserved": "",
+       "protocol": "",
+       "provider": ""
+      }
+     ],
+     "providerDetails": [
+      {
+       "firstObserved": "",
+       "lastObserved": "",
+       "name": ""
+      }
+     ],
+     "serviceKey": "",
+     "serviceKeyType": "",
+     "tlsVersions": [
+      {
+       "activityStatus": "",
+       "cipherSuite": "",
+       "firstObserved": "",
+       "lastObserved": "",
+       "tlsVersion": ""
+      }
+     ]
+    },
+    "discovery_type": "",
+    "domain": "",
+    "externally_detected_providers": "",
+    "externally_inferred_cves": "",
+    "externally_inferred_vulnerability_score": "",
+    "first_observed": "",
+    "inactive_classifications": "",
+    "ip_address": "",
+    "is_active": "",
+    "last_observed": "",
+    "port": "",
+    "protocol": "",
+    "service_id": "",
+    "service_name": "",
+    "service_type": ""
+   }
+  ]
+ }
+}

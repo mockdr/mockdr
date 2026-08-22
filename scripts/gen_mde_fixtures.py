@@ -35,6 +35,7 @@ ENTITIES = {
             "GET /api/machineactions",
             "GET /api/machineactions/{id}",
             "POST /api/machines/{id}/isolate",
+            "POST /api/machines/{id}/runliveresponse",
         ],
     ),
     "software": ("software", ["GET /api/software", "GET /api/software/{id}"]),
@@ -100,17 +101,18 @@ def main() -> int:
     doc = json.load(open(REDUCED))
     OUT.mkdir(parents=True, exist_ok=True)
     tables = doc.get("entities", {})
-    routes = {k: dict(v) for k, v in doc.get("routes", {}).items()}
+    # the docs spell paths with their own casing (/API/machines/…)
+    routes = {k.lower(): dict(v) for k, v in doc.get("routes", {}).items()}
     # The XSOAR pack's recorded alert pages show fields the docs example elides.
     samples = REDUCED.with_name("mde_samples_reduced.json")
     if samples.exists():
         for key, entry in json.load(open(samples)).items():
-            merged = routes.setdefault(key, {"page": "xsoar", "paths": []})
+            merged = routes.setdefault(key.lower(), {"page": "xsoar", "paths": []})
             merged["paths"] = sorted(set(merged["paths"]) | set(entry.get("paths", [])))
     for entity, (table, keys) in ENTITIES.items():
         tree: dict = {}
         for key in keys:
-            for path in routes.get(key, {}).get("paths", []):
+            for path in routes.get(key.lower(), {}).get("paths", []):
                 if path.startswith("@odata") or path == "value":
                     continue
                 if path.startswith("value[*]."):

@@ -3,7 +3,21 @@
  "reply": {
   "data": {
    "aeec6a2cc92e46fab3b6f621722e9916": "",
-   "23a86310665d413a958926fce5b794b3": ""
+   "23a86310665d413a958926fce5b794b3": "",
+   "5a763600a3e44928a94ba84b6088380f": ""
+  },
+  "errorReasons": {
+   "5a763600a3e44928a94ba84b6088380f": {
+    "errorData": "",
+    "terminated_by": "",
+    "errorDescription": "",
+    "terminate_result": [
+     {
+      "path": "",
+      "status": 0
+     }
+    ]
+   }
   }
  }
 }

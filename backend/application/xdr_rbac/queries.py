@@ -1,7 +1,7 @@
 """Cortex XDR RBAC query handlers (read-only)."""
 from __future__ import annotations
 
-from utils.xdr_response import build_xdr_list_reply
+from utils.xdr_response import build_xdr_reply
 
 
 def get_users() -> dict:
@@ -39,7 +39,7 @@ def get_users() -> dict:
             "groups": ["Read Only"],
         },
     ]
-    return build_xdr_list_reply(users, total_count=len(users))
+    return build_xdr_reply(users)  # recorded: a bare list in reply
 
 
 def get_user_groups() -> dict:
@@ -53,7 +53,7 @@ def get_user_groups() -> dict:
         {"group_name": "SOC Team", "user_count": 1, "description": "Security operations analysts"},
         {"group_name": "Read Only", "user_count": 1, "description": "Read-only viewers"},
     ]
-    return build_xdr_list_reply(groups, total_count=len(groups))
+    return build_xdr_reply(groups)  # recorded: a bare list in reply
 
 
 def get_roles() -> dict:
@@ -82,4 +82,4 @@ def get_roles() -> dict:
             "permissions": ["read:*"],
         },
     ]
-    return build_xdr_list_reply(roles, total_count=len(roles))
+    return build_xdr_reply(roles)  # recorded: a bare list in reply

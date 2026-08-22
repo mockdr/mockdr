@@ -1,0 +1,9 @@
+{
+ "route": "POST /public_api/v1/authentication-settings/get/metadata",
+ "reply": {
+  "sp_entity_id": "",
+  "sp_logout_url": "",
+  "sp_url": "",
+  "tenant_id": ""
+ }
+}

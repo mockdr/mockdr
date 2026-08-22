@@ -2,11 +2,37 @@
  "cancellationComment": "",
  "cancellationDateTimeUtc": "",
  "cancellationRequestor": "",
- "commands": "",
+ "command": {
+  "params": "",
+  "type": ""
+ },
+ "commandStatus": "",
+ "commands": [
+  {
+   "command": {
+    "params": [
+     {
+      "key": "",
+      "value": ""
+     }
+    ],
+    "type": ""
+   },
+   "commandStatus": "",
+   "endTime": "",
+   "errors": "",
+   "index": "",
+   "startTime": ""
+  }
+ ],
  "computerDnsName": "",
  "creationDateTimeUtc": "",
+ "endTime": "",
+ "errorHResult": "",
+ "errors": "",
  "externalID": "",
  "id": "",
+ "index": "",
  "lastUpdateDateTimeUtc": "",
  "machineId": "",
  "relatedFileInfo": "",
@@ -14,6 +40,7 @@
  "requestor": "",
  "requestorComment": "",
  "scope": "",
+ "startTime": "",
  "status": "",
  "title": "",
  "type": ""

@@ -27,4 +27,5 @@ def healthcheck() -> dict:
     Returns:
         XDR reply with OK status.
     """
-    return build_xdr_reply({"status": "ok"})
+    # The reference answers {"status": …} without a reply envelope.
+    return {"status": "available"}

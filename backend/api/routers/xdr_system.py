@@ -6,7 +6,7 @@ All POST endpoints use ``{"request_data": {...}}`` body wrapper.
 
 from __future__ import annotations
 
-import uuid
+import time
 
 from fastapi import APIRouter, Body, Depends
 
@@ -33,6 +33,7 @@ def get_tenant_info(
 
 
 @router.get("/healthcheck")
+@xdr_shape("healthcheck")
 def healthcheck() -> dict:
     """Health check endpoint (no auth required)."""
     return system_queries.healthcheck()
@@ -42,6 +43,7 @@ def healthcheck() -> dict:
 
 
 @router.post("/rbac/get_users/")
+@xdr_shape("rbac_get_users")
 def get_users(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -51,6 +53,7 @@ def get_users(
 
 
 @router.post("/rbac/get_user_group/")
+@xdr_shape("rbac_get_user_group")
 def get_user_groups(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -60,6 +63,7 @@ def get_user_groups(
 
 
 @router.post("/rbac/get_roles/")
+@xdr_shape("rbac_get_roles")
 def get_roles(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -72,6 +76,7 @@ def get_roles(
 
 
 @router.post("/tags/agents/assign/")
+@xdr_shape("tags_agents_assign")
 def assign_tag(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -87,6 +92,7 @@ def assign_tag(
 
 
 @router.post("/tags/agents/remove/")
+@xdr_shape("tags_agents_remove")
 def remove_tag(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -105,47 +111,50 @@ def remove_tag(
 
 
 @router.post("/alerts_exclusion/")
+@xdr_shape("alerts_exclusion")
 def list_exclusions(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """List alert exclusions (canned data)."""
+    # Recorded (XSOAR CoreIRApiModule get_exclusion_response.json): a bare list
+    # of ALERT_WHITELIST_* rows in reply, not a paged envelope with invented
+    # exclusion_id/name/status fields.
     exclusions = [
         {
-            "exclusion_id": "excl-001",
-            "name": "Benign PowerShell Scripts",
-            "description": "Exclude known-good PowerShell automation",
-            "status": "enabled",
-            "alert_fields": {"alert_name": ["*automation*"]},
-            "creation_time": 1700000000000,
+            "ALERT_WHITELIST_ID": 1,
+            "ALERT_WHITELIST_NAME": "Benign PowerShell Scripts",
+            "ALERT_WHITELIST_COMMENT": "Exclude known-good PowerShell automation",
+            "ALERT_WHITELIST_MODIFY_TIME": 1700000000000,
+            "ALERT_WHITELIST_HITS": 0,
         },
     ]
-    return build_xdr_list_reply(exclusions, total_count=len(exclusions))
+    return build_xdr_reply(exclusions)
 
 
 @router.post("/alerts_exclusion/add/")
+@xdr_shape("alerts_exclusion_add")
 def add_exclusion(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Add an alert exclusion (stub)."""
-    request_data = require_request_data(body)
-    return build_xdr_reply(
-        {
-            "exclusion_id": str(uuid.uuid4()),
-            "name": request_data.get("name", ""),
-            "status": "enabled",
-        }
-    )
+    require_request_data(body)
+    # Recorded: {"reply": {"rule_id": 42}}
+    return build_xdr_reply({"rule_id": int(time.time()) % 100000})
 
 
 @router.post("/alerts_exclusion/delete/")
+@xdr_shape("alerts_exclusion_delete")
 def delete_exclusion(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Delete an alert exclusion (stub)."""
-    return build_xdr_reply(True)
+    request_data = require_request_data(body)
+    ids = request_data.get("alert_exclusion_id")
+    # Recorded: {"reply": {"rule_id": [42]}}
+    return build_xdr_reply({"rule_id": ids if isinstance(ids, list) else [ids]})
 
 
 # ── Device Control ────────────────────────────────────────────────────────────

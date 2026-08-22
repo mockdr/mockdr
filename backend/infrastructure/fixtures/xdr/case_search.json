@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/v1/case/search",
+ "reply": {
+  "DATA": "",
+  "FILTER_COUNT": "",
+  "TOTAL_COUNT": ""
+ }
+}

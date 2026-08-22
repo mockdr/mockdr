@@ -7,8 +7,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.mde_auth import require_mde_auth, require_mde_write
-from application.mde_investigations import commands as investigation_commands
+from api.mde_auth import require_mde_auth
 from application.mde_investigations import queries as investigation_queries
 from utils.mde_response import build_mde_error_response
 
@@ -44,18 +43,3 @@ def get_investigation(
     return result
 
 
-@router.post("/api/investigations/{investigation_id}/collect")
-def collect_investigation(
-    investigation_id: str,
-    _: dict = Depends(require_mde_write),
-) -> dict:
-    """Trigger evidence collection for an investigation."""
-    result = investigation_commands.collect_investigation(investigation_id)
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=build_mde_error_response(
-                "ResourceNotFound", f"Investigation {investigation_id} not found",
-            ),
-        )
-    return result

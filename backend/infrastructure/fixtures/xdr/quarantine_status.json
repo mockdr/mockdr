@@ -1,26 +1,11 @@
 {
  "route": "POST /public_api/v1/quarantine/status/",
- "reply": {
-  "api_response": {
-   "reply": [
-    {
-     "endpoint_id": "",
-     "file_path": "",
-     "file_hash": "",
-     "status": false
-    }
-   ]
-  },
-  "command_args": {
+ "reply": [
+  {
    "endpoint_id": "",
    "file_path": "",
-   "file_hash": ""
-  },
-  "context_data": {
-   "status": false,
-   "endpointId": "",
-   "filePath": "",
-   "fileHash": ""
+   "file_hash": "",
+   "status": false
   }
- }
+ ]
 }

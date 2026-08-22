@@ -1,0 +1,1675 @@
+{
+ "POST /public_api/v1/api_keys/delete": {
+  "source": "api_keys_delete.yaml",
+  "paths": [
+   "reply",
+   "reply.update_count"
+  ]
+ },
+ "POST /public_api/v1/api_keys/generate": {
+  "source": "api_keys_generate.yaml",
+  "paths": [
+   "reply",
+   "reply.id",
+   "reply.key"
+  ]
+ },
+ "POST /public_api/v1/api_keys/get_api_keys": {
+  "source": "api_keys_get_api_keys.yaml",
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].comment",
+   "reply.data[*].created_by",
+   "reply.data[*].creation_time",
+   "reply.data[*].expiration",
+   "reply.data[*].id",
+   "reply.data[*].roles",
+   "reply.data[*].security_level",
+   "reply.data[*].user_name",
+   "reply.filter_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/asset-groups": {
+  "source": "asset_groups.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/asset-groups/create": {
+  "source": "asset_groups_create.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/asset-groups/delete/{group_id}": {
+  "source": "asset_groups_delete_by_id.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/asset-groups/update/{group_id}": {
+  "source": "asset_groups_update_by_id.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/assets/get_external_service": {
+  "source": "assets_get_external_service.yaml",
+  "paths": [
+   "reply",
+   "reply.details",
+   "reply.details[*].active_classifications",
+   "reply.details[*].business_units",
+   "reply.details[*].details",
+   "reply.details[*].details.businessUnits",
+   "reply.details[*].details.businessUnits[*].name",
+   "reply.details[*].details.certificates",
+   "reply.details[*].details.certificates[*].activityStatus",
+   "reply.details[*].details.certificates[*].certificate",
+   "reply.details[*].details.certificates[*].certificate.formattedIssuerOrg",
+   "reply.details[*].details.certificates[*].certificate.issuer",
+   "reply.details[*].details.certificates[*].certificate.issuerAlternativeNames",
+   "reply.details[*].details.certificates[*].certificate.issuerCountry",
+   "reply.details[*].details.certificates[*].certificate.issuerEmail",
+   "reply.details[*].details.certificates[*].certificate.issuerLocality",
+   "reply.details[*].details.certificates[*].certificate.issuerName",
+   "reply.details[*].details.certificates[*].certificate.issuerOrg",
+   "reply.details[*].details.certificates[*].certificate.issuerOrgUnit",
+   "reply.details[*].details.certificates[*].certificate.issuerState",
+   "reply.details[*].details.certificates[*].certificate.md5Fingerprint",
+   "reply.details[*].details.certificates[*].certificate.publicKey",
+   "reply.details[*].details.certificates[*].certificate.publicKeyAlgorithm",
+   "reply.details[*].details.certificates[*].certificate.publicKeyBits",
+   "reply.details[*].details.certificates[*].certificate.publicKeyModulus",
+   "reply.details[*].details.certificates[*].certificate.publicKeyRsaExponent",
+   "reply.details[*].details.certificates[*].certificate.publicKeySpki",
+   "reply.details[*].details.certificates[*].certificate.serialNumber",
+   "reply.details[*].details.certificates[*].certificate.sha1Fingerprint",
+   "reply.details[*].details.certificates[*].certificate.sha256Fingerprint",
+   "reply.details[*].details.certificates[*].certificate.signatureAlgorithm",
+   "reply.details[*].details.certificates[*].certificate.subject",
+   "reply.details[*].details.certificates[*].certificate.subjectAlternativeNames",
+   "reply.details[*].details.certificates[*].certificate.subjectCountry",
+   "reply.details[*].details.certificates[*].certificate.subjectEmail",
+   "reply.details[*].details.certificates[*].certificate.subjectLocality",
+   "reply.details[*].details.certificates[*].certificate.subjectName",
+   "reply.details[*].details.certificates[*].certificate.subjectOrg",
+   "reply.details[*].details.certificates[*].certificate.subjectOrgUnit",
+   "reply.details[*].details.certificates[*].certificate.subjectState",
+   "reply.details[*].details.certificates[*].certificate.validNotAfter",
+   "reply.details[*].details.certificates[*].certificate.validNotBefore",
+   "reply.details[*].details.certificates[*].certificate.version",
+   "reply.details[*].details.certificates[*].firstObserved",
+   "reply.details[*].details.certificates[*].lastObserved",
+   "reply.details[*].details.classifications",
+   "reply.details[*].details.classifications[*].activityStatus",
+   "reply.details[*].details.classifications[*].firstObserved",
+   "reply.details[*].details.classifications[*].lastObserved",
+   "reply.details[*].details.classifications[*].name",
+   "reply.details[*].details.classifications[*].values",
+   "reply.details[*].details.classifications[*].values[*].firstObserved",
+   "reply.details[*].details.classifications[*].values[*].jsonValue",
+   "reply.details[*].details.classifications[*].values[*].lastObserved",
+   "reply.details[*].details.domains",
+   "reply.details[*].details.enrichedObservationSource",
+   "reply.details[*].details.inferredCvesObserved",
+   "reply.details[*].details.ip_ranges",
+   "reply.details[*].details.ips",
+   "reply.details[*].details.ips[*].activityStatus",
+   "reply.details[*].details.ips[*].firstObserved",
+   "reply.details[*].details.ips[*].geolocation",
+   "reply.details[*].details.ips[*].geolocation.city",
+   "reply.details[*].details.ips[*].geolocation.countryCode",
+   "reply.details[*].details.ips[*].geolocation.latitude",
+   "reply.details[*].details.ips[*].geolocation.longitude",
+   "reply.details[*].details.ips[*].geolocation.regionCode",
+   "reply.details[*].details.ips[*].geolocation.timeZone",
+   "reply.details[*].details.ips[*].ip",
+   "reply.details[*].details.ips[*].lastObserved",
+   "reply.details[*].details.ips[*].protocol",
+   "reply.details[*].details.ips[*].provider",
+   "reply.details[*].details.providerDetails",
+   "reply.details[*].details.providerDetails[*].firstObserved",
+   "reply.details[*].details.providerDetails[*].lastObserved",
+   "reply.details[*].details.providerDetails[*].name",
+   "reply.details[*].details.serviceKey",
+   "reply.details[*].details.serviceKeyType",
+   "reply.details[*].details.tlsVersions",
+   "reply.details[*].details.tlsVersions[*].activityStatus",
+   "reply.details[*].details.tlsVersions[*].cipherSuite",
+   "reply.details[*].details.tlsVersions[*].firstObserved",
+   "reply.details[*].details.tlsVersions[*].lastObserved",
+   "reply.details[*].details.tlsVersions[*].tlsVersion",
+   "reply.details[*].discovery_type",
+   "reply.details[*].domain",
+   "reply.details[*].externally_detected_providers",
+   "reply.details[*].externally_inferred_cves",
+   "reply.details[*].externally_inferred_vulnerability_score",
+   "reply.details[*].first_observed",
+   "reply.details[*].inactive_classifications",
+   "reply.details[*].ip_address",
+   "reply.details[*].is_active",
+   "reply.details[*].last_observed",
+   "reply.details[*].port",
+   "reply.details[*].protocol",
+   "reply.details[*].service_id",
+   "reply.details[*].service_name",
+   "reply.details[*].service_type"
+  ]
+ },
+ "POST /public_api/v1/assets/get_external_services": {
+  "source": "assets_get_external_services.yaml",
+  "paths": [
+   "reply",
+   "reply.external_services",
+   "reply.external_services[*].active_classifications",
+   "reply.external_services[*].business_units",
+   "reply.external_services[*].cloud_management_status",
+   "reply.external_services[*].discovery_type",
+   "reply.external_services[*].domain",
+   "reply.external_services[*].externally_detected_providers",
+   "reply.external_services[*].externally_inferred_cves",
+   "reply.external_services[*].externally_inferred_vulnerability_score",
+   "reply.external_services[*].first_observed",
+   "reply.external_services[*].inactive_classifications",
+   "reply.external_services[*].inferred_cves_observed",
+   "reply.external_services[*].ip_address",
+   "reply.external_services[*].is_active",
+   "reply.external_services[*].last_observed",
+   "reply.external_services[*].port",
+   "reply.external_services[*].protocol",
+   "reply.external_services[*].service_id",
+   "reply.external_services[*].service_name",
+   "reply.external_services[*].service_type",
+   "reply.external_services[*].tls_versions",
+   "reply.result_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/assets/get_vulnerability_tests": {
+  "source": "assets_get_vulnerability_tests.yaml",
+  "paths": [
+   "reply",
+   "reply.result_count",
+   "reply.total_count",
+   "reply.vulnerability_tests",
+   "reply.vulnerability_tests[*].affected_software",
+   "reply.vulnerability_tests[*].affected_software[*].NAME",
+   "reply.vulnerability_tests[*].affected_software[*].PRODUCT",
+   "reply.vulnerability_tests[*].affected_software[*].VENDOR",
+   "reply.vulnerability_tests[*].affected_software[*].VERSION",
+   "reply.vulnerability_tests[*].affected_software[*].VERSION_END_EXCLUDING",
+   "reply.vulnerability_tests[*].affected_software[*].VERSION_END_INCLUDING",
+   "reply.vulnerability_tests[*].affected_software[*].VERSION_START_EXCLUDING",
+   "reply.vulnerability_tests[*].affected_software[*].VERSION_START_INCLUDING",
+   "reply.vulnerability_tests[*].count_vulnerable_services",
+   "reply.vulnerability_tests[*].created",
+   "reply.vulnerability_tests[*].cwe_ids",
+   "reply.vulnerability_tests[*].description",
+   "reply.vulnerability_tests[*].epss_score",
+   "reply.vulnerability_tests[*].first_published",
+   "reply.vulnerability_tests[*].id",
+   "reply.vulnerability_tests[*].name",
+   "reply.vulnerability_tests[*].references",
+   "reply.vulnerability_tests[*].remediation_guidance",
+   "reply.vulnerability_tests[*].severity_score",
+   "reply.vulnerability_tests[*].status",
+   "reply.vulnerability_tests[*].vendor_names",
+   "reply.vulnerability_tests[*].vulnerability_ids"
+  ]
+ },
+ "POST /public_api/v1/audits/agents_reports": {
+  "source": "audits_agents_reports.yaml",
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].CATEGORY",
+   "reply.data[*].DESCRIPTION",
+   "reply.data[*].DOMAIN",
+   "reply.data[*].ENDPOINTID",
+   "reply.data[*].ENDPOINTNAME",
+   "reply.data[*].REASON",
+   "reply.data[*].RECEIVEDTIME",
+   "reply.data[*].RESULT",
+   "reply.data[*].SUBTYPE",
+   "reply.data[*].TIMESTAMP",
+   "reply.data[*].TRAPSVERSION",
+   "reply.data[*].TYPE",
+   "reply.result_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/audits/management_logs": {
+  "source": "audits_management_logs.yaml",
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].AUDIT_ADDITIONAL_INFORMATION",
+   "reply.data[*].AUDIT_ADDITIONAL_INFORMATION.endpoint_count",
+   "reply.data[*].AUDIT_ADDITIONAL_INFORMATION.endpoint_names",
+   "reply.data[*].AUDIT_ASSET_JSON",
+   "reply.data[*].AUDIT_ASSET_NAMES",
+   "reply.data[*].AUDIT_CASE_ID",
+   "reply.data[*].AUDIT_DESCRIPTION",
+   "reply.data[*].AUDIT_ENTITY",
+   "reply.data[*].AUDIT_ENTITY_SUBTYPE",
+   "reply.data[*].AUDIT_HOSTNAME",
+   "reply.data[*].AUDIT_ID",
+   "reply.data[*].AUDIT_INSERT_TIME",
+   "reply.data[*].AUDIT_LINK",
+   "reply.data[*].AUDIT_OBJECT_ID",
+   "reply.data[*].AUDIT_OWNER_EMAIL",
+   "reply.data[*].AUDIT_OWNER_NAME",
+   "reply.data[*].AUDIT_REASON",
+   "reply.data[*].AUDIT_RESULT",
+   "reply.data[*].AUDIT_SESSION_ID",
+   "reply.data[*].AUDIT_SEVERITY",
+   "reply.data[*].AUDIT_SOURCE_IP",
+   "reply.data[*].AUDIT_USER_AGENT",
+   "reply.data[*].AUDIT_USER_ROLES",
+   "reply.result_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/authentication-settings/create": {
+  "source": "authentication_settings_create.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/authentication-settings/delete": {
+  "source": "authentication_settings_delete.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/authentication-settings/get/metadata": {
+  "source": "authentication_settings_get_metadata.yaml",
+  "paths": [
+   "reply",
+   "reply.sp_entity_id",
+   "reply.sp_logout_url",
+   "reply.sp_url",
+   "reply.tenant_id"
+  ]
+ },
+ "POST /public_api/v1/authentication-settings/get/settings": {
+  "source": "authentication_settings_get_settings.yaml",
+  "paths": [
+   "reply",
+   "reply[*].advanced_settings",
+   "reply[*].advanced_settings.authn_context_enabled",
+   "reply[*].advanced_settings.force_authn",
+   "reply[*].advanced_settings.idp_single_logout_url",
+   "reply[*].advanced_settings.relay_state",
+   "reply[*].advanced_settings.service_provider_private_key",
+   "reply[*].advanced_settings.service_provider_public_cert",
+   "reply[*].default_role",
+   "reply[*].domain",
+   "reply[*].idp_certificate",
+   "reply[*].idp_enabled",
+   "reply[*].idp_issuer",
+   "reply[*].idp_sso_url",
+   "reply[*].is_account_role",
+   "reply[*].mappings",
+   "reply[*].mappings.email",
+   "reply[*].mappings.firstname",
+   "reply[*].mappings.group_name",
+   "reply[*].mappings.lastname",
+   "reply[*].metadata_url",
+   "reply[*].name",
+   "reply[*].sp_entity_id",
+   "reply[*].sp_logout_url",
+   "reply[*].sp_url",
+   "reply[*].tenant_id"
+  ]
+ },
+ "POST /public_api/v1/authentication-settings/update": {
+  "source": "authentication_settings_update.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/bioc/delete": {
+  "source": "bioc_delete.yaml",
+  "paths": [
+   "objects",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/bioc/get": {
+  "source": "bioc_get.yaml",
+  "paths": [
+   "objects",
+   "objects[*].comment",
+   "objects[*].indicator",
+   "objects[*].indicator.investigation",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter.AND",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter.AND[*].EXTRA_FIELDS",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter.AND[*].SEARCH_FIELD",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter.AND[*].SEARCH_TYPE",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter.AND[*].SEARCH_VALUE",
+   "objects[*].indicator.investigation.PROCESS_EXECUTION_EVENT.filter.AND[*].isExtended",
+   "objects[*].indicator.investigationType",
+   "objects[*].indicator.runOnCGO",
+   "objects[*].is_xql",
+   "objects[*].mitre_tactic_id_and_name",
+   "objects[*].mitre_technique_id_and_name",
+   "objects[*].name",
+   "objects[*].rule_id",
+   "objects[*].severity",
+   "objects[*].status",
+   "objects[*].type",
+   "objects_count",
+   "objects_type"
+  ]
+ },
+ "POST /public_api/v1/bioc/insert": {
+  "source": "bioc_insert.yaml",
+  "paths": [
+   "added_objects",
+   "added_objects[*].id",
+   "added_objects[*].status",
+   "errors",
+   "updated_objects",
+   "updated_objects[*].id",
+   "updated_objects[*].status"
+  ]
+ },
+ "POST /public_api/v1/case/search": {
+  "source": "case_search.yaml",
+  "paths": [
+   "reply",
+   "reply.DATA",
+   "reply.FILTER_COUNT",
+   "reply.TOTAL_COUNT"
+  ]
+ },
+ "POST /public_api/v1/correlations/delete": {
+  "source": "correlations_delete.yaml",
+  "paths": [
+   "objects",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/correlations/get": {
+  "source": "correlations_get.yaml",
+  "paths": [
+   "objects",
+   "objects[*].alert_category",
+   "objects[*].alert_fields",
+   "objects[*].alert_name",
+   "objects[*].crontab",
+   "objects[*].dataset",
+   "objects[*].description",
+   "objects[*].drilldown_query_timeframe",
+   "objects[*].execution_mode",
+   "objects[*].id",
+   "objects[*].is_enabled",
+   "objects[*].mapping_strategy",
+   "objects[*].mitre_defs",
+   "objects[*].mitre_defs.TA0005 - Defense Evasion",
+   "objects[*].name",
+   "objects[*].search_window",
+   "objects[*].severity",
+   "objects[*].simple_schedule",
+   "objects[*].suppression_enabled",
+   "objects[*].suppression_fields",
+   "objects[*].timezone",
+   "objects[*].xql_query",
+   "objects_count",
+   "objects_type"
+  ]
+ },
+ "POST /public_api/v1/correlations/insert": {
+  "source": "correlations_insert.yaml",
+  "paths": [
+   "added_objects",
+   "added_objects[*].id",
+   "added_objects[*].status",
+   "errors",
+   "updated_objects",
+   "updated_objects[*].id",
+   "updated_objects[*].status"
+  ]
+ },
+ "POST /public_api/v1/dashboards/delete": {
+  "source": "dashboards_delete.yaml",
+  "paths": [
+   "objects",
+   "objects.failures_items",
+   "objects.failures_items[*].error",
+   "objects.failures_items[*].global_id",
+   "objects.failures_items[*].internal_id",
+   "objects.succeeded_items",
+   "objects.succeeded_items[*].global_id",
+   "objects.succeeded_items[*].internal_id",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/dashboards/get": {
+  "source": "dashboards_get.yaml",
+  "paths": [
+   "objects",
+   "objects[*].dashboards_data",
+   "objects[*].dashboards_data[*].default_dashboard_id",
+   "objects[*].dashboards_data[*].description",
+   "objects[*].dashboards_data[*].global_id",
+   "objects[*].dashboards_data[*].layout",
+   "objects[*].dashboards_data[*].layout[*].data",
+   "objects[*].dashboards_data[*].layout[*].data[*].data",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.alerts_or_incidents",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.height",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.params",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.params[*].name",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.params[*].value",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.phrase",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.time_frame",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.time_frame.relativeTime",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.type",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.viewOptions",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.viewOptions.commands",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.viewOptions.commands[*].command",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.viewOptions.type",
+   "objects[*].dashboards_data[*].layout[*].data[*].data.width",
+   "objects[*].dashboards_data[*].layout[*].data[*].key",
+   "objects[*].dashboards_data[*].layout[*].id",
+   "objects[*].dashboards_data[*].metadata",
+   "objects[*].dashboards_data[*].metadata.params",
+   "objects[*].dashboards_data[*].name",
+   "objects[*].dashboards_data[*].status",
+   "objects[*].widgets_data",
+   "objects[*].widgets_data[*].additional_info",
+   "objects[*].widgets_data[*].additional_info.query_tables",
+   "objects[*].widgets_data[*].additional_info.query_uses_library",
+   "objects[*].widgets_data[*].creation_time",
+   "objects[*].widgets_data[*].creator_mail",
+   "objects[*].widgets_data[*].data",
+   "objects[*].widgets_data[*].data.params",
+   "objects[*].widgets_data[*].data.params[*].name",
+   "objects[*].widgets_data[*].data.params[*].value",
+   "objects[*].widgets_data[*].data.phrase",
+   "objects[*].widgets_data[*].data.time_frame",
+   "objects[*].widgets_data[*].data.time_frame.relativeTime",
+   "objects[*].widgets_data[*].data.viewOptions",
+   "objects[*].widgets_data[*].data.viewOptions.commands",
+   "objects[*].widgets_data[*].data.viewOptions.commands[*].command",
+   "objects[*].widgets_data[*].data.viewOptions.commands[*].command.name",
+   "objects[*].widgets_data[*].data.viewOptions.commands[*].command.op",
+   "objects[*].widgets_data[*].data.viewOptions.commands[*].command.value",
+   "objects[*].widgets_data[*].data.viewOptions.type",
+   "objects[*].widgets_data[*].description",
+   "objects[*].widgets_data[*].support_time_range",
+   "objects[*].widgets_data[*].title",
+   "objects[*].widgets_data[*].widget_key",
+   "objects_count",
+   "objects_type"
+  ]
+ },
+ "POST /public_api/v1/dashboards/insert": {
+  "source": "dashboards_insert.yaml",
+  "paths": [
+   "added_objects",
+   "added_objects[*].global_id",
+   "added_objects[*].internal_id",
+   "errors",
+   "errors[*].error",
+   "errors[*].global_id",
+   "updated_objects",
+   "updated_objects[*].global_id",
+   "updated_objects[*].internal_id"
+  ]
+ },
+ "POST /public_api/v1/dataset/delete_dataset": {
+  "source": "dataset_delete_dataset.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/dataset/get_created_datasets": {
+  "source": "dataset_get_created_datasets.yaml",
+  "paths": [
+   "datasets"
+  ]
+ },
+ "POST /public_api/v1/device_control/get_violations": {
+  "source": "device_control_get_violations.yaml",
+  "paths": [
+   "reply",
+   "reply.result_count",
+   "reply.total_count",
+   "reply.violations"
+  ]
+ },
+ "POST /public_api/v1/distributions/create": {
+  "source": "distributions_create.yaml",
+  "paths": [
+   "reply",
+   "reply.distribution_id"
+  ]
+ },
+ "POST /public_api/v1/distributions/get_dist_url": {
+  "source": "distributions_get_dist_url.yaml",
+  "paths": [
+   "reply",
+   "reply.distribution_url"
+  ]
+ },
+ "POST /public_api/v1/distributions/get_distributions": {
+  "source": "distributions_get_distributions.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/distributions/get_status": {
+  "source": "distributions_get_status.yaml",
+  "paths": [
+   "reply",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/distributions/get_versions": {
+  "source": "distributions_get_versions.yaml",
+  "paths": [
+   "reply",
+   "reply.linux",
+   "reply.macos",
+   "reply.windows"
+  ]
+ },
+ "POST /public_api/v1/endpoints/abort_scan": {
+  "source": "endpoints_abort_scan.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/file_retrieval": {
+  "source": "endpoints_file_retrieval.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_endpoint": {
+  "source": "endpoints_get_endpoint.yaml",
+  "paths": [
+   "reply",
+   "reply.endpoints",
+   "reply.endpoints[*].active_directory",
+   "reply.endpoints[*].alias",
+   "reply.endpoints[*].assigned_extensions_policy",
+   "reply.endpoints[*].assigned_prevention_policy",
+   "reply.endpoints[*].cloud_id",
+   "reply.endpoints[*].cloud_instance_id",
+   "reply.endpoints[*].cloud_provider",
+   "reply.endpoints[*].cloud_provider_account_id",
+   "reply.endpoints[*].cloud_region",
+   "reply.endpoints[*].content_release_timestamp",
+   "reply.endpoints[*].content_status",
+   "reply.endpoints[*].content_version",
+   "reply.endpoints[*].domain",
+   "reply.endpoints[*].endpointTags",
+   "reply.endpoints[*].endpoint_id",
+   "reply.endpoints[*].endpoint_name",
+   "reply.endpoints[*].endpoint_status",
+   "reply.endpoints[*].endpoint_type",
+   "reply.endpoints[*].endpoint_version",
+   "reply.endpoints[*].first_seen",
+   "reply.endpoints[*].group_name",
+   "reply.endpoints[*].install_date",
+   "reply.endpoints[*].installation_package",
+   "reply.endpoints[*].ip",
+   "reply.endpoints[*].ipv6",
+   "reply.endpoints[*].is_isolated",
+   "reply.endpoints[*].isolated_date",
+   "reply.endpoints[*].last_content_update_time",
+   "reply.endpoints[*].last_seen",
+   "reply.endpoints[*].mac_address",
+   "reply.endpoints[*].operating_system",
+   "reply.endpoints[*].operational_status",
+   "reply.endpoints[*].operational_status_description",
+   "reply.endpoints[*].operational_status_details",
+   "reply.endpoints[*].operational_status_details[*].reason",
+   "reply.endpoints[*].operational_status_details[*].title",
+   "reply.endpoints[*].os_type",
+   "reply.endpoints[*].os_version",
+   "reply.endpoints[*].public_ip",
+   "reply.endpoints[*].scan_status",
+   "reply.endpoints[*].users",
+   "reply.result_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_endpoints": {
+  "source": "endpoints_get_endpoints.yaml",
+  "paths": [
+   "reply",
+   "reply[*].agent_id",
+   "reply[*].agent_status",
+   "reply[*].agent_type",
+   "reply[*].host_name",
+   "reply[*].ip",
+   "reply[*].last_seen",
+   "reply[*].operational_status",
+   "reply[*].tags",
+   "reply[*].tags.endpoint_tags",
+   "reply[*].tags.server_tags",
+   "reply[*].users"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_policy": {
+  "source": "endpoints_get_policy.yaml",
+  "paths": [
+   "reply",
+   "reply.policy_name"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_profiles": {
+  "source": "endpoints_get_profiles.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/endpoints/isolate": {
+  "source": "endpoints_isolate.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/quarantine": {
+  "source": "endpoints_quarantine.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/endpoints/restore": {
+  "source": "endpoints_restore.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/scan": {
+  "source": "endpoints_scan.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/unisolate": {
+  "source": "endpoints_unisolate.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/update_agent_name": {
+  "source": "endpoints_update_agent_name.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/endpoints/upgrade": {
+  "source": "endpoints_upgrade.yaml",
+  "paths": [
+   "reply",
+   "reply.details",
+   "reply.summary"
+  ]
+ },
+ "POST /public_api/v1/entries/get": {
+  "source": "entries_get.yaml",
+  "paths": [
+   "data",
+   "data[*].category",
+   "data[*].contents",
+   "data[*].created",
+   "data[*].format",
+   "data[*].id",
+   "data[*].investigationId",
+   "data[*].isTodo",
+   "data[*].modified",
+   "data[*].parentContent",
+   "data[*].tags",
+   "data[*].user",
+   "total"
+  ]
+ },
+ "POST /public_api/v1/entries/insert": {
+  "source": "entries_insert.yaml",
+  "paths": [
+   "IndicatorTimeline",
+   "InstanceID",
+   "Relationships",
+   "brand",
+   "cacheVersn",
+   "category",
+   "contents",
+   "contentsSize",
+   "created",
+   "cronView",
+   "endingDate",
+   "entryTask",
+   "errorSource",
+   "file",
+   "fileID",
+   "fileMetadata",
+   "format",
+   "id",
+   "incidentCreationTime",
+   "investigationCreationTime",
+   "investigationId",
+   "isTodo",
+   "mirrored",
+   "modified",
+   "note",
+   "parentContent",
+   "parentEntryTruncated",
+   "parentId",
+   "pinned",
+   "playbookId",
+   "recurrent",
+   "reputationSize",
+   "reputations",
+   "retryTime",
+   "scheduled",
+   "scheduledEntryGuid",
+   "sizeInBytes",
+   "startDate",
+   "system",
+   "tags",
+   "tagsRaw",
+   "taskId",
+   "times",
+   "timezoneOffset",
+   "type",
+   "user",
+   "version"
+  ]
+ },
+ "POST /public_api/v1/assets": {
+  "source": "fetch_all_assets.yaml",
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].cases_breakdown",
+   "reply.data[*].cases_breakdown.critical",
+   "reply.data[*].cases_breakdown.high",
+   "reply.data[*].cases_breakdown.low",
+   "reply.data[*].cases_breakdown.medium",
+   "reply.data[*].cases_critical",
+   "reply.data[*].issues_breakdown",
+   "reply.data[*].issues_breakdown.critical",
+   "reply.data[*].issues_breakdown.high",
+   "reply.data[*].issues_breakdown.low",
+   "reply.data[*].issues_breakdown.medium",
+   "reply.data[*].issues_critical",
+   "reply.data[*].xdm.asset.cloud.region",
+   "reply.data[*].xdm.asset.first_observed",
+   "reply.data[*].xdm.asset.group_ids",
+   "reply.data[*].xdm.asset.id",
+   "reply.data[*].xdm.asset.last_observed",
+   "reply.data[*].xdm.asset.name",
+   "reply.data[*].xdm.asset.provider",
+   "reply.data[*].xdm.asset.realm",
+   "reply.data[*].xdm.asset.strong_id",
+   "reply.data[*].xdm.asset.type.category",
+   "reply.data[*].xdm.asset.type.class",
+   "reply.data[*].xdm.asset.type.id",
+   "reply.data[*].xdm.asset.type.name",
+   "reply.data[*].xdm.host.ipv4_addresses",
+   "reply.metadata",
+   "reply.metadata.filter_count",
+   "reply.metadata.total_count"
+  ]
+ },
+ "GET /public_api/v1/assets/{id}": {
+  "source": "get_assets_by_id.yaml",
+  "paths": [
+   "data",
+   "data[*].cases_breakdown",
+   "data[*].cases_breakdown.critical",
+   "data[*].cases_breakdown.high",
+   "data[*].cases_breakdown.low",
+   "data[*].cases_breakdown.medium",
+   "data[*].cases_critical",
+   "data[*].issues_breakdown",
+   "data[*].issues_breakdown.critical",
+   "data[*].issues_breakdown.high",
+   "data[*].issues_breakdown.low",
+   "data[*].issues_breakdown.medium",
+   "data[*].issues_critical",
+   "data[*].xdm.asset.cloud.region",
+   "data[*].xdm.asset.first_observed",
+   "data[*].xdm.asset.group_ids",
+   "data[*].xdm.asset.id",
+   "data[*].xdm.asset.last_observed",
+   "data[*].xdm.asset.name",
+   "data[*].xdm.asset.provider",
+   "data[*].xdm.asset.realm",
+   "data[*].xdm.asset.strong_id",
+   "data[*].xdm.asset.type.category",
+   "data[*].xdm.asset.type.class",
+   "data[*].xdm.asset.type.id",
+   "data[*].xdm.asset.type.name",
+   "data[*].xdm.host.ipv4_addresses",
+   "metadata",
+   "metadata.filter_count",
+   "metadata.total_count"
+  ]
+ },
+ "GET /public_api/v1/assets/{id}/raw_fields": {
+  "source": "get_assets_by_id_raw_fields.yaml",
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].xdm__asset__raw_fields",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.Adjustable",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.Description",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.GlobalQuota",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.QuotaAppliedAtLevel",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.QuotaArn",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.QuotaCode",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.QuotaName",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.ServiceCode",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.ServiceName",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.Unit",
+   "reply.data[*].xdm__asset__raw_fields.Platform Discovery.Value",
+   "reply.metadata",
+   "reply.metadata.filter_count",
+   "reply.metadata.total_count"
+  ]
+ },
+ "GET /public_api/v1/assets/enum/{field_name}": {
+  "source": "get_assets_enum_by_id.yaml",
+  "paths": []
+ },
+ "GET /public_api/v1/assets/schema": {
+  "source": "get_assets_schema.yaml",
+  "paths": []
+ },
+ "GET /public_api/v1/case/artifacts/{case-id}": {
+  "source": "get_case_artifacts_by_id.yaml",
+  "paths": [
+   "reply",
+   "reply.DATA",
+   "reply.FILTER_COUNT",
+   "reply.TOTAL_COUNT"
+  ]
+ },
+ "GET /public_api/v1/cli/releases/version": {
+  "source": "get_cli_releases_version.yaml",
+  "paths": []
+ },
+ "GET /public_api/v1/healthcheck": {
+  "source": "get_healthcheck.yaml",
+  "paths": [
+   "status"
+  ]
+ },
+ "POST /public_api/v1/get_risk_score": {
+  "source": "get_risk_score.yaml",
+  "paths": [
+   "reply",
+   "reply.email",
+   "reply.id",
+   "reply.norm_risk_score",
+   "reply.reasons",
+   "reply.reasons[*].date created",
+   "reply.reasons[*].description",
+   "reply.reasons[*].points",
+   "reply.reasons[*].severity",
+   "reply.reasons[*].status",
+   "reply.risk_level",
+   "reply.score",
+   "reply.type"
+  ]
+ },
+ "POST /public_api/v1/get_risky_hosts": {
+  "source": "get_risky_hosts.yaml",
+  "paths": [
+   "reply",
+   "reply[*].id",
+   "reply[*].norm_risk_score",
+   "reply[*].reasons",
+   "reply[*].reasons[*].date created",
+   "reply[*].reasons[*].description",
+   "reply[*].reasons[*].points",
+   "reply[*].reasons[*].severity",
+   "reply[*].reasons[*].status",
+   "reply[*].risk_level",
+   "reply[*].score",
+   "reply[*].type"
+  ]
+ },
+ "POST /public_api/v1/get_risky_users": {
+  "source": "get_risky_users.yaml",
+  "paths": [
+   "reply",
+   "reply[*].email",
+   "reply[*].id",
+   "reply[*].norm_risk_score",
+   "reply[*].reasons",
+   "reply[*].reasons[*].date created",
+   "reply[*].reasons[*].description",
+   "reply[*].reasons[*].points",
+   "reply[*].reasons[*].severity",
+   "reply[*].reasons[*].status",
+   "reply[*].risk_level",
+   "reply[*].score",
+   "reply[*].type"
+  ]
+ },
+ "POST /public_api/v1/get_triage_presets": {
+  "source": "get_triage_presets.yaml",
+  "paths": [
+   "reply",
+   "reply.triage_presets",
+   "reply.triage_presets[*].created_by",
+   "reply.triage_presets[*].description",
+   "reply.triage_presets[*].name",
+   "reply.triage_presets[*].os",
+   "reply.triage_presets[*].type",
+   "reply.triage_presets[*].uuid"
+  ]
+ },
+ "POST /public_api/v1/hash_exceptions/allowlist": {
+  "source": "hash_exceptions_allowlist.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/hash_exceptions/blocklist": {
+  "source": "hash_exceptions_blocklist.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/indicators/delete": {
+  "source": "indicators_delete.yaml",
+  "paths": [
+   "objects",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/indicators/get": {
+  "source": "indicators_get.yaml",
+  "paths": [
+   "objects",
+   "objects[*].comment",
+   "objects[*].expiration_date",
+   "objects[*].indicator",
+   "objects[*].rule_id",
+   "objects[*].severity",
+   "objects[*].type",
+   "objects_count",
+   "objects_type"
+  ]
+ },
+ "POST /public_api/v1/indicators/insert": {
+  "source": "indicators_insert.yaml",
+  "paths": [
+   "added_objects",
+   "added_objects[*].id",
+   "added_objects[*].status",
+   "errors",
+   "updated_objects",
+   "updated_objects[*].id",
+   "updated_objects[*].status"
+  ]
+ },
+ "POST /public_api/v1/integrations/syslog/create": {
+  "source": "integrations_syslog_create.yaml",
+  "paths": [
+   "name",
+   "syslog_integration_id"
+  ]
+ },
+ "POST /public_api/v1/integrations/syslog/get": {
+  "source": "integrations_syslog_get.yaml",
+  "paths": [
+   "objects",
+   "objects[*].FACILITY",
+   "objects[*].SYSLOG_INTEGRATION_ADDRESS",
+   "objects[*].SYSLOG_INTEGRATION_CERTIFICATE_NAME",
+   "objects[*].SYSLOG_INTEGRATION_ERROR",
+   "objects[*].SYSLOG_INTEGRATION_ID",
+   "objects[*].SYSLOG_INTEGRATION_IGNORE_CERTIFICATE_ERROR",
+   "objects[*].SYSLOG_INTEGRATION_NAME",
+   "objects[*].SYSLOG_INTEGRATION_PORT",
+   "objects[*].SYSLOG_INTEGRATION_PROTOCOL",
+   "objects[*].SYSLOG_INTEGRATION_STATUS",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/integrations/syslog/update": {
+  "source": "integrations_syslog_update.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/issue_exceptions/": {
+  "source": "issue_exceptions.yaml",
+  "paths": [
+   "reply",
+   "reply.exception_id"
+  ]
+ },
+ "POST /public_api/v1/issue_exceptions/disable/": {
+  "source": "issue_exceptions_disable.yaml",
+  "paths": [
+   "reply",
+   "reply.rows_affected",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/issue_exceptions/search/": {
+  "source": "issue_exceptions_search.yaml",
+  "paths": [
+   "reply",
+   "reply.exceptions",
+   "reply.filter_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/issue/schema": {
+  "source": "issue_schema.yaml",
+  "paths": [
+   "reply",
+   "reply.data"
+  ]
+ },
+ "POST /public_api/v1/issue/search": {
+  "source": "issue_search.yaml",
+  "paths": [
+   "reply",
+   "reply.issues",
+   "reply.result_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/legacy_exceptions/add": {
+  "source": "legacy_exceptions_add.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/legacy_exceptions/delete": {
+  "source": "legacy_exceptions_delete.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/legacy_exceptions/edit": {
+  "source": "legacy_exceptions_edit.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/legacy_exceptions/fetch": {
+  "source": "legacy_exceptions_fetch.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/legacy_exceptions/get_modules": {
+  "source": "legacy_exceptions_get_modules.yaml",
+  "paths": [
+   "reply",
+   "reply[*].conditions_definition",
+   "reply[*].conditions_definition.remoteIpsWhitelist",
+   "reply[*].conditions_definition.remoteIpsWhitelist.description",
+   "reply[*].conditions_definition.remoteIpsWhitelist.schema",
+   "reply[*].conditions_definition.remoteIpsWhitelist.schema.items",
+   "reply[*].conditions_definition.remoteIpsWhitelist.schema.items.type",
+   "reply[*].conditions_definition.remoteIpsWhitelist.schema.minItems",
+   "reply[*].conditions_definition.remoteIpsWhitelist.schema.type",
+   "reply[*].label",
+   "reply[*].module_id",
+   "reply[*].platforms",
+   "reply[*].pretty_name",
+   "reply[*].profile_type",
+   "reply[*].title"
+  ]
+ },
+ "POST /public_api/v1/playbooks/delete": {
+  "source": "playbooks_delete.yaml",
+  "paths": [
+   "objects",
+   "objects.failures_items",
+   "objects.failures_items[*].error",
+   "objects.failures_items[*].id",
+   "objects.succeeded_items",
+   "objects.succeeded_items[*].id",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/playbooks/insert": {
+  "source": "playbooks_insert.yaml",
+  "paths": [
+   "objects",
+   "objects.failures_items",
+   "objects.failures_items[*].error",
+   "objects.failures_items[*].id",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/policies/prevention/edit": {
+  "source": "policies_prevention_edit.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/profiles/add_signer_cn_to_allowlist": {
+  "source": "profiles_add_signer_cn_to_allowlist.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/profiles/prevention/add": {
+  "source": "profiles_prevention_add.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/profiles/prevention/edit": {
+  "source": "profiles_prevention_edit.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/profiles/prevention/get_modules": {
+  "source": "profiles_prevention_get_modules.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/quarantine/status": {
+  "source": "quarantine_status.yaml",
+  "paths": [
+   "reply",
+   "reply[*].endpoint_id",
+   "reply[*].file_hash",
+   "reply[*].file_path",
+   "reply[*].status"
+  ]
+ },
+ "POST /public_api/v1/rbac/get_roles": {
+  "source": "rbac_get_roles.yaml",
+  "paths": [
+   "reply",
+   "reply[*].created_by",
+   "reply[*].description",
+   "reply[*].groups",
+   "reply[*].insert_time",
+   "reply[*].permissions",
+   "reply[*].pretty_name",
+   "reply[*].update_time",
+   "reply[*].users"
+  ]
+ },
+ "POST /public_api/v1/rbac/get_user_group": {
+  "source": "rbac_get_user_group.yaml",
+  "paths": [
+   "reply",
+   "reply[*].description",
+   "reply[*].group_name",
+   "reply[*].insert_time",
+   "reply[*].pretty_name",
+   "reply[*].source",
+   "reply[*].update_time",
+   "reply[*].user_email"
+  ]
+ },
+ "POST /public_api/v1/rbac/get_users": {
+  "source": "rbac_get_users.yaml",
+  "paths": [
+   "reply",
+   "reply[*].groups",
+   "reply[*].last_logged_in",
+   "reply[*].role_name",
+   "reply[*].scope",
+   "reply[*].user_email",
+   "reply[*].user_first_name",
+   "reply[*].user_last_name",
+   "reply[*].user_type"
+  ]
+ },
+ "POST /public_api/v1/rbac/set_user_role": {
+  "source": "rbac_set_user_role.yaml",
+  "paths": [
+   "reply",
+   "reply.update_count"
+  ]
+ },
+ "POST /public_api/v1/scheduled_queries/delete": {
+  "source": "scheduled_queries_delete.yaml",
+  "paths": [
+   "reply",
+   "reply[*].scheduled_query_id"
+  ]
+ },
+ "POST /public_api/v1/scheduled_queries/insert": {
+  "source": "scheduled_queries_insert.yaml",
+  "paths": [
+   "reply",
+   "reply.<query_id>",
+   "reply.<query_id>.query_definition_name",
+   "reply.<query_id>.schedule",
+   "reply.<query_id>.schedule.run_date",
+   "reply.<query_id>.schedule.trigger_type",
+   "reply.<query_id>.timeframe",
+   "reply.<query_id>.timeframe.relativeTime",
+   "reply.<query_id>.xql"
+  ]
+ },
+ "POST /public_api/v1/scheduled_queries/list": {
+  "source": "scheduled_queries_list.yaml",
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].enable",
+   "reply.data[*].query_def_id",
+   "reply.data[*].query_definition_name",
+   "reply.data[*].schedule",
+   "reply.data[*].schedule.run_date",
+   "reply.data[*].schedule.trigger_type",
+   "reply.data[*].tenants",
+   "reply.data[*].timeframe",
+   "reply.data[*].timeframe.relativeTime",
+   "reply.data[*].xql",
+   "reply.filter_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/scripts/delete": {
+  "source": "scripts_delete.yaml",
+  "paths": [
+   "objects",
+   "objects.failures_items",
+   "objects.failures_items[*].error",
+   "objects.failures_items[*].id",
+   "objects.succeeded_items",
+   "objects.succeeded_items[*].id",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_code": {
+  "source": "scripts_get_script_code.yaml",
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_execution_results": {
+  "source": "scripts_get_script_execution_results.yaml",
+  "paths": [
+   "reply",
+   "reply.date_created",
+   "reply.error_message",
+   "reply.results",
+   "reply.results[*].domain",
+   "reply.results[*].endpoint_id",
+   "reply.results[*].endpoint_ip_address",
+   "reply.results[*].endpoint_name",
+   "reply.results[*].endpoint_status",
+   "reply.results[*].execution_status",
+   "reply.results[*].failed_files",
+   "reply.results[*].retention_date",
+   "reply.results[*].retrieved_files",
+   "reply.results[*].standard_output",
+   "reply.scope",
+   "reply.script_description",
+   "reply.script_name",
+   "reply.script_parameters"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_execution_results_files": {
+  "source": "scripts_get_script_execution_results_files.yaml",
+  "paths": [
+   "reply",
+   "reply.data"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_execution_status": {
+  "source": "scripts_get_script_execution_status.yaml",
+  "paths": [
+   "reply",
+   "reply.endpoints_aborted",
+   "reply.endpoints_canceled",
+   "reply.endpoints_completed_successfully",
+   "reply.endpoints_expired",
+   "reply.endpoints_failed",
+   "reply.endpoints_in_progress",
+   "reply.endpoints_pending",
+   "reply.endpoints_pending_abort",
+   "reply.endpoints_timeout",
+   "reply.error_message",
+   "reply.general_status"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_metadata": {
+  "source": "scripts_get_script_metadata.yaml",
+  "paths": [
+   "reply",
+   "reply.created_by",
+   "reply.description",
+   "reply.entry_point",
+   "reply.is_high_risk",
+   "reply.linux_supported",
+   "reply.macos_supported",
+   "reply.modification_date",
+   "reply.name",
+   "reply.script_id",
+   "reply.script_input",
+   "reply.script_input[*].friendly_name",
+   "reply.script_input[*].name",
+   "reply.script_input[*].type",
+   "reply.script_output_dictionary_definitions",
+   "reply.script_output_dictionary_definitions[*].friendly_name",
+   "reply.script_output_dictionary_definitions[*].name",
+   "reply.script_output_dictionary_definitions[*].type",
+   "reply.script_output_type",
+   "reply.script_uid",
+   "reply.windows_supported"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_scripts": {
+  "source": "scripts_get_scripts.yaml",
+  "paths": [
+   "reply",
+   "reply.result_count",
+   "reply.scripts",
+   "reply.scripts[*].created_by",
+   "reply.scripts[*].description",
+   "reply.scripts[*].is_high_risk",
+   "reply.scripts[*].linux_supported",
+   "reply.scripts[*].macos_supported",
+   "reply.scripts[*].modification_date",
+   "reply.scripts[*].name",
+   "reply.scripts[*].script_id",
+   "reply.scripts[*].script_uid",
+   "reply.scripts[*].windows_supported",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/scripts/insert": {
+  "source": "scripts_insert.yaml",
+  "paths": [
+   "objects",
+   "objects.failures_items",
+   "objects.failures_items[*].error",
+   "objects.failures_items[*].id",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/scripts/run_script": {
+  "source": "scripts_run_script.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/scripts/run_snippet_code_script": {
+  "source": "scripts_run_snippet_code_script.yaml",
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/system/get_tenant_info": {
+  "source": "system_get_tenant_info.yaml",
+  "paths": [
+   "reply",
+   "reply.attack_surface_management_expiration",
+   "reply.compute_unit_expiration",
+   "reply.data_enabled_pro_cloud",
+   "reply.data_enabled_pro_per_endpoint",
+   "reply.enabled_forensics",
+   "reply.enabled_host_insights",
+   "reply.forensics_expiration",
+   "reply.host_insights_expiration",
+   "reply.identity_threat_expiration",
+   "reply.installed_prevent",
+   "reply.installed_pro_cloud",
+   "reply.installed_pro_gb",
+   "reply.prevent_expiration",
+   "reply.pro_cloud_expiration",
+   "reply.pro_gb_expiration",
+   "reply.pro_per_endpoint_expiration",
+   "reply.purchased_attack_surface_management",
+   "reply.purchased_compute_unit",
+   "reply.purchased_host_insights",
+   "reply.purchased_prevent",
+   "reply.purchased_pro_cloud",
+   "reply.purchased_pro_cloud.agents",
+   "reply.purchased_pro_gb",
+   "reply.purchased_pro_gb.gb",
+   "reply.purchased_pro_per_endpoint",
+   "reply.purchased_pro_per_endpoint.agents",
+   "reply.purchased_threat_intelligence_management",
+   "reply.purchased_xsiam_ep_cold",
+   "reply.purchased_xsiam_ep_hot",
+   "reply.purchased_xsiam_gb_cold",
+   "reply.purchased_xsiam_gb_hot",
+   "reply.purchased_xsiam_premium",
+   "reply.purchased_xsiam_premium.agents",
+   "reply.purchased_xsiam_premium.gb",
+   "reply.purchased_xsiam_premium.users",
+   "reply.purchased_xth",
+   "reply.threat_intelligence_management_expiration",
+   "reply.xsiam_ep_cold_expiration",
+   "reply.xsiam_ep_hot_expiration",
+   "reply.xsiam_gb_cold_expiration",
+   "reply.xsiam_gb_hot_expiration",
+   "reply.xsiam_premium_expiration",
+   "reply.xth_expiration"
+  ]
+ },
+ "POST /public_api/v1/tags/agents/assign": {
+  "source": "tags_agents_assign.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/tags/agents/delete_permanently": {
+  "source": "tags_agents_delete_permanently.yaml",
+  "paths": [
+   "reply",
+   "reply.message"
+  ]
+ },
+ "POST /public_api/v1/tags/agents/remove": {
+  "source": "tags_agents_remove.yaml",
+  "paths": []
+ },
+ "POST /public_api/v1/triage_endpoint": {
+  "source": "triage_endpoint.yaml",
+  "paths": [
+   "reply",
+   "reply.group_action_id",
+   "reply.successful_agent_ids",
+   "reply.unsuccessful_agent_ids"
+  ]
+ },
+ "POST /public_api/v1/widgets/delete": {
+  "source": "widgets_delete.yaml",
+  "paths": [
+   "objects",
+   "objects_count"
+  ]
+ },
+ "POST /public_api/v1/widgets/get": {
+  "source": "widgets_get.yaml",
+  "paths": [
+   "objects",
+   "objects[*].widgets_data",
+   "objects[*].widgets_data[*].additional_info",
+   "objects[*].widgets_data[*].additional_info.query_tables",
+   "objects[*].widgets_data[*].additional_info.query_uses_library",
+   "objects[*].widgets_data[*].creation_time",
+   "objects[*].widgets_data[*].creator_mail",
+   "objects[*].widgets_data[*].data",
+   "objects[*].widgets_data[*].data.gridRawStorageInfo",
+   "objects[*].widgets_data[*].data.gridRawStorageInfo.coldefs",
+   "objects[*].widgets_data[*].data.gridRawStorageInfo.columnWidth",
+   "objects[*].widgets_data[*].data.gridRawStorageInfo.rowHeight",
+   "objects[*].widgets_data[*].data.gridRawStorageInfo.sort",
+   "objects[*].widgets_data[*].data.phrase",
+   "objects[*].widgets_data[*].data.time_frame",
+   "objects[*].widgets_data[*].data.time_frame.relativeTime",
+   "objects[*].widgets_data[*].data.viewOptions",
+   "objects[*].widgets_data[*].data.viewOptions.commands",
+   "objects[*].widgets_data[*].data.viewOptions.type",
+   "objects[*].widgets_data[*].description",
+   "objects[*].widgets_data[*].is_predefined",
+   "objects[*].widgets_data[*].is_public",
+   "objects[*].widgets_data[*].support_time_range",
+   "objects[*].widgets_data[*].title",
+   "objects[*].widgets_data[*].widget_key",
+   "objects_count",
+   "objects_type"
+  ]
+ },
+ "POST /public_api/v1/widgets/insert": {
+  "source": "widgets_insert.yaml",
+  "paths": [
+   "added_objects",
+   "added_objects[*].key",
+   "added_objects[*].title",
+   "errors",
+   "errors[*].error",
+   "errors[*].key",
+   "updated_objects",
+   "updated_objects[*].key",
+   "updated_objects[*].title"
+  ]
+ },
+ "POST /public_api/v1/xql/add_dataset": {
+  "source": "xql_add_dataset.yaml",
+  "paths": [
+   "dataset_name"
+  ]
+ },
+ "POST /public_api/v1/xql/get_datasets": {
+  "source": "xql_get_datasets.yaml",
+  "paths": [
+   "reply",
+   "reply[*].average_daily_size",
+   "reply[*].average_event_size",
+   "reply[*].cold_range",
+   "reply[*].cold_range.from",
+   "reply[*].cold_range.to",
+   "reply[*].dataset_name",
+   "reply[*].default_query_target",
+   "reply[*].hot_range",
+   "reply[*].hot_range.from",
+   "reply[*].hot_range.to",
+   "reply[*].last_updated",
+   "reply[*].log_update_type",
+   "reply[*].total_days_stored",
+   "reply[*].total_events",
+   "reply[*].total_size_stored",
+   "reply[*].ttl",
+   "reply[*].type"
+  ]
+ },
+ "POST /public_api/v1/xql/get_query_results": {
+  "source": "xql_get_query_results.yaml",
+  "paths": [
+   "reply",
+   "reply.number_of_results",
+   "reply.query_cost",
+   "reply.remaining_quota",
+   "reply.results",
+   "reply.results.data",
+   "reply.results.data[*]._product",
+   "reply.results.data[*]._time",
+   "reply.results.data[*]._vendor",
+   "reply.results.data[*].agent_os_type",
+   "reply.results.data[*].agent_version",
+   "reply.results.data[*].event_id",
+   "reply.results.data[*].event_sub_type",
+   "reply.results.data[*].event_type",
+   "reply.results.data[*].insert_timestamp",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/xql/get_quota": {
+  "source": "xql_get_quota.yaml",
+  "paths": [
+   "reply",
+   "reply.additional_purchased_quota",
+   "reply.current_concurrent_active_queries",
+   "reply.current_concurrent_active_queries_count",
+   "reply.eval_quota",
+   "reply.license_quota",
+   "reply.max_daily_concurrent_active_query_count",
+   "reply.total_daily_concurrent_rejected_queries",
+   "reply.total_daily_running_queries",
+   "reply.used_quota"
+  ]
+ },
+ "POST /public_api/xql_library/delete": {
+  "source": "xql_library_delete.yaml",
+  "paths": [
+   "reply",
+   "reply.errors",
+   "reply.queries_count",
+   "reply.xql_query_names"
+  ]
+ },
+ "POST /public_api/xql_library/get": {
+  "source": "xql_library_get.yaml",
+  "paths": [
+   "reply",
+   "reply.queries_count",
+   "reply.xql_queries",
+   "reply.xql_queries[*].created_at",
+   "reply.xql_queries[*].created_by",
+   "reply.xql_queries[*].created_by_pretty",
+   "reply.xql_queries[*].description",
+   "reply.xql_queries[*].id",
+   "reply.xql_queries[*].is_private",
+   "reply.xql_queries[*].labels",
+   "reply.xql_queries[*].name",
+   "reply.xql_queries[*].query_metadata",
+   "reply.xql_queries[*].query_metadata.is_datamodel",
+   "reply.xql_queries[*].query_metadata.is_valid",
+   "reply.xql_queries[*].query_metadata.query_calls",
+   "reply.xql_queries[*].query_metadata.query_presets",
+   "reply.xql_queries[*].query_metadata.query_tables",
+   "reply.xql_queries[*].query_text"
+  ]
+ },
+ "POST /public_api/xql_library/insert": {
+  "source": "xql_library_insert.yaml",
+  "paths": [
+   "reply",
+   "reply.errors",
+   "reply.xql_queries_added",
+   "reply.xql_queries_updated"
+  ]
+ },
+ "POST /public_api/v1/xql/lookups/add_data": {
+  "source": "xql_lookups_add_data.yaml",
+  "paths": [
+   "added",
+   "skipped",
+   "updated"
+  ]
+ },
+ "POST /public_api/v1/xql/lookups/get_data": {
+  "source": "xql_lookups_get_data.yaml",
+  "paths": [
+   "data",
+   "filter_count",
+   "total_count"
+  ]
+ },
+ "POST /public_api/v1/xql/lookups/remove_data": {
+  "source": "xql_lookups_remove_data.yaml",
+  "paths": [
+   "deleted"
+  ]
+ },
+ "POST /public_api/v1/xql/start_xql_query": {
+  "source": "xql_start_xql_query.yaml",
+  "paths": [
+   "reply"
+  ]
+ }
+}

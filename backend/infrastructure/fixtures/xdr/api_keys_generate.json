@@ -1,0 +1,7 @@
+{
+ "route": "POST /public_api/v1/api_keys/generate",
+ "reply": {
+  "id": "",
+  "key": ""
+ }
+}

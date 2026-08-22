@@ -1,0 +1,34 @@
+{
+ "route": "POST /public_api/v1/authentication-settings/get/settings",
+ "reply": [
+  {
+   "advanced_settings": {
+    "authn_context_enabled": "",
+    "force_authn": "",
+    "idp_single_logout_url": "",
+    "relay_state": "",
+    "service_provider_private_key": "",
+    "service_provider_public_cert": ""
+   },
+   "default_role": "",
+   "domain": "",
+   "idp_certificate": "",
+   "idp_enabled": "",
+   "idp_issuer": "",
+   "idp_sso_url": "",
+   "is_account_role": "",
+   "mappings": {
+    "email": "",
+    "firstname": "",
+    "group_name": "",
+    "lastname": ""
+   },
+   "metadata_url": "",
+   "name": "",
+   "sp_entity_id": "",
+   "sp_logout_url": "",
+   "sp_url": "",
+   "tenant_id": ""
+  }
+ ]
+}

@@ -1,6 +1,7 @@
 {
  "route": "POST /public_api/v1/endpoints/scan/",
  "reply": {
-  "action_id": 0
+  "action_id": 0,
+  "endpoints_count": ""
  }
 }

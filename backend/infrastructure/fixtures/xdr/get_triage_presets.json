@@ -1,0 +1,15 @@
+{
+ "route": "POST /public_api/v1/get_triage_presets",
+ "reply": {
+  "triage_presets": [
+   {
+    "created_by": "",
+    "description": "",
+    "name": "",
+    "os": "",
+    "type": "",
+    "uuid": ""
+   }
+  ]
+ }
+}

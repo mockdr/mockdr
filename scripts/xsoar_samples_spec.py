@@ -55,6 +55,19 @@ XDR = {
     "blacklist_whitelist_files_success.json": "POST /public_api/v1/hash_exceptions/blocklist/",
 }
 
+#: The shared CoreIRApiModule (Cortex XDR / XSIAM) test data: more recordings.
+CORE = {
+    "get_list_users.json": "POST /public_api/v1/rbac/get_users/",
+    "get_list_user_groups.json": "POST /public_api/v1/rbac/get_user_group/",
+    "get_exclusion_response.json": "POST /public_api/v1/alerts_exclusion/",
+    "add_exclusion_response.json": "POST /public_api/v1/alerts_exclusion/add/",
+    "delete_exclusion_response.json": "POST /public_api/v1/alerts_exclusion/delete/",
+    "add_blocklist_files_detailed_response.json": "POST /public_api/v1/hash_exceptions/blocklist/",
+    # the test file holds the already-extracted endpoints array: wrap it back
+    "get_endpoints_windows_response.json": "POST /public_api/v1/endpoints/get_endpoint/ | reply.endpoints",
+    "action_status_get.json": "POST /public_api/v1/actions/get_action_status/",
+}
+
 #: Defender for Endpoint: the recorded alert pages.
 MDE = {
     "first_response_alerts.json": "GET /api/alerts",
@@ -84,14 +97,33 @@ def unwrap(sample):
     return sample
 
 
+def split_route(route: str) -> tuple[str, str | None]:
+    """``"POST /x | reply.endpoints"`` → the route and the path to wrap a bare array under."""
+    if " | " in route:
+        r, wrap = route.split(" | ", 1)
+        return r.strip(), wrap.strip()
+    return route, None
+
+
+def wrap(sample, path: str | None):
+    """Put an extracted array back where the real reply carries it."""
+    if not path:
+        return sample
+    node = sample
+    for key in reversed(path.split(".")):
+        node = {key: node}
+    return node
+
+
 def reduce(pack: str, mapping: dict[str, str], out_name: str) -> None:
     reduced: dict[str, dict] = {}
     for name, route in mapping.items():
+        route, wrap_at = split_route(route)
         path = SAMPLES / pack / name
         if not path.exists():
             print(f"  ? {pack}/{name} missing")
             continue
-        paths = observed(unwrap(json.load(open(path))))
+        paths = observed(wrap(unwrap(json.load(open(path))), wrap_at))
         entry = reduced.setdefault(route, {"samples": [], "paths": set()})
         entry["samples"].append(name)
         entry["paths"] |= paths
@@ -113,6 +145,7 @@ def reduce(pack: str, mapping: dict[str, str], out_name: str) -> None:
 
 def main() -> int:
     reduce("CortexXDR", XDR, "xdr_samples_reduced.json")
+    reduce("CoreIRApiModule", CORE, "xdr_core_samples_reduced.json")
     reduce("MicrosoftDefenderAdvancedThreatProtection", MDE, "mde_samples_reduced.json")
     return 0
 
