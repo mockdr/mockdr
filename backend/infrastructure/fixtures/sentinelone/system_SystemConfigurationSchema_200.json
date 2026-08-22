@@ -1,0 +1,80 @@
+{
+ "definition": "system_SystemConfigurationSchema_200",
+ "routes": "/system/configuration",
+ "data": {
+  "cloudIntelligenceOn": false,
+  "globalTwoFaEnabled": false,
+  "cloudLastConnectionTime": "2018-02-27T04:49:26.257525Z",
+  "rememberMeLength": 0,
+  "rememberMeLengthRange": {
+   "min": 60,
+   "max": 1440
+  },
+  "uiInactivityTimeoutSeconds": 0,
+  "uiInactivityTimeoutSecondsRange": {
+   "min": 300,
+   "max": 600
+  },
+  "accessibleUrl": "",
+  "scalyrUrl": "",
+  "region": "",
+  "advancedMode": false,
+  "advancedModeAllowChanges": false,
+  "earlyAccess": false,
+  "earlyAccessPlatforms": [],
+  "maxCoreLicenses": 0,
+  "maxControlLicenses": 0,
+  "maxCompleteLicenses": 0,
+  "unlimitedCore": false,
+  "unlimitedControl": false,
+  "unlimitedComplete": false,
+  "allowDuplicateSite": false,
+  "allowedDomains": [
+   {
+    "domain": "",
+    "inherited": false
+   }
+  ],
+  "licenses": {
+   "bundles": [
+    {
+     "displayName": "",
+     "majorVersion": 0,
+     "minorVersion": 0,
+     "name": "",
+     "surfaces": [
+      {
+       "count": 0,
+       "name": ""
+      }
+     ],
+     "totalSurfaces": 0
+    }
+   ],
+   "modules": [
+    {
+     "displayName": "",
+     "majorVersion": 0,
+     "name": ""
+    }
+   ],
+   "settings": [
+    {
+     "displayName": "",
+     "settingGroup": "",
+     "settingGroupDisplayName": "",
+     "groupName": null,
+     "setting": null
+    }
+   ]
+  },
+  "tfaEnrollmentExpiration": 0,
+  "globalSharedConsole": false,
+  "globalSalesforceId": "",
+  "passwordExpiration": 60,
+  "passwordExpirationRange": {
+   "min": 30,
+   "max": 180
+  }
+ }
+}

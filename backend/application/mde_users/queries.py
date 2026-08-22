@@ -1,4 +1,5 @@
 """Microsoft Defender for Endpoint User-related query handlers (read-only)."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -26,10 +27,7 @@ def get_user_machines(user_id: str) -> dict:
         for user in machine.loggedOnUsers:
             acct = user.get("accountName", "").lower()
             domain = user.get("accountDomain", "").lower()
-            if (
-                acct == user_id.lower()
-                or f"{domain}\\{acct}" == user_id.lower()
-            ):
+            if acct == user_id.lower() or f"{domain}\\{acct}" == user_id.lower():
                 matched.append(asdict(machine))
                 break
     return build_mde_list_response(matched)
@@ -54,10 +52,7 @@ def get_user_alerts(user_id: str) -> dict:
         for user in machine.loggedOnUsers:
             acct = user.get("accountName", "").lower()
             domain = user.get("accountDomain", "").lower()
-            if (
-                acct == user_id.lower()
-                or f"{domain}\\{acct}" == user_id.lower()
-            ):
+            if acct == user_id.lower() or f"{domain}\\{acct}" == user_id.lower():
                 machine_ids.add(machine.machineId)
                 break
 

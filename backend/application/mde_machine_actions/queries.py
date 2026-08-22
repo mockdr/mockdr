@@ -1,4 +1,5 @@
 """Microsoft Defender for Endpoint Machine Action query handlers (read-only)."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -6,6 +7,7 @@ from datetime import UTC, datetime
 
 from repository.mde_machine_action_repo import mde_machine_action_repo
 from utils.dt import utc_now
+from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
@@ -13,8 +15,7 @@ from utils.mde_serde import to_mde_resource
 
 def _resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
-    return to_mde_resource(record, "actionId")
-
+    return complete_mde(to_mde_resource(record, "actionId"), "machineaction")
 
 
 def _auto_promote(action_dict: dict) -> dict:

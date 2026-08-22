@@ -9,12 +9,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_actions import queries as action_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Actions"])
 
 
 @router.post("/actions/get_action_status/")
+@xdr_shape("actions_get_action_status")
 def get_action_status(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -35,6 +37,7 @@ def get_action_status(
 
 
 @router.post("/actions/file_retrieval_details/")
+@xdr_shape("actions_file_retrieval_details")
 def get_file_retrieval_details(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),

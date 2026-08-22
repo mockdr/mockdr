@@ -1,0 +1,39 @@
+{
+ "definition": "v2_1.schemas_GetIndicatorSchema_many_200",
+ "routes": "/threat-intelligence/iocs",
+ "data": [
+  {
+   "reference": [],
+   "description": null,
+   "validUntil": null,
+   "method": null,
+   "parentScopeId": "225494730938493804",
+   "updatedAt": null,
+   "pattern": null,
+   "intrusionSets": [],
+   "campaignNames": [],
+   "uploadTime": null,
+   "originalRiskScore": 0,
+   "uuid": "",
+   "scopeId": "225494730938493804",
+   "malwareNames": [],
+   "type": null,
+   "creationTime": null,
+   "patternType": null,
+   "mitreTactic": [],
+   "threatActors": [],
+   "batchId": "",
+   "labels": [],
+   "category": [],
+   "metadata": null,
+   "source": "",
+   "scope": "global",
+   "severity": 0,
+   "externalId": null,
+   "name": "",
+   "threatActorTypes": [],
+   "value": "",
+   "creator": null
+  }
+ ]
+}

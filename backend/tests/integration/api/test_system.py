@@ -48,9 +48,10 @@ class TestSystemInfo:
 
     def test_info_contains_server_version(self, client: TestClient, auth_headers: dict) -> None:
         data = client.get(f"{BASE}/system/info", headers=auth_headers).json()["data"]
-        assert "serverVersion" in data
-        assert isinstance(data["serverVersion"], str)
-        assert len(data["serverVersion"]) > 0
+        # system_SystemInfoSchema: version/build/patch/release (2.1 swagger)
+        assert "version" in data
+        assert isinstance(data["version"], str)
+        assert len(data["version"]) > 0
 
     def test_info_contains_latest_agent_version(
         self, client: TestClient, auth_headers: dict,
@@ -61,7 +62,7 @@ class TestSystemInfo:
 
     def test_info_contains_build_time(self, client: TestClient, auth_headers: dict) -> None:
         data = client.get(f"{BASE}/system/info", headers=auth_headers).json()["data"]
-        assert "buildTime" in data
+        assert "build" in data and "patch" in data and "release" in data
 
     def test_info_requires_auth(self, client: TestClient) -> None:
         resp = client.get(f"{BASE}/system/info")
@@ -85,21 +86,20 @@ class TestSystemConfiguration:
         self, client: TestClient, auth_headers: dict,
     ) -> None:
         data = client.get(f"{BASE}/system/configuration", headers=auth_headers).json()["data"]
-        assert "enforcementMode" in data
-        assert data["enforcementMode"] == "protect"
+        # system_SystemConfigurationSchema declares no enforcementMode
+        assert "advancedMode" in data
 
     def test_configuration_contains_log_level(
         self, client: TestClient, auth_headers: dict,
     ) -> None:
         data = client.get(f"{BASE}/system/configuration", headers=auth_headers).json()["data"]
-        assert "logLevel" in data
+        assert "cloudIntelligenceOn" in data
 
     def test_configuration_contains_max_free_space(
         self, client: TestClient, auth_headers: dict,
     ) -> None:
         data = client.get(f"{BASE}/system/configuration", headers=auth_headers).json()["data"]
-        assert "maxFreeSpaceForLog" in data
-        assert isinstance(data["maxFreeSpaceForLog"], int)
+        assert "accessibleUrl" in data
 
     def test_configuration_requires_auth(self, client: TestClient) -> None:
         resp = client.get(f"{BASE}/system/configuration")

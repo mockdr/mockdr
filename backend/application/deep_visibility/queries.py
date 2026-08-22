@@ -28,23 +28,30 @@ def get_query_status(query_id: str) -> dict | None:
             query.status = "FINISHED"
             dv_query_repo.save(query)
             progress = 100
-        return {"data": {
+        return {
+            "data": {
+                "queryId": query_id,
+                "responseState": query.status,
+                "progressStatus": progress,
+                "status": query.status,
+            }
+        }
+    return {
+        "data": {
             "queryId": query_id,
             "responseState": query.status,
-            "progressStatus": progress,
+            "progressStatus": 100,
             "status": query.status,
-        }}
-    return {"data": {
-        "queryId": query_id,
-        "responseState": query.status,
-        "progressStatus": 100,
-        "status": query.status,
-    }}
+        }
+    }
 
 
 def get_events(
-    query_id: str, cursor: str | None, limit: int,
-    *, event_type: str | None = None,
+    query_id: str,
+    cursor: str | None,
+    limit: int,
+    *,
+    event_type: str | None = None,
 ) -> dict | None:
     """Return a paginated list of events for a completed Deep Visibility query.
 
@@ -64,4 +71,9 @@ def get_events(
     if event_type:
         events = [e for e in events if e.get("eventType") == event_type]
     page, next_cursor, total = paginate(events, cursor, limit)
-    return build_list_response(page, next_cursor, total)
+    return build_list_response(
+        page,
+        next_cursor,
+        total,
+        definition="deep_visibility.deep_visibility_v2_schemas_DeepVisibilityEventEntitySchema_many_200",
+    )

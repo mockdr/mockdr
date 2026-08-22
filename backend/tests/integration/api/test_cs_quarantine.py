@@ -298,20 +298,9 @@ class TestActionQuarantinedFiles:
         assert "meta" in body
         assert body["meta"]["powered_by"] == "crowdstrike-api"
         assert "trace_id" in body["meta"]
-        assert "resources" in body
+        # MsaReplyMetaOnly: meta and errors, no resources
+        assert "resources" not in body
         assert body["errors"] == []
-
-    def test_action_response_resources_contain_affected_id(self, client: TestClient) -> None:
-        headers = _cs_auth(client)
-        file_id = self._get_quarantined_id(client, headers)
-
-        resp = client.patch(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            json={"ids": [file_id], "action": "release"},
-        )
-        affected_ids = [r["id"] for r in resp.json()["resources"]]
-        assert file_id in affected_ids
 
     def test_auth_required_returns_401_without_token(self, client: TestClient) -> None:
         resp = client.patch(

@@ -1,0 +1,30 @@
+{
+ "definition": "_ActivityViewSchema_many_200",
+ "routes": "/activities",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "activityUuid": "",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "activityType": 0,
+   "data": {},
+   "primaryDescription": "",
+   "secondaryDescription": "",
+   "comments": "",
+   "osFamily": null,
+   "description": "",
+   "hash": "",
+   "agentUpdatedVersion": "2.5.1.1320",
+   "userId": "225494730938493804",
+   "threatId": "225494730938493804",
+   "agentId": "225494730938493804",
+   "accountId": "225494730938493804",
+   "siteId": "225494730938493804",
+   "groupId": "225494730938493804",
+   "accountName": "",
+   "siteName": "",
+   "groupName": ""
+  }
+ ]
+}

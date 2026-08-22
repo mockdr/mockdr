@@ -1,4 +1,5 @@
 """Microsoft Defender for Endpoint Advanced Hunting query handler."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -68,10 +69,7 @@ def _schema_for(results: list[dict], source: list[dict]) -> list[dict[str, str]]
     sample = results[0] if results else {}
     if not sample and source:
         sample = source[0]
-    return [
-        {"Name": name, "Type": _type_name(value)}
-        for name, value in sample.items()
-    ]
+    return [{"Name": name, "Type": _type_name(value)} for name, value in sample.items()]
 
 
 def _type_name(value: Any) -> str:

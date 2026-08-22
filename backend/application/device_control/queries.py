@@ -24,4 +24,6 @@ def list_rules(params: dict, cursor: str | None, limit: int) -> dict:
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, DEVICE_CTRL_CURSOR)
     stripped = [strip_fields(r, DEVICE_CONTROL_INTERNAL_FIELDS) for r in page]
-    return build_list_response(stripped, next_cursor, total)
+    return build_list_response(
+        stripped, next_cursor, total, definition="device_control.schemas_DeviceSchema_many_200"
+    )

@@ -37,11 +37,12 @@ def generate_processes_for_agent(agent_id: str) -> list[dict]:
     """
     return [
         {
-            "pid":         random.randint(100, 65535),
-            "parentPid":   random.randint(1, 1000),
-            "name":        proc_name,
-            "path":        proc_path,
-            "user":        _fake.user_name(),
+            # agents.schemas_AgentProcessesSchema: pid, processName,
+            # executablePath, cpuUsage, memoryUsage, startTime — not the
+            # invented name/path/parentPid/user this used to carry.
+            "pid": random.randint(100, 65535),
+            "processName": proc_name,
+            "executablePath": proc_path,
             "startTime":   rand_ago(1),
             "cpuUsage":    random.randint(0, 15),
             "memoryUsage": random.randint(10, 512),

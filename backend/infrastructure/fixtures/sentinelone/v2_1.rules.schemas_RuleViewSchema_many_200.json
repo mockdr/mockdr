@@ -1,0 +1,69 @@
+{
+ "definition": "v2_1.rules.schemas_RuleViewSchema_many_200",
+ "routes": "/cloud-detection/rules",
+ "data": [
+  {
+   "siteName": "",
+   "name": "",
+   "id": "225494730938493804",
+   "creator": "",
+   "siteId": "225494730938493804",
+   "queryLang": "1.0",
+   "description": null,
+   "accountId": "225494730938493804",
+   "enrichment": {
+    "scopeName": "225494730938493804",
+    "updater": "225494730938493804",
+    "creator": "225494730938493804"
+   },
+   "templateRuleId": null,
+   "expirationMode": "Permanent",
+   "status": "Draft",
+   "scopeId": [],
+   "generatedAlerts": 0,
+   "s1ql": "",
+   "editable": false,
+   "updaterId": "225494730938493804",
+   "lastAlertTime": "2018-02-27T04:49:26.257525Z",
+   "scope": "global",
+   "expired": false,
+   "treatAsThreat": "UNDEFINED",
+   "accountName": "",
+   "correlationParams": {
+    "entity": "user",
+    "timeWindow": {
+     "windowMinutes": 0
+    },
+    "subQueries": [
+     {
+      "subQuery": "",
+      "matchesRequired": 0
+     }
+    ],
+    "matchInOrder": false
+   },
+   "scheduledParams": {
+    "query": "",
+    "threshold": {
+     "value": 0,
+     "operator": "Greater"
+    },
+    "runIntervalMinutes": 0,
+    "lookbackWindowMinutes": 0
+   },
+   "networkQuarantine": false,
+   "statusReason": "",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "activeResponse": false,
+   "creatorId": "225494730938493804",
+   "severity": "Low",
+   "expiration": null,
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "coolOffSettings": {
+    "renotifyMinutes": 0
+   },
+   "reachedLimit": false,
+   "queryType": "events"
+  }
+ ]
+}

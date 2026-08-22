@@ -1,9 +1,11 @@
 """Microsoft Defender for Endpoint Alert query handlers (read-only)."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
 
 from repository.mde_alert_repo import mde_alert_repo
+from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
@@ -11,8 +13,7 @@ from utils.mde_serde import to_mde_resource
 
 def _resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
-    return to_mde_resource(record, "alertId")
-
+    return complete_mde(to_mde_resource(record, "alertId"), "alert")
 
 
 def list_alerts(
@@ -46,11 +47,12 @@ def list_alerts(
     next_link = None
     if skip + top < total:
         next_link = (
-            f"https://api.securitycenter.microsoft.com/api/alerts"
-            f"?$top={top}&$skip={skip + top}"
+            f"https://api.securitycenter.microsoft.com/api/alerts?$top={top}&$skip={skip + top}"
         )
     return build_mde_list_response(
-        page, next_link=next_link, count=total if count else None,
+        page,
+        next_link=next_link,
+        count=total if count else None,
     )
 
 

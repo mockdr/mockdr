@@ -1,4 +1,5 @@
 """Microsoft Defender for Endpoint File/Domain/IP info query handlers."""
+
 from __future__ import annotations
 
 from utils.dt import utc_now
@@ -47,6 +48,10 @@ def get_file_stats(file_hash: str) -> dict:
         "sha1": file_hash if len(file_hash) == 40 else "",
         "sha256": file_hash if len(file_hash) == 64 else "",
         "organizationPrevalence": 12,
+        # The docs' file statistics carry the global view too.
+        "globallyPrevalence": 48213,
+        "globalFirstObserved": "2023-11-14T08:21:00Z",
+        "globalLastObserved": utc_now(),
         "orgFirstSeen": "2024-02-01T10:00:00Z",
         "orgLastSeen": utc_now(),
         "topFileNames": ["agent.exe", "updater.exe"],
@@ -64,7 +69,7 @@ def get_domain_info(domain: str) -> dict:
     """
     return {
         "host": domain,
-        "orgPrevalence": "Medium",
+        "organizationPrevalence": "Medium",
         "orgFirstSeen": "2024-03-01T12:00:00Z",
         "orgLastSeen": utc_now(),
         "registrar": "GoDaddy.com, LLC",
@@ -86,7 +91,7 @@ def get_domain_stats(domain: str) -> dict:
     """
     return {
         "host": domain,
-        "orgPrevalence": 8,
+        "organizationPrevalence": 8,
         "orgFirstSeen": "2024-03-01T12:00:00Z",
         "orgLastSeen": utc_now(),
         "topDevices": [
@@ -107,7 +112,7 @@ def get_ip_info(ip: str) -> dict:
     """
     return {
         "ipAddress": ip,
-        "orgPrevalence": "Low",
+        "organizationPrevalence": "Low",
         "orgFirstSeen": "2024-04-01T14:00:00Z",
         "orgLastSeen": utc_now(),
         "firstSeenDateTime": "2024-04-01T14:00:00Z",
@@ -128,7 +133,7 @@ def get_ip_stats(ip: str) -> dict:
     """
     return {
         "ipAddress": ip,
-        "orgPrevalence": 3,
+        "organizationPrevalence": 3,
         "orgFirstSeen": "2024-04-01T14:00:00Z",
         "orgLastSeen": utc_now(),
         "topDevices": [

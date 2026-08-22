@@ -1,0 +1,20 @@
+{
+ "route": "POST /public_api/v1/scripts/get_scripts/",
+ "reply": {
+  "result_count": 0,
+  "scripts": [
+   {
+    "created_by": "",
+    "description": "",
+    "is_high_risk": false,
+    "linux_supported": false,
+    "macos_supported": false,
+    "modification_date": 0,
+    "name": "",
+    "script_id": 0,
+    "script_uid": "",
+    "windows_supported": false
+   }
+  ]
+ }
+}

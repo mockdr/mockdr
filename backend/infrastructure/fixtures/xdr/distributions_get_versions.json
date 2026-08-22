@@ -1,0 +1,8 @@
+{
+ "route": "POST /public_api/v1/distributions/get_versions/",
+ "reply": {
+  "windows": [],
+  "linux": [],
+  "macos": []
+ }
+}

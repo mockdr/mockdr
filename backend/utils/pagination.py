@@ -10,14 +10,18 @@ Two modes are supported:
 - **Offset** (legacy): omit ``CursorSpec``.  Used for internal endpoints that
   have no direct S1 equivalent (Deep Visibility event pages, passphrases, …).
 """
+
 import base64
 import json
 from dataclasses import dataclass
 from typing import Any
 
+from utils.s1_fixtures import complete_item, restrict_item
+
 # ---------------------------------------------------------------------------
 # CursorSpec — describes the keyset cursor for a given list endpoint
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CursorSpec:
@@ -57,19 +61,19 @@ class CursorSpec:
 # Pre-defined specs — one per real S1 list endpoint (confirmed from live API)
 # ---------------------------------------------------------------------------
 
-AGENT_CURSOR       = CursorSpec("AgentView.id")
-THREAT_CURSOR      = CursorSpec("ThreatInfoView.id")
-SITE_CURSOR        = CursorSpec("SiteView.id")
-GROUP_CURSOR       = CursorSpec("Group.id")
-EXCLUSION_CURSOR   = CursorSpec("ExclusionItemHashView.id")
+AGENT_CURSOR = CursorSpec("AgentView.id")
+THREAT_CURSOR = CursorSpec("ThreatInfoView.id")
+SITE_CURSOR = CursorSpec("SiteView.id")
+GROUP_CURSOR = CursorSpec("Group.id")
+EXCLUSION_CURSOR = CursorSpec("ExclusionItemHashView.id")
 RESTRICTION_CURSOR = CursorSpec("RestrictionHashView.id")
-ACTIVITY_CURSOR    = CursorSpec("Activity.id")
-USER_CURSOR        = CursorSpec("ManagementUser.id")
-ALERT_CURSOR       = CursorSpec("CloudAlertView.id")
-IOC_CURSOR         = CursorSpec("ThreatIntelligenceItem.id")
+ACTIVITY_CURSOR = CursorSpec("Activity.id")
+USER_CURSOR = CursorSpec("ManagementUser.id")
+ALERT_CURSOR = CursorSpec("CloudAlertView.id")
+IOC_CURSOR = CursorSpec("ThreatIntelligenceItem.id")
 DEVICE_CTRL_CURSOR = CursorSpec("DeviceControlRule.id")
-ACCOUNT_CURSOR     = CursorSpec("Account.id")
-TAG_CURSOR         = CursorSpec("TagManagerView.id")
+ACCOUNT_CURSOR = CursorSpec("Account.id")
+TAG_CURSOR = CursorSpec("TagManagerView.id")
 
 # Firewall is special: primary sort is by *order* ASC; identity column is
 # created_at DESC (matching the real API cursor shape).
@@ -86,6 +90,7 @@ FIREWALL_CURSOR = CursorSpec(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _encode_keyset(item: dict, spec: CursorSpec) -> str:
     """Build a URL-safe S1 keyset cursor string from the given item."""
@@ -141,6 +146,7 @@ def _decode_offset(cursor: str) -> int:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _resume_index(
     items: list,
@@ -205,7 +211,7 @@ def paginate(
                     return [], None, total
                 start = resumed
 
-        page = items[start: start + limit]
+        page = items[start : start + limit]
         if page and (start + len(page)) < total:
             next_cursor: str | None = _encode_keyset(page[-1], spec)
         else:
@@ -213,14 +219,24 @@ def paginate(
     else:
         # ── legacy offset mode ───────────────────────────────────────────────
         offset = _decode_offset(cursor) if cursor else 0
-        page = items[offset: offset + limit]
+        page = items[offset : offset + limit]
         next_cursor = _encode_offset(offset + limit) if (offset + limit) < total else None
 
     return page, next_cursor, total
 
 
-def build_list_response(data: list, next_cursor: str | None, total: int) -> dict:
+def build_list_response(
+    data: list,
+    next_cursor: str | None,
+    total: int,
+    definition: str | None = None,
+    strict: bool = False,
+) -> dict:
     """Build a standard S1 API list response envelope."""
+    if definition:
+        # Every property the 2.1 swagger declares for this collection.
+        shape = restrict_item if strict else complete_item
+        data = [shape(i, definition) if isinstance(i, dict) else i for i in data]
     return {
         "data": data,
         "pagination": {"totalItems": total, "nextCursor": next_cursor},

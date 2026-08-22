@@ -1,0 +1,209 @@
+{
+ "definition": "threats.schemas_ThreatSchema_many_200",
+ "routes": "/threats",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "whiteningOptions": [],
+   "mitigationStatus": [
+    {
+     "status": "success",
+     "action": "kill",
+     "reportId": "225494730938493804",
+     "lastUpdate": "2018-02-27T04:49:26.257525Z",
+     "groupNotFound": false,
+     "latestReport": "",
+     "actionsCounters": {
+      "total": 0,
+      "success": 0,
+      "failed": 0,
+      "pendingReboot": 0,
+      "notFound": 0
+     },
+     "agentSupportsReport": false,
+     "mitigationStartedAt": "2018-02-27T04:49:26.257525Z",
+     "mitigationEndedAt": "2018-02-27T04:49:26.257525Z"
+    }
+   ],
+   "indicators": [
+    {
+     "ids": [],
+     "category": "",
+     "categoryId": 0,
+     "description": "",
+     "tactics": [
+      {
+       "name": "",
+       "source": "",
+       "techniques": [
+        {
+         "name": "",
+         "link": ""
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "containerInfo": {
+    "id": "",
+    "name": "",
+    "image": "",
+    "labels": [],
+    "isContainerQuarantine": false
+   },
+   "kubernetesInfo": {
+    "cluster": "",
+    "namespace": "",
+    "pod": "",
+    "node": "",
+    "nodeLabels": [],
+    "namespaceLabels": [],
+    "podLabels": [],
+    "controllerKind": "",
+    "controllerName": "",
+    "controllerLabels": [],
+    "isContainerQuarantine": false
+   },
+   "ecsInfo": {
+    "type": "",
+    "version": "",
+    "clusterName": "",
+    "taskArn": "",
+    "taskAvailabilityZone": "",
+    "serviceName": "",
+    "serviceArn": "",
+    "taskDefinitionFamily": "",
+    "taskDefinitionRevision": "",
+    "taskDefinitionArn": ""
+   },
+   "threatInfo": {
+    "threatId": "225494730938493804",
+    "analystVerdict": "undefined",
+    "analystVerdictDescription": null,
+    "browserType": "",
+    "certificateId": "",
+    "classification": "",
+    "classificationSource": null,
+    "collectionId": "225494730938493804",
+    "confidenceLevel": "malicious",
+    "createdAt": "2018-02-27T04:49:26.257525Z",
+    "mitigatedPreemptively": false,
+    "detectionType": null,
+    "engines": null,
+    "detectionEngines": null,
+    "fileExtension": "",
+    "fileExtensionType": "",
+    "filePath": null,
+    "fileSize": 0,
+    "fileVerificationType": "",
+    "identifiedAt": "2018-02-27T04:49:26.257525Z",
+    "initiatedBy": "agent_policy",
+    "initiatedByDescription": null,
+    "initiatingUserId": "225494730938493804",
+    "initiatingUsername": "",
+    "isValidCertificate": false,
+    "isFileless": null,
+    "reachedEventsLimit": false,
+    "maliciousProcessArguments": "",
+    "md5": "",
+    "originatorProcess": "",
+    "publisherName": "",
+    "sha1": "ddd5030a3d029f3845fc1052419829f08f312240",
+    "sha256": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
+    "mitigationStatus": "not_mitigated",
+    "mitigationStatusDescription": null,
+    "threatName": "",
+    "incidentStatus": "unresolved",
+    "incidentStatusDescription": null,
+    "storyline": "a00637fa-e18d-9b80-e803-f370524f8085",
+    "updatedAt": "2018-02-27T04:49:26.257525Z",
+    "externalTicketId": "",
+    "externalTicketExists": null,
+    "automaticallyResolved": false,
+    "cloudFilesHashVerdict": "",
+    "failedActions": false,
+    "rebootRequired": false,
+    "pendingActions": false,
+    "processUser": "",
+    "macroModules": [
+     {
+      "moduleName": "",
+      "sha1": "",
+      "sha256": "",
+      "content": null,
+      "macroDetectionSource": null,
+      "isMacroContentTruncated": null
+     }
+    ],
+    "rootProcessUpn": ""
+   },
+   "agentRealtimeInfo": {
+    "accountId": "225494730938493804",
+    "accountName": "",
+    "siteId": "225494730938493804",
+    "siteName": "",
+    "groupId": "225494730938493804",
+    "groupName": "",
+    "activeThreats": 0,
+    "agentDomain": "",
+    "agentId": "225494730938493804",
+    "agentIsActive": false,
+    "agentIsDecommissioned": false,
+    "agentDecommissionedAt": false,
+    "agentMachineType": "unknown",
+    "agentNetworkStatus": "connected",
+    "agentOsName": "",
+    "agentOsType": "macos",
+    "agentOsRevision": "",
+    "agentUuid": "",
+    "agentComputerName": "",
+    "agentVersion": "3.6.1.14",
+    "userActionsNeeded": [],
+    "scanStatus": "none",
+    "scanStartedAt": "2018-02-27T04:49:26.257525Z",
+    "scanFinishedAt": "2018-02-27T04:49:26.257525Z",
+    "scanAbortedAt": "2018-02-27T04:49:26.257525Z",
+    "agentMitigationMode": "detect",
+    "networkInterfaces": [
+     {
+      "id": "225494730938493804",
+      "name": "",
+      "physical": "00:25:96:FF:FE:12:34:56",
+      "inet": [],
+      "inet6": []
+     }
+    ],
+    "agentInfected": false,
+    "rebootRequired": false,
+    "operationalState": "",
+    "storageType": "",
+    "storageName": ""
+   },
+   "agentDetectionInfo": {
+    "groupId": null,
+    "groupName": null,
+    "siteId": null,
+    "siteName": null,
+    "accountId": null,
+    "accountName": null,
+    "agentIpV4": null,
+    "agentIpV6": null,
+    "agentDomain": null,
+    "externalIp": null,
+    "agentUuid": null,
+    "agentLastLoggedInUserName": null,
+    "agentLastLoggedInUserMail": null,
+    "agentLastLoggedInUpn": null,
+    "agentOsRevision": null,
+    "agentOsName": null,
+    "agentRegisteredAt": null,
+    "agentVersion": null,
+    "assetVersion": null,
+    "agentMitigationMode": null,
+    "agentDetectionState": null,
+    "cloudProviders": {}
+   }
+  }
+ ]
+}

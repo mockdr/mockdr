@@ -8,7 +8,7 @@ from utils.strip import strip_fields
 
 FILTER_SPECS = [
     FilterSpec("ids", "id", "in"),
-    FilterSpec("siteIds", "siteId", "in"),   # internal field, used for filtering only
+    FilterSpec("siteIds", "siteId", "in"),  # internal field, used for filtering only
     FilterSpec("statuses", "status", "in"),
     FilterSpec("actions", "action", "in"),
 ]
@@ -22,4 +22,6 @@ def list_rules(params: dict, cursor: str | None, limit: int) -> dict:
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, FIREWALL_CURSOR)
     stripped = [strip_fields(r, FIREWALL_INTERNAL_FIELDS) for r in page]
-    return build_list_response(stripped, next_cursor, total)
+    return build_list_response(
+        stripped, next_cursor, total, definition="firewall_control.schemas_FirewallSchema_many_200"
+    )

@@ -1,0 +1,18 @@
+{
+ "determinationType": "",
+ "determinationValue": "",
+ "fileProductName": "",
+ "filePublisher": "",
+ "fileType": "",
+ "globalFirstObserved": "",
+ "globalLastObserved": "",
+ "globalPrevalence": "",
+ "isPeFile": "",
+ "isValidCertificate": "",
+ "issuer": "",
+ "sha1": "",
+ "sha256": "",
+ "signer": "",
+ "signerHash": "",
+ "size": ""
+}

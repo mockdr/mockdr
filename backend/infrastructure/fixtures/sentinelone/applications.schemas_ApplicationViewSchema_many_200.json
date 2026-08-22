@@ -1,0 +1,32 @@
+{
+ "definition": "applications.schemas_ApplicationViewSchema_many_200",
+ "routes": "/installed-applications",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "type": "app",
+   "name": "Sentinel Agent",
+   "version": "2.8.1.3862",
+   "publisher": "SentinelOne",
+   "osType": "macos",
+   "installedAt": "2018-02-27T04:49:26.257525Z",
+   "size": 1956039,
+   "signed": false,
+   "riskLevel": null,
+   "agentId": "225494730938493804",
+   "agentMachineType": "unknown",
+   "agentUuid": "a57efb63-f9d4-4fb1-9e80-8960d4f27205",
+   "agentComputerName": "MY_COMPUTER_1234",
+   "agentDomain": "sentinelone.net",
+   "agentVersion": "2.8.1.3862",
+   "agentOsType": "macos",
+   "agentNetworkStatus": "connected",
+   "agentIsDecommissioned": false,
+   "agentIsActive": false,
+   "agentInfected": false,
+   "agentOperationalState": ""
+  }
+ ]
+}

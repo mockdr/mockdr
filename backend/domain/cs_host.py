@@ -57,7 +57,6 @@ class CsHost:
     first_seen: str = ""
     last_seen: str = ""
     modified_timestamp: str = ""
-    slow_changing_modified_timestamp: str = ""
 
     # ── Domain / OU ───────────────────────────────────────────────────────────
     site_name: str = ""

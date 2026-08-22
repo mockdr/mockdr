@@ -6,11 +6,13 @@ from api.dto.requests import StarRuleCreateBody
 from application.alerts import commands as alert_commands
 from application.alerts import queries as alert_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.pagination import build_list_response
 
 router = APIRouter(tags=["Alerts"])
 
 
 # ── Queries ───────────────────────────────────────────────────────────────────
+
 
 @router.get("/cloud-detection/alerts")
 def list_alerts(
@@ -48,6 +50,7 @@ def get_alert(alert_id: str) -> dict:
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/cloud-detection/alerts/analyst-verdict")
 def set_analyst_verdict(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
     """Set the analyst verdict on the specified alerts."""
@@ -66,10 +69,19 @@ def set_incident_status(body: FilterBody, current_user: dict = Depends(require_w
 
 # ── STAR Rules ───────────────────────────────────────────────────────────────
 
+
 @router.get("/cloud-detection/rules")
 def list_star_rules() -> dict:
     """Return all STAR custom detection rules."""
-    return alert_commands.list_star_rules()
+    rules = alert_commands.list_star_rules().get("data", [])
+    # RuleViewSchema_many: the declared fields only, with a pagination block.
+    return build_list_response(
+        rules,
+        None,
+        len(rules),
+        definition="v2_1.rules.schemas_RuleViewSchema_many_200",
+        strict=True,
+    )
 
 
 @router.post("/cloud-detection/rules")

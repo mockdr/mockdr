@@ -10,12 +10,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_incidents import commands as incident_commands
 from application.xdr_incidents import queries as incident_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Incidents"])
 
 
 @router.post("/incidents/get_incidents/")
+@xdr_shape("incidents_get_incidents")
 def get_incidents(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -26,6 +28,7 @@ def get_incidents(
 
 
 @router.post("/incidents/get_incident_extra_data/")
+@xdr_shape("incidents_get_incident_extra_data")
 def get_incident_extra_data(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),

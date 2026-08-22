@@ -220,8 +220,9 @@ class TestXdrScriptIdentifier:
         ).json()["reply"]["scripts"]
 
         assert scripts
+        # the recorded product response carries both script_uid and script_id
         assert "script_uid" in scripts[0]
-        assert "script_id" not in scripts[0]
+        assert "script_id" in scripts[0]
 
     def test_metadata_is_addressable_by_script_uid(self, client: TestClient) -> None:
         uid = client.post(

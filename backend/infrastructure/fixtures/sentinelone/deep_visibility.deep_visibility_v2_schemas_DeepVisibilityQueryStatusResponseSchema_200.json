@@ -1,0 +1,14 @@
+{
+ "definition": "deep_visibility.deep_visibility_v2_schemas_DeepVisibilityQueryStatusResponseSchema_200",
+ "routes": "/dv/query-status",
+ "data": {
+  "responseState": "PROCESS_RUNNING",
+  "progressStatus": 50,
+  "responseError": "",
+  "queryModeInfo": {
+   "mode": "presto",
+   "lastActivatedAt": ""
+  },
+  "warnings": ""
+ }
+}

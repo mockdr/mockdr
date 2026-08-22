@@ -1,0 +1,1239 @@
+{
+ "routes": {
+  "DELETE /api/libraryfiles/script1.ps1": {
+   "page": "delete-library.md",
+   "paths": []
+  },
+  "GET /api/DeviceAuthenticatedScanAgents": {
+   "page": "Get-agent-details.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].AssignedApplicationId",
+    "value[*].LastCommandExecutionTimestamp",
+    "value[*].ScannerSoftwareVersion",
+    "value[*].computerDnsName",
+    "value[*].id",
+    "value[*].lastSeen",
+    "value[*].machineId",
+    "value[*].mdeClientVersion"
+   ]
+  },
+  "GET /api/DeviceAuthenticatedScanDefinitions": {
+   "page": "get-all-scan-definitions.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].createdBy",
+    "value[*].id",
+    "value[*].intervalInHours",
+    "value[*].isActive",
+    "value[*].latestScan",
+    "value[*].latestScan.executionDateTime",
+    "value[*].latestScan.failureReason",
+    "value[*].latestScan.status",
+    "value[*].orgId",
+    "value[*].scanAuthenticationParams",
+    "value[*].scanAuthenticationParams.@odata.type",
+    "value[*].scanAuthenticationParams.authPassword",
+    "value[*].scanAuthenticationParams.authProtocol",
+    "value[*].scanAuthenticationParams.communityString",
+    "value[*].scanAuthenticationParams.privPassword",
+    "value[*].scanAuthenticationParams.privProtocol",
+    "value[*].scanAuthenticationParams.username",
+    "value[*].scanName",
+    "value[*].scanType",
+    "value[*].scannerAgent",
+    "value[*].scannerAgent.AssignedApplicationId",
+    "value[*].scannerAgent.LastCommandExecutionTimestamp",
+    "value[*].scannerAgent.ScannerSoftwareVersion",
+    "value[*].scannerAgent.id",
+    "value[*].scannerAgent.lastSeen",
+    "value[*].scannerAgent.machineId",
+    "value[*].scannerAgent.machineName",
+    "value[*].scannerAgent.mdeClientVersion",
+    "value[*].target",
+    "value[*].targetType"
+   ]
+  },
+  "GET /api/Software": {
+   "page": "get-software.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].activeAlert",
+    "value[*].exposedMachines",
+    "value[*].id",
+    "value[*].impactScore",
+    "value[*].name",
+    "value[*].publicExploit",
+    "value[*].vendor",
+    "value[*].weaknesses"
+   ]
+  },
+  "GET /api/Software/{id}": {
+   "page": "get-software-by-id.md",
+   "paths": [
+    "@odata.context",
+    "activeAlert",
+    "exposedMachines",
+    "id",
+    "impactScore",
+    "name",
+    "publicExploit",
+    "vendor",
+    "weaknesses"
+   ]
+  },
+  "GET /api/Software/{id}/distributions": {
+   "page": "get-software-ver-distribution.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].installations",
+    "value[*].version",
+    "value[*].vulnerabilities"
+   ]
+  },
+  "GET /api/Software/{id}/getmissingkbs": {
+   "page": "get-missing-kbs-software.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cveAddressed",
+    "value[*].id",
+    "value[*].machineMissedOn",
+    "value[*].name",
+    "value[*].productsNames",
+    "value[*].url"
+   ]
+  },
+  "GET /api/Software/{id}/machineReferences": {
+   "page": "get-machines-by-software.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].computerDnsName",
+    "value[*].id",
+    "value[*].osPlatform",
+    "value[*].rbacGroupName"
+   ]
+  },
+  "GET /api/Software/{id}/vulnerabilities": {
+   "page": "get-vuln-by-software.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cvssV3",
+    "value[*].description",
+    "value[*].exploitInKit",
+    "value[*].exploitTypes",
+    "value[*].exploitUris",
+    "value[*].exploitVerified",
+    "value[*].exposedMachines",
+    "value[*].id",
+    "value[*].name",
+    "value[*].publicExploit",
+    "value[*].publishedOn",
+    "value[*].severity",
+    "value[*].updatedOn"
+   ]
+  },
+  "GET /api/alerts": {
+   "page": "get-alerts.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].aadTenantId",
+    "value[*].alertCreationTime",
+    "value[*].assignedTo",
+    "value[*].category",
+    "value[*].classification",
+    "value[*].comments",
+    "value[*].comments[*].comment",
+    "value[*].comments[*].createdBy",
+    "value[*].comments[*].createdTime",
+    "value[*].computerDnsName",
+    "value[*].description",
+    "value[*].detectionSource",
+    "value[*].detectorId",
+    "value[*].determination",
+    "value[*].evidence",
+    "value[*].evidence[*].aadUserId",
+    "value[*].evidence[*].accountName",
+    "value[*].evidence[*].detectionStatus",
+    "value[*].evidence[*].domainName",
+    "value[*].evidence[*].entityType",
+    "value[*].evidence[*].evidenceCreationTime",
+    "value[*].evidence[*].fileName",
+    "value[*].evidence[*].filePath",
+    "value[*].evidence[*].ipAddress",
+    "value[*].evidence[*].parentProcessCreationTime",
+    "value[*].evidence[*].parentProcessFileName",
+    "value[*].evidence[*].parentProcessFilePath",
+    "value[*].evidence[*].parentProcessId",
+    "value[*].evidence[*].processCommandLine",
+    "value[*].evidence[*].processCreationTime",
+    "value[*].evidence[*].processId",
+    "value[*].evidence[*].registryHive",
+    "value[*].evidence[*].registryKey",
+    "value[*].evidence[*].registryValue",
+    "value[*].evidence[*].registryValueType",
+    "value[*].evidence[*].sha1",
+    "value[*].evidence[*].sha256",
+    "value[*].evidence[*].url",
+    "value[*].evidence[*].userPrincipalName",
+    "value[*].evidence[*].userSid",
+    "value[*].firstEventTime",
+    "value[*].id",
+    "value[*].incidentId",
+    "value[*].investigationId",
+    "value[*].investigationState",
+    "value[*].lastEventTime",
+    "value[*].lastUpdateTime",
+    "value[*].machineId",
+    "value[*].mitreTechniques",
+    "value[*].rbacGroupName",
+    "value[*].relatedUser",
+    "value[*].relatedUser.domainName",
+    "value[*].relatedUser.userName",
+    "value[*].resolvedTime",
+    "value[*].severity",
+    "value[*].status",
+    "value[*].threatFamilyName",
+    "value[*].threatName",
+    "value[*].title"
+   ]
+  },
+  "GET /api/alerts/{id}": {
+   "page": "get-alert-info-by-id.md",
+   "paths": []
+  },
+  "GET /api/alerts/{id}/domains": {
+   "page": "get-alert-related-domain-info.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].host"
+   ]
+  },
+  "GET /api/alerts/{id}/files": {
+   "page": "get-alert-related-files-info.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].determinationType",
+    "value[*].determinationValue",
+    "value[*].fileProductName",
+    "value[*].filePublisher",
+    "value[*].fileType",
+    "value[*].globalFirstObserved",
+    "value[*].globalLastObserved",
+    "value[*].globalPrevalence",
+    "value[*].isPeFile",
+    "value[*].isValidCertificate",
+    "value[*].issuer",
+    "value[*].md5",
+    "value[*].sha1",
+    "value[*].sha256",
+    "value[*].signer",
+    "value[*].signerHash",
+    "value[*].size"
+   ]
+  },
+  "GET /api/alerts/{id}/ips": {
+   "page": "get-alert-related-ip-info.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].id"
+   ]
+  },
+  "GET /api/alerts/{id}/machine": {
+   "page": "get-alert-related-machine-info.md",
+   "paths": [
+    "aadDeviceId",
+    "computerDnsName",
+    "deviceValue",
+    "exposureLevel",
+    "firstSeen",
+    "healthStatus",
+    "id",
+    "ipAddresses",
+    "ipAddresses[*].ipAddress",
+    "ipAddresses[*].macAddress",
+    "ipAddresses[*].operationalStatus",
+    "lastExternalIpAddress",
+    "lastIpAddress",
+    "lastSeen",
+    "machineTags",
+    "osBuild",
+    "osPlatform",
+    "osProcessor",
+    "rbacGroupName",
+    "riskScore",
+    "version"
+   ]
+  },
+  "GET /api/alerts/{id}/user": {
+   "page": "get-alert-related-user-info.md",
+   "paths": [
+    "@odata.context",
+    "accountDomain",
+    "accountName",
+    "accountSid",
+    "firstSeen",
+    "id",
+    "isDomainAdmin",
+    "isOnlyNetworkUser",
+    "lastSeen",
+    "leastPrevalentMachineId",
+    "logOnMachinesCount",
+    "logonTypes",
+    "mostPrevalentMachineId"
+   ]
+  },
+  "GET /api/configurationScore": {
+   "page": "get-device-secure-score.md",
+   "paths": [
+    "@odata.context",
+    "score",
+    "time"
+   ]
+  },
+  "GET /api/domains/{id}/alerts": {
+   "page": "get-domain-related-alerts.md",
+   "paths": []
+  },
+  "GET /api/domains/{id}/machines": {
+   "page": "get-domain-related-machines.md",
+   "paths": []
+  },
+  "GET /api/domains/{id}/stats": {
+   "page": "get-domain-statistics.md",
+   "paths": [
+    "@odata.context",
+    "host",
+    "orgFirstSeen",
+    "orgLastSeen",
+    "organizationPrevalence"
+   ]
+  },
+  "GET /api/exposureScore": {
+   "page": "get-exposure-score.md",
+   "paths": [
+    "@odata.context",
+    "score",
+    "time"
+   ]
+  },
+  "GET /api/exposureScore/ByMachineGroups": {
+   "page": "get-machine-group-exposure-score.md",
+   "paths": []
+  },
+  "GET /api/files/{id}": {
+   "page": "get-file-information.md",
+   "paths": [
+    "@odata.context",
+    "determinationType",
+    "determinationValue",
+    "fileProductName",
+    "filePublisher",
+    "fileType",
+    "globalFirstObserved",
+    "globalLastObserved",
+    "globalPrevalence",
+    "isPeFile",
+    "isValidCertificate",
+    "issuer",
+    "sha1",
+    "sha256",
+    "signer",
+    "signerHash",
+    "size"
+   ]
+  },
+  "GET /api/files/{id}/alerts": {
+   "page": "get-file-related-alerts.md",
+   "paths": []
+  },
+  "GET /api/files/{id}/machines": {
+   "page": "get-file-related-machines.md",
+   "paths": []
+  },
+  "GET /api/files/{id}/stats": {
+   "page": "get-file-statistics.md",
+   "paths": [
+    "@odata.context",
+    "globalFirstObserved",
+    "globalLastObserved",
+    "globallyPrevalence",
+    "orgFirstSeen",
+    "orgLastSeen",
+    "organizationPrevalence",
+    "sha1",
+    "topFileNames"
+   ]
+  },
+  "GET /api/indicators": {
+   "page": "get-ti-indicators-collection.md",
+   "paths": []
+  },
+  "GET /api/investigations": {
+   "page": "get-investigation-collection.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cancelledBy",
+    "value[*].computerDnsName",
+    "value[*].endTime",
+    "value[*].id",
+    "value[*].machineId",
+    "value[*].startTime",
+    "value[*].state",
+    "value[*].statusDetails",
+    "value[*].triggeringAlertId"
+   ]
+  },
+  "GET /api/investigations/{id}": {
+   "page": "get-investigation-object.md",
+   "paths": []
+  },
+  "GET /api/ips/{id}/alerts": {
+   "page": "get-ip-related-alerts.md",
+   "paths": []
+  },
+  "GET /api/ips/{id}/stats": {
+   "page": "get-ip-statistics.md",
+   "paths": [
+    "@odata.context",
+    "ipAddress",
+    "orgFirstSeen",
+    "orgLastSeen",
+    "organizationPrevalence"
+   ]
+  },
+  "GET /api/machineactions": {
+   "page": "get-machineactions-collection.md",
+   "paths": []
+  },
+  "GET /api/machineactions/{id}": {
+   "page": "get-machineaction-object.md",
+   "paths": [
+    "@odata.context",
+    "computerDnsName",
+    "creationDateTimeUtc",
+    "id",
+    "lastUpdateDateTimeUtc",
+    "machineId",
+    "relatedFileInfo",
+    "requestor",
+    "requestorComment",
+    "scope",
+    "status",
+    "type"
+   ]
+  },
+  "GET /api/machineactions/{machine": {
+   "page": "get-package-sas-uri.md",
+   "paths": [
+    "@odata.context",
+    "value"
+   ]
+  },
+  "GET /api/machines": {
+   "page": "get-machines.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].aadDeviceId",
+    "value[*].computerDnsName",
+    "value[*].exposureLevel",
+    "value[*].firstSeen",
+    "value[*].healthStatus",
+    "value[*].id",
+    "value[*].isAadJoined",
+    "value[*].lastExternalIpAddress",
+    "value[*].lastIpAddress",
+    "value[*].lastSeen",
+    "value[*].machineTags",
+    "value[*].osBuild",
+    "value[*].osPlatform",
+    "value[*].osProcessor",
+    "value[*].rbacGroupId",
+    "value[*].rbacGroupName",
+    "value[*].riskScore",
+    "value[*].version"
+   ]
+  },
+  "GET /api/machines/find(timestamp={id},key={id})": {
+   "page": "find-machine-info-by-ip.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].computerDnsName",
+    "value[*].firstSeen",
+    "value[*].id",
+    "value[*].osPlatform"
+   ]
+  },
+  "GET /api/machines/findbyip(ip='{id}',timestamp={id})": {
+   "page": "find-machines-by-ip.md",
+   "paths": []
+  },
+  "GET /api/machines/findbytag": {
+   "page": "find-machines-by-tag.md",
+   "paths": []
+  },
+  "GET /api/machines/{id}": {
+   "page": "get-machine-by-id.md",
+   "paths": [
+    "@odata.context",
+    "aadDeviceId",
+    "computerDnsName",
+    "exposureLevel",
+    "firstSeen",
+    "healthStatus",
+    "id",
+    "isAadJoined",
+    "lastExternalIpAddress",
+    "lastIpAddress",
+    "lastSeen",
+    "machineTags",
+    "osBuild",
+    "osPlatform",
+    "osProcessor",
+    "rbacGroupId",
+    "rbacGroupName",
+    "riskScore",
+    "version"
+   ]
+  },
+  "GET /api/machines/{id}/alerts": {
+   "page": "get-machine-related-alerts.md",
+   "paths": []
+  },
+  "GET /api/machines/{id}/getmissingkbs": {
+   "page": "get-missing-kbs-machine.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cveAddressed",
+    "value[*].id",
+    "value[*].machineMissedOn",
+    "value[*].name",
+    "value[*].productsNames",
+    "value[*].url"
+   ]
+  },
+  "GET /api/machines/{id}/logonusers": {
+   "page": "get-machine-log-on-users.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].accountDomain",
+    "value[*].accountName",
+    "value[*].firstSeen",
+    "value[*].id",
+    "value[*].isDomainAdmin",
+    "value[*].isOnlyNetworkUser",
+    "value[*].lastSeen",
+    "value[*].logonTypes"
+   ]
+  },
+  "GET /api/machines/{id}/recommendations": {
+   "page": "get-security-recommendations.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].activeAlert",
+    "value[*].associatedThreats",
+    "value[*].configScoreImpact",
+    "value[*].exposedMachinesCount",
+    "value[*].exposureImpact",
+    "value[*].id",
+    "value[*].nonProductivityImpactedAssets",
+    "value[*].productName",
+    "value[*].publicExploit",
+    "value[*].recommendationCategory",
+    "value[*].recommendationName",
+    "value[*].recommendedVersion",
+    "value[*].relatedComponent",
+    "value[*].remediationType",
+    "value[*].severityScore",
+    "value[*].status",
+    "value[*].subCategory",
+    "value[*].totalMachineCount",
+    "value[*].vendor",
+    "value[*].weaknesses"
+   ]
+  },
+  "GET /api/machines/{id}/software": {
+   "page": "get-installed-software.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].activeAlert",
+    "value[*].exposedMachines",
+    "value[*].id",
+    "value[*].impactScore",
+    "value[*].name",
+    "value[*].publicExploit",
+    "value[*].vendor",
+    "value[*].weaknesses"
+   ]
+  },
+  "GET /api/machines/{id}/vulnerabilities": {
+   "page": "get-discovered-vulnerabilities.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cvssV3",
+    "value[*].description",
+    "value[*].exploitInKit",
+    "value[*].exploitTypes",
+    "value[*].exploitUris",
+    "value[*].exploitVerified",
+    "value[*].exposedMachines",
+    "value[*].id",
+    "value[*].name",
+    "value[*].publicExploit",
+    "value[*].publishedOn",
+    "value[*].severity",
+    "value[*].updatedOn"
+   ]
+  },
+  "GET /api/recommendations": {
+   "page": "get-all-recommendations.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].activeAlert",
+    "value[*].associatedThreats",
+    "value[*].configScoreImpact",
+    "value[*].exposedCriticalDevices",
+    "value[*].exposedMachinesCount",
+    "value[*].exposureImpact",
+    "value[*].hasUnpatchableCve",
+    "value[*].id",
+    "value[*].nonProductivityImpactedAssets",
+    "value[*].productName",
+    "value[*].publicExploit",
+    "value[*].recommendationCategory",
+    "value[*].recommendationName",
+    "value[*].recommendedProgram",
+    "value[*].recommendedVendor",
+    "value[*].recommendedVersion",
+    "value[*].relatedComponent",
+    "value[*].remediationType",
+    "value[*].severityScore",
+    "value[*].status",
+    "value[*].subCategory",
+    "value[*].tags",
+    "value[*].totalMachineCount",
+    "value[*].vendor",
+    "value[*].weaknesses"
+   ]
+  },
+  "GET /api/recommendations/{id}": {
+   "page": "get-recommendation-by-id.md",
+   "paths": [
+    "@odata.context",
+    "activeAlert",
+    "associatedThreats",
+    "configScoreImpact",
+    "exposedCriticalDevices",
+    "exposedMachinesCount",
+    "exposureImpact",
+    "id",
+    "nonProductivityImpactedAssets",
+    "productName",
+    "publicExploit",
+    "recommendationCategory",
+    "recommendationName",
+    "recommendedVersion",
+    "relatedComponent",
+    "remediationType",
+    "severityScore",
+    "status",
+    "subCategory",
+    "tags",
+    "totalMachineCount",
+    "vendor",
+    "weaknesses"
+   ]
+  },
+  "GET /api/recommendations/{id}/machineReferences": {
+   "page": "get-recommendation-machines.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].computerDnsName",
+    "value[*].id",
+    "value[*].osPlatform",
+    "value[*].rbacGroupName"
+   ]
+  },
+  "GET /api/recommendations/{id}/software": {
+   "page": "list-recommendation-software.md",
+   "paths": [
+    "@odata.context",
+    "activeAlert",
+    "exposedMachines",
+    "id",
+    "impactScore",
+    "name",
+    "publicExploit",
+    "vendor",
+    "weaknesses"
+   ]
+  },
+  "GET /api/recommendations/{id}/vulnerabilities": {
+   "page": "get-recommendation-vulnerabilities.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cvssV3",
+    "value[*].description",
+    "value[*].exploitInKit",
+    "value[*].exploitTypes",
+    "value[*].exploitUris",
+    "value[*].exploitVerified",
+    "value[*].exposedMachines",
+    "value[*].id",
+    "value[*].name",
+    "value[*].publicExploit",
+    "value[*].publishedOn",
+    "value[*].severity",
+    "value[*].updatedOn"
+   ]
+  },
+  "GET /api/users/{id}/alerts": {
+   "page": "get-user-related-alerts.md",
+   "paths": []
+  },
+  "GET /api/users/{id}/machines": {
+   "page": "get-user-related-machines.md",
+   "paths": []
+  },
+  "GET /api/vulnerabilities": {
+   "page": "get-all-vulnerabilities.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cveSupportability",
+    "value[*].cvssV3",
+    "value[*].cvssVector",
+    "value[*].description",
+    "value[*].epss",
+    "value[*].exploitInKit",
+    "value[*].exploitTypes",
+    "value[*].exploitUris",
+    "value[*].exploitVerified",
+    "value[*].exposedMachines",
+    "value[*].firstDetected",
+    "value[*].id",
+    "value[*].name",
+    "value[*].publicExploit",
+    "value[*].publishedOn",
+    "value[*].severity",
+    "value[*].status",
+    "value[*].tags",
+    "value[*].updatedOn"
+   ]
+  },
+  "GET /api/vulnerabilities/machinesVulnerabilities": {
+   "page": "get-all-vulnerabilities-by-machines.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].cveId",
+    "value[*].fixingKbId",
+    "value[*].id",
+    "value[*].machineId",
+    "value[*].productName",
+    "value[*].productVendor",
+    "value[*].productVersion",
+    "value[*].severity"
+   ]
+  },
+  "GET /api/vulnerabilities/{id}": {
+   "page": "get-vulnerability-by-id.md",
+   "paths": [
+    "@odata.context",
+    "cveSupportability",
+    "cvssV3",
+    "cvssVector",
+    "description",
+    "epss",
+    "exploitInKit",
+    "exploitTypes",
+    "exploitUris",
+    "exploitVerified",
+    "exposedMachines",
+    "firstDetected",
+    "id",
+    "name",
+    "publicExploit",
+    "publishedOn",
+    "severity",
+    "status",
+    "tags",
+    "updatedOn"
+   ]
+  },
+  "GET /api/vulnerabilities/{id}/machineReferences": {
+   "page": "get-machines-by-vulnerability.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].computerDnsName",
+    "value[*].id",
+    "value[*].osPlatform",
+    "value[*].rbacGroupName"
+   ]
+  },
+  "GET api/browserextensions/permissionsinfo": {
+   "page": "get-browser-extensions-permission-info.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].value",
+    "value[*].value[*].description",
+    "value[*].value[*].key",
+    "value[*].value[*].permissionName"
+   ]
+  },
+  "PATCH /api/alerts/{id}": {
+   "page": "update-alert.md",
+   "paths": []
+  },
+  "PATCH /api/machines/{id}": {
+   "page": "update-machine-method.md",
+   "paths": []
+  },
+  "POST /api/DeviceAuthenticatedScanDefinitions": {
+   "page": "add-a-new-scan-definition.md",
+   "paths": [
+    "@odata.context",
+    "advancedActiveConfiguration",
+    "createdBy",
+    "id",
+    "intervalInHours",
+    "isActive",
+    "latestScan",
+    "latestScan.executionDateTime",
+    "latestScan.failureReason",
+    "latestScan.status",
+    "orgId",
+    "scanAuthenticationParams",
+    "scanName",
+    "scanType",
+    "scannerAgent",
+    "scannerAgent.assignedApplicationId",
+    "scannerAgent.id",
+    "scannerAgent.lastCommandExecutionTimestamp",
+    "scannerAgent.lastSeen",
+    "scannerAgent.machineId",
+    "scannerAgent.machineName",
+    "scannerAgent.mdeClientVersion",
+    "scannerAgent.scannerSoftwareVersion",
+    "target",
+    "targetType"
+   ]
+  },
+  "POST /api/DeviceAuthenticatedScanDefinitions/GetScanHistoryBySessionId": {
+   "page": "Get-scan-history-by-session.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].LastScanned",
+    "value[*].ListScannedTargets",
+    "value[*].ListScannedTargets.ErrorMessage",
+    "value[*].ListScannedTargets.Hostname",
+    "value[*].ListScannedTargets.Ip",
+    "value[*].ListScannedTargets.ScanDuration",
+    "value[*].ListScannedTargets.ScanStatus",
+    "value[*].ListScannedTargets.ScannedDeviceDescription",
+    "value[*].NumberOfSuccessfullyScannedTargets",
+    "value[*].NumberOfTargets",
+    "value[*].ScanDefinitionIds",
+    "value[*].ScanStatus",
+    "value[*].SessionIds",
+    "value[*].orgId"
+   ]
+  },
+  "POST /api/advancedqueries/run": {
+   "page": "run-advanced-query-api.md",
+   "paths": [
+    "Results",
+    "Results[*].DeviceId",
+    "Results[*].FileName",
+    "Results[*].InitiatingProcessFileName",
+    "Results[*].Timestamp",
+    "Schema",
+    "Schema[*].Name",
+    "Schema[*].Type"
+   ]
+  },
+  "POST /api/alerts/CreateAlertByReference": {
+   "page": "create-alert-by-reference.md",
+   "paths": []
+  },
+  "POST /api/alerts/batchUpdate": {
+   "page": "batch-update-alerts.md",
+   "paths": []
+  },
+  "POST /api/indicators": {
+   "page": "post-ti-indicator.md",
+   "paths": []
+  },
+  "POST /api/indicators/BatchDelete": {
+   "page": "batch-delete-ti-indicators.md",
+   "paths": []
+  },
+  "POST /api/indicators/import": {
+   "page": "import-ti-indicators.md",
+   "paths": [
+    "value",
+    "value[*].failureReason",
+    "value[*].id",
+    "value[*].indicator",
+    "value[*].isFailed"
+   ]
+  },
+  "POST /api/machineactions/<machineactionid>/cancel": {
+   "page": "cancel-machine-action.md",
+   "paths": []
+  },
+  "POST /api/machines/AddOrRemoveTagForMultipleMachines": {
+   "page": "add-or-remove-multiple-machine-tags.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/StopAndQuarantineFile": {
+   "page": "stop-and-quarantine-file.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/collectInvestigationPackage": {
+   "page": "collect-investigation-package.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/isolate": {
+   "page": "isolate-machine.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/offboard": {
+   "page": "offboard-machine-api.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/restrictCodeExecution": {
+   "page": "restrict-code-execution.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/runAntiVirusScan": {
+   "page": "run-av-scan.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/setDeviceValue": {
+   "page": "set-device-value.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/startInvestigation": {
+   "page": "initiate-autoir-investigation.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/tags": {
+   "page": "add-or-remove-machine-tags.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/unisolate": {
+   "page": "unisolate-machine.md",
+   "paths": []
+  },
+  "POST /api/machines/{id}/unrestrictCodeExecution": {
+   "page": "unrestrict-code-execution.md",
+   "paths": []
+  },
+  "POST api/DeviceAuthenticatedScanDefinitions/GetScanHistoryByScanDefinitionId": {
+   "page": "Get-scan-history-by-definition.md",
+   "paths": [
+    "@odata.context",
+    "value",
+    "value[*].LastScanned",
+    "value[*].ScanDefinitionIds",
+    "value[*].ScanStatus",
+    "value[*].ScannerId"
+   ]
+  }
+ },
+ "entities": {
+  "alerts": [
+   "ID",
+   "title",
+   "description",
+   "alertCreationTime",
+   "lastEventTime",
+   "firstEventTime",
+   "lastUpdateTime",
+   "resolvedTime",
+   "incidentId",
+   "investigationId",
+   "investigationState",
+   "assignedTo",
+   "rbacGroupName",
+   "mitreTechniques",
+   "relatedUser",
+   "severity",
+   "status",
+   "classification",
+   "determination",
+   "category",
+   "detectionSource",
+   "threatFamilyName",
+   "threatName",
+   "machineId",
+   "computerDnsName",
+   "aadTenantId",
+   "detectorId",
+   "comments",
+   "Evidence"
+  ],
+  "files": [
+   "sha1",
+   "sha256",
+   "globalPrevalence",
+   "globalFirstObserved",
+   "globalLastObserved",
+   "size",
+   "fileType",
+   "isPeFile",
+   "filePublisher",
+   "fileProductName",
+   "signer",
+   "issuer",
+   "signerHash",
+   "isValidCertificate",
+   "determinationType",
+   "determinationValue"
+  ],
+  "get-authenticated-scan-properties": [
+   "id",
+   "scanType",
+   "scanName",
+   "isActive",
+   "orgId",
+   "intervalInHours",
+   "createdBy",
+   "targetType",
+   "target",
+   "scanAuthenticationParams",
+   "scannerAgent"
+  ],
+  "get-remediation-all-activities": [
+   "Category",
+   "completerEmail",
+   "completerId",
+   "completionMethod",
+   "createdOn",
+   "Description",
+   "dueOn",
+   "fixedDevices",
+   "ID",
+   "nameId",
+   "Priority",
+   "productId",
+   "productivityImpactRemediationType",
+   "rbacGroupNames",
+   "recommendedProgram",
+   "recommendedVendor",
+   "recommendedVersion",
+   "relatedComponent",
+   "requesterEmail",
+   "requesterId",
+   "requesterNotes",
+   "Scid",
+   "Status",
+   "statusLastModifiedOn",
+   "targetDevices",
+   "Title",
+   "Type",
+   "vendorId"
+  ],
+  "get-remediation-exposed-devices-activities": [
+   "id",
+   "computerDnsName",
+   "osPlatform",
+   "rbacGroupName"
+  ],
+  "get-remediation-methods-properties": [
+   "Category",
+   "completerEmail",
+   "completerId",
+   "completionMethod",
+   "createdOn",
+   "Description",
+   "dueOn",
+   "fixedDevices",
+   "ID",
+   "nameId",
+   "Priority",
+   "productId",
+   "productivityImpactRemediationType",
+   "rbacGroupNames",
+   "recommendedProgram",
+   "recommendedVendor",
+   "recommendedVersion",
+   "relatedComponent",
+   "requesterEmail",
+   "requesterId",
+   "requesterNotes",
+   "Scid",
+   "Status",
+   "statusLastModifiedOn",
+   "targetDevices",
+   "Title",
+   "Type",
+   "vendorId"
+  ],
+  "get-remediation-one-activity": [
+   "Category",
+   "completerEmail",
+   "completerId",
+   "completionMethod",
+   "createdOn",
+   "Description",
+   "dueOn",
+   "fixedDevices",
+   "ID",
+   "nameId",
+   "Priority",
+   "productId",
+   "productivityImpactRemediationType",
+   "rbacGroupNames",
+   "recommendedProgram",
+   "recommendedVendor",
+   "recommendedVersion",
+   "relatedComponent",
+   "requesterEmail",
+   "requesterId",
+   "requesterNotes",
+   "Scid",
+   "Status",
+   "statusLastModifiedOn",
+   "targetDevices",
+   "Title",
+   "Type",
+   "vendorId"
+  ],
+  "investigation": [
+   "ID",
+   "startTime",
+   "endTime",
+   "cancelledBy",
+   "State",
+   "statusDetails",
+   "machineId",
+   "computerDnsName",
+   "triggeringAlertId"
+  ],
+  "machine": [
+   "id",
+   "computerDnsName",
+   "firstSeen",
+   "lastSeen",
+   "osPlatform",
+   "onboardingstatus",
+   "osProcessor",
+   "version",
+   "osBuild",
+   "lastIpAddress",
+   "lastExternalIpAddress",
+   "healthStatus",
+   "rbacGroupName",
+   "rbacGroupId",
+   "riskScore",
+   "aadDeviceId",
+   "machineTags",
+   "exposureLevel",
+   "deviceValue",
+   "ipAddresses",
+   "osArchitecture"
+  ],
+  "machineaction": [
+   "ID",
+   "type",
+   "scope",
+   "requestor",
+   "externalID",
+   "requestSource",
+   "commands",
+   "cancellationRequestor",
+   "requestorComment",
+   "cancellationComment",
+   "status",
+   "machineId",
+   "computerDnsName",
+   "creationDateTimeUtc",
+   "cancellationDateTimeUtc",
+   "lastUpdateDateTimeUtc",
+   "title",
+   "relatedFileInfo"
+  ],
+  "score": [
+   "Score",
+   "Time",
+   "RbacGroupName",
+   "RbacGroupId"
+  ],
+  "software": [
+   "id",
+   "Name",
+   "Vendor",
+   "Weaknesses",
+   "publicExploit",
+   "activeAlert",
+   "exposedMachines",
+   "impactScore"
+  ],
+  "ti-indicator": [
+   "ID",
+   "indicatorValue",
+   "indicatorType",
+   "application",
+   "action",
+   "externalID",
+   "sourceType",
+   "createdBySource",
+   "createdBy",
+   "lastUpdatedBy",
+   "creationTimeDateTimeUtc",
+   "expirationTime",
+   "lastUpdateTime",
+   "severity",
+   "title",
+   "description",
+   "recommendedActions",
+   "rbacGroupNames",
+   "rbacGroupIds",
+   "generateAlert"
+  ],
+  "vulnerability": [
+   "Id",
+   "Name",
+   "Description",
+   "Severity",
+   "cvssV3",
+   "cvssVector",
+   "exposedMachines",
+   "publishedOn",
+   "updatedOn",
+   "publicExploit",
+   "exploitVerified",
+   "exploitInKit",
+   "exploitTypes",
+   "exploitUris",
+   "CveSupportability",
+   "EPSS"
+  ]
+ }
+}

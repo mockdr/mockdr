@@ -117,7 +117,9 @@ def seed_es_rules(fake: Faker) -> list[str]:
             exceptions_list=[],
             created_at=created_at,
             created_by=created_by,
-            updated_at=now_ts,
+            # taken after created_at: now_ts was sampled before the loop, so a
+            # created_at drawn close to "now" could land after it
+            updated_at=rand_ago(0),
             updated_by=created_by,
             immutable=False,
         ))

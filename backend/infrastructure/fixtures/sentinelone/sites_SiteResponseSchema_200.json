@@ -1,0 +1,83 @@
+{
+ "definition": "sites_SiteResponseSchema_200",
+ "routes": "/sites",
+ "data": {
+  "allSites": {
+   "activeLicenses": 0,
+   "totalLicenses": 0
+  },
+  "sites": [
+   {
+    "id": 182483948009279264,
+    "name": "My Site",
+    "registrationToken": null,
+    "isDefault": false,
+    "healthStatus": false,
+    "totalLicenses": 0,
+    "siteType": "",
+    "expiration": "2018-02-27T04:49:26.257525Z",
+    "externalId": "",
+    "description": "",
+    "state": "active",
+    "suite": null,
+    "sku": null,
+    "createdAt": "2018-02-27T04:49:26.257525Z",
+    "updatedAt": "2018-02-27T04:49:26.257525Z",
+    "accountId": "225494730938493804",
+    "accountName": "SentinelOne",
+    "activeLicenses": 31,
+    "licenses": {
+     "bundles": [
+      {
+       "displayName": "",
+       "majorVersion": 0,
+       "minorVersion": 0,
+       "name": "",
+       "surfaces": [
+        {
+         "count": null,
+         "name": null
+        }
+       ],
+       "totalSurfaces": 0
+      }
+     ],
+     "modules": [
+      {
+       "displayName": "",
+       "majorVersion": 0,
+       "name": ""
+      }
+     ],
+     "settings": [
+      {
+       "displayName": "",
+       "settingGroup": "",
+       "settingGroupDisplayName": "",
+       "groupName": null,
+       "setting": null
+      }
+     ]
+    },
+    "usageType": "",
+    "irFields": {
+     "companyName": "",
+     "contactFirstName": "",
+     "contactLastName": "",
+     "contactEmail": "ADMIN@SENTINELONE.COM",
+     "region": "",
+     "country": "",
+     "city": null,
+     "postal": null,
+     "numberOfEmployeesEndpoints": 0,
+     "industry": "Education"
+    },
+    "inheritAccountExpiration": false,
+    "creator": "",
+    "creatorId": "225494730938493804",
+    "unlimitedExpiration": false,
+    "unlimitedLicenses": false
+   }
+  ]
+ }
+}

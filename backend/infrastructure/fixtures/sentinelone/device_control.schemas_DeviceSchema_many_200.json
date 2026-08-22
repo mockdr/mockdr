@@ -1,0 +1,38 @@
+{
+ "definition": "device_control.schemas_DeviceSchema_many_200",
+ "routes": "/device-control",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "order": 0,
+   "interface": "USB",
+   "deviceId": "02",
+   "deviceClass": "02h",
+   "deviceClassName": null,
+   "ruleName": "",
+   "vendorId": "02",
+   "productId": "02",
+   "uid": "",
+   "action": "Allow",
+   "status": "Enabled",
+   "scope": "site",
+   "scopeName": "",
+   "scopeId": "225494730938493804",
+   "editable": false,
+   "ruleType": "class",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "creator": "",
+   "creatorId": "225494730938493804",
+   "version": "",
+   "minorClasses": [],
+   "accessPermission": "Read-Only",
+   "bluetoothAddress": "",
+   "gattService": [],
+   "manufacturerName": "",
+   "deviceName": "",
+   "deviceInformationServiceInfoKey": "",
+   "deviceInformationServiceInfoValue": ""
+  }
+ ]
+}

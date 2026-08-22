@@ -1,4 +1,5 @@
 """Microsoft Defender for Endpoint Machine query handlers (read-only)."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -6,6 +7,7 @@ from dataclasses import asdict
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
+from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
@@ -13,8 +15,10 @@ from utils.mde_serde import to_mde_resource
 
 def _resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
-    return to_mde_resource(record, "machineId")
-
+    # The docs' machine has none of these; loggedOnUsers has its own route.
+    for key in ("groupName", "loggedOnUsers", "agentVersion"):
+        record.pop(key, None)
+    return complete_mde(to_mde_resource(record, "machineId"), "machine")
 
 
 def list_machines(
@@ -48,11 +52,12 @@ def list_machines(
     next_link = None
     if skip + top < total:
         next_link = (
-            f"https://api.securitycenter.microsoft.com/api/machines"
-            f"?$top={top}&$skip={skip + top}"
+            f"https://api.securitycenter.microsoft.com/api/machines?$top={top}&$skip={skip + top}"
         )
     return build_mde_list_response(
-        page, next_link=next_link, count=total if count else None,
+        page,
+        next_link=next_link,
+        count=total if count else None,
     )
 
 
@@ -83,7 +88,7 @@ def get_machine_logon_users(machine_id: str) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    return build_mde_list_response(machine.loggedOnUsers)
+    return build_mde_list_response([complete_mde(dict(u), "user") for u in machine.loggedOnUsers])
 
 
 def get_machine_alerts(machine_id: str) -> dict | None:
@@ -107,6 +112,7 @@ def get_machine_alerts(machine_id: str) -> dict | None:
 def _get_agent_id_for_machine(machine_id: str) -> str | None:
     """Find the S1 agent_id mapped to this MDE machine_id via edr_id_map."""
     from repository.store import store
+
     all_maps = store.get_all_with_keys("edr_id_map")
     for agent_id, mapping in all_maps.items():
         if isinstance(mapping, dict) and mapping.get("mde_machine_id") == machine_id:
@@ -160,6 +166,7 @@ def get_machine_software(machine_id: str) -> dict | None:
         return build_mde_list_response([])
 
     from repository.store import store
+
     all_apps = store.get_all("installed_apps")
     machine_apps = [a for a in all_apps if a.get("agentId") == agent_id]
 
@@ -179,9 +186,11 @@ def get_software_inventory_export() -> dict:
         "exportFiles": [
             "/_mock/mde/software-export-data.json",
         ],
-        "generatedTime": __import__("datetime").datetime.now(
+        "generatedTime": __import__("datetime")
+        .datetime.now(
             __import__("datetime").UTC,
-        ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
@@ -214,20 +223,22 @@ def get_software_export_data() -> list[dict]:
         info = agent_info.get(agent_id)
         if not info:
             continue
-        records.append({
-            "deviceId": info["mde_machine_id"],
-            "deviceName": info["hostname"],
-            "osPlatform": info["os_platform"],
-            "softwareVendor": app.get("publisher", app.get("publisherName", "")),
-            "softwareName": app.get("name", ""),
-            "softwareVersion": app.get("version", ""),
-            "numberOfWeaknesses": 0,
-            "diskPaths": [],
-            "registryPaths": [],
-            "softwareFirstSeenTimestamp": app.get("installedDate", ""),
-            "endOfSupportStatus": "",
-            "endOfSupportDate": None,
-        })
+        records.append(
+            {
+                "deviceId": info["mde_machine_id"],
+                "deviceName": info["hostname"],
+                "osPlatform": info["os_platform"],
+                "softwareVendor": app.get("publisher", app.get("publisherName", "")),
+                "softwareName": app.get("name", ""),
+                "softwareVersion": app.get("version", ""),
+                "numberOfWeaknesses": 0,
+                "diskPaths": [],
+                "registryPaths": [],
+                "softwareFirstSeenTimestamp": app.get("installedDate", ""),
+                "endOfSupportStatus": "",
+                "endOfSupportDate": None,
+            }
+        )
 
     return records
 
@@ -248,14 +259,15 @@ def get_machine_vulnerabilities(machine_id: str) -> dict | None:
     all_vulns = [asdict(v) for v in mde_vulnerability_repo.list_all()]
     machines = mde_machine_repo.list_all()
     machine_idx = next(
-        (i for i, m in enumerate(machines) if m.machineId == machine_id), -1,
+        (i for i, m in enumerate(machines) if m.machineId == machine_id),
+        -1,
     )
     if machine_idx < 0:
         return build_mde_list_response([])
-    associated = [
-        v for i, v in enumerate(all_vulns) if i % len(machines) == machine_idx
-    ] if machines else []
-    return build_mde_list_response(associated)
+    associated = (
+        [v for i, v in enumerate(all_vulns) if i % len(machines) == machine_idx] if machines else []
+    )
+    return build_mde_list_response([complete_mde(dict(v), "vulnerability") for v in associated])
 
 
 def get_machine_recommendations(machine_id: str) -> dict | None:

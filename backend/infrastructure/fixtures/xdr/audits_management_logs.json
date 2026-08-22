@@ -1,0 +1,24 @@
+{
+ "route": "POST /public_api/v1/audits/management_logs/",
+ "reply": {
+  "result_count": 0,
+  "data": [
+   {
+    "AUDIT_ID": 0,
+    "AUDIT_OWNER_NAME": "",
+    "AUDIT_OWNER_EMAIL": "",
+    "AUDIT_ASSET_JSON": "",
+    "AUDIT_ASSET_NAMES": "",
+    "AUDIT_HOSTNAME": "",
+    "AUDIT_RESULT": "",
+    "AUDIT_REASON": "",
+    "AUDIT_DESCRIPTION": "",
+    "AUDIT_ENTITY": "",
+    "AUDIT_ENTITY_SUBTYPE": "",
+    "AUDIT_SESSION_ID": "",
+    "AUDIT_CASE_ID": "",
+    "AUDIT_INSERT_TIME": 0
+   }
+  ]
+ }
+}

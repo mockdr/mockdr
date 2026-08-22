@@ -1,0 +1,22 @@
+{
+ "route": "POST /public_api/v1/audits/agents_reports/",
+ "reply": {
+  "result_count": 0,
+  "data": [
+   {
+    "TIMESTAMP": 0,
+    "RECEIVEDTIME": 0,
+    "ENDPOINTID": "",
+    "ENDPOINTNAME": "",
+    "DOMAIN": "",
+    "TRAPSVERSION": "",
+    "CATEGORY": "",
+    "TYPE": "",
+    "SUBTYPE": "",
+    "RESULT": "",
+    "REASON": "",
+    "DESCRIPTION": ""
+   }
+  ]
+ }
+}

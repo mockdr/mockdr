@@ -24,7 +24,8 @@ class TestAgentProcesses:
         assert resp.status_code == 200
         body = resp.json()
         assert "data" in body
-        assert "pagination" in body
+        # AgentProcessesSchema_many: data and errors, no pagination block
+        assert "pagination" not in body
         assert isinstance(body["data"], list)
 
     def test_processes_have_required_fields(self, client: TestClient, auth_headers: dict) -> None:
@@ -33,7 +34,7 @@ class TestAgentProcesses:
                                headers=auth_headers).json()["data"]
         if processes:
             proc = processes[0]
-            for field in ("pid", "name", "user"):
+            for field in ("pid", "processName", "executablePath"):
                 assert field in proc, f"Required field '{field}' missing from process"
 
     def test_limit_parameter(self, client: TestClient, auth_headers: dict) -> None:
@@ -63,7 +64,7 @@ class TestAgentApplications:
                           headers=auth_headers).json()["data"]
         if apps:
             app = apps[0]
-            for field in ("name", "version", "publisherName"):
+            for field in ('name', 'version', 'publisher'):  # AgentApplicationsSchema (2.1 swagger)
                 assert field in app, f"Required field '{field}' missing from application"
 
     def test_limit_parameter(self, client: TestClient, auth_headers: dict) -> None:

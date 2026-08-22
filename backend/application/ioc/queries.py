@@ -19,4 +19,6 @@ def list_iocs(params: dict, cursor: str | None, limit: int) -> dict:
     filtered.sort(key=lambda r: r.get("creationTime", ""), reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, IOC_CURSOR)
-    return build_list_response(page, next_cursor, total)
+    return build_list_response(
+        page, next_cursor, total, definition="v2_1.schemas_GetIndicatorSchema_many_200"
+    )

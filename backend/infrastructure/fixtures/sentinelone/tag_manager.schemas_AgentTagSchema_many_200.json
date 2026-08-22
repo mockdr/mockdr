@@ -1,0 +1,24 @@
+{
+ "definition": "tag_manager.schemas_AgentTagSchema_many_200",
+ "routes": "/agents/tags",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "key": "env",
+   "value": "production",
+   "description": "env-prod",
+   "type": "agents",
+   "allowEdit": false,
+   "scopePath": "Global\\Default account\\Default site",
+   "scopeLevel": "site",
+   "scopeId": "225494730938493804",
+   "createdAt": "2018-02-19T16:32:00.000Z",
+   "updatedAt": "2018-02-20T16:40:00.000Z",
+   "createdBy": "John Doe",
+   "updatedBy": "John Doe",
+   "totalEndpoints": 0,
+   "endpointsInCurrentScope": 0,
+   "totalExclusions": 0
+  }
+ ]
+}

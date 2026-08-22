@@ -1,0 +1,42 @@
+{
+ "route": "POST /public_api/v1/alerts/get_alerts_by_filter_data/",
+ "reply": {
+  "result_count": 0,
+  "alerts": [
+   {
+    "alert_fields": {
+     "events": [
+      {
+       "module_id": "",
+       "module_name": "",
+       "association_strength": 0,
+       "event_type": 0,
+       "event_timestamp": 0
+      }
+     ],
+     "internal_id": 0,
+     "alert_source": "",
+     "matching_status": "",
+     "severity": "",
+     "local_insert_ts": 0,
+     "source_insert_ts": 0,
+     "alert_name": "",
+     "alert_category": "",
+     "alert_description": "",
+     "external_id": "",
+     "bioc_indicator": "",
+     "alert_action_status": "",
+     "is_whitelisted": false,
+     "starred": false,
+     "agent_data_collection_status": false,
+     "agent_id": "",
+     "agent_os_type": "",
+     "agent_ip_addresses": [],
+     "case_id": 0,
+     "events_length": 0
+    },
+    "incident_fields": ""
+   }
+  ]
+ }
+}

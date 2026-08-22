@@ -1,0 +1,32 @@
+{
+ "route": "POST /public_api/v1/incidents/get_incidents/",
+ "reply": {
+  "total_count": 0,
+  "result_count": 0,
+  "incidents": [
+   {
+    "incident_id": "",
+    "creation_time": 0,
+    "modification_time": 0,
+    "detection_time": "",
+    "status": "",
+    "severity": "",
+    "description": "",
+    "assigned_user_mail": "",
+    "assigned_user_pretty_name": "",
+    "alert_count": 0,
+    "low_severity_alert_count": 0,
+    "med_severity_alert_count": 0,
+    "high_severity_alert_count": 0,
+    "user_count": 0,
+    "host_count": 0,
+    "notes": "",
+    "resolve_comment": "",
+    "manual_severity": "",
+    "manual_description": "",
+    "xdr_url": "",
+    "starred": false
+   }
+  ]
+ }
+}

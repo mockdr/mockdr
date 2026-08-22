@@ -1,0 +1,11 @@
+{
+ "definition": "system_SystemInfoSchema_200",
+ "routes": "/system/info",
+ "data": {
+  "release": "",
+  "version": "",
+  "build": "",
+  "patch": "",
+  "latestAgentVersion": ""
+ }
+}

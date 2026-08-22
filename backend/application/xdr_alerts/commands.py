@@ -1,4 +1,5 @@
 """Cortex XDR Alert command handlers (mutations)."""
+
 from __future__ import annotations
 
 import time
@@ -38,13 +39,43 @@ def insert_parsed_alerts(alerts: list[dict]) -> dict:
         xdr_alert_repo.save(alert)
         # Bridge the alert into Splunk and Sentinel (ADR-009). The bridge
         # subscribed to this event and nothing ever published it.
-        event_bus.publish(XdrAlertCreated(
-            entity_id=alert.alert_id,
-            payload=asdict(alert),
-            timestamp=time.time(),
-        ))
+        event_bus.publish(
+            XdrAlertCreated(
+                entity_id=alert.alert_id,
+                payload=asdict(alert),
+                timestamp=time.time(),
+            )
+        )
 
     return build_xdr_reply(True)
+
+
+_CEF_SEVERITY = {
+    range(0, 4): "low",
+    range(4, 7): "medium",
+    range(7, 9): "high",
+    range(9, 11): "critical",
+}
+
+
+def _parse_cef(line: str) -> dict:
+    """The fields of one CEF line: header pipes, then key=value extensions."""
+    parts = line.split("|", 7)
+    if len(parts) < 7 or not parts[0].startswith("CEF:"):
+        return {"name": "CEF Alert", "cef_version": line[:64]}
+    severity = "medium"
+    if parts[6].strip().isdigit():
+        level = int(parts[6].strip())
+        severity = next((name for band, name in _CEF_SEVERITY.items() if level in band), "medium")
+    extension = dict(
+        pair.split("=", 1) for pair in (parts[7] if len(parts) > 7 else "").split() if "=" in pair
+    )
+    return {
+        "name": parts[5].strip() or "CEF Alert",
+        "severity": severity,
+        "cef_version": f"{parts[1]} {parts[2]} {parts[3]}".strip(),
+        "device_host_name": extension.get("dvchost") or extension.get("shost") or "",
+    }
 
 
 def insert_cef_alerts(alerts: list[dict]) -> dict:
@@ -57,7 +88,12 @@ def insert_cef_alerts(alerts: list[dict]) -> dict:
         XDR reply confirming success.
     """
     now_ms = _epoch_ms()
-    for alert_data in alerts:
+    for raw in alerts:
+        # The real API takes CEF *lines* ("CEF:0|Vendor|Product|…"); a dict
+        # is accepted too. A string used to crash this with AttributeError.
+        alert_data = _parse_cef(raw) if isinstance(raw, str) else raw
+        if not isinstance(alert_data, dict):
+            continue
         alert_id = str(uuid.uuid4())
         alert = XdrAlert(
             alert_id=alert_id,
@@ -71,11 +107,13 @@ def insert_cef_alerts(alerts: list[dict]) -> dict:
         xdr_alert_repo.save(alert)
         # Bridge the alert into Splunk and Sentinel (ADR-009). The bridge
         # subscribed to this event and nothing ever published it.
-        event_bus.publish(XdrAlertCreated(
-            entity_id=alert.alert_id,
-            payload=asdict(alert),
-            timestamp=time.time(),
-        ))
+        event_bus.publish(
+            XdrAlertCreated(
+                entity_id=alert.alert_id,
+                payload=asdict(alert),
+                timestamp=time.time(),
+            )
+        )
 
     return build_xdr_reply(True)
 
@@ -110,4 +148,5 @@ def update_alerts(alert_ids: list[str], update_data: dict) -> dict:
 def _epoch_ms() -> int:
     """Return current time as epoch milliseconds."""
     from datetime import UTC, datetime
+
     return int(datetime.now(UTC).timestamp() * 1000)

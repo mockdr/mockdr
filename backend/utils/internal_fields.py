@@ -10,6 +10,7 @@ by the application layer (queries and commands) via ``utils.strip.strip_fields``
 AGENT_INTERNAL_FIELDS: frozenset[str] = frozenset({
     "passphrase", "localIp", "isInfected", "installedAt",
     "agentLicenseType", "cpuUsage", "memoryUsage",
+    "decommissionedAt",  # a filter field; AgentViewSchema does not declare it
 })
 
 DEVICE_CONTROL_INTERNAL_FIELDS: frozenset[str] = frozenset({"siteId"})

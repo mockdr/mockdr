@@ -1,0 +1,96 @@
+{
+ "route": "POST /public_api/v1/incidents/get_incident_extra_data/",
+ "reply": {
+  "incident": {
+   "incident_id": "",
+   "creation_time": 0,
+   "modification_time": 0,
+   "detection_time": "",
+   "status": "",
+   "severity": "",
+   "description": "",
+   "assigned_user_mail": "",
+   "assigned_user_pretty_name": "",
+   "alert_count": 0,
+   "low_severity_alert_count": 0,
+   "med_severity_alert_count": 0,
+   "high_severity_alert_count": 0,
+   "user_count": 0,
+   "host_count": 0,
+   "notes": "",
+   "resolve_comment": "",
+   "manual_severity": "",
+   "manual_description": "",
+   "xdr_url": "",
+   "starred": false
+  },
+  "alerts": {
+   "total_count": 0,
+   "data": [
+    {
+     "alert_id": "",
+     "detection_timestamp": 0,
+     "source": "",
+     "severity": "",
+     "name": "",
+     "category": "",
+     "action": "",
+     "action_pretty": "",
+     "description": "",
+     "host_ip": "",
+     "host_name": "",
+     "user_name": "",
+     "event_type": "",
+     "actor_process_image_name": "",
+     "actor_process_command_line": "",
+     "actor_process_signature_status": "",
+     "actor_process_signature_vendor": "",
+     "causality_actor_process_image_name": "",
+     "causality_actor_process_command_line": "",
+     "causality_actor_process_signature_status": "",
+     "causality_actor_process_signature_vendor": "",
+     "causality_actor_causality_id": "",
+     "action_process_image_name": "",
+     "action_process_image_command_line": "",
+     "action_process_image_sha256": "",
+     "action_process_signature_status": "",
+     "action_process_signature_vendor": "",
+     "action_file_path": "",
+     "action_file_md5": "",
+     "action_file_sha256": "",
+     "action_registry_data": "",
+     "action_registry_full_key": "",
+     "action_local_ip": "",
+     "action_local_port": "",
+     "action_remote_ip": "",
+     "action_remote_port": "",
+     "action_external_hostname": "",
+     "fw_app_id": "",
+     "is_whitelisted": "",
+     "starred": false
+    }
+   ]
+  },
+  "network_artifacts": {
+   "total_count": 0,
+   "data": []
+  },
+  "file_artifacts": {
+   "total_count": 0,
+   "data": [
+    {
+     "type": "",
+     "alert_count": 0,
+     "is_manual": false,
+     "is_malicious": false,
+     "is_process": false,
+     "file_name": "",
+     "file_sha256": "",
+     "file_signature_status": "",
+     "file_signature_vendor_name": "",
+     "file_wildfire_verdict": ""
+    }
+   ]
+  }
+ }
+}

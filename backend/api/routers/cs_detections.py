@@ -3,6 +3,7 @@
 Implements the alerts/queries, alerts/entities, and alerts update endpoints
 matching the real CrowdStrike Falcon API path structure.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -39,6 +40,22 @@ def query_detections(
     return detection_queries.query_detection_ids(filter, offset, limit, sort)
 
 
+#: Fields of the legacy detection document that an alert (v2) does not carry
+#: (gofalcon DetectsapiPostEntitiesAlertsV2Response).
+_DETECTION_ONLY = (
+    "behaviors",
+    "date_updated",
+    "first_behavior",
+    "last_behavior",
+    "hostinfo",
+    "max_confidence",
+    "max_severity",
+    "max_severity_displayname",
+    "assignee",
+    "assigner",
+)
+
+
 @router.post("/alerts/entities/alerts/v2")
 def get_detections(
     body: dict = Body(...),
@@ -46,7 +63,18 @@ def get_detections(
 ) -> dict:
     """Return full detection entities for the given composite IDs."""
     ids: list[str] = _id_list(body)
-    return detection_queries.get_detection_entities(ids)
+    response = detection_queries.get_detection_entities(ids)
+    # An alert (v2) is not a detection: it carries no ``behaviors`` array
+    # (gofalcon DetectsapiPostEntitiesAlertsV2Response). The legacy detects
+    # route keeps them.
+    for resource in response.get("resources", []):
+        # An alert's severity is the detection's max_severity, under the
+        # names DetectsapiAlert declares.
+        resource.setdefault("severity", resource.get("max_severity"))
+        resource.setdefault("severity_name", resource.get("max_severity_displayname"))
+        for legacy in _DETECTION_ONLY:
+            resource.pop(legacy, None)
+    return response
 
 
 @router.patch("/alerts/entities/alerts/v3")
@@ -63,7 +91,7 @@ def update_detections(
     """
     ids: list[str] = _id_list(body)
     try:
-        return detection_commands.update_detections(
+        response = detection_commands.update_detections(
             ids=ids,
             action_parameters=body.get("action_parameters"),
             status=body.get("status"),
@@ -75,3 +103,6 @@ def update_detections(
             status_code=400,
             detail=build_vendor_error("crowdstrike", 400, str(exc)),
         ) from exc
+    # DetectsapiResponseFields: meta and errors only, no resources.
+    response.pop("resources", None)
+    return response

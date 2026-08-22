@@ -1,9 +1,11 @@
 """Microsoft Defender for Endpoint Investigation query handlers (read-only)."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
 
 from repository.mde_investigation_repo import mde_investigation_repo
+from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
@@ -11,8 +13,7 @@ from utils.mde_serde import to_mde_resource
 
 def _resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
-    return to_mde_resource(record, "investigationId")
-
+    return complete_mde(to_mde_resource(record, "investigationId"), "investigation")
 
 
 def list_investigations(

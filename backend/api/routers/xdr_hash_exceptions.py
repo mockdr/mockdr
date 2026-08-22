@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_hash_exceptions import commands as hash_commands
 from application.xdr_hash_exceptions import queries as hash_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import require_request_data
 
 router = APIRouter(tags=["XDR Hash Exceptions"])
@@ -34,6 +35,7 @@ def get_allowlist(
 
 
 @router.post("/hash_exceptions/blocklist/")
+@xdr_shape("hash_exceptions_blocklist")
 def add_to_blocklist(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),

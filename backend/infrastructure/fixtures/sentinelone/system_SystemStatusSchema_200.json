@@ -1,0 +1,7 @@
+{
+ "definition": "system_SystemStatusSchema_200",
+ "routes": "/system/status",
+ "data": {
+  "health": "ok"
+ }
+}

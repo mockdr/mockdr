@@ -1,0 +1,19 @@
+{
+ "route": "POST /public_api/v1/hash_exceptions/blocklist/",
+ "reply": {
+  "multi_command_args": {
+   "hash_list": [],
+   "comment": ""
+  },
+  "single_command_args": {
+   "hash_list": [],
+   "comment": ""
+  },
+  "no_comment_command_args": {
+   "hash_list": []
+  },
+  "api_response": {
+   "reply": false
+  }
+ }
+}

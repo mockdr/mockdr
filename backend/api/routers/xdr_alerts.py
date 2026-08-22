@@ -10,12 +10,14 @@ from fastapi import APIRouter, Body, Depends
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_alerts import commands as alert_commands
 from application.xdr_alerts import queries as alert_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import require_request_data
 
 router = APIRouter(tags=["XDR Alerts"])
 
 
 @router.post("/alerts/get_alerts_by_filter_data/")
+@xdr_shape("alerts_get_alerts_by_filter_data")
 def get_alerts(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -26,6 +28,7 @@ def get_alerts(
 
 
 @router.post("/alerts/get_original_alerts/")
+@xdr_shape("alerts_get_original_alerts")
 def get_original_alerts(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),

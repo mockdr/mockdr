@@ -7,6 +7,7 @@ from repository.store import store
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.pagination import AGENT_CURSOR, build_list_response, build_single_response, paginate
+from utils.s1_fixtures import restrict_item
 from utils.strip import strip_fields
 
 FILTER_SPECS = [
@@ -37,16 +38,12 @@ def _apply_tag_filters(records: list[dict], params: dict) -> list[dict]:
 
     if has_tags is not None:
         want = str(has_tags).lower() in ("true", "1", "yes")
-        records = [
-            r for r in records
-            if bool((r.get("tags") or {}).get("sentinelone", [])) == want
-        ]
+        records = [r for r in records if bool((r.get("tags") or {}).get("sentinelone", [])) == want]
 
     if tags_data_raw:
         try:
             tag_filter = (
-                json.loads(tags_data_raw) if isinstance(tags_data_raw, str)
-                else tags_data_raw
+                json.loads(tags_data_raw) if isinstance(tags_data_raw, str) else tags_data_raw
             )
         except (json.JSONDecodeError, TypeError):
             tag_filter = {}
@@ -80,7 +77,9 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, AGENT_CURSOR)
     stripped = [strip_fields(r, AGENT_INTERNAL_FIELDS) for r in page]
-    return build_list_response(stripped, next_cursor, total)
+    return build_list_response(
+        stripped, next_cursor, total, definition="agents.schemas_AgentViewSchema_many_200"
+    )
 
 
 def count_agents(params: dict) -> dict:
@@ -102,8 +101,13 @@ def list_passphrases(params: dict, cursor: str | None, limit: int) -> dict:
         for r in filtered
     ]
     page, next_cursor, total = paginate(passphrases, cursor, limit)
-    return build_list_response(page, next_cursor, total)
-
+    return build_list_response(
+        page,
+        next_cursor,
+        total,
+        definition="agents.schemas_AgentPassphraseSchema_many_200",
+        strict=True,
+    )
 
 
 def get_agent(agent_id: str) -> dict | None:
@@ -128,19 +132,20 @@ def get_agent_processes(agent_id: str, cursor: str | None, limit: int) -> dict |
         return None
     processes = generate_processes_for_agent(agent_id)
     page, next_cursor, total = paginate(processes, cursor, limit)
-    return build_list_response(page, next_cursor, total)
+    return {
+        "data": [restrict_item(i, "agents.schemas_AgentProcessesSchema_many_200") for i in page]
+    }
 
 
 def get_agent_applications(agent_id: str, cursor: str | None, limit: int) -> dict | None:
     """Return a paginated list of installed applications for the given agent, or None."""
     if not agent_repo.exists(agent_id):
         return None
-    apps = [
-        r for r in store.get_all("installed_apps")
-        if r.get("agentId") == agent_id
-    ]
+    apps = [r for r in store.get_all("installed_apps") if r.get("agentId") == agent_id]
     page, next_cursor, total = paginate(apps, cursor, limit)
-    return build_list_response(page, next_cursor, total)
+    return {
+        "data": [restrict_item(i, "agents.schemas_AgentApplicationsSchema_many_200") for i in page]
+    }
 
 
 def list_applications_for_agents(
@@ -179,6 +184,7 @@ def list_applications_for_agents(
     # Filter by installedAt date range
     if installed_at_between:
         from utils.filtering import _parse_dt
+
         parts = installed_at_between.split(",", 1)
         if len(parts) == 2:
             start_dt = _parse_dt(parts[0].strip())
@@ -192,7 +198,9 @@ def list_applications_for_agents(
                 apps = filtered
 
     page, next_cursor, total = paginate(apps, cursor, limit)
-    return build_list_response(page, next_cursor, total)
+    return {
+        "data": [restrict_item(i, "agents.schemas_AgentApplicationsSchema_many_200") for i in page]
+    }
 
 
 def list_processes_for_agents(agent_ids: list[str], cursor: str | None, limit: int) -> dict:
@@ -206,7 +214,9 @@ def list_processes_for_agents(agent_ids: list[str], cursor: str | None, limit: i
     for agent in targets:
         processes.extend(generate_processes_for_agent(agent.id))
     page, next_cursor, total = paginate(processes, cursor, limit)
-    return build_list_response(page, next_cursor, total)
+    return {
+        "data": [restrict_item(i, "agents.schemas_AgentProcessesSchema_many_200") for i in page]
+    }
 
 
 def get_agent_upload(agent_id: str, activity_id: str) -> bytes | None:

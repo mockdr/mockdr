@@ -187,8 +187,9 @@ class TestGetUserEntitiesPost:
             json={"ids": ids[:1]},
         )
         user = resp.json()["resources"][0]
-        required_fields = ["uuid", "uid", "first_name", "last_name", "roles",
-                           "cid", "customer", "status", "created_at", "last_login_at"]
+        # FlightcontrolapiUser (gofalcon): no roles/customer on the user entity
+        required_fields = ["uuid", "uid", "first_name", "last_name",
+                           "cid", "status", "created_at", "last_login_at"]
         for f in required_fields:
             assert f in user, f"Required field '{f}' missing from user entity"
 
@@ -203,19 +204,6 @@ class TestGetUserEntitiesPost:
             json={"ids": [target_id]},
         )
         assert resp.json()["resources"][0]["uuid"] == target_id
-
-    def test_user_roles_is_a_list(self, client: TestClient) -> None:
-        """roles field must be a non-empty list of strings."""
-        headers = _cs_auth(client)
-        ids = self._get_all_user_ids(client, headers)
-        resp = client.post(
-            "/cs/user-management/entities/users/GET/v1",
-            headers=headers,
-            json={"ids": ids},
-        )
-        for user in resp.json()["resources"]:
-            assert isinstance(user["roles"], list)
-            assert len(user["roles"]) > 0
 
     def test_uid_is_acmecorp_email(self, client: TestClient) -> None:
         """uid (email) must use the acmecorp.internal seed domain."""

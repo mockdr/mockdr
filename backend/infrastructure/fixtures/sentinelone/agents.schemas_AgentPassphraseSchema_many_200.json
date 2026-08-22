@@ -1,0 +1,25 @@
+{
+ "definition": "agents.schemas_AgentPassphraseSchema_many_200",
+ "routes": "/agents/passphrases",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "uuid": "ff819e70af13be381993075eb0ce5f2f6de05be2",
+   "domain": "mybusiness.net",
+   "computerName": "JOHN-WIN-4125",
+   "lastLoggedInUserName": "janedoe3",
+   "passphrase": "DUNE BRAG LINT RATE ATE WEE BLOB BUSS SIS TINY GREW SHOD",
+   "createdAt": null,
+   "acknowledgedAt": null,
+   "createdByUser": null,
+   "previousPassphrases": [
+    {
+     "passphrase": "DUNE BRAG LINT RATE ATE WEE BLOB BUSS SIS TINY GREW SHOD",
+     "createdAt": null,
+     "acknowledgedAt": null,
+     "createdByUser": null
+    }
+   ]
+  }
+ ]
+}

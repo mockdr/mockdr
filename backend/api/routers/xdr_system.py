@@ -3,6 +3,7 @@
 Groups miscellaneous XDR endpoints that don't warrant their own router module.
 All POST endpoints use ``{"request_data": {...}}`` body wrapper.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -12,6 +13,7 @@ from fastapi import APIRouter, Body, Depends
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_rbac import queries as rbac_queries
 from application.xdr_system import queries as system_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply, require_request_data
 
 router = APIRouter(tags=["XDR System"])
@@ -21,6 +23,7 @@ router = APIRouter(tags=["XDR System"])
 
 
 @router.post("/system/get_tenant_info/")
+@xdr_shape("system_get_tenant_info")
 def get_tenant_info(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -75,10 +78,12 @@ def assign_tag(
 ) -> dict:
     """Assign a tag to agents (stub)."""
     request_data = require_request_data(body)
-    return build_xdr_reply({
-        "assigned_count": len(request_data.get("endpoint_ids", [])),
-        "tag": request_data.get("tag", ""),
-    })
+    return build_xdr_reply(
+        {
+            "assigned_count": len(request_data.get("endpoint_ids", [])),
+            "tag": request_data.get("tag", ""),
+        }
+    )
 
 
 @router.post("/tags/agents/remove/")
@@ -88,10 +93,12 @@ def remove_tag(
 ) -> dict:
     """Remove a tag from agents (stub)."""
     request_data = require_request_data(body)
-    return build_xdr_reply({
-        "removed_count": len(request_data.get("endpoint_ids", [])),
-        "tag": request_data.get("tag", ""),
-    })
+    return build_xdr_reply(
+        {
+            "removed_count": len(request_data.get("endpoint_ids", [])),
+            "tag": request_data.get("tag", ""),
+        }
+    )
 
 
 # ── Alert Exclusions ─────────────────────────────────────────────────────────
@@ -123,11 +130,13 @@ def add_exclusion(
 ) -> dict:
     """Add an alert exclusion (stub)."""
     request_data = require_request_data(body)
-    return build_xdr_reply({
-        "exclusion_id": str(uuid.uuid4()),
-        "name": request_data.get("name", ""),
-        "status": "enabled",
-    })
+    return build_xdr_reply(
+        {
+            "exclusion_id": str(uuid.uuid4()),
+            "name": request_data.get("name", ""),
+            "status": "enabled",
+        }
+    )
 
 
 @router.post("/alerts_exclusion/delete/")
@@ -143,6 +152,7 @@ def delete_exclusion(
 
 
 @router.post("/device_control/get_violations/")
+@xdr_shape("device_control_get_violations")
 def get_device_control_violations(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -169,19 +179,20 @@ def get_device_control_violations(
 
 
 @router.post("/quarantine/status/")
+@xdr_shape("quarantine_status")
 def get_quarantine_status(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """List quarantine status entries (canned data)."""
+    # The product answers a bare list of {endpoint_id, file_hash, file_path,
+    # status} (recorded in the XSOAR pack), not a paged envelope.
     entries = [
         {
+            "endpoint_id": "mock-endpoint-001",
             "file_hash": "a" * 64,
             "file_path": "C:\\Users\\analyst\\Downloads\\sample.exe",
-            "endpoint_id": "mock-endpoint-001",
-            "hostname": "ACME-WS-001",
             "status": "quarantined",
-            "date_detected": 1700000000000,
         },
     ]
-    return build_xdr_list_reply(entries, total_count=len(entries))
+    return build_xdr_reply(entries)

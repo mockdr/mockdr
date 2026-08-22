@@ -3,6 +3,7 @@
 Implements quarantined-file query and action endpoints used by XSOAR
 for managing files quarantined by the Falcon sensor.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -27,6 +28,22 @@ def query_quarantined_files(
     return quarantine_queries.query_quarantined_file_ids(filter, offset, limit, sort)
 
 
+@router.post("/quarantine/entities/quarantined-files/GET/v1")
+def get_quarantined_file_entities_by_body(
+    body: dict = Body(...),
+    _: dict = Depends(require_cs_auth),
+) -> dict:
+    """Return full quarantined file entities; ids in the body, as the current API takes them."""
+    ids = body.get("ids") if isinstance(body, dict) else None
+    response = quarantine_queries.get_quarantined_file_entities(
+        [str(i) for i in ids] if isinstance(ids, list) else []
+    )
+    # DomainAPIQuarantinedFile keeps the name under paths[*].filename only.
+    for resource in response.get("resources", []):
+        resource.pop("filename", None)
+    return response
+
+
 @router.get("/quarantine/entities/quarantined-files/v1")
 def get_quarantined_file_entities(
     ids: str = Query(...),
@@ -48,4 +65,7 @@ def action_quarantined_files(
     """
     ids = require_list(body, "ids")
     action = body.get("action", "release")
-    return quarantine_commands.action_quarantined_files(ids, action)
+    response = quarantine_commands.action_quarantined_files(ids, action)
+    # MsaReplyMetaOnly: meta and errors only, no resources.
+    response.pop("resources", None)
+    return response

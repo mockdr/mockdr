@@ -131,11 +131,9 @@ class TestGetDetectionEntities:
             json={"ids": [det_id]},
         )
         detection = resp.json()["resources"][0]
-        required_fields = [
-            "composite_id", "device", "behaviors", "max_severity",
-            "max_severity_displayname", "status", "created_timestamp",
-            "first_behavior", "last_behavior",
-        ]
+        # DetectsapiPostEntitiesAlertsV2Response: an alert has no behaviors,
+        # max_severity or first/last_behavior (those are the legacy detection)
+        required_fields = ["composite_id", "device", "status", "created_timestamp", "severity"]
         for field in required_fields:
             assert field in detection, f"Required field '{field}' missing from detection"
 
@@ -157,31 +155,6 @@ class TestGetDetectionEntities:
         assert isinstance(detection["device"], dict)
         assert "device_id" in detection["device"]
         assert "hostname" in detection["device"]
-
-    def test_detection_behaviors_have_mitre_fields(self, client: TestClient) -> None:
-        """Each behavior must contain tactic, technique, and tactic_id fields."""
-        headers = _cs_auth(client)
-        query_resp = client.get(
-            "/cs/alerts/queries/alerts/v2",
-            headers=headers,
-            params={"limit": 5},
-        )
-        det_ids = query_resp.json()["resources"]
-
-        resp = client.post(
-            "/cs/alerts/entities/alerts/v2",
-            headers=headers,
-            json={"ids": det_ids},
-        )
-        for detection in resp.json()["resources"]:
-            assert isinstance(detection["behaviors"], list)
-            assert len(detection["behaviors"]) > 0
-            for behavior in detection["behaviors"]:
-                assert "tactic" in behavior
-                assert "technique" in behavior
-                assert "tactic_id" in behavior
-                assert "technique_id" in behavior
-                assert "severity" in behavior
 
     def test_nonexistent_detection_returns_empty(self, client: TestClient) -> None:
         headers = _cs_auth(client)
@@ -214,8 +187,9 @@ class TestUpdateDetections:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body["resources"]) == 1
-        assert body["resources"][0]["id"] == det_id
+        # DetectsapiResponseFields: meta and errors only
+        assert "resources" not in body
+        assert body["errors"] == []
 
         # Verify status changed
         entity_resp = client.post(

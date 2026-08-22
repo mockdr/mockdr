@@ -1,0 +1,19 @@
+{
+ "route": "POST /public_api/v1/scripts/get_script_metadata/",
+ "reply": {
+  "created_by": "",
+  "description": "",
+  "entry_point": "",
+  "is_high_risk": false,
+  "linux_supported": false,
+  "macos_supported": false,
+  "modification_date": 0,
+  "name": "",
+  "script_id": 0,
+  "script_input": "",
+  "script_output_dictionary_definitions": "",
+  "script_output_type": "",
+  "script_uid": "",
+  "windows_supported": false
+ }
+}

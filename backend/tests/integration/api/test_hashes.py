@@ -11,7 +11,6 @@ class TestHashVerdict:
         assert resp.status_code == 200
         body = resp.json()
         assert body["data"]["verdict"] == "undefined"
-        assert body["data"]["source"] == "cloud"
 
     def test_blocklisted_hash_returns_blacklisted(self, client: TestClient, auth_headers: dict) -> None:
         sha256 = "a" * 64
@@ -28,8 +27,8 @@ class TestHashVerdict:
         resp = client.get(f"{BASE}/deadbeefdeadbeef/verdict", headers=auth_headers)
         body = resp.json()["data"]
         assert "verdict" in body
-        assert "confidence" in body
-        assert "source" in body
+        # the 2.1 swagger declares a verdict and nothing else
+        assert set(body) == {"verdict"}
 
     def test_hash_lookup_is_case_insensitive(self, client: TestClient, auth_headers: dict) -> None:
         sha256 = "b" * 64
@@ -40,20 +39,6 @@ class TestHashVerdict:
         )
         resp = client.get(f"{BASE}/{sha256.lower()}/verdict", headers=auth_headers)
         assert resp.json()["data"]["verdict"] == "blacklisted"
-
-    def test_unknown_hash_confidence_is_na(self, client: TestClient, auth_headers: dict) -> None:
-        body = client.get(f"{BASE}/0000000000000000/verdict", headers=auth_headers).json()
-        assert body["data"]["confidence"] == "n/a"
-
-    def test_blocklisted_hash_source_is_user(self, client: TestClient, auth_headers: dict) -> None:
-        sha256 = "c" * 64
-        client.post(
-            "/web/api/v2.1/restrictions",
-            headers=auth_headers,
-            json={"data": {"type": "black_hash", "value": sha256, "description": "src test"}},
-        )
-        body = client.get(f"{BASE}/{sha256}/verdict", headers=auth_headers).json()
-        assert body["data"]["source"] == "user"
 
     def test_different_unknown_hashes_all_undefined(
         self, client: TestClient, auth_headers: dict,

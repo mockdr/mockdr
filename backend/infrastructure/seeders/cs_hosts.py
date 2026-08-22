@@ -131,7 +131,6 @@ def seed_cs_hosts(fake: Faker) -> list[str]:
             first_seen=agent.createdAt,
             last_seen=agent.lastActiveDate,
             modified_timestamp=now_ts,
-            slow_changing_modified_timestamp=rand_ago(7),
             site_name=agent.siteName,
             machine_domain=agent.domain,
             ou=[],

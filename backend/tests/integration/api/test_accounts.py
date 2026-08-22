@@ -36,7 +36,8 @@ class TestListAccounts:
 
     def test_account_has_expected_fields(self, client: TestClient, auth_headers: dict) -> None:
         account = _first_account(client, auth_headers)
-        for field in ("id", "name", "state", "accountType", "numberOfSites", "numberOfAgents"):
+        # AccountViewSchema_many (2.1 swagger) declares: id, name, state, accountType, numberOfSites
+        for field in ('id', 'name', 'state', 'accountType', 'numberOfSites'):
             assert field in account
 
 

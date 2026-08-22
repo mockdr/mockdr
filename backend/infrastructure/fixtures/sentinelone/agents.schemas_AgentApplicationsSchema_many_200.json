@@ -1,0 +1,13 @@
+{
+ "definition": "agents.schemas_AgentApplicationsSchema_many_200",
+ "routes": "/agents/applications",
+ "data": [
+  {
+   "name": "",
+   "size": 0,
+   "version": "",
+   "publisher": "",
+   "installedDate": "2018-02-27T04:49:26.257525Z"
+  }
+ ]
+}

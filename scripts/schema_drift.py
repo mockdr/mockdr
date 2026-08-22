@@ -43,7 +43,7 @@ def load_specs(platform: str) -> list[dict]:
     files = {
         "graph": [],
         "sentinel": sorted(SPECS.glob("sentinel_2024-03-01_*.json")),
-        "crowdstrike": [SPECS / "crowdstrike_swagger.json"],
+        "sentinelone": [SPECS.parent / "swagger_2_1.json"],
     }[platform]
     return [json.load(open(f)) for f in files if f.exists()]
 
@@ -220,6 +220,8 @@ def observed_opaque(value, prefix: str = "", depth: int = 0) -> set[str]:
         return out
     if isinstance(value, dict):
         for k, v in value.items():
+            if v is None:
+                out.add(f"{prefix}{k}")  # a null object has no observable members
             out |= observed_opaque(v, f"{prefix}{k}.", depth + 1)
     elif isinstance(value, list):
         if not value:
@@ -238,11 +240,24 @@ def declared_opaque(doc: dict, schema, prefix: str = "", depth: int = 0) -> set[
         if not isinstance(sub, dict) or depth > 6:
             continue
         if sub.get("type") == "array":
-            out |= declared_opaque(doc, sub.get("items", {}), f"{path}[*].", depth + 1)
+            items = deref(doc, sub.get("items", {}))
+            if not isinstance(items, dict) or not (
+                items.get("properties")
+                or items.get("allOf")
+                or items.get("type") not in (None, "object")
+            ):
+                out.add(f"{path}[*]")  # items declared as bare objects: members unknown
+            else:
+                out |= declared_opaque(doc, items, f"{path}[*].", depth + 1)
         elif "properties" in sub or "allOf" in sub:
             out |= declared_opaque(doc, sub, f"{path}.", depth + 1)
-        elif sub.get("type") == "object" or "additionalProperties" in sub:
-            out.add(path)
+        elif (
+            sub.get("type") == "object"
+            or "additionalProperties" in sub
+            or not sub
+            or (sub.get("type") is None and "$ref" not in sub)
+        ):
+            out.add(path)  # declared without a member schema: members unknown
     return out
 
 
@@ -268,7 +283,187 @@ def shape(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "{}", path.lower())
 
 
+def _cs_prepare(client: TestClient, headers: dict) -> dict:
+    """Ids for CrowdStrike's entities routes, from its queries routes."""
+    ctx: dict = {}
+    for name, url in {
+        "device_ids": "/cs/devices/queries/devices/v1",
+        "alert_ids": "/cs/alerts/queries/alerts/v2",
+        "ioc_ids": "/cs/iocs/combined/indicator/v1",
+        "quarantine_ids": "/cs/quarantine/queries/quarantined-files/v1",
+        "user_uuids": "/cs/user-management/queries/users/v1",
+        "group_ids": "/cs/devices/combined/host-groups/v1",
+        "case_ids": "/cs/alerts/queries/cases/v1",
+    }.items():
+        r = client.get(url, headers=headers, params={"limit": 3})
+        resources = r.json().get("resources", []) if r.status_code == 200 else []
+        ctx[name] = [x["id"] if isinstance(x, dict) else x for x in resources][:3]
+    return ctx
+
+
+def _xdr_prepare(client: TestClient, headers: dict) -> dict:
+    """Ids for Cortex XDR's entity routes, from its list routes."""
+
+    def post(path: str) -> dict:
+        r = client.post("/xdr" + path, headers=headers, json={"request_data": {}})
+        body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        reply = body.get("reply") if isinstance(body, dict) else None
+        return reply if isinstance(reply, dict) else {}
+
+    incidents = post("/public_api/v1/incidents/get_incidents/").get("incidents", [])
+    endpoints = post("/public_api/v1/endpoints/get_endpoint/").get("endpoints", [])
+    scripts = post("/public_api/v1/scripts/get_scripts/").get("scripts", [])
+    return {
+        "incident_id": incidents[0]["incident_id"] if incidents else "1",
+        "endpoint_id": endpoints[0]["endpoint_id"] if endpoints else "x",
+        "script_uid": scripts[0]["script_uid"] if scripts else "x",
+    }
+
+
 PLATFORMS = {
+    "crowdstrike": {
+        "kind": "paths",
+        "extras_only": True,
+        "mount": "/cs",
+        "reduced": SPECS / "crowdstrike_gofalcon_reduced.json",
+        "auth": lambda c: _oauth(
+            c, "/cs/oauth2/token", "cs-mock-admin-client", "cs-mock-admin-secret"
+        ),
+        "prepare": _cs_prepare,
+        "default_body": {},
+        "requests": {
+            "POST /devices/entities/devices/v2": {"json": {"ids": "{device_ids}"}},
+            "GET /devices/entities/host-groups/v1": {"params": {"ids": "{group_ids}"}},
+            "GET /devices/combined/host-group-members/v1": {"params": {"id": "{group_ids}"}},
+            "POST /alerts/entities/alerts/v2": {"json": {"composite_ids": "{alert_ids}"}},
+            "GET /iocs/entities/indicators/v1": {"params": {"ids": "{ioc_ids}"}},
+            "POST /user-management/entities/users/GET/v1": {"json": {"ids": "{user_uuids}"}},
+            "POST /quarantine/entities/quarantined-files/GET/v1": {
+                "json": {"ids": "{quarantine_ids}"}
+            },
+            "POST /alerts/entities/cases/GET/v1": {"json": {"ids": "{case_ids}"}},
+        },
+    },
+    "xdr": {
+        "kind": "paths",
+        "missing_only": True,
+        "mount": "/xdr",
+        "reduced": SPECS / "xdr_samples_reduced.json",
+        "auth": lambda c: {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"},
+        "prepare": _xdr_prepare,
+        "default_body": {"request_data": {}},
+        "requests": {
+            "POST /public_api/v1/incidents/get_incident_extra_data/": {
+                "json": {"request_data": {"incident_id": "{incident_id}"}}
+            },
+            "POST /public_api/v1/incidents/update_incident/": {
+                "json": {
+                    "request_data": {
+                        "incident_id": "{incident_id}",
+                        "update_data": {"status": "under_investigation"},
+                    }
+                }
+            },
+            "POST /public_api/v1/endpoints/isolate": {
+                "json": {"request_data": {"endpoint_id": "{endpoint_id}"}}
+            },
+            "POST /public_api/v1/endpoints/unisolate": {
+                "json": {"request_data": {"endpoint_id": "{endpoint_id}"}}
+            },
+            "POST /public_api/v1/endpoints/scan/": {
+                "json": {
+                    "request_data": {
+                        "filters": [
+                            {
+                                "field": "endpoint_id_list",
+                                "operator": "in",
+                                "value": ["{endpoint_id}"],
+                            }
+                        ]
+                    }
+                }
+            },
+            "POST /public_api/v1/scripts/get_script_metadata/": {
+                "json": {"request_data": {"script_uid": "{script_uid}"}}
+            },
+            "POST /public_api/v1/scripts/run_script/": {
+                "json": {
+                    "request_data": {
+                        "script_uid": "{script_uid}",
+                        "timeout": 600,
+                        "filters": [
+                            {
+                                "field": "endpoint_id_list",
+                                "operator": "in",
+                                "value": ["{endpoint_id}"],
+                            }
+                        ],
+                        "parameters_values": {},
+                    }
+                }
+            },
+            "POST /public_api/v1/alerts/insert_cef_alerts/": {
+                "json": {"request_data": {"alerts": ["CEF:0|mockdr|drift|1|1|drift|1|"]}}
+            },
+        },
+    },
+    "mde": {
+        "kind": "paths",
+        "missing_only": True,
+        "skip": {"POST /api/advancedqueries/run": "columns are the query's, not the API's"},
+        "mount": "/mde",
+        "reduced": SPECS / "mde_docs_reduced.json",
+        "reduced_extra": [SPECS / "mde_samples_reduced.json"],
+        # The OData envelope every MDE list carries.
+        "envelope": ["@odata.context", "@odata.nextLink", "@odata.count", "value"],
+        "auth": lambda c: _oauth(
+            c,
+            "/mde/oauth2/v2.0/token",
+            "mde-mock-admin-client",
+            "mde-mock-admin-secret",
+            "https://api.securitycenter.microsoft.com/.default",
+        ),
+        "default_body": {"Comment": "schema drift"},
+        "entities": {
+            "/api/alerts": "alerts",
+            "/api/machines": "machine",
+            "/api/machineactions": "machineaction",
+            "/api/investigations": "investigation",
+            "/api/indicators": "ti-indicator",
+            "/api/vulnerabilities": "vulnerability",
+            "/api/software": "software",
+            "/api/files": "files",
+            "/api/exposureScore": "score",
+            # machine actions answer with a machineAction, whatever they act on
+            "POST /api/machines/{id}/isolate": "machineaction",
+            "POST /api/machines/{id}/unisolate": "machineaction",
+            "POST /api/machines/{id}/runAntiVirusScan": "machineaction",
+            "POST /api/machines/{id}/collectInvestigationPackage": "machineaction",
+            "POST /api/machines/{id}/restrictCodeExecution": "machineaction",
+            "POST /api/machines/{id}/unrestrictCodeExecution": "machineaction",
+            "POST /api/machines/{id}/offboard": "machineaction",
+            "POST /api/machines/{id}/StopAndQuarantineFile": "machineaction",
+            "PATCH /api/alerts/{id}": "alerts",
+            "POST /api/alerts/{id}": "alerts",
+        },
+        "requests": {
+            "POST /api/machines/{id}/isolate": {
+                "json": {"Comment": "drift", "IsolationType": "Full"}
+            },
+            "POST /api/machines/{id}/runAntiVirusScan": {
+                "json": {"Comment": "drift", "ScanType": "Quick"}
+            },
+            "POST /api/advancedqueries/run": {"json": {"Query": "DeviceInfo | take 1"}},
+        },
+    },
+    "sentinelone": {
+        "mount": "/web/api/v2.1",
+        "auth": lambda c: {"Authorization": "ApiToken admin-token-0000-0000-000000000001"},
+        "optional_top": ("errors",),
+        "spec_prefix": "/web/api/v2.1",
+        "params": {},
+        "fill": {},
+    },
     "graph": {
         "mount": "/graph",
         "reduced": SPECS / "graph_v1.0_reduced.json",
@@ -323,14 +518,25 @@ def _ids(client: TestClient, collection_url: str, headers: dict, params: dict) -
     if r.status_code != 200 or not r.headers.get("content-type", "").startswith("application/json"):
         return []
     body = r.json()
-    items = body.get("value") if isinstance(body, dict) else body
+    items = body
+    if isinstance(body, dict):
+        items = body.get("value") or body.get("data") or body.get("resources")
+        if items is None and isinstance(body.get("reply"), dict):
+            items = next((v for v in body["reply"].values() if isinstance(v, list)), None)
     out = []
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict):
             continue
         ident = item.get("id")
         if not isinstance(ident, str) or "/" in ident:
-            ident = item.get("name") or item.get("alias") or ident
+            ident = (
+                item.get("name")
+                or item.get("alias")
+                or item.get("incident_id")
+                or item.get("endpoint_id")
+                or item.get("script_uid")
+                or ident
+            )
         if ident:
             out.append(str(ident))
     return out
@@ -371,6 +577,149 @@ def _fill(
     return out
 
 
+def _oauth(client: TestClient, url: str, client_id: str, secret: str, scope: str = "") -> dict:
+    data = {"grant_type": "client_credentials", "client_id": client_id, "client_secret": secret}
+    if scope:
+        data["scope"] = scope
+    return {"Authorization": "Bearer " + client.post(url, data=data).json()["access_token"]}
+
+
+def _substitute(value, ctx: dict):
+    """Fill ``{name}`` placeholders from ctx; a list placeholder stays a list."""
+    if isinstance(value, str):
+        m = re.fullmatch(r"\{(\w+)\}", value)
+        if m:
+            return ctx.get(m.group(1), value)
+        return value
+    if isinstance(value, dict):
+        return {k: _substitute(v, ctx) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_substitute(v, ctx) for v in value]
+    return value
+
+
+def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, routes: set) -> int:
+    """Compare the mock against a route → declared key-path map.
+
+    The map comes from a generated SDK (gofalcon), a docs tree (MDE) or
+    recorded responses (XSOAR samples) — see the scripts that write them.
+    Each entry lists the dotted paths a real response carries; the mock's
+    response is flattened the same way. Empty arrays are unobservable, not
+    missing; ``{id}`` is normalised on both sides.
+    """
+    mount = cfg["mount"]
+    declared_by_route: dict[str, set] = {}
+    for source in [cfg["reduced"], *cfg.get("reduced_extra", [])]:
+        doc = json.load(open(source))
+        for key, entry in (doc.get("routes") or doc).items():
+            if isinstance(entry, dict) and "paths" in entry:
+                declared_by_route.setdefault(key, set()).update(entry["paths"])
+    entities = {}
+    for source in [cfg["reduced"], *cfg.get("reduced_extra", [])]:
+        entities.update(json.load(open(source)).get("entities") or {})
+    norm = lambda p: re.sub(r"\{[^}]+\}", "{id}", p)  # noqa: E731
+    mock = {(m, norm(r)): r for m, r in routes}
+    ctx = cfg["prepare"](client, headers) if "prepare" in cfg else {}
+    findings = checked = 0
+    unjudged = sorted(f"{m} {r}" for (m, r) in mock if f"{m} {r}" not in declared_by_route)
+    for key in sorted(declared_by_route):
+        method, route = key.split(" ", 1)
+        if (method, route) not in mock:
+            continue
+        if key in cfg.get("skip", {}):
+            print(f"  -  {method} {route}: {cfg['skip'][key]} (skipped)")
+            continue
+        real_route = mock[(method, route)]
+        url = _fill(client, real_route, headers, cfg.get("params", {}), cfg.get("fill", {}), mount)
+        req = _substitute(cfg.get("requests", {}).get(key, {}), ctx)
+        params = {**cfg.get("params", {}), **req.get("params", {})}
+        body = req.get("json", cfg.get("default_body") if method != "GET" else None)
+        try:
+            r = client.request(method, mount + url, headers=headers, params=params, json=body)
+        except Exception as exc:  # noqa: BLE001 — the crash is the finding
+            findings += 1
+            print(f"  {method} {route}\n      crash    {type(exc).__name__}: {exc}")
+            continue
+        if r.status_code >= 300 or not r.headers.get("content-type", "").startswith(
+            "application/json"
+        ):
+            print(f"  -  {method} {route}: HTTP {r.status_code} (skipped)")
+            continue
+        payload = r.json()
+        checked += 1
+        declared = set(declared_by_route[key]) | set(cfg.get("envelope", []))
+        # An entity table applies to the route's items: value[*].<prop> on a
+        # list, <prop> on a single resource.
+        for prefix, entity in cfg.get("entities", {}).items():
+            if (key == prefix or route in (prefix, prefix + "/{id}")) and entity in entities:
+                is_list = isinstance(payload, dict) and isinstance(payload.get("value"), list)
+                declared |= {("value[*]." if is_list else "") + p for p in entities[entity]}
+        seen = observed(payload)
+        unobservable = observed_opaque(payload)
+        # A declared container with no declared children (a docs table names
+        # ``ipAddresses`` but not its members) is opaque: its members are
+        # neither missing nor extra.
+        free = set(cfg.get("free_form", [])) | {
+            p
+            for p in declared
+            if not any(q.startswith((p + ".", p + "[")) for q in declared)
+            and any(q.startswith((p + ".", p + "[")) for q in seen)
+        }
+        # Envelope members are declared but conditional (@odata.count needs
+        # $count=true); a docs table may capitalise a key the API does not.
+        optional = set(cfg.get("envelope", []))
+        seen_ci = {p.lower() for p in seen}
+        missing = sorted(
+            p
+            for p in declared
+            if p not in seen
+            and p.lower() not in seen_ci
+            and not p.endswith("[*]")
+            and p not in optional
+            and not _under(p, unobservable)
+        )
+        declared_ci = {p.lower() for p in declared}
+        extra = sorted(
+            p
+            for p in seen
+            if p not in declared
+            and p.lower() not in declared_ci
+            and "[*]" not in p.split(".")[-1]
+            and not _under(p, free)
+        )
+        # A generated SDK (gofalcon) declares every field a model *can* carry,
+        # omitted when empty — absence is not drift there; coverage is printed.
+        # A recorded response or a docs example proves what a real response
+        # carries, never what it does not: for those references only absence
+        # is drift, and surplus is listed as undocumented without counting.
+        undocumented = extra if cfg.get("missing_only") else []
+        if cfg.get("missing_only"):
+            extra = []
+        if cfg.get("extras_only"):
+            print(
+                f"  ·  {method} {route}: {len(declared & seen)}/{len(declared)} declared paths present"
+            )
+            missing = []
+        if missing or extra or undocumented:
+            findings += len(missing) + len(extra)
+            print(f"  {method} {route}")
+            for p in missing[:12]:
+                print(f"      missing  {p}")
+            for p in extra[:12]:
+                print(f"      extra    {p}")
+            for p in undocumented[:6]:
+                print(f"      undocumented {p}")
+            if len(missing) > 12 or len(extra) > 12:
+                more_missing = max(0, len(missing) - 12)
+                print(f"      … {more_missing} more missing, {max(0, len(extra) - 12)} more extra")
+    if unjudged:
+        print(f"\n  {len(unjudged)} mock route(s) the reference does not describe:")
+        for u in unjudged:
+            print(f"      {u}")
+    print(f"\n{platform}: {checked} routes compared, {findings} drift findings")
+    return 1 if findings else 0
+
+
 def main(platform: str) -> int:
     # Imported here so the schema helpers above stay usable without the app.
     from main import app  # noqa: PLC0415
@@ -387,6 +736,8 @@ def main(platform: str) -> int:
 
     findings = 0
     checked = 0
+    if cfg.get("kind") == "paths":
+        return _compare_paths(platform, cfg, client, headers, routes)
     if "reduced" in cfg:
         reduced = json.load(open(cfg["reduced"]))
         for key, entry in sorted(reduced.items()):
@@ -456,7 +807,16 @@ def main(platform: str) -> int:
     for method, route in sorted(routes):
         if method != "GET":
             continue
-        candidates = [k for k in spec_paths if k.endswith(shape(route)) or shape(route).endswith(k)]
+        if route.startswith("/_dev/"):
+            continue  # mockdr's own control surface, not the vendor's API
+        if cfg.get("spec_prefix"):
+            # The swagger carries the mount in its paths: match exactly, so
+            # /policies is not judged by /upgrade-policy/policies.
+            candidates = [k for k in spec_paths if k == shape(cfg["spec_prefix"] + route)]
+        else:
+            candidates = [
+                k for k in spec_paths if k.endswith(shape(route)) or shape(route).endswith(k)
+            ]
         if not candidates:
             print(f"  ?  {method} {route}: no spec path")
             continue
@@ -467,6 +827,9 @@ def main(platform: str) -> int:
             "schema", {}
         )
         declared = flatten(doc, schema)
+        # Top-level members the spec declares but a success response omits
+        # (SentinelOne's ``errors``).
+        declared = {p for p in declared if p.split(".")[0] not in cfg.get("optional_top", ())}
         if not declared:
             continue
         url = _fill(client, route, headers, cfg.get("params", {}), cfg["fill"], mount)

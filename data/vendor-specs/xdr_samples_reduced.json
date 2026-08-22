@@ -1,0 +1,547 @@
+{
+ "POST /public_api/v1/actions/file_retrieval_details/": {
+  "samples": [
+   "retrieve_file_details.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data.endpoint_test"
+  ]
+ },
+ "POST /public_api/v1/actions/get_action_status/": {
+  "samples": [
+   "action_status_get.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data.23a86310665d413a958926fce5b794b3",
+   "reply.data.aeec6a2cc92e46fab3b6f621722e9916"
+  ]
+ },
+ "POST /public_api/v1/alerts/get_alerts_by_filter_data/": {
+  "samples": [
+   "get_alerts_by_filter_results.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.alerts",
+   "reply.alerts[*].alert_fields",
+   "reply.alerts[*].alert_fields.agent_data_collection_status",
+   "reply.alerts[*].alert_fields.agent_id",
+   "reply.alerts[*].alert_fields.agent_ip_addresses",
+   "reply.alerts[*].alert_fields.agent_os_type",
+   "reply.alerts[*].alert_fields.alert_action_status",
+   "reply.alerts[*].alert_fields.alert_category",
+   "reply.alerts[*].alert_fields.alert_description",
+   "reply.alerts[*].alert_fields.alert_name",
+   "reply.alerts[*].alert_fields.alert_source",
+   "reply.alerts[*].alert_fields.bioc_indicator",
+   "reply.alerts[*].alert_fields.case_id",
+   "reply.alerts[*].alert_fields.events",
+   "reply.alerts[*].alert_fields.events[*].association_strength",
+   "reply.alerts[*].alert_fields.events[*].event_timestamp",
+   "reply.alerts[*].alert_fields.events[*].event_type",
+   "reply.alerts[*].alert_fields.events[*].module_id",
+   "reply.alerts[*].alert_fields.events[*].module_name",
+   "reply.alerts[*].alert_fields.events_length",
+   "reply.alerts[*].alert_fields.external_id",
+   "reply.alerts[*].alert_fields.internal_id",
+   "reply.alerts[*].alert_fields.is_whitelisted",
+   "reply.alerts[*].alert_fields.local_insert_ts",
+   "reply.alerts[*].alert_fields.matching_status",
+   "reply.alerts[*].alert_fields.severity",
+   "reply.alerts[*].alert_fields.source_insert_ts",
+   "reply.alerts[*].alert_fields.starred",
+   "reply.alerts[*].incident_fields",
+   "reply.result_count"
+  ]
+ },
+ "POST /public_api/v1/alerts/get_original_alerts/": {
+  "samples": [
+   "get_original_alerts_results.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.alerts",
+   "reply.alerts[*].internal_id",
+   "reply.alerts[*].original_alert_json"
+  ]
+ },
+ "POST /public_api/v1/alerts/insert_cef_alerts/": {
+  "samples": [
+   "insert_cef_alerts.json"
+  ],
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/audits/agents_reports/": {
+  "samples": [
+   "get_audit_agent_report.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].CATEGORY",
+   "reply.data[*].DESCRIPTION",
+   "reply.data[*].DOMAIN",
+   "reply.data[*].ENDPOINTID",
+   "reply.data[*].ENDPOINTNAME",
+   "reply.data[*].REASON",
+   "reply.data[*].RECEIVEDTIME",
+   "reply.data[*].RESULT",
+   "reply.data[*].SUBTYPE",
+   "reply.data[*].TIMESTAMP",
+   "reply.data[*].TRAPSVERSION",
+   "reply.data[*].TYPE",
+   "reply.result_count"
+  ]
+ },
+ "POST /public_api/v1/audits/management_logs/": {
+  "samples": [
+   "get_audit_management_logs.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.data",
+   "reply.data[*].AUDIT_ASSET_JSON",
+   "reply.data[*].AUDIT_ASSET_NAMES",
+   "reply.data[*].AUDIT_CASE_ID",
+   "reply.data[*].AUDIT_DESCRIPTION",
+   "reply.data[*].AUDIT_ENTITY",
+   "reply.data[*].AUDIT_ENTITY_SUBTYPE",
+   "reply.data[*].AUDIT_HOSTNAME",
+   "reply.data[*].AUDIT_ID",
+   "reply.data[*].AUDIT_INSERT_TIME",
+   "reply.data[*].AUDIT_OWNER_EMAIL",
+   "reply.data[*].AUDIT_OWNER_NAME",
+   "reply.data[*].AUDIT_REASON",
+   "reply.data[*].AUDIT_RESULT",
+   "reply.data[*].AUDIT_SESSION_ID",
+   "reply.result_count"
+  ]
+ },
+ "POST /public_api/v1/device_control/get_violations/": {
+  "samples": [
+   "get_endpoint_violations.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.result_count",
+   "reply.total_count",
+   "reply.violations",
+   "reply.violations[*].endpoint_id",
+   "reply.violations[*].hostname",
+   "reply.violations[*].ip",
+   "reply.violations[*].os_type",
+   "reply.violations[*].product",
+   "reply.violations[*].product_id",
+   "reply.violations[*].serial",
+   "reply.violations[*].timestamp",
+   "reply.violations[*].type",
+   "reply.violations[*].username",
+   "reply.violations[*].vendor",
+   "reply.violations[*].vendor_id",
+   "reply.violations[*].violation_id"
+  ]
+ },
+ "POST /public_api/v1/distributions/create/": {
+  "samples": [
+   "create_distribution.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.distribution_id"
+  ]
+ },
+ "POST /public_api/v1/distributions/get_dist_url/": {
+  "samples": [
+   "get_distribution_url.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.distribution_url"
+  ]
+ },
+ "POST /public_api/v1/distributions/get_status/": {
+  "samples": [
+   "get_distribution_status.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.status"
+  ]
+ },
+ "POST /public_api/v1/distributions/get_versions/": {
+  "samples": [
+   "get_distribution_versions.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.linux",
+   "reply.macos",
+   "reply.windows"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_endpoint/": {
+  "samples": [
+   "get_endpoints.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.endpoints",
+   "reply.endpoints[*].active_directory",
+   "reply.endpoints[*].alias",
+   "reply.endpoints[*].content_version",
+   "reply.endpoints[*].domain",
+   "reply.endpoints[*].endpoint_id",
+   "reply.endpoints[*].endpoint_name",
+   "reply.endpoints[*].endpoint_status",
+   "reply.endpoints[*].endpoint_type",
+   "reply.endpoints[*].endpoint_version",
+   "reply.endpoints[*].first_seen",
+   "reply.endpoints[*].group_name",
+   "reply.endpoints[*].install_date",
+   "reply.endpoints[*].installation_package",
+   "reply.endpoints[*].ip",
+   "reply.endpoints[*].is_isolated",
+   "reply.endpoints[*].last_seen",
+   "reply.endpoints[*].os_type",
+   "reply.endpoints[*].users",
+   "reply.result_count"
+  ]
+ },
+ "POST /public_api/v1/endpoints/get_endpoints/": {
+  "samples": [
+   "get_all_endpoints.json"
+  ],
+  "paths": [
+   "reply",
+   "reply[*].active_directory",
+   "reply[*].alias",
+   "reply[*].content_version",
+   "reply[*].domain",
+   "reply[*].endpoint_id",
+   "reply[*].endpoint_name",
+   "reply[*].endpoint_status",
+   "reply[*].endpoint_type",
+   "reply[*].endpoint_version",
+   "reply[*].first_seen",
+   "reply[*].group_name",
+   "reply[*].install_date",
+   "reply[*].installation_package",
+   "reply[*].ip",
+   "reply[*].is_isolated",
+   "reply[*].last_seen",
+   "reply[*].os_type",
+   "reply[*].users"
+  ]
+ },
+ "POST /public_api/v1/endpoints/isolate": {
+  "samples": [
+   "isolate_endpoint.json"
+  ],
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/endpoints/quarantine/": {
+  "samples": [
+   "quarantine_files.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.action_id"
+  ]
+ },
+ "POST /public_api/v1/endpoints/scan/": {
+  "samples": [
+   "scan_endpoints.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.action_id"
+  ]
+ },
+ "POST /public_api/v1/endpoints/unisolate": {
+  "samples": [
+   "unisolate_endpoint.json"
+  ],
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/hash_exceptions/blocklist/": {
+  "samples": [
+   "blacklist_whitelist_files_success.json"
+  ],
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/incidents/get_incident_extra_data/": {
+  "samples": [
+   "get_incident_extra_data.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.alerts",
+   "reply.alerts.data",
+   "reply.alerts.data[*].action",
+   "reply.alerts.data[*].action_external_hostname",
+   "reply.alerts.data[*].action_file_md5",
+   "reply.alerts.data[*].action_file_path",
+   "reply.alerts.data[*].action_file_sha256",
+   "reply.alerts.data[*].action_local_ip",
+   "reply.alerts.data[*].action_local_port",
+   "reply.alerts.data[*].action_pretty",
+   "reply.alerts.data[*].action_process_image_command_line",
+   "reply.alerts.data[*].action_process_image_name",
+   "reply.alerts.data[*].action_process_image_sha256",
+   "reply.alerts.data[*].action_process_signature_status",
+   "reply.alerts.data[*].action_process_signature_vendor",
+   "reply.alerts.data[*].action_registry_data",
+   "reply.alerts.data[*].action_registry_full_key",
+   "reply.alerts.data[*].action_remote_ip",
+   "reply.alerts.data[*].action_remote_port",
+   "reply.alerts.data[*].actor_process_command_line",
+   "reply.alerts.data[*].actor_process_image_name",
+   "reply.alerts.data[*].actor_process_signature_status",
+   "reply.alerts.data[*].actor_process_signature_vendor",
+   "reply.alerts.data[*].alert_id",
+   "reply.alerts.data[*].category",
+   "reply.alerts.data[*].causality_actor_causality_id",
+   "reply.alerts.data[*].causality_actor_process_command_line",
+   "reply.alerts.data[*].causality_actor_process_image_name",
+   "reply.alerts.data[*].causality_actor_process_signature_status",
+   "reply.alerts.data[*].causality_actor_process_signature_vendor",
+   "reply.alerts.data[*].description",
+   "reply.alerts.data[*].detection_timestamp",
+   "reply.alerts.data[*].event_type",
+   "reply.alerts.data[*].fw_app_id",
+   "reply.alerts.data[*].host_ip",
+   "reply.alerts.data[*].host_name",
+   "reply.alerts.data[*].is_whitelisted",
+   "reply.alerts.data[*].name",
+   "reply.alerts.data[*].severity",
+   "reply.alerts.data[*].source",
+   "reply.alerts.data[*].starred",
+   "reply.alerts.data[*].user_name",
+   "reply.alerts.total_count",
+   "reply.file_artifacts",
+   "reply.file_artifacts.data",
+   "reply.file_artifacts.data[*].alert_count",
+   "reply.file_artifacts.data[*].file_name",
+   "reply.file_artifacts.data[*].file_sha256",
+   "reply.file_artifacts.data[*].file_signature_status",
+   "reply.file_artifacts.data[*].file_signature_vendor_name",
+   "reply.file_artifacts.data[*].file_wildfire_verdict",
+   "reply.file_artifacts.data[*].is_malicious",
+   "reply.file_artifacts.data[*].is_manual",
+   "reply.file_artifacts.data[*].is_process",
+   "reply.file_artifacts.data[*].type",
+   "reply.file_artifacts.total_count",
+   "reply.incident",
+   "reply.incident.alert_count",
+   "reply.incident.assigned_user_mail",
+   "reply.incident.assigned_user_pretty_name",
+   "reply.incident.creation_time",
+   "reply.incident.description",
+   "reply.incident.detection_time",
+   "reply.incident.high_severity_alert_count",
+   "reply.incident.host_count",
+   "reply.incident.incident_id",
+   "reply.incident.low_severity_alert_count",
+   "reply.incident.manual_description",
+   "reply.incident.manual_severity",
+   "reply.incident.med_severity_alert_count",
+   "reply.incident.modification_time",
+   "reply.incident.notes",
+   "reply.incident.resolve_comment",
+   "reply.incident.severity",
+   "reply.incident.starred",
+   "reply.incident.status",
+   "reply.incident.user_count",
+   "reply.incident.xdr_url",
+   "reply.network_artifacts",
+   "reply.network_artifacts.data",
+   "reply.network_artifacts.total_count"
+  ]
+ },
+ "POST /public_api/v1/incidents/get_incidents/": {
+  "samples": [
+   "get_incidents_list.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.incidents",
+   "reply.incidents[*].alert_count",
+   "reply.incidents[*].assigned_user_mail",
+   "reply.incidents[*].assigned_user_pretty_name",
+   "reply.incidents[*].creation_time",
+   "reply.incidents[*].description",
+   "reply.incidents[*].detection_time",
+   "reply.incidents[*].high_severity_alert_count",
+   "reply.incidents[*].host_count",
+   "reply.incidents[*].incident_id",
+   "reply.incidents[*].low_severity_alert_count",
+   "reply.incidents[*].manual_description",
+   "reply.incidents[*].manual_severity",
+   "reply.incidents[*].med_severity_alert_count",
+   "reply.incidents[*].modification_time",
+   "reply.incidents[*].notes",
+   "reply.incidents[*].resolve_comment",
+   "reply.incidents[*].severity",
+   "reply.incidents[*].starred",
+   "reply.incidents[*].status",
+   "reply.incidents[*].user_count",
+   "reply.incidents[*].xdr_url",
+   "reply.result_count",
+   "reply.total_count"
+  ]
+ },
+ "POST /public_api/v1/incidents/update_incident/": {
+  "samples": [
+   "update_incident.json"
+  ],
+  "paths": [
+   "reply"
+  ]
+ },
+ "POST /public_api/v1/quarantine/status/": {
+  "samples": [
+   "get_quarantine_status.json"
+  ],
+  "paths": [
+   "reply",
+   "reply[*].endpoint_id",
+   "reply[*].file_hash",
+   "reply[*].file_path",
+   "reply[*].status"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_execution_results": {
+  "samples": [
+   "get_script_execution_results.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.date_created",
+   "reply.error_message",
+   "reply.results",
+   "reply.results[*].domain",
+   "reply.results[*].endpoint_id",
+   "reply.results[*].endpoint_ip_address",
+   "reply.results[*].endpoint_name",
+   "reply.results[*].endpoint_status",
+   "reply.results[*].execution_status",
+   "reply.results[*].failed_files",
+   "reply.results[*].retention_date",
+   "reply.results[*].retrieved_files",
+   "reply.results[*].standard_output",
+   "reply.scope",
+   "reply.script_description",
+   "reply.script_name",
+   "reply.script_parameters"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_execution_status/": {
+  "samples": [
+   "get_script_execution_status.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.endpoints_aborted",
+   "reply.endpoints_canceled",
+   "reply.endpoints_completed_successfully",
+   "reply.endpoints_expired",
+   "reply.endpoints_failed",
+   "reply.endpoints_in_progress",
+   "reply.endpoints_pending",
+   "reply.endpoints_pending_abort",
+   "reply.endpoints_timeout",
+   "reply.general_status"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_script_metadata/": {
+  "samples": [
+   "get_script_metadata.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.created_by",
+   "reply.description",
+   "reply.entry_point",
+   "reply.is_high_risk",
+   "reply.linux_supported",
+   "reply.macos_supported",
+   "reply.modification_date",
+   "reply.name",
+   "reply.script_id",
+   "reply.script_input",
+   "reply.script_output_dictionary_definitions",
+   "reply.script_output_type",
+   "reply.script_uid",
+   "reply.windows_supported"
+  ]
+ },
+ "POST /public_api/v1/scripts/get_scripts/": {
+  "samples": [
+   "get_scripts.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.result_count",
+   "reply.scripts",
+   "reply.scripts[*].created_by",
+   "reply.scripts[*].description",
+   "reply.scripts[*].is_high_risk",
+   "reply.scripts[*].linux_supported",
+   "reply.scripts[*].macos_supported",
+   "reply.scripts[*].modification_date",
+   "reply.scripts[*].name",
+   "reply.scripts[*].script_id",
+   "reply.scripts[*].script_uid",
+   "reply.scripts[*].windows_supported"
+  ]
+ },
+ "POST /public_api/v1/scripts/run_script/": {
+  "samples": [
+   "run_script.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.action_id",
+   "reply.endpoints_count"
+  ]
+ },
+ "POST /public_api/v1/system/get_tenant_info/": {
+  "samples": [
+   "get_tenant_info.json"
+  ],
+  "paths": [
+   "reply",
+   "reply.compute_unit_expiration",
+   "reply.compute_unit_is_trial",
+   "reply.data_enabled_pro_per_endpoint",
+   "reply.enabled_host_insights",
+   "reply.forensics_expiration",
+   "reply.host_insights_expiration",
+   "reply.installed_prevent",
+   "reply.installed_pro_tb",
+   "reply.prevent_expiration",
+   "reply.pro_per_endpoint_expiration",
+   "reply.pro_tb_expiration",
+   "reply.purchased_compute_unit",
+   "reply.purchased_forensics",
+   "reply.purchased_host_insights",
+   "reply.purchased_prevent",
+   "reply.purchased_pro_per_endpoint",
+   "reply.purchased_pro_per_endpoint.agents",
+   "reply.purchased_pro_tb",
+   "reply.purchased_pro_tb.tb"
+  ]
+ }
+}

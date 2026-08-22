@@ -1,0 +1,141 @@
+{
+ "definition": "agents.schemas_AgentViewSchema_many_200",
+ "routes": "/agents",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "groupUpdatedAt": "2018-02-27T04:49:26.257525Z",
+   "policyUpdatedAt": "2018-02-27T04:49:26.257525Z",
+   "accountId": "225494730938493804",
+   "accountName": "",
+   "siteId": "225494730938493804",
+   "siteName": "",
+   "groupId": "225494730938493804",
+   "groupName": "",
+   "licenseKey": "",
+   "uuid": "ff819e70af13be381993075eb0ce5f2f6de05be2",
+   "agentVersion": "2.5.0.2417",
+   "networkInterfaces": [
+    {
+     "id": "225494730938493804",
+     "name": "",
+     "physical": "00:25:96:FF:FE:12:34:56",
+     "inet": [],
+     "inet6": [],
+     "gatewayMacAddress": "00:25:96:FF:FE:12",
+     "gatewayIp": "192.168.1.1"
+    }
+   ],
+   "domain": "mybusiness.net",
+   "computerName": "JOHN-WIN-4125",
+   "osName": "Windows 10",
+   "osRevision": "",
+   "osArch": "32 bit",
+   "osUsername": "",
+   "osStartTime": "2018-02-27T04:49:26.257525Z",
+   "osType": "macos",
+   "totalMemory": 8192,
+   "modelName": "Acme computers - 15x4k",
+   "machineType": "unknown",
+   "cpuId": "Acme chips inc. Pro5555 @ 3.33GHz",
+   "cpuCount": 2,
+   "coreCount": 8,
+   "externalIp": "31.155.5.7",
+   "groupIp": "31.155.5.x",
+   "activeThreats": 3,
+   "infected": false,
+   "threatRebootRequired": false,
+   "lastActiveDate": "2018-02-27T04:49:26.257525Z",
+   "isActive": false,
+   "isUpToDate": false,
+   "networkStatus": "connected",
+   "registeredAt": "2018-02-27T04:49:26.257525Z",
+   "isPendingUninstall": false,
+   "isUninstalled": false,
+   "isDecommissioned": false,
+   "encryptedApplications": false,
+   "lastLoggedInUserName": "janedoe3",
+   "activeDirectory": {
+    "lastUserDistinguishedName": "CN=John Doe,CN=Users,DC=sentinelone,DC=com",
+    "lastUserMemberOf": [],
+    "computerDistinguishedName": "CN=TEMP-T470P,CN=Computers,DC=sentinelone,DC=com",
+    "computerMemberOf": [],
+    "userPrincipalName": "some@mail.com",
+    "mail": "ActiveDirectory UPN"
+   },
+   "scanStatus": "none",
+   "scanStartedAt": "2018-02-27T04:49:26.257525Z",
+   "scanFinishedAt": "2018-02-27T04:49:26.257525Z",
+   "scanAbortedAt": "2018-02-27T04:49:26.257525Z",
+   "fullDiskScanLastUpdatedAt": "2018-02-27T04:49:26.257525Z",
+   "mitigationMode": "detect",
+   "mitigationModeSuspicious": "detect",
+   "userActionsNeeded": [],
+   "missingPermissions": [],
+   "consoleMigrationStatus": "N/A",
+   "appsVulnerabilityStatus": "patch_required",
+   "inRemoteShellSession": false,
+   "allowRemoteShell": false,
+   "locations": [
+    {
+     "id": "225494730938493804",
+     "name": "office1",
+     "scope": "site"
+    }
+   ],
+   "locationType": "not_applicable",
+   "externalId": "",
+   "serialNumber": "",
+   "machineSid": "",
+   "installerType": ".msi",
+   "rangerVersion": "",
+   "rangerStatus": "NotApplicable",
+   "lastIpToMgmt": "",
+   "operationalState": "",
+   "operationalStateExpiration": "2018-02-27T04:49:26.257525Z",
+   "remoteProfilingState": "",
+   "remoteProfilingStateExpiration": "",
+   "networkQuarantineEnabled": false,
+   "firewallEnabled": false,
+   "locationEnabled": false,
+   "cloudProviders": {},
+   "storageType": "",
+   "storageName": "",
+   "detectionState": "",
+   "firstFullModeTime": "",
+   "tags": {
+    "sentinelone": [
+     {
+      "id": "225494730938493804",
+      "key": "",
+      "value": "",
+      "assignedAt": "2018-02-27T04:49:26.257525Z",
+      "assignedBy": "",
+      "assignedById": "225494730938493804"
+     }
+    ]
+   },
+   "showAlertIcon": false,
+   "lastSuccessfulScanDate": "2018-02-27T04:49:26.257525Z",
+   "proxyStates": {
+    "console": false,
+    "deepVisibility": false,
+    "pacFileUsage": false,
+    "proxyMethod": "",
+    "consoleProxyAddress": "",
+    "deepVisibilityProxyAddress": ""
+   },
+   "containerizedWorkloadCounts": {
+    "podsCount": 0,
+    "containersCount": 0,
+    "tasksCount": 0
+   },
+   "hasContainerizedWorkload": false,
+   "isAdConnector": false,
+   "isHyperAutomate": false,
+   "activeProtection": []
+  }
+ ]
+}

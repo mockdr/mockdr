@@ -110,7 +110,9 @@ def list_blocklist(
     filtered = apply_filters(records, params, _BLOCKLIST_SPECS)
     page, next_cursor, total = paginate(filtered, cursor, limit, RESTRICTION_CURSOR)
     stripped = [{k: v for k, v in r.items() if k not in _BLOCKLIST_INTERNAL} for r in page]
-    return build_list_response(stripped, next_cursor, total)
+    return build_list_response(
+        stripped, next_cursor, total, definition="exclusions.schemas_RestrictionSchemaGet_many_200"
+    )
 
 
 @router.post("/restrictions")
@@ -130,9 +132,8 @@ def create_blocklist_entry(body: dict, current_user: dict = Depends(require_admi
         "description": data.get("description", ""),
         "source": data.get("source", "user"),
         "osType": data.get("osType", "windows"),
-        "scope": data.get("scope") or {
-            "siteIds": [], "groupIds": [], "accountIds": [], "tenant": False
-        },
+        "scope": data.get("scope")
+        or {"siteIds": [], "groupIds": [], "accountIds": [], "tenant": False},
         "scopeName": data.get("scopeName", ""),
         "scopePath": data.get("scopePath", ""),
         "siteId": data.get("siteId"),

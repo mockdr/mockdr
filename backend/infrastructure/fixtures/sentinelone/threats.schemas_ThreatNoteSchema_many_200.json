@@ -1,0 +1,15 @@
+{
+ "definition": "threats.schemas_ThreatNoteSchema_many_200",
+ "routes": "/threats/{threat_id}/notes",
+ "data": [
+  {
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "edited": false,
+   "id": "225494730938493804",
+   "text": "Discovered using analysis",
+   "creator": "John Doe",
+   "creatorId": "225494730938493804"
+  }
+ ]
+}

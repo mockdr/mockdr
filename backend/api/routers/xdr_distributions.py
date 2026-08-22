@@ -10,12 +10,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_distributions import commands as dist_commands
 from application.xdr_distributions import queries as dist_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Distributions"])
 
 
 @router.post("/distributions/get_versions/")
+@xdr_shape("distributions_get_versions")
 def get_versions(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -25,6 +27,7 @@ def get_versions(
 
 
 @router.post("/distributions/create/")
+@xdr_shape("distributions_create")
 def create_distribution(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -35,6 +38,7 @@ def create_distribution(
 
 
 @router.post("/distributions/get_dist_url/")
+@xdr_shape("distributions_get_dist_url")
 def get_distribution_url(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -54,6 +58,7 @@ def get_distribution_url(
 
 
 @router.post("/distributions/get_status/")
+@xdr_shape("distributions_get_status")
 def get_distribution_status(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),

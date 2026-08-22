@@ -1,0 +1,24 @@
+{
+ "route": "POST /public_api/v1/device_control/get_violations/",
+ "reply": {
+  "result_count": 0,
+  "total_count": 0,
+  "violations": [
+   {
+    "endpoint_id": "",
+    "hostname": "",
+    "ip": "",
+    "os_type": "",
+    "product": "",
+    "product_id": "",
+    "serial": "",
+    "timestamp": 0,
+    "type": "",
+    "username": "",
+    "vendor": "",
+    "vendor_id": "",
+    "violation_id": 0
+   }
+  ]
+ }
+}

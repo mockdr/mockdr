@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/distributions/create/",
+ "reply": {
+  "distribution_id": ""
+ }
+}

@@ -46,7 +46,7 @@ class TestListMachines:
         required_fields = [
             "id", "computerDnsName", "osPlatform", "healthStatus",
             "riskScore", "exposureLevel", "lastSeen", "firstSeen",
-            "machineTags", "lastIpAddress", "agentVersion",
+            "machineTags", "lastIpAddress", "deviceValue", "osArchitecture",
         ]
         for field in required_fields:
             assert field in machine, f"Required field '{field}' missing from machine"

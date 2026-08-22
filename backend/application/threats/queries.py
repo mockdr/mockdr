@@ -32,6 +32,17 @@ FILTER_SPECS = [
 ]
 
 
+def _public(record: dict) -> dict:
+    """ThreatSchema declares no ``agentDetectionInfo.agentComputerName``; it stays internal."""
+    info = record.get("agentDetectionInfo")
+    if isinstance(info, dict) and "agentComputerName" in info:
+        record = {
+            **record,
+            "agentDetectionInfo": {k: v for k, v in info.items() if k != "agentComputerName"},
+        }
+    return record
+
+
 def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of threats sorted by creation date."""
     records = [asdict(t) for t in threat_repo.list_all()]
@@ -39,7 +50,12 @@ def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     filtered.sort(key=lambda r: (r.get("threatInfo") or {}).get("createdAt", ""), reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, THREAT_CURSOR)
-    return build_list_response([strip_fields(r, _INTERNAL) for r in page], next_cursor, total)
+    return build_list_response(
+        [_public(strip_fields(r, _INTERNAL)) for r in page],
+        next_cursor,
+        total,
+        definition="threats.schemas_ThreatSchema_many_200",
+    )
 
 
 def get_threat(threat_id: str) -> dict | None:
@@ -55,7 +71,12 @@ def get_threat_timeline(threat_id: str) -> dict | None:
     threat = threat_repo.get(threat_id)
     if not threat:
         return None
-    return build_list_response(threat.timeline, None, len(threat.timeline))
+    return build_list_response(
+        threat.timeline,
+        None,
+        len(threat.timeline),
+        definition="threat_analysis.schemas_TimelineViewSchema_many_200", strict=True,
+    )
 
 
 def get_fetched_file(threat_id: str) -> tuple[bytes, str] | None:
@@ -76,4 +97,9 @@ def get_threat_notes(threat_id: str) -> dict | None:
     threat = threat_repo.get(threat_id)
     if not threat:
         return None
-    return build_list_response(threat.notes, None, len(threat.notes))
+    return build_list_response(
+        threat.notes,
+        None,
+        len(threat.notes),
+        definition="threats.schemas_ThreatNoteSchema_many_200",
+    )

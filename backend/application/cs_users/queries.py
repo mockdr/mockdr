@@ -9,6 +9,11 @@ from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
 
 
+def _public(record: dict) -> dict:
+    """A user as FlightcontrolapiUser declares it: no ``customer``/``roles``."""
+    return {k: v for k, v in record.items() if k not in ("customer", "roles")}
+
+
 def query_user_ids(
     filter_fql: str | None,
     offset: int,
@@ -26,7 +31,7 @@ def query_user_ids(
     Returns:
         CS ID response envelope with user UUIDs.
     """
-    records = [asdict(u) for u in cs_user_repo.list_all()]
+    records = [_public(asdict(u)) for u in cs_user_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     if sort:
@@ -54,5 +59,5 @@ def get_user_entities(ids: list[str]) -> dict:
     for user_id in ids:
         user = cs_user_repo.get(user_id)
         if user:
-            entities.append(asdict(user))
+            entities.append(_public(asdict(user)))
     return build_cs_entity_response(entities)

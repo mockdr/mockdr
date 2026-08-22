@@ -4,6 +4,7 @@ from repository.site_repo import site_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import SITE_INTERNAL_FIELDS
 from utils.pagination import SITE_CURSOR, build_single_response, paginate
+from utils.s1_fixtures import complete_s1
 from utils.strip import strip_fields
 
 FILTER_SPECS = [
@@ -34,16 +35,19 @@ def list_sites(params: dict, cursor: str | None, limit: int) -> dict:
         "activeLicenses": sum(r.get("activeLicenses", 0) for r in filtered),
         "totalLicenses": sum(r.get("totalLicenses", 0) for r in filtered),
     }
-    return {
-        "data": {
-            "allSites": all_sites,
-            "sites": sites,
+    return complete_s1(
+        {
+            "data": {
+                "allSites": all_sites,
+                "sites": sites,
+            },
+            "pagination": {
+                "totalItems": total,
+                "nextCursor": next_cursor,
+            },
         },
-        "pagination": {
-            "totalItems": total,
-            "nextCursor": next_cursor,
-        },
-    }
+        "sites_SiteResponseSchema_200",
+    )
 
 
 def get_site(site_id: str) -> dict | None:

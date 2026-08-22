@@ -1,0 +1,8 @@
+{
+ "definition": "users.schemas_ApiTokenDetailSchema_200",
+ "routes": "/users/{user_id}/api-token-details",
+ "data": {
+  "createdAt": "2018-02-27T04:49:26.257525Z",
+  "expiresAt": "2018-02-27T04:49:26.257525Z"
+ }
+}

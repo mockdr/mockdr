@@ -1,0 +1,38 @@
+{
+ "GET /api/alerts": {
+  "samples": [
+   "first_response_alerts.json",
+   "second_response_alerts.json",
+   "third_response_alerts.json"
+  ],
+  "paths": [
+   "@odata.context",
+   "value",
+   "value[*].alertCreationTime",
+   "value[*].alertDomains",
+   "value[*].alertFiles",
+   "value[*].alertIps",
+   "value[*].alertUser",
+   "value[*].assignedTo",
+   "value[*].category",
+   "value[*].classification",
+   "value[*].comments",
+   "value[*].description",
+   "value[*].detectionSource",
+   "value[*].determination",
+   "value[*].firstEventTime",
+   "value[*].id",
+   "value[*].incidentId",
+   "value[*].investigationId",
+   "value[*].investigationState",
+   "value[*].lastEventTime",
+   "value[*].lastUpdateTime",
+   "value[*].machineId",
+   "value[*].resolvedTime",
+   "value[*].severity",
+   "value[*].status",
+   "value[*].threatFamilyName",
+   "value[*].title"
+  ]
+ }
+}

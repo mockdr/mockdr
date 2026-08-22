@@ -53,7 +53,6 @@ def _transform_app_to_discover(app: dict, cs_device_id: str) -> dict:
             "aid": cs_device_id,
             "platform_name": _os_to_platform(app.get("osType", "")),
         },
-        "aid": cs_device_id,
     }
 
 

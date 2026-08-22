@@ -10,12 +10,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_endpoints import commands as endpoint_commands
 from application.xdr_endpoints import queries as endpoint_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Endpoints"])
 
 
 @router.post("/endpoints/get_endpoint/")
+@xdr_shape("endpoints_get_endpoint")
 def get_endpoints(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -60,6 +62,7 @@ def unisolate_endpoint(
 
 
 @router.post("/endpoints/scan/")
+@xdr_shape("endpoints_scan")
 def scan_endpoint(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -140,6 +143,7 @@ def terminate_process(
 
 
 @router.post("/endpoints/quarantine/")
+@xdr_shape("endpoints_quarantine")
 def quarantine_file(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),

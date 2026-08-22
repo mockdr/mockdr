@@ -1,0 +1,11 @@
+{
+ "definition": "activities_ActivityTypesSchema_many_200",
+ "routes": "/activities/types",
+ "data": [
+  {
+   "action": "",
+   "descriptionTemplate": "",
+   "id": 0
+  }
+ ]
+}

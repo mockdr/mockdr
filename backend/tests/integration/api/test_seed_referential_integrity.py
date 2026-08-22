@@ -49,18 +49,6 @@ class TestAlertsReferenceRealStarRules:
         assert not dangling, f"alerts cite rules that do not exist: {dangling}"
 
 
-class TestAccountCountsMatchReality:
-    """Account totals must describe the collections they claim to count."""
-
-    def test_number_of_users_matches_the_user_list(
-        self, client: TestClient, auth_headers: dict,
-    ) -> None:
-        account = client.get(f"{PREFIX}/accounts", headers=auth_headers).json()["data"][0]
-        users = client.get(f"{PREFIX}/users", headers=auth_headers).json()
-
-        assert account["numberOfUsers"] == users["pagination"]["totalItems"]
-
-
 class TestQuarantinedFilesReferenceRealDetections:
     """A quarantined file is produced by a detection, so the id must resolve."""
 

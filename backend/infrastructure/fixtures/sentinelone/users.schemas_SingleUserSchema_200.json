@@ -1,0 +1,81 @@
+{
+ "definition": "users.schemas_SingleUserSchema_200",
+ "routes": "/users/{user_id}",
+ "data": {
+  "id": "225494730938493804",
+  "source": "",
+  "globalUserId": null,
+  "globalOrganizationId": null,
+  "email": null,
+  "emailReadOnly": false,
+  "fullName": null,
+  "fullNameReadOnly": false,
+  "firstLogin": "2018-02-27T04:49:26.257525Z",
+  "lastLogin": "2018-02-27T04:49:26.257525Z",
+  "dateJoined": "2018-02-27T04:49:26.257525Z",
+  "lowestRole": "",
+  "groupsReadOnly": false,
+  "twoFaEnabled": false,
+  "primaryTwoFaMethod": "",
+  "emailVerified": false,
+  "scope": "tenant",
+  "apiToken": {
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "expiresAt": "2018-02-27T04:49:26.257525Z"
+  },
+  "twoFaEnabledReadOnly": false,
+  "agreedEula": false,
+  "agreementUrl": "",
+  "allowRemoteShell": false,
+  "twoFaConfigured": false,
+  "scopeRoles": [
+   {
+    "id": "225494730938493804",
+    "roles": [],
+    "roleName": "Admin",
+    "roleId": "225494730938493804",
+    "name": "My Scope 1",
+    "accountName": "My Scope 1"
+   }
+  ],
+  "isSystem": false,
+  "isExternalLoginUser": false,
+  "canGenerateApiToken": false,
+  "elevatedSessionDurationMinutes": 0,
+  "twoFaStatus": "configured",
+  "tenantRoles": [],
+  "siteRoles": [
+   {
+    "id": "225494730938493804",
+    "name": "My Site 1",
+    "roles": [],
+    "roleName": "Admin",
+    "roleId": "225494730938493804"
+   }
+  ],
+  "pages": [
+   {
+    "name": "",
+    "identifier": "",
+    "permissions": [
+     {
+      "identifier": "",
+      "title": "",
+      "value": false,
+      "description": "",
+      "additionalDescription": null,
+      "type": "",
+      "dependsOn": [],
+      "groupName": null,
+      "disabledReason": null,
+      "disabledReasonCode": null
+     }
+    ]
+   }
+  ],
+  "account": {
+   "id": "225494730938493804",
+   "name": ""
+  }
+ }
+}

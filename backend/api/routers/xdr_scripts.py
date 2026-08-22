@@ -10,12 +10,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_scripts import commands as script_commands
 from application.xdr_scripts import queries as script_queries
+from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Scripts"])
 
 
 @router.post("/scripts/get_scripts/")
+@xdr_shape("scripts_get_scripts")
 def get_scripts(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
@@ -26,6 +28,7 @@ def get_scripts(
 
 
 @router.post("/scripts/get_script_metadata/")
+@xdr_shape("scripts_get_script_metadata")
 def get_script_metadata(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -43,6 +46,7 @@ def get_script_metadata(
 
 
 @router.post("/scripts/run_script/")
+@xdr_shape("scripts_run_script")
 def run_script(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
@@ -61,6 +65,7 @@ def run_script(
 
 
 @router.post("/scripts/get_script_execution_status/")
+@xdr_shape("scripts_get_script_execution_status")
 def get_execution_status(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),
@@ -78,6 +83,7 @@ def get_execution_status(
 
 
 @router.post("/scripts/get_script_execution_results")
+@xdr_shape("scripts_get_script_execution_results")
 def get_execution_results(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),

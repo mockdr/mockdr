@@ -1,0 +1,24 @@
+{
+ "definition": "groups_SummarizedGroupSchema_many_200",
+ "routes": "/groups",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "name": "",
+   "description": "",
+   "siteId": "225494730938493804",
+   "isDefault": false,
+   "creator": "",
+   "creatorId": "225494730938493804",
+   "type": "static",
+   "filterId": "225494730938493804",
+   "rank": 1,
+   "registrationToken": null,
+   "totalAgents": 0,
+   "filterName": "",
+   "inherits": false
+  }
+ ]
+}

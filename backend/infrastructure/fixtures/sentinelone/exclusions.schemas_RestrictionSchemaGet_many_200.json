@@ -1,0 +1,31 @@
+{
+ "definition": "exclusions.schemas_RestrictionSchemaGet_many_200",
+ "routes": "/restrictions",
+ "data": [
+  {
+   "description": "",
+   "userId": "225494730938493804",
+   "userName": "",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "osType": "macos",
+   "type": "",
+   "scopeName": "",
+   "scope": {
+    "groupIds": [],
+    "siteIds": [],
+    "accountIds": [],
+    "tenant": false
+   },
+   "notRecommended": "",
+   "scopePath": "",
+   "includeParents": false,
+   "includeChildren": false,
+   "id": "",
+   "value": "",
+   "source": "user",
+   "imported": false,
+   "sha256Value": ""
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/distributions/get_status/",
+ "reply": {
+  "status": ""
+ }
+}

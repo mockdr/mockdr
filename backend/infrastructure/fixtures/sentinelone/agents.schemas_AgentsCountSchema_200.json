@@ -1,0 +1,7 @@
+{
+ "definition": "agents.schemas_AgentsCountSchema_200",
+ "routes": "/agents/count",
+ "data": {
+  "total": 0
+ }
+}

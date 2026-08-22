@@ -1,0 +1,6 @@
+{
+ "route": "POST /public_api/v1/endpoints/quarantine/",
+ "reply": {
+  "action_id": 0
+ }
+}

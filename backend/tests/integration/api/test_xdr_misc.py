@@ -329,4 +329,6 @@ class TestQuarantineStatus:
         )
         assert resp.status_code == 200
         reply = resp.json()["reply"]
-        assert "total_count" in reply
+        # recorded: a bare list of {endpoint_id, file_hash, file_path, status}
+        assert isinstance(reply, list) and reply
+        assert set(reply[0]) == {"endpoint_id", "file_hash", "file_path", "status"}

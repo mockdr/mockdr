@@ -1,4 +1,5 @@
 """Read-only queries for scoped tag definitions."""
+
 from dataclasses import asdict
 
 from repository.agent_repo import agent_repo
@@ -40,16 +41,15 @@ def _resolve_scope_ids(
 
     # Parse comma-separated IDs
     site_ids = (
-        {s.strip() for s in str(site_ids_raw).split(",") if s.strip()}
-        if site_ids_raw else set()
+        {s.strip() for s in str(site_ids_raw).split(",") if s.strip()} if site_ids_raw else set()
     )
     account_ids = (
         {s.strip() for s in str(account_ids_raw).split(",") if s.strip()}
-        if account_ids_raw else set()
+        if account_ids_raw
+        else set()
     )
     group_ids = (
-        {s.strip() for s in str(group_ids_raw).split(",") if s.strip()}
-        if group_ids_raw else set()
+        {s.strip() for s in str(group_ids_raw).split(",") if s.strip()} if group_ids_raw else set()
     )
 
     # Direct scope matches
@@ -131,10 +131,7 @@ def list_tags(params: dict, cursor: str | None, limit: int) -> dict:
 
     # Scope filtering
     if scope_set is not None:
-        records = [
-            r for r in records
-            if (r["scopeLevel"], r.get("scopeId", "")) in scope_set
-        ]
+        records = [r for r in records if (r["scopeLevel"], r.get("scopeId", "")) in scope_set]
 
     # Standard field filters
     filtered = apply_filters(records, params, FILTER_SPECS)
@@ -149,4 +146,10 @@ def list_tags(params: dict, cursor: str | None, limit: int) -> dict:
         r["totalExclusions"] = 0  # mock: no tag-linked exclusions
 
     page, next_cursor, total_items = paginate(filtered, cursor, limit, TAG_CURSOR)
-    return build_list_response(page, next_cursor, total_items)
+    return build_list_response(
+        page,
+        next_cursor,
+        total_items,
+        definition="tag_manager.schemas_AgentTagSchema_many_200",
+        strict=True,
+    )

@@ -15,6 +15,7 @@ from utils.cs_response import require_list
 router = APIRouter(tags=["CrowdStrike Cases"])
 
 
+@router.get("/cases/queries/cases/v1")
 @router.get("/alerts/queries/cases/v1")
 def query_case_ids(
     filter: str = Query(None),
@@ -56,6 +57,7 @@ def update_case(
     return case_commands.update_case(case_id, body)
 
 
+@router.post("/cases/entities/case-tags/v1")
 @router.post("/alerts/entities/cases/tags/v1")
 def add_case_tags(
     body: dict = Body(...),
@@ -70,6 +72,7 @@ def add_case_tags(
     return case_commands.add_case_tags(case_id, tags)
 
 
+@router.delete("/cases/entities/case-tags/v1")
 @router.delete("/alerts/entities/cases/tags/v1")
 def delete_case_tags(
     body: dict = Body(...),

@@ -12,7 +12,9 @@ def list_activity_types() -> dict:
         Dict with ``data`` list of ``{id, action}`` records.
     """
     from infrastructure.seeders._shared import ACTIVITY_CATALOG
-    return {"data": [{"id": t, "action": d} for t, d in ACTIVITY_CATALOG]}
+
+    # activity types carry id, action and a descriptionTemplate (2.1 swagger)
+    return {"data": [{"id": t, "action": d, "descriptionTemplate": d} for t, d in ACTIVITY_CATALOG]}
 
 
 FILTER_SPECS = [
@@ -33,11 +35,10 @@ def list_activities(params: dict, cursor: str | None, limit: int) -> dict:
     string_fields = {"agentId", "agentUpdatedVersion", "threatId", "hash"}
     raw = [{**asdict(a), "activityType": int(a.activityType)} for a in activity_repo.list_all()]
     records = [
-        {k: ("" if v is None and k in string_fields else v) for k, v in r.items()}
-        for r in raw
+        {k: ("" if v is None and k in string_fields else v) for k, v in r.items()} for r in raw
     ]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: r.get("id", 0))
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, ACTIVITY_CURSOR)
-    return build_list_response(page, next_cursor, total)
+    return build_list_response(page, next_cursor, total, definition="_ActivityViewSchema_many_200")

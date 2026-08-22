@@ -1,4 +1,5 @@
 """Microsoft Defender for Endpoint Machine command handlers (mutations)."""
+
 from __future__ import annotations
 
 import time
@@ -11,6 +12,7 @@ from domain.mde_machine_action import MdeMachineAction
 from repository.mde_machine_action_repo import mde_machine_action_repo
 from repository.mde_machine_repo import mde_machine_repo
 from utils.dt import utc_now
+from utils.mde_fixtures import complete_mde
 from utils.mde_serde import to_mde_resource
 
 
@@ -22,11 +24,14 @@ def _publish_machine_updated(machine: MdeMachine) -> None:
     downstream SIEMs saw nothing (ADR-009).
     """
     mde_machine_repo.save(machine)
-    event_bus.publish(MdeMachineUpdated(
-        entity_id=machine.machineId,
-        payload=to_mde_resource(asdict(machine), "machineId"),
-        timestamp=time.time(),
-    ))
+    event_bus.publish(
+        MdeMachineUpdated(
+            entity_id=machine.machineId,
+            payload=to_mde_resource(asdict(machine), "machineId"),
+            timestamp=time.time(),
+        )
+    )
+
 
 def _create_action(
     machine_id: str,
@@ -57,7 +62,7 @@ def _create_action(
         requestorComment=comment,
     )
     mde_machine_action_repo.save(action)
-    return to_mde_resource(asdict(action), "actionId")
+    return complete_mde(to_mde_resource(asdict(action), "actionId"), "machineaction")
 
 
 def isolate_machine(machine_id: str, body: dict) -> dict | None:
@@ -175,7 +180,10 @@ def collect_investigation_package(machine_id: str, body: dict) -> dict | None:
     comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(
-        machine_id, "CollectInvestigationPackage", comment, requestor,
+        machine_id,
+        "CollectInvestigationPackage",
+        comment,
+        requestor,
     )
 
 

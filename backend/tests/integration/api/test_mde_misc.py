@@ -322,7 +322,7 @@ class TestUsers:
         if not logon_users:
             # Try getting logon users via sub-resource
             lu_resp = client.get(
-                f"/mde/api/machines/{machine['machineId']}/logonusers",
+                f"/mde/api/machines/{machine['id']}/logonusers",
                 headers=headers,
             )
             logon_users = lu_resp.json().get("value", [])

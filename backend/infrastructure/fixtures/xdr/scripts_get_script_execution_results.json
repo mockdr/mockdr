@@ -1,0 +1,25 @@
+{
+ "route": "POST /public_api/v1/scripts/get_script_execution_results",
+ "reply": {
+  "script_name": "",
+  "script_description": "",
+  "script_parameters": [],
+  "date_created": "",
+  "scope": "",
+  "error_message": "",
+  "results": [
+   {
+    "endpoint_name": "",
+    "endpoint_ip_address": [],
+    "endpoint_status": "",
+    "domain": "",
+    "endpoint_id": "",
+    "execution_status": "",
+    "standard_output": "",
+    "retrieved_files": 0,
+    "failed_files": 0,
+    "retention_date": ""
+   }
+  ]
+ }
+}

@@ -1,0 +1,57 @@
+{
+ "definition": "firewall_control.schemas_FirewallSchema_many_200",
+ "routes": "/firewall-control",
+ "data": [
+  {
+   "id": "225494730938493804",
+   "order": 0,
+   "direction": null,
+   "osType": "macos",
+   "osTypes": [],
+   "tag": "",
+   "application": null,
+   "name": "",
+   "protocol": "",
+   "productId": "",
+   "localHost": null,
+   "localPort": null,
+   "remoteHost": null,
+   "remoteHosts": [
+    {
+     "type": "any",
+     "values": []
+    }
+   ],
+   "remotePort": null,
+   "location": {
+    "type": "all",
+    "values": [
+     {
+      "id": "225494730938493804",
+      "name": null,
+      "scope": null
+     }
+    ]
+   },
+   "action": "Allow",
+   "status": "Enabled",
+   "scope": "site",
+   "scopeId": "225494730938493804",
+   "editable": false,
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "creator": "",
+   "creatorId": "225494730938493804",
+   "tags": [
+    {
+     "name": "My Tag",
+     "id": "225494730938493804"
+    }
+   ],
+   "tagIds": [],
+   "tagNames": [],
+   "description": null,
+   "ruleCategory": "firewall"
+  }
+ ]
+}

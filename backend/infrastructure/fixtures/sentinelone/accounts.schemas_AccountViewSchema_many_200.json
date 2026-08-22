@@ -1,0 +1,92 @@
+{
+ "definition": "accounts.schemas_AccountViewSchema_many_200",
+ "routes": "/accounts",
+ "data": [
+  {
+   "id": 182483948009279264,
+   "name": "My Account",
+   "isDefault": false,
+   "accountType": "",
+   "expiration": "2018-02-27T04:49:26.257525Z",
+   "salesforceId": "",
+   "externalId": "",
+   "state": "active",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "unlimitedExpiration": false,
+   "activeAgents": 0,
+   "skus": [
+    {
+     "type": "Core",
+     "totalLicenses": 0,
+     "unlimited": false,
+     "agentsInSku": 0
+    }
+   ],
+   "licenses": {
+    "bundles": [
+     {
+      "displayName": "",
+      "majorVersion": 0,
+      "minorVersion": 0,
+      "name": "",
+      "surfaces": [
+       {
+        "count": 0,
+        "name": ""
+       }
+      ],
+      "totalSurfaces": 0
+     }
+    ],
+    "modules": [
+     {
+      "displayName": "",
+      "majorVersion": 0,
+      "name": ""
+     }
+    ],
+    "settings": [
+     {
+      "displayName": "",
+      "settingGroup": "",
+      "settingGroupDisplayName": "",
+      "groupName": null,
+      "setting": null
+     }
+    ]
+   },
+   "totalLicenses": 0,
+   "usageType": "customer",
+   "billingMode": "subscription",
+   "irFields": {
+    "companyName": "",
+    "contactFirstName": "",
+    "contactLastName": "",
+    "contactEmail": "ADMIN@SENTINELONE.COM",
+    "region": "",
+    "country": "",
+    "city": null,
+    "postal": null,
+    "numberOfEmployeesEndpoints": 0,
+    "industry": "Education"
+   },
+   "makeSocDefaultUi": false,
+   "creator": "",
+   "creatorId": "225494730938493804",
+   "numberOfSites": 0,
+   "coreSites": 0,
+   "controlSites": 0,
+   "completeSites": 0,
+   "totalCore": 0,
+   "totalControl": 0,
+   "totalComplete": 0,
+   "unlimitedCore": false,
+   "unlimitedControl": false,
+   "unlimitedComplete": false,
+   "agentsInCoreSku": 0,
+   "agentsInControlSku": 0,
+   "agentsInCompleteSku": 0
+  }
+ ]
+}

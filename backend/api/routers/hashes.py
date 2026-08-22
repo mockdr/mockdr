@@ -9,14 +9,8 @@ def _lookup_hash(hash_value: str) -> dict:
     """Look up a hash against the blocklist and return the verdict payload."""
     for item in blocklist_repo.list_all():
         if item.get("value", "").lower() == hash_value.lower():
-            return {
-                "data": {
-                    "verdict": "blacklisted",
-                    "confidence": "n/a",
-                    "source": item.get("source", "user"),
-                }
-            }
-    return {"data": {"verdict": "undefined", "confidence": "n/a", "source": "cloud"}}
+            return {"data": {"verdict": "blacklisted"}}
+    return {"data": {"verdict": "undefined"}}
 
 
 @router.get("/hashes/{hash_value}/reputation")

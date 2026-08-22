@@ -9,6 +9,7 @@ from domain.event_bus import MdeAlertCreated, event_bus
 from domain.mde_alert import MdeAlert
 from repository.mde_alert_repo import mde_alert_repo
 from utils.dt import utc_now
+from utils.mde_fixtures import complete_mde
 from utils.mde_serde import to_mde_resource
 
 
@@ -50,7 +51,7 @@ def update_alert(alert_id: str, body: dict) -> dict | None:
         alert.resolvedTime = now
 
     mde_alert_repo.save(alert)
-    return to_mde_resource(asdict(alert), "alertId")
+    return complete_mde(to_mde_resource(asdict(alert), "alertId"), "alert")
 
 
 def create_alert_by_reference(body: dict) -> dict:
@@ -111,4 +112,4 @@ def batch_update_alerts(body: dict) -> list[dict]:
         result = update_alert(alert_id, body)
         if result:
             updated.append(result)
-    return updated
+    return complete_mde(updated, "alert") if isinstance(updated, dict) else updated

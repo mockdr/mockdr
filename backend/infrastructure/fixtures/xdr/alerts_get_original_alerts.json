@@ -1,0 +1,11 @@
+{
+ "route": "POST /public_api/v1/alerts/get_original_alerts/",
+ "reply": {
+  "alerts": [
+   {
+    "internal_id": 0,
+    "original_alert_json": ""
+   }
+  ]
+ }
+}

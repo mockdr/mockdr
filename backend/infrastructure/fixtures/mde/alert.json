@@ -1,0 +1,72 @@
+{
+ "aadTenantId": "",
+ "alertCreationTime": "",
+ "alertDomains": "",
+ "alertFiles": "",
+ "alertIps": "",
+ "alertUser": "",
+ "assignedTo": "",
+ "category": "",
+ "classification": "",
+ "comments": [
+  {
+   "comment": "",
+   "createdBy": "",
+   "createdTime": ""
+  }
+ ],
+ "computerDnsName": "",
+ "description": "",
+ "detectionSource": "",
+ "detectorId": "",
+ "determination": "",
+ "evidence": [
+  {
+   "aadUserId": "",
+   "accountName": "",
+   "detectionStatus": "",
+   "domainName": "",
+   "entityType": "",
+   "evidenceCreationTime": "",
+   "fileName": "",
+   "filePath": "",
+   "ipAddress": "",
+   "parentProcessCreationTime": "",
+   "parentProcessFileName": "",
+   "parentProcessFilePath": "",
+   "parentProcessId": "",
+   "processCommandLine": "",
+   "processCreationTime": "",
+   "processId": "",
+   "registryHive": "",
+   "registryKey": "",
+   "registryValue": "",
+   "registryValueType": "",
+   "sha1": "",
+   "sha256": "",
+   "url": "",
+   "userPrincipalName": "",
+   "userSid": ""
+  }
+ ],
+ "firstEventTime": "",
+ "id": "",
+ "incidentId": "",
+ "investigationId": "",
+ "investigationState": "",
+ "lastEventTime": "",
+ "lastUpdateTime": "",
+ "machineId": "",
+ "mitreTechniques": "",
+ "rbacGroupName": "",
+ "relatedUser": {
+  "domainName": "",
+  "userName": ""
+ },
+ "resolvedTime": "",
+ "severity": "",
+ "status": "",
+ "threatFamilyName": "",
+ "threatName": "",
+ "title": ""
+}

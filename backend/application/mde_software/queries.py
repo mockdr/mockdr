@@ -5,6 +5,7 @@ from dataclasses import asdict
 
 from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_software_repo import mde_software_repo
+from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 
@@ -39,7 +40,7 @@ def _machine_refs_for(software_id: str) -> list[dict]:
 def _with_exposed_count(record: dict) -> dict:
     """Overwrite ``exposedMachines`` with the real membership count."""
     record["exposedMachines"] = len(_machine_refs_for(record.get("softwareId", "")))
-    return record
+    return complete_mde(record, "software")
 
 
 def list_software(

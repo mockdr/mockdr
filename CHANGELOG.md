@@ -83,12 +83,64 @@ set, not an `{id, displayName}` stub.
   profile and the sourcetypes it touched; a KV collection's own field
   schema) as such, with the reason on the line.
 
+**The four EDR platforms, against public references after all.** The
+vendor sites gate their specs, but the references exist in the open:
+CrowdStrike's `gofalcon` SDK is generated from the swagger and versions
+every operation, 200 payload and model (`scripts/gofalcon_spec.py`);
+Microsoft's Defender docs are Markdown in `MicrosoftDocs/defender-docs`
+with request blocks, property tables and response examples
+(`scripts/mde_docs_spec.py`); Cortex XDR has no spec anywhere, but the
+XSOAR content pack ships responses recorded from the real product
+(`data/vendor-specs/xsoar-samples/`, MIT); SentinelOne's 2.1 swagger, which
+`scripts/fetch_swagger.sh` already fetched, is generated from the product's
+own response schemas. Each reference is used for what it can prove: an
+`omitempty` SDK model only for surplus fields, a recording or a docs
+example only for absent ones, the SentinelOne swagger for both. Measured
+before → after: SentinelOne 342 → 0 on 31 routes; CrowdStrike 61 → 0 on 23;
+Defender for Endpoint 642 → 0 on 30; Cortex XDR 277 → 0 on 20.
+
+- *SentinelOne*: every list and single resource is completed to — and
+  restricted to — the swagger's fields (`backend/infrastructure/fixtures/sentinelone/`,
+  one per response definition): a user has 33 fields, not 11; `system/info`
+  answers `build/patch/release/version`, not an invented
+  `serverVersion/buildTime`; agent processes carry `processName`,
+  `executablePath`, `cpuUsage`, `memoryUsage`, `startTime` and no
+  `pagination`; exclusion scopes are `{tenant, accountIds, siteIds, groupIds}`;
+  `activities/types` has its `descriptionTemplate`; a hash verdict is a
+  verdict, without an invented `confidence`; cloud-detection alerts lose a
+  `agentRealtimeInfo` the schema never had. Twelve routes the 2.1 API does
+  not have (`/agents/{id}`, `/threats/{id}`, `/webhooks`, …) are listed by the
+  comparator as mock-only.
+- *CrowdStrike*: an alert (v2) carried the legacy detection's `behaviors`,
+  `hostinfo`, `max_severity`… — gone; users lose `customer`/`roles`; devices
+  the retired `slow_changing_modified_timestamp`; PATCHes answer meta-only as
+  `MsaReplyMetaOnly` does; the current `/cases/queries/cases/v1`,
+  `/cases/entities/case-tags/v1` and `POST …/quarantined-files/GET/v1` paths
+  are served. Sixteen routes the current API no longer has (legacy
+  `/indicators/*/iocs`, `/incidents/*`, `/alerts/*/cases`) are still served
+  and listed as such.
+- *Defender for Endpoint*: machines, alerts, vulnerabilities, machine
+  actions, software, investigations, indicators and logon users are
+  completed from the docs (`fixtures/mde/`): an alert has its `evidence`
+  items with 20 fields each, a machine `deviceValue`, `osArchitecture`,
+  `version`; `groupName`, `loggedOnUsers` and `agentVersion` were not
+  documented machine fields; file statistics carry the global view; domain
+  and IP statistics say `organizationPrevalence`, not `orgPrevalence`.
+- *Cortex XDR*: replies are completed to the recorded shape
+  (`fixtures/xdr/`, one per route): an alert has its `alert_fields`, an
+  incident its `hosts`/`users`/`incident_sources`; `quarantine/status` is a
+  bare list, not a paged envelope; `insert_cef_alerts` takes CEF *lines* as
+  the product does — a string used to crash it with `AttributeError`.
+
 ### Known limits
 
-CrowdStrike's swagger is not publicly downloadable (the public URL answers a
-CloudFront 403), and Defender for Endpoint and Cortex XDR publish docs pages
-only, so those four platforms are still compared by hand against the docs.
 Graph `/beta/` routes are served but cannot be judged by the v1.0 metadata.
+Cortex XDR has no specification at all: 28 of its routes have no recorded
+response to compare against, and a recording cannot prove a field absent.
+Sixteen Defender routes have no documented example. The CrowdStrike cases
+model changed shape in the current API (`OperationsGetCasesByIDsResponseVM`);
+the mock still models the legacy shape and does not alias the new create
+and update paths.
 
 ## [2.0.5] - 2026-08-22
 

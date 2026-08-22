@@ -4,12 +4,13 @@ from repository.user_repo import user_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import USER_INTERNAL_FIELDS
 from utils.pagination import USER_CURSOR, build_list_response, paginate
+from utils.s1_fixtures import complete_s1
 from utils.strip import strip_fields
 
 FILTER_SPECS = [
     FilterSpec("ids", "id", "in"),
     FilterSpec("accountIds", "accountId", "in"),
-    FilterSpec("roles", "role", "in"),   # internal field, used for filtering only
+    FilterSpec("roles", "role", "in"),  # internal field, used for filtering only
     FilterSpec("email", "email", "contains"),
 ]
 
@@ -21,7 +22,13 @@ def list_users(params: dict, cursor: str | None, limit: int) -> dict:
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, USER_CURSOR)
     stripped = [strip_fields(r, USER_INTERNAL_FIELDS) for r in page]
-    return build_list_response(stripped, next_cursor, total)
+    response = build_list_response(
+        stripped, next_cursor, total, definition="users.schemas_GetUserListSchema_many_200"
+    )
+    # The token itself never leaves the server: apiToken is null in every response.
+    for item in response["data"]:
+        item["apiToken"] = None
+    return response
 
 
 def get_user(user_id: str) -> dict | None:
@@ -29,7 +36,14 @@ def get_user(user_id: str) -> dict | None:
     user = user_repo.get(user_id)
     if not user:
         return None
-    return {"data": strip_fields(asdict(user), USER_INTERNAL_FIELDS)}
+    response = complete_s1(
+        {"data": strip_fields(asdict(user), USER_INTERNAL_FIELDS)},
+        "users.schemas_SingleUserSchema_200",
+    )
+    # The token itself never leaves the server: apiToken is null in every
+    # response, whatever the schema's object shape (critical test).
+    response["data"]["apiToken"] = None
+    return response
 
 
 def get_user_by_token(token: str) -> dict | None:

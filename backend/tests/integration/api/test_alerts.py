@@ -12,11 +12,18 @@ Key nested field notes:
   - no top-level id field
   - no agentRealtimeInfo field
 """
+
 from fastapi.testclient import TestClient
 
 _REQUIRED_TOP = {
-    "alertInfo", "ruleInfo", "sourceProcessInfo", "agentDetectionInfo",
-    "containerInfo", "kubernetesInfo", "sourceParentProcessInfo", "targetProcessInfo",
+    "alertInfo",
+    "ruleInfo",
+    "sourceProcessInfo",
+    "agentDetectionInfo",
+    "containerInfo",
+    "kubernetesInfo",
+    "sourceParentProcessInfo",
+    "targetProcessInfo",
 }
 
 _VALID_SEVERITIES = {"Critical", "High", "Medium", "Low", "Info"}
@@ -36,12 +43,22 @@ class TestListAlerts:
         assert isinstance(body["data"], list)
 
     def test_required_fields_present(self, client: TestClient, auth_headers: dict) -> None:
-        alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()["data"][0]
+        alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()[
+            "data"
+        ][0]
         for field in _REQUIRED_TOP:
             assert field in alert, f"Required top-level field '{field}' missing from alert"
         # alertInfo sub-fields (swagger-defined)
-        for sub in ("alertId", "analystVerdict", "incidentStatus", "createdAt", "updatedAt",
-                    "eventType", "hitType", "reportedAt"):
+        for sub in (
+            "alertId",
+            "analystVerdict",
+            "incidentStatus",
+            "createdAt",
+            "updatedAt",
+            "eventType",
+            "hitType",
+            "reportedAt",
+        ):
             assert sub in alert["alertInfo"], f"alertInfo.{sub} missing"
         # ruleInfo sub-fields (severity is here, not in alertInfo)
         assert "name" in alert["ruleInfo"], "ruleInfo.name missing"
@@ -50,13 +67,20 @@ class TestListAlerts:
         assert "siteId" in alert["agentDetectionInfo"], "agentDetectionInfo.siteId missing"
 
     def test_severity_is_valid(self, client: TestClient, auth_headers: dict) -> None:
-        alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()["data"][0]
+        alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()[
+            "data"
+        ][0]
         assert alert["ruleInfo"]["severity"] in _VALID_SEVERITIES
 
     def test_incident_status_is_valid(self, client: TestClient, auth_headers: dict) -> None:
-        alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()["data"][0]
+        alert = client.get("/web/api/v2.1/cloud-detection/alerts", headers=auth_headers).json()[
+            "data"
+        ][0]
         assert alert["alertInfo"]["incidentStatus"] in _VALID_STATUSES
 
+
+def _all_agents(client: TestClient, auth_headers: dict) -> list[dict]:
+    return client.get("/web/api/v2.1/agents?limit=1000", headers=auth_headers).json()["data"]
 
 
 class TestAlertToAgentPivot:
@@ -67,33 +91,32 @@ class TestAlertToAgentPivot:
     404 for every alert in the store.
     """
 
-    def test_alert_agent_id_resolves_to_an_agent(
-        self, client: TestClient, auth_headers: dict,
+    def test_alert_agent_uuid_resolves_to_an_agent(
+        self,
+        client: TestClient,
+        auth_headers: dict,
     ) -> None:
+        """AlertInformationSchema names the endpoint by agentDetectionInfo.uuid."""
         alerts = client.get(
-            "/web/api/v2.1/cloud-detection/alerts", headers=auth_headers,
+            "/web/api/v2.1/cloud-detection/alerts",
+            headers=auth_headers,
         ).json()["data"]
-
+        uuids = {a["uuid"] for a in _all_agents(client, auth_headers)}
         for alert in alerts:
-            agent_id = alert["agentRealtimeInfo"]["id"]
-            resp = client.get(f"/web/api/v2.1/agents/{agent_id}", headers=auth_headers)
-            assert resp.status_code == 200, f"alert names unknown agent {agent_id}"
-
-    def test_agent_id_is_not_the_uuid(
-        self, client: TestClient, auth_headers: dict,
-    ) -> None:
-        alert = client.get(
-            "/web/api/v2.1/cloud-detection/alerts?limit=1", headers=auth_headers,
-        ).json()["data"][0]
-        assert alert["agentRealtimeInfo"]["id"] != alert["agentDetectionInfo"]["uuid"]
+            uuid = alert["agentDetectionInfo"]["uuid"]
+            assert uuid in uuids, f"alert names unknown agent uuid {uuid}"
 
     def test_agent_ids_filter_selects_by_agent_id(
-        self, client: TestClient, auth_headers: dict,
+        self,
+        client: TestClient,
+        auth_headers: dict,
     ) -> None:
         alert = client.get(
-            "/web/api/v2.1/cloud-detection/alerts?limit=1", headers=auth_headers,
+            "/web/api/v2.1/cloud-detection/alerts?limit=1",
+            headers=auth_headers,
         ).json()["data"][0]
-        agent_id = alert["agentRealtimeInfo"]["id"]
+        uuid = alert["agentDetectionInfo"]["uuid"]
+        agent_id = next(a["id"] for a in _all_agents(client, auth_headers) if a["uuid"] == uuid)
 
         resp = client.get(
             f"/web/api/v2.1/cloud-detection/alerts?agentIds={agent_id}",
@@ -101,6 +124,4 @@ class TestAlertToAgentPivot:
         ).json()
 
         assert resp["pagination"]["totalItems"] >= 1
-        assert all(
-            a["agentRealtimeInfo"]["id"] == agent_id for a in resp["data"]
-        )
+        assert all(a["agentDetectionInfo"]["uuid"] == uuid for a in resp["data"])

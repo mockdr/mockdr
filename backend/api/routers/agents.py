@@ -8,11 +8,13 @@ from application.agents import commands as agent_commands
 from application.agents import queries as agent_queries
 from application.tags import queries as tag_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.pagination import build_list_response
 
 router = APIRouter(tags=["Agents"])
 
 
 # ── Static sub-resource endpoints (must come before /{agent_id}) ──────────────
+
 
 @router.get("/agents/count")
 def count_agents(
@@ -83,10 +85,20 @@ def list_installed_applications(
     filters matching the real S1 API contract.
     """
     agent_ids = [i.strip() for i in agentIds.split(",") if i.strip()] if agentIds else []
-    return agent_queries.list_applications_for_agents(
-        agent_ids, cursor, limit,
+    apps = agent_queries.list_applications_for_agents(
+        agent_ids,
+        cursor,
+        limit,
         agent_is_decommissioned=agentIsDecommissioned,
         installed_at_between=installedAt__between,
+    ).get("data", [])
+    # ApplicationViewSchema_many: the declared fields only, with a pagination block.
+    return build_list_response(
+        apps,
+        None,
+        len(apps),
+        definition="applications.schemas_ApplicationViewSchema_many_200",
+        strict=True,
     )
 
 
@@ -119,6 +131,7 @@ def list_agent_processes(
 
 
 # ── List + actions ────────────────────────────────────────────────────────────
+
 
 @router.get("/agents")
 def list_agents(
@@ -168,6 +181,7 @@ def agent_action(
 
 
 # ── Per-agent endpoints ────────────────────────────────────────────────────────
+
 
 @router.get("/agents/{agent_id}/passphrase")
 def get_passphrase(agent_id: str) -> dict:

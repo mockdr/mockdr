@@ -1,0 +1,36 @@
+{
+ "definition": "exclusions.schemas_ExclusionSchemaGet_many_200",
+ "routes": "/exclusions",
+ "data": [
+  {
+   "description": "",
+   "userId": "225494730938493804",
+   "userName": "",
+   "createdAt": "2018-02-27T04:49:26.257525Z",
+   "updatedAt": "2018-02-27T04:49:26.257525Z",
+   "osType": "macos",
+   "type": "",
+   "scopeName": "",
+   "scope": {
+    "groupIds": [],
+    "siteIds": [],
+    "accountIds": [],
+    "tenant": false
+   },
+   "notRecommended": "",
+   "scopePath": "",
+   "includeParents": false,
+   "includeChildren": false,
+   "id": "",
+   "value": "",
+   "inject": false,
+   "mode": null,
+   "pathExclusionType": null,
+   "actions": [],
+   "source": "user",
+   "imported": false,
+   "applicationName": null,
+   "inAppInventory": false
+  }
+ ]
+}
