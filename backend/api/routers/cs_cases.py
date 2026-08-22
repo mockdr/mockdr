@@ -10,13 +10,11 @@ from fastapi import APIRouter, Body, Depends, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_cases import commands as case_commands
 from application.cs_cases import queries as case_queries
-from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Cases"])
 
 
 @router.get("/cases/queries/cases/v1")
-@router.get("/alerts/queries/cases/v1")
 def query_case_ids(
     filter: str = Query(None),
     offset: int = Query(0),
@@ -28,37 +26,7 @@ def query_case_ids(
     return case_queries.query_case_ids(filter, offset, limit, sort)
 
 
-@router.post("/alerts/entities/cases/GET/v1")
-def get_case_entities(
-    body: dict = Body(...),
-    _: dict = Depends(require_cs_auth),
-) -> dict:
-    """Return full case entities by ID list (POST body)."""
-    ids = require_list(body, "ids")
-    return case_queries.get_case_entities(ids)
-
-
-@router.post("/alerts/entities/cases/v1")
-def create_case(
-    body: dict = Body(...),
-    _: dict = Depends(require_cs_write),
-) -> dict:
-    """Create a new case."""
-    return case_commands.create_case(body)
-
-
-@router.patch("/alerts/entities/cases/v1")
-def update_case(
-    body: dict = Body(...),
-    _: dict = Depends(require_cs_write),
-) -> dict:
-    """Update an existing case."""
-    case_id = body.get("id", "")
-    return case_commands.update_case(case_id, body)
-
-
 @router.post("/cases/entities/case-tags/v1")
-@router.post("/alerts/entities/cases/tags/v1")
 def add_case_tags(
     body: dict = Body(...),
     _: dict = Depends(require_cs_write),
@@ -73,7 +41,6 @@ def add_case_tags(
 
 
 @router.delete("/cases/entities/case-tags/v1")
-@router.delete("/alerts/entities/cases/tags/v1")
 def delete_case_tags(
     body: dict = Body(...),
     _: dict = Depends(require_cs_write),

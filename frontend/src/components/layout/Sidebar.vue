@@ -8,7 +8,7 @@ import {
   Flame, UsbIcon, Users, Activity, Shield,
   Webhook, ScrollText, Database, DatabaseBackup, Gauge, Radio, Play, Crosshair, Briefcase, Tag,
   AlertTriangle, Target, Bug, FileCheck, ShieldOff,
-  Search, Zap, ChevronDown, Terminal, Hash,
+  Search, Zap, ChevronDown, Terminal,
   Mail, FileText, Key, Clock, Smartphone, Package, RefreshCw, Settings,
 } from 'lucide-vue-next'
 
@@ -79,8 +79,6 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/crowdstrike', icon: LayoutDashboard, group: 'cs' },
   { label: 'Hosts', path: '/crowdstrike/hosts', icon: Monitor, group: 'cs' },
   { label: 'Detections', path: '/crowdstrike/detections', icon: ShieldAlert, group: 'cs' },
-  { label: 'Incidents', path: '/crowdstrike/incidents', icon: AlertTriangle, group: 'cs' },
-  { label: 'Cases', path: '/crowdstrike/cases', icon: Briefcase, group: 'cs' },
 
   // ── Microsoft Defender ────────────────────────────────────────────────────
   { divider: true, label: 'MICROSOFT DEFENDER', collapsible: true, key: 'mde' },
@@ -106,7 +104,6 @@ const navItems: NavItem[] = [
   { label: 'Alerts', path: '/cortex-xdr/alerts', icon: ShieldAlert, group: 'xdr' },
   { label: 'Endpoints', path: '/cortex-xdr/endpoints', icon: Monitor, group: 'xdr' },
   { label: 'Scripts', path: '/cortex-xdr/scripts', icon: Terminal, group: 'xdr' },
-  { label: 'Hash Exceptions', path: '/cortex-xdr/hash-exceptions', icon: Hash, group: 'xdr' },
 
   // ── Splunk SIEM ───────────────────────────────────────────────────────────
   { divider: true, label: 'SPLUNK SIEM', collapsible: true, key: 'splunk' },

@@ -23,10 +23,8 @@ import {
   csAuthApi,
   csHostsApi,
   csDetectionsApi,
-  csIncidentsApi,
   csIocsApi,
   csHostGroupsApi,
-  csCasesApi,
 } from '@/api/crowdstrike'
 
 describe('crowdstrike API', () => {
@@ -80,20 +78,8 @@ describe('crowdstrike API', () => {
     expect(result).toBeInstanceOf(Promise)
   })
 
-  it('csIncidentsApi.queryIds returns promise', async () => {
-    const result = csIncidentsApi.queryIds({ limit: 10 })
-    expect(result).toBeInstanceOf(Promise)
-  })
 
-  it('csIncidentsApi.getEntities returns promise', async () => {
-    const result = csIncidentsApi.getEntities(['id1'])
-    expect(result).toBeInstanceOf(Promise)
-  })
 
-  it('csIncidentsApi.action returns promise', async () => {
-    const result = csIncidentsApi.action(['id1'], [{ name: 'update_status', value: 'Closed' }])
-    expect(result).toBeInstanceOf(Promise)
-  })
 
   it('csIocsApi.search returns promise', async () => {
     const result = csIocsApi.search({ limit: 10 })
@@ -115,8 +101,4 @@ describe('crowdstrike API', () => {
     expect(result).toBeInstanceOf(Promise)
   })
 
-  it('csCasesApi.list returns promise', async () => {
-    const result = csCasesApi.list()
-    expect(result).toBeInstanceOf(Promise)
-  })
 })

@@ -71,13 +71,7 @@ describe('cortex XDR API', () => {
     expect(xdrEndpointsApi.scan('ep-id')).toBeInstanceOf(Promise)
   })
 
-  it('xdrHashExceptionsApi.getBlocklist returns promise', async () => {
-    expect(xdrHashExceptionsApi.getBlocklist()).toBeInstanceOf(Promise)
-  })
 
-  it('xdrHashExceptionsApi.getAllowlist returns promise', async () => {
-    expect(xdrHashExceptionsApi.getAllowlist()).toBeInstanceOf(Promise)
-  })
 
   it('xdrHashExceptionsApi.addToBlocklist returns promise', async () => {
     expect(xdrHashExceptionsApi.addToBlocklist([{ hash: 'abc123' }])).toBeInstanceOf(Promise)

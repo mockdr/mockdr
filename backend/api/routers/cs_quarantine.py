@@ -44,16 +44,6 @@ def get_quarantined_file_entities_by_body(
     return response
 
 
-@router.get("/quarantine/entities/quarantined-files/v1")
-def get_quarantined_file_entities(
-    ids: str = Query(...),
-    _: dict = Depends(require_cs_auth),
-) -> dict:
-    """Return full quarantined file entities by comma-separated IDs."""
-    id_list = [i.strip() for i in ids.split(",") if i.strip()]
-    return quarantine_queries.get_quarantined_file_entities(id_list)
-
-
 @router.patch("/quarantine/entities/quarantined-files/v1")
 def action_quarantined_files(
     body: dict = Body(...),

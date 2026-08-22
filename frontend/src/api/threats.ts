@@ -28,7 +28,7 @@ export const threatsApi = {
   /** Get a single threat by ID. */
   get: (id: string): Promise<SingleResponse<ThreatRecord>> =>
     Promise.resolve(client.get('/threats', { params: { ids: id } }) as Promise<PaginatedResponse<ThreatRecord>>)
-      .then((res) => ({ data: res.data[0] })),
+      .then((res) => ({ data: (res.data ?? [])[0] })),
 
   /** Get the threat event timeline. */
   timeline: (id: string): Promise<PaginatedResponse<TimelineEvent>> =>

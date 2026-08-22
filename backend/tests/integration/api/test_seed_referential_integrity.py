@@ -62,9 +62,10 @@ class TestQuarantinedFilesReferenceRealDetections:
         files = client.get(
             "/cs/quarantine/queries/quarantined-files/v1", headers=headers,
         ).json()["resources"]
-        detail = client.get(
-            f"/cs/quarantine/entities/quarantined-files/v1?ids={','.join(files)}",
+        detail = client.post(
+            "/cs/quarantine/entities/quarantined-files/GET/v1",  # the current API takes ids in the body
             headers=headers,
+            json={"ids": files},
         ).json()["resources"]
 
         detect_ids = [d for record in detail for d in record.get("detect_ids", [])]

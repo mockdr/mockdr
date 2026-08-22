@@ -36,11 +36,3 @@ def get_user_entities(
     return user_queries.get_user_entities(ids)
 
 
-@router.get("/user-management/entities/users/v1")
-def get_user_entities_get(
-    ids: str = Query(...),
-    _: dict = Depends(require_cs_auth),
-) -> dict:
-    """Return full user entities by comma-separated UUIDs (GET)."""
-    id_list = [i.strip() for i in ids.split(",") if i.strip()]
-    return user_queries.get_user_entities(id_list)

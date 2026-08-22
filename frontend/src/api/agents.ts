@@ -17,12 +17,12 @@ export const agentsApi = {
   /** Get a single agent by ID — the 2.1 API has no /agents/{id}; it is a filtered list. */
   get: (id: string): Promise<SingleResponse<Agent>> =>
     Promise.resolve(client.get('/agents', { params: { ids: id } }) as Promise<PaginatedResponse<Agent>>)
-      .then((res) => ({ data: res.data[0] })),
+      .then((res) => ({ data: (res.data ?? [])[0] })),
 
   /** Retrieve the decryption passphrase for an agent (``/agents/passphrases?ids=``). */
   passphrase: (id: string): Promise<SingleResponse<{ passphrase: string }>> =>
     Promise.resolve(client.get('/agents/passphrases', { params: { ids: id } }) as Promise<PaginatedResponse<{ passphrase: string }>>)
-      .then((res) => ({ data: res.data[0] })),
+      .then((res) => ({ data: (res.data ?? [])[0] })),
 
   /** List processes running on an agent (``/agents/processes?ids=``; no pagination block). */
   processes: (id: string, params?: Record<string, unknown>): Promise<SingleResponse<AgentProcess[]>> =>

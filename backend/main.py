@@ -66,13 +66,7 @@ from api.routers import (
     cs_hosts as cs_hosts_router,
 )
 from api.routers import (
-    cs_incidents as cs_incidents_router,
-)
-from api.routers import (
     cs_iocs as cs_iocs_router,
-)
-from api.routers import (
-    cs_legacy_iocs as cs_legacy_iocs_router,
 )
 from api.routers import (
     cs_processes as cs_processes_router,
@@ -686,9 +680,7 @@ app.include_router(cs_auth_router.router, prefix=CS_PREFIX)
 for _cs_module in [
     cs_hosts_router,
     cs_detections_router,
-    cs_incidents_router,
     cs_iocs_router,
-    cs_legacy_iocs_router,
     cs_host_groups_router,
     cs_users_router,
     cs_processes_router,

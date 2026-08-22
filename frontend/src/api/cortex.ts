@@ -5,7 +5,6 @@ import type {
   XdrAlert,
   XdrEndpoint,
   XdrIncidentExtraData,
-  XdrHashException,
   XdrScript,
 } from '../types/cortex'
 
@@ -122,17 +121,6 @@ export const xdrEndpointsApi = {
 // ── Hash Exceptions API ───────────────────────────────────────────────────
 
 export const xdrHashExceptionsApi = {
-  /** Get blocklist entries. */
-  getBlocklist: (): Promise<XdrResponse<{ total_count: number; result_count: number; data: XdrHashException[] }>> =>
-    xdrClient.post('/hash_exceptions/blocklist/get/', {
-      request_data: {},
-    }) as Promise<XdrResponse<{ total_count: number; result_count: number; data: XdrHashException[] }>>,
-
-  /** Get allowlist entries. */
-  getAllowlist: (): Promise<XdrResponse<{ total_count: number; result_count: number; data: XdrHashException[] }>> =>
-    xdrClient.post('/hash_exceptions/allowlist/get/', {
-      request_data: {},
-    }) as Promise<XdrResponse<{ total_count: number; result_count: number; data: XdrHashException[] }>>,
 
   /** Add hashes to blocklist. */
   addToBlocklist: (hashes: { hash: string; comment?: string }[]): Promise<unknown> =>

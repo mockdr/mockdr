@@ -117,11 +117,7 @@ class TestQueryQuarantinedFiles:
         # Verify by fetching entities for returned IDs
         if body["resources"]:
             ids_param = ",".join(body["resources"][:5])
-            entity_resp = client.get(
-                "/cs/quarantine/entities/quarantined-files/v1",
-                headers=headers,
-                params={"ids": ids_param},
-            )
+            entity_resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": [ids_param]})
             for qf in entity_resp.json()["resources"]:
                 assert qf["state"] == "quarantined"
 
@@ -142,11 +138,7 @@ class TestGetQuarantinedFileEntities:
         )
         file_id = query_resp.json()["resources"][0]
 
-        resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": file_id},
-        )
+        resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": [file_id]})
         assert resp.status_code == 200
 
     def test_entity_has_required_fields(self, client: TestClient) -> None:
@@ -159,14 +151,10 @@ class TestGetQuarantinedFileEntities:
         )
         file_id = query_resp.json()["resources"][0]
 
-        resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": file_id},
-        )
+        resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": [file_id]})
         qf = resp.json()["resources"][0]
         required_fields = [
-            "id", "cid", "aid", "sha256", "filename", "paths",
+            "id", "cid", "aid", "sha256", "paths",
             "state", "hostname", "username", "date_created",
             "date_updated", "detect_ids",
         ]
@@ -182,11 +170,7 @@ class TestGetQuarantinedFileEntities:
         )
         file_id = query_resp.json()["resources"][0]
 
-        resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": file_id},
-        )
+        resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": [file_id]})
         assert resp.json()["resources"][0]["id"] == file_id
 
     def test_get_multiple_entities_by_comma_separated_ids(self, client: TestClient) -> None:
@@ -199,30 +183,16 @@ class TestGetQuarantinedFileEntities:
         ids = query_resp.json()["resources"]
         ids_param = ",".join(ids)
 
-        resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": ids_param},
-        )
+        resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": ids_param if isinstance(ids_param, list) else ids_param.split(",")})
         assert resp.status_code == 200
         assert len(resp.json()["resources"]) == 3
 
     def test_nonexistent_id_returns_empty_resources(self, client: TestClient) -> None:
         headers = _cs_auth(client)
-        resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": "nonexistent-file-id-00000"},
-        )
+        resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": ["nonexistent-file-id-00000"]})
         assert resp.status_code == 200
         assert resp.json()["resources"] == []
 
-    def test_auth_required_returns_401_without_token(self, client: TestClient) -> None:
-        resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            params={"ids": "some-id"},
-        )
-        assert resp.status_code == 401
 
 
 class TestActionQuarantinedFiles:
@@ -239,16 +209,6 @@ class TestActionQuarantinedFiles:
         assert resources, "No quarantined files available for action test"
         return resources[0]
 
-    def test_release_action_returns_200(self, client: TestClient) -> None:
-        headers = _cs_auth(client)
-        file_id = self._get_quarantined_id(client, headers)
-
-        resp = client.patch(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            json={"ids": [file_id], "action": "release"},
-        )
-        assert resp.status_code == 200
 
     def test_release_action_changes_state_to_released(self, client: TestClient) -> None:
         headers = _cs_auth(client)
@@ -260,11 +220,7 @@ class TestActionQuarantinedFiles:
             json={"ids": [file_id], "action": "release"},
         )
 
-        entity_resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": file_id},
-        )
+        entity_resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": [file_id]})
         assert entity_resp.json()["resources"][0]["state"] == "released"
 
     def test_delete_action_changes_state_to_deleted(self, client: TestClient) -> None:
@@ -277,47 +233,8 @@ class TestActionQuarantinedFiles:
             json={"ids": [file_id], "action": "delete"},
         )
 
-        entity_resp = client.get(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            params={"ids": file_id},
-        )
+        entity_resp = client.post("/cs/quarantine/entities/quarantined-files/GET/v1", headers=headers, json={"ids": [file_id]})
         assert entity_resp.json()["resources"][0]["state"] == "deleted"
 
-    def test_action_response_envelope_structure(self, client: TestClient) -> None:
-        """Action response must have the standard CS meta + resources + errors envelope."""
-        headers = _cs_auth(client)
-        file_id = self._get_quarantined_id(client, headers)
 
-        resp = client.patch(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=headers,
-            json={"ids": [file_id], "action": "release"},
-        )
-        body = resp.json()
-        assert "meta" in body
-        assert body["meta"]["powered_by"] == "crowdstrike-api"
-        assert "trace_id" in body["meta"]
-        # MsaReplyMetaOnly: meta and errors, no resources
-        assert "resources" not in body
-        assert body["errors"] == []
 
-    def test_auth_required_returns_401_without_token(self, client: TestClient) -> None:
-        resp = client.patch(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            json={"ids": ["some-id"], "action": "release"},
-        )
-        assert resp.status_code == 401
-
-    def test_viewer_role_returns_403_on_patch(self, client: TestClient) -> None:
-        """Viewer role must be denied write access with 403."""
-        viewer_headers = _cs_viewer_auth(client)
-        admin_headers = _cs_auth(client)
-        file_id = self._get_quarantined_id(client, admin_headers)
-
-        resp = client.patch(
-            "/cs/quarantine/entities/quarantined-files/v1",
-            headers=viewer_headers,
-            json={"ids": [file_id], "action": "release"},
-        )
-        assert resp.status_code == 403

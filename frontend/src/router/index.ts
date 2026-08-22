@@ -48,8 +48,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'crowdstrike/hosts/:id',     component: () => import('../views/cs/CsHostDetailView.vue') },
       { path: 'crowdstrike/detections',    component: () => import('../views/cs/CsDetectionsView.vue') },
       { path: 'crowdstrike/detections/:id', component: () => import('../views/cs/CsDetectionDetailView.vue') },
-      { path: 'crowdstrike/incidents',     component: () => import('../views/cs/CsIncidentsView.vue') },
-      { path: 'crowdstrike/cases',         component: () => import('../views/cs/CsCasesView.vue') },
       // Microsoft Defender
       { path: 'defender',                    component: () => import('../views/mde/MdeDashboardView.vue') },
       { path: 'defender/machines',           component: () => import('../views/mde/MdeMachinesView.vue') },
@@ -73,7 +71,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'cortex-xdr/endpoints',           component: () => import('../views/xdr/XdrEndpointsView.vue') },
       { path: 'cortex-xdr/endpoints/:id',       component: () => import('../views/xdr/XdrEndpointDetailView.vue') },
       { path: 'cortex-xdr/scripts',             component: () => import('../views/xdr/XdrScriptsView.vue') },
-      { path: 'cortex-xdr/hash-exceptions',     component: () => import('../views/xdr/XdrHashExceptionsView.vue') },
       // Splunk SIEM
       { path: 'splunk',                          component: () => import('../views/splunk/SplunkDashboardView.vue') },
       { path: 'splunk/search',                   component: () => import('../views/splunk/SplunkSearchView.vue') },

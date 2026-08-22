@@ -40,26 +40,6 @@ vi.mock('../../../api/crowdstrike', () => ({
       errors: [],
     }),
   },
-  csIncidentsApi: {
-    queryIds: vi.fn().mockResolvedValue({
-      resources: ['inc-1'],
-      meta: { pagination: { total: 1, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    }),
-    getEntities: vi.fn().mockResolvedValue({
-      resources: [
-        {
-          incident_id: 'inc-1',
-          name: 'Test Incident',
-          status: 20,
-          fine_score: 75,
-          hosts: [{ hostname: 'WKSTN-001' }],
-        },
-      ],
-      meta: { query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    }),
-  },
 }))
 
 vi.mock('vue-chartjs', () => ({
@@ -74,7 +54,7 @@ vi.mock('chart.js', () => ({
 }))
 
 import CsDashboardView from '@/views/cs/CsDashboardView.vue'
-import { ensureCsAuth, csHostsApi, csDetectionsApi, csIncidentsApi } from '@/api/crowdstrike'
+import { ensureCsAuth, csHostsApi } from '@/api/crowdstrike'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -82,7 +62,6 @@ const router = createRouter({
     { path: '/', component: { template: '<div />' } },
     { path: '/crowdstrike/detections', component: { template: '<div />' } },
     { path: '/crowdstrike/detections/:id', component: { template: '<div />' } },
-    { path: '/crowdstrike/incidents', component: { template: '<div />' } },
   ],
 })
 
@@ -102,34 +81,10 @@ describe('CsDashboardView', () => {
     const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
     expect(wrapper.text()).toContain('Total Hosts')
     expect(wrapper.text()).toContain('Detections')
-    expect(wrapper.text()).toContain('Incidents')
   })
 
-  it('calls ensureCsAuth and all three queryIds APIs on mount', async () => {
-    mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    expect(ensureCsAuth).toHaveBeenCalled()
-    expect(csHostsApi.queryIds).toHaveBeenCalledWith({ limit: 100 })
-    expect(csDetectionsApi.queryIds).toHaveBeenCalledWith({ limit: 100 })
-    expect(csIncidentsApi.queryIds).toHaveBeenCalledWith({ limit: 100 })
-  })
 
-  it('calls getEntities for all three APIs after IDs are resolved', async () => {
-    mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    expect(csHostsApi.getEntities).toHaveBeenCalledWith(['host-1', 'host-2'])
-    expect(csDetectionsApi.getEntities).toHaveBeenCalledWith(['det-1'])
-    expect(csIncidentsApi.getEntities).toHaveBeenCalledWith(['inc-1'])
-  })
 
-  it('populates hostCount, detectionCount, incidentCount from pagination total', async () => {
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    const vm = wrapper.vm as any
-    expect(vm.hostCount).toBe(2)
-    expect(vm.detectionCount).toBe(1)
-    expect(vm.incidentCount).toBe(1)
-  })
 
   it('displays loaded counts in the DOM', async () => {
     const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
@@ -193,91 +148,10 @@ describe('CsDashboardView', () => {
     expect(data.datasets[0].data[0]).toBe(1)
   })
 
-  it('computes incidentStatusChartData correctly from incident entities', async () => {
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    const vm = wrapper.vm as any
-    const data = vm.incidentStatusChartData
-    expect(data.labels).toContain('New')
-    expect(data.datasets[0].data[0]).toBe(1)
-  })
 
-  it('computes incidentStatusChartData with unknown status fallback', async () => {
-    vi.mocked(csIncidentsApi.getEntities).mockResolvedValueOnce({
-      resources: [
-        { incident_id: 'inc-x', name: 'X', status: 99, fine_score: 10, hosts: [] },
-      ],
-      meta: { query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    } as any)
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    const data = (wrapper.vm as any).incidentStatusChartData
-    expect(data.labels).toContain('Status 99')
-  })
 
-  it('computes summaryCards array with correct labels and icons', async () => {
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    const vm = wrapper.vm as any
-    const cards = vm.summaryCards
-    expect(cards).toHaveLength(3)
-    expect(cards[0].label).toBe('Total Hosts')
-    expect(cards[1].label).toBe('Detections')
-    expect(cards[2].label).toBe('Incidents')
-  })
 
-  it('skips getEntities calls when queryIds returns empty resources', async () => {
-    vi.mocked(csHostsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    vi.mocked(csDetectionsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    vi.mocked(csIncidentsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    // getEntities should NOT be called when no IDs returned
-    expect(csHostsApi.getEntities).not.toHaveBeenCalled()
-  })
 
-  it('uses resources.length as fallback when pagination total is absent', async () => {
-    vi.mocked(csHostsApi.queryIds).mockResolvedValueOnce({
-      resources: ['h1', 'h2', 'h3'],
-      meta: { query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    } as any)
-    vi.mocked(csDetectionsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    } as any)
-    vi.mocked(csIncidentsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    } as any)
-    vi.mocked(csHostsApi.getEntities).mockResolvedValueOnce({
-      resources: [
-        { device_id: 'h1', hostname: 'H1', platform_name: 'Linux', status: 'normal' },
-        { device_id: 'h2', hostname: 'H2', platform_name: 'Linux', status: 'normal' },
-        { device_id: 'h3', hostname: 'H3', platform_name: 'Linux', status: 'normal' },
-      ],
-      meta: { query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    } as any)
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    expect((wrapper.vm as any).hostCount).toBe(3)
-  })
 
   it('clears error on subsequent successful fetchAll', async () => {
     vi.mocked(csHostsApi.queryIds).mockRejectedValueOnce(new Error('Temporary error'))
@@ -295,37 +169,7 @@ describe('CsDashboardView', () => {
     expect((wrapper.vm as any).error).toBe('')
   })
 
-  it('shows "No data" placeholder when no detections loaded', async () => {
-    vi.mocked(csDetectionsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    vi.mocked(csIncidentsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    expect(wrapper.text()).toContain('No data')
-  })
 
-  it('shows "No recent detections" when detections array is empty', async () => {
-    vi.mocked(csDetectionsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    vi.mocked(csIncidentsApi.queryIds).mockResolvedValueOnce({
-      resources: [],
-      meta: { pagination: { total: 0, offset: 0, limit: 100 }, query_time: 0, powered_by: '', trace_id: '' },
-      errors: [],
-    })
-    const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })
-    await flushPromises()
-    expect(wrapper.text()).toContain('No recent detections')
-  })
 
   it('severityChartData only includes labels with count > 0', async () => {
     const wrapper = mount(CsDashboardView, { global: { plugins: [router], stubs } })

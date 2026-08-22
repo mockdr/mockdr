@@ -25,23 +25,3 @@ def insert_iocs(
     return ioc_commands.insert_iocs(iocs)
 
 
-@router.post("/indicators/enable_iocs")
-def enable_iocs(
-    body: dict = Body(...),
-    _: object = Depends(require_xdr_write),
-) -> dict:
-    """Enable one or more IOC indicators."""
-    request_data = require_request_data(body)
-    ioc_ids = request_data.get("ioc_id_list", [])
-    return ioc_commands.enable_iocs(ioc_ids)
-
-
-@router.post("/indicators/disable_iocs")
-def disable_iocs(
-    body: dict = Body(...),
-    _: object = Depends(require_xdr_write),
-) -> dict:
-    """Disable one or more IOC indicators."""
-    request_data = require_request_data(body)
-    ioc_ids = request_data.get("ioc_id_list", [])
-    return ioc_commands.disable_iocs(ioc_ids)

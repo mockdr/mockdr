@@ -61,13 +61,3 @@ def insert_cef_alerts(
     return alert_commands.insert_cef_alerts(alerts)
 
 
-@router.post("/alerts/update_alerts")
-def update_alerts(
-    body: dict = Body(...),
-    _: object = Depends(require_xdr_write),
-) -> dict:
-    """Update status/severity on one or more alerts."""
-    request_data = require_request_data(body)
-    alert_ids = request_data.get("alert_id_list", [])
-    update_data = request_data.get("update_data", {})
-    return alert_commands.update_alerts(alert_ids, update_data)

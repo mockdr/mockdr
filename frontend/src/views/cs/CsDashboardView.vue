@@ -1,37 +1,32 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { Monitor, ShieldAlert, AlertTriangle, RefreshCw } from 'lucide-vue-next'
+import { Monitor, ShieldAlert, RefreshCw } from 'lucide-vue-next'
 import { Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS, ArcElement, Tooltip, Legend,
 } from 'chart.js'
-import { ensureCsAuth, csHostsApi, csDetectionsApi, csIncidentsApi } from '../../api/crowdstrike'
-import type { CsHost, CsDetection, CsIncident } from '../../types/crowdstrike'
+import { ensureCsAuth, csHostsApi, csDetectionsApi } from '../../api/crowdstrike'
+import type { CsHost, CsDetection } from '../../types/crowdstrike'
 import LoadingSkeleton from '../../components/shared/LoadingSkeleton.vue'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
-const router = useRouter()
 const loading = ref(true)
 const error = ref('')
 
 // Summary counts
 const hostCount = ref(0)
 const detectionCount = ref(0)
-const incidentCount = ref(0)
 
 // Entities for charts
 const hosts = ref<CsHost[]>([])
 const detections = ref<CsDetection[]>([])
-const incidents = ref<CsIncident[]>([])
 
 let timer: ReturnType<typeof setInterval>
 
 const summaryCards = computed(() => [
   { label: 'Total Hosts', value: hostCount.value, icon: Monitor, color: 'text-red-400', bg: 'bg-red-500/10' },
   { label: 'Detections', value: detectionCount.value, icon: ShieldAlert, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-  { label: 'Incidents', value: incidentCount.value, icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
 ])
 
 // Platform distribution chart
@@ -68,23 +63,6 @@ const severityChartData = computed(() => {
   }
 })
 
-// Incident status distribution chart
-const incidentStatusChartData = computed(() => {
-  const STATUS_MAP: Record<number, string> = { 20: 'New', 25: 'Reopened', 30: 'In Progress', 40: 'Closed' }
-  const counts: Record<string, number> = {}
-  for (const inc of incidents.value) {
-    const label = STATUS_MAP[inc.status] ?? `Status ${inc.status}`
-    counts[label] = (counts[label] ?? 0) + 1
-  }
-  return {
-    labels: Object.keys(counts),
-    datasets: [{
-      data: Object.values(counts),
-      backgroundColor: ['#3B82F6', '#F97316', '#EAB308', '#22C55E'],
-      borderWidth: 0,
-    }],
-  }
-})
 
 const chartOptions = {
   responsive: true,
@@ -103,32 +81,26 @@ async function fetchAll(): Promise<void> {
   try {
     await ensureCsAuth()
 
-    const [hostIdsRes, detIdsRes, incIdsRes] = await Promise.all([
+    const [hostIdsRes, detIdsRes] = await Promise.all([
       csHostsApi.queryIds({ limit: 100 }),
       csDetectionsApi.queryIds({ limit: 100 }),
-      csIncidentsApi.queryIds({ limit: 100 }),
     ])
 
     hostCount.value = hostIdsRes.meta.pagination?.total ?? hostIdsRes.resources.length
     detectionCount.value = detIdsRes.meta.pagination?.total ?? detIdsRes.resources.length
-    incidentCount.value = incIdsRes.meta.pagination?.total ?? incIdsRes.resources.length
 
     // Fetch sample entities for charts
-    const [hostsRes, detsRes, incsRes] = await Promise.all([
+    const [hostsRes, detsRes] = await Promise.all([
       hostIdsRes.resources.length > 0
         ? csHostsApi.getEntities(hostIdsRes.resources.slice(0, 50))
         : Promise.resolve({ resources: [] as CsHost[], meta: { query_time: 0, powered_by: '', trace_id: '' }, errors: [] }),
       detIdsRes.resources.length > 0
         ? csDetectionsApi.getEntities(detIdsRes.resources.slice(0, 50))
         : Promise.resolve({ resources: [] as CsDetection[], meta: { query_time: 0, powered_by: '', trace_id: '' }, errors: [] }),
-      incIdsRes.resources.length > 0
-        ? csIncidentsApi.getEntities(incIdsRes.resources.slice(0, 50))
-        : Promise.resolve({ resources: [] as CsIncident[], meta: { query_time: 0, powered_by: '', trace_id: '' }, errors: [] }),
     ])
 
     hosts.value = hostsRes.resources
     detections.value = detsRes.resources
-    incidents.value = incsRes.resources
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to fetch data'
   } finally {
@@ -205,98 +177,7 @@ onUnmounted(() => clearInterval(timer))
         </div>
       </div>
 
-      <!-- Incident Status -->
-      <div class="card p-5">
-        <h3 class="text-sm font-semibold text-s1-text mb-4">Incident Status</h3>
-        <div class="h-40">
-          <Doughnut v-if="!loading && incidents.length" :data="incidentStatusChartData" :options="chartOptions" />
-          <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
-          <LoadingSkeleton v-else :rows="3" />
-        </div>
-      </div>
-    </div>
 
-    <!-- Tables row -->
-    <div class="grid grid-cols-2 gap-4">
-      <!-- Recent Detections -->
-      <div class="card">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-s1-border">
-          <h3 class="text-sm font-semibold text-s1-text">Recent Detections</h3>
-          <RouterLink to="/crowdstrike/detections" class="text-xs text-red-400 hover:underline">View all</RouterLink>
-        </div>
-        <LoadingSkeleton v-if="loading" :rows="5" />
-        <table v-else class="w-full">
-          <tbody>
-            <tr
-              v-for="det in detections.slice(0, 5)" :key="det.composite_id"
-              class="table-row"
-              @click="router.push(`/crowdstrike/detections/${det.composite_id}`)"
-            >
-              <td class="table-cell">
-                <div class="font-medium text-s1-text text-sm truncate max-w-[160px]">
-                  {{ det.device?.hostname ?? 'Unknown' }}
-                </div>
-                <div class="text-xs text-s1-muted">{{ det.behaviors?.[0]?.scenario ?? '—' }}</div>
-              </td>
-              <td class="table-cell">
-                <span
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                  :class="{
-                    'bg-red-500/15 text-red-400': det.max_severity >= 80,
-                    'bg-orange-500/15 text-orange-400': det.max_severity >= 60 && det.max_severity < 80,
-                    'bg-yellow-500/15 text-yellow-400': det.max_severity >= 40 && det.max_severity < 60,
-                    'bg-blue-500/15 text-blue-400': det.max_severity >= 20 && det.max_severity < 40,
-                    'bg-gray-500/15 text-gray-400': det.max_severity < 20,
-                  }"
-                >
-                  {{ det.max_severity_displayname }}
-                </span>
-              </td>
-              <td class="table-cell text-xs text-s1-muted">{{ det.status }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="!loading && !detections.length" class="py-8 text-center text-s1-muted text-sm">
-          No recent detections
-        </div>
-      </div>
-
-      <!-- Recent Incidents -->
-      <div class="card">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-s1-border">
-          <h3 class="text-sm font-semibold text-s1-text">Recent Incidents</h3>
-          <RouterLink to="/crowdstrike/incidents" class="text-xs text-red-400 hover:underline">View all</RouterLink>
-        </div>
-        <LoadingSkeleton v-if="loading" :rows="5" />
-        <div v-else class="divide-y divide-s1-border">
-          <div
-            v-for="inc in incidents.slice(0, 5)" :key="inc.incident_id"
-            class="px-5 py-3 hover:bg-s1-hover transition-colors cursor-pointer"
-            @click="router.push('/crowdstrike/incidents')"
-          >
-            <div class="flex items-center justify-between">
-              <div class="text-sm text-s1-text truncate max-w-[70%]">{{ inc.name }}</div>
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="{
-                  'bg-blue-500/15 text-blue-400': inc.status === 20,
-                  'bg-orange-500/15 text-orange-400': inc.status === 25,
-                  'bg-yellow-500/15 text-yellow-400': inc.status === 30,
-                  'bg-green-500/15 text-green-400': inc.status === 40,
-                }"
-              >
-                {{ { 20: 'New', 25: 'Reopened', 30: 'In Progress', 40: 'Closed' }[inc.status] ?? inc.status }}
-              </span>
-            </div>
-            <div class="text-xs text-s1-muted mt-0.5">
-              Score: {{ inc.fine_score }} | {{ inc.hosts?.length ?? 0 }} host(s)
-            </div>
-          </div>
-        </div>
-        <div v-if="!loading && !incidents.length" class="py-8 text-center text-s1-muted text-sm">
-          No incidents
-        </div>
-      </div>
     </div>
   </div>
 </template>

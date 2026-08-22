@@ -3,10 +3,8 @@ import type {
   CsResponse,
   CsHost,
   CsDetection,
-  CsIncident,
   CsIoc,
   CsHostGroup,
-  CsCase,
 } from '../types/crowdstrike'
 
 /**
@@ -113,22 +111,6 @@ export const csDetectionsApi = {
 
 // ── Incidents API ────────────────────────────────────────────────────────────
 
-export const csIncidentsApi = {
-  /** Query incident IDs. */
-  queryIds: (params?: Record<string, unknown>): Promise<CsResponse<string>> =>
-    csClient.get('/incidents/queries/incidents/v1', { params }) as Promise<CsResponse<string>>,
-
-  /** Fetch full incident entities by IDs. */
-  getEntities: (ids: string[]): Promise<CsResponse<CsIncident>> =>
-    csClient.post('/incidents/entities/incidents/GET/v1', { ids }) as Promise<CsResponse<CsIncident>>,
-
-  /** Perform incident actions (update status, assign, etc.). */
-  action: (ids: string[], actionParams: Array<{ name: string; value: string }>): Promise<CsResponse<unknown>> =>
-    csClient.post('/incidents/entities/incident-actions/v1', {
-      ids,
-      action_parameters: actionParams,
-    }) as Promise<CsResponse<unknown>>,
-}
 
 // ── IOCs API ─────────────────────────────────────────────────────────────────
 
@@ -158,8 +140,3 @@ export const csHostGroupsApi = {
 
 // ── Cases API ───────────────────────────────────────────────────────────────
 
-export const csCasesApi = {
-  /** List all cases. */
-  list: (params?: Record<string, unknown>): Promise<CsResponse<CsCase>> =>
-    csClient.get('/cases/entities/cases/GET/v1', { params }) as Promise<CsResponse<CsCase>>,
-}

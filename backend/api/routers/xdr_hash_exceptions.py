@@ -7,31 +7,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends
 
-from api.xdr_auth import require_xdr_auth, require_xdr_write
+from api.xdr_auth import require_xdr_write
 from application.xdr_hash_exceptions import commands as hash_commands
-from application.xdr_hash_exceptions import queries as hash_queries
 from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import require_request_data
 
 router = APIRouter(tags=["XDR Hash Exceptions"])
-
-
-@router.post("/hash_exceptions/blocklist/get/")
-def get_blocklist(
-    body: dict = Body(...),
-    _: object = Depends(require_xdr_auth),
-) -> dict:
-    """List all blocklist hash exceptions."""
-    return hash_queries.get_blocklist()
-
-
-@router.post("/hash_exceptions/allowlist/get/")
-def get_allowlist(
-    body: dict = Body(...),
-    _: object = Depends(require_xdr_auth),
-) -> dict:
-    """List all allowlist hash exceptions."""
-    return hash_queries.get_allowlist()
 
 
 @router.post("/hash_exceptions/blocklist/")

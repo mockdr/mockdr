@@ -169,16 +169,26 @@ envelope; `alerts_exclusion/add` answers `{rule_id}` and `delete`
 `{rule_id: [...]}`; `healthcheck` answers `{status}` without a `reply`
 envelope; roles, groups and users carry their recorded fields.
 
+**No evidence, no route.** A mock that serves a path nobody can document
+invents the product. Removed, with the UI that leaned on them: the five
+Cortex XDR routes with no public evidence of their reply shape
+(`alerts/update_alerts`, `hash_exceptions/allowlist|blocklist/get`,
+`indicators/enable_iocs|disable_iocs`; the hash-exceptions view went with
+them, add/remove stay), and the sixteen CrowdStrike routes the current API
+no longer has — the legacy Incidents API (`/incidents/*`), the legacy IOC
+API (`/indicators/*/iocs/v1`), the cases shape under `/alerts/*/cases` and
+the GET variants of `…/GET/v1` POSTs. The CrowdStrike incidents and cases
+views and the dashboard's incident widget are gone with them; cases keep
+the documented `/cases/queries/cases/v1` and `/cases/entities/case-tags/v1`.
+Every mounted CrowdStrike and Cortex XDR route now has a reference
+(23 and 33 compared, 0 drift, 0 unjudged).
+
 ### Known limits
 
-Six Cortex XDR routes have no public evidence of their reply shape at all
-(`alerts/update_alerts`, `hash_exceptions/allowlist|blocklist/get`,
-`indicators/enable_iocs|disable_iocs`, and the members of `endpoints/delete`);
-they stay listed as unjudged. A recording or a transcription proves what a
-real reply carries, never what it does not. The CrowdStrike cases model
-changed shape in the current API (`OperationsGetCasesByIDsResponseVM`); the
-mock still models the legacy shape and does not alias the new create and
-update paths.
+A recording or a transcription proves what a real reply carries, never
+what it does not: for Cortex XDR and Defender, surplus fields are listed as
+undocumented, not counted as drift. The two Defender OAuth token endpoints
+are Azure AD, not the product API, and are not compared.
 
 ## [2.0.5] - 2026-08-22
 
