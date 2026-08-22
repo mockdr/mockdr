@@ -62,7 +62,6 @@ def seed_es_rules(fake: Faker) -> list[str]:
     """
     rule_ids: list[str] = []
     created_by = "elastic"
-    now_ts = rand_ago(0)
 
     for i, name in enumerate(ES_RULE_NAMES):
         rule_id_str = es_uuid()
