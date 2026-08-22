@@ -40,6 +40,12 @@ class ESAggregationError(ValueError):
     silently empty result would be worse than the original bug.
     """
 
+    def __init__(self, message: str, *, clause: str | None = None) -> None:
+        """Record the message, and the unknown aggregation type if that is the failure."""
+        super().__init__(message)
+        self.clause = clause
+
+
 
 def apply_aggregations(
     records: list[dict],
@@ -81,7 +87,7 @@ def _split_definition(name: str, definition: dict) -> tuple[str, dict, dict]:
     types = [k for k in definition if k not in ("aggs", "aggregations", "meta")]
     if len(types) != 1:
         msg = f"[{name}] must declare exactly one aggregation type"
-        raise ESAggregationError(msg)
+        raise ESAggregationError(msg, clause=name)
     agg_type = types[0]
     body = definition[agg_type]
     return agg_type, body if isinstance(body, dict) else {}, sub
@@ -98,7 +104,7 @@ def _evaluate(
         return _metric(agg_type, body, records, index)
 
     msg = f"Unknown aggregation type [{agg_type}]"
-    raise ESAggregationError(msg)
+    raise ESAggregationError(msg, clause=agg_type)
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, Query
 
 from api.cs_auth import require_cs_auth
 from application.cs_users import queries as user_queries
+from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Users"])
 
@@ -31,7 +32,7 @@ def get_user_entities(
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return full user entities by UUID list (POST body)."""
-    ids = body.get("ids", [])
+    ids = require_list(body, "ids")
     return user_queries.get_user_entities(ids)
 
 

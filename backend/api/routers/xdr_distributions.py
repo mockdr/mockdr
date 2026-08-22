@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_distributions import commands as dist_commands
 from application.xdr_distributions import queries as dist_queries
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Distributions"])
 
@@ -30,7 +30,7 @@ def create_distribution(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Create a new agent distribution package."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return dist_commands.create_distribution(request_data)
 
 
@@ -40,7 +40,7 @@ def get_distribution_url(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get the download URL for a distribution package."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     distribution_id = request_data.get("distribution_id", "")
     result = dist_queries.get_distribution_url(distribution_id)
     if result is None:
@@ -59,7 +59,7 @@ def get_distribution_status(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get the status of a distribution package."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     distribution_id = request_data.get("distribution_id", "")
     result = dist_queries.get_distribution_status(distribution_id)
     if result is None:

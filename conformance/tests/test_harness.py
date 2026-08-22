@@ -154,6 +154,11 @@ class TestCompare:
         findings = compare("p", mock, _response(200, {"ok": True}), SIGNIFICANT)
         assert findings[0].kind == "type"
 
+    def test_identical_non_json_is_agreement(self) -> None:
+        """Both sides answering Atom XML is not a finding."""
+        xml = Response(200, {}, None, body_error="non-json (text/xml)")
+        assert compare("p", xml, xml, SIGNIFICANT) == []
+
     def test_ignored_paths_are_dropped(self) -> None:
         findings = compare(
             "p", _response(200, {"a": 1}), _response(200, {"a": "x"}), SIGNIFICANT,

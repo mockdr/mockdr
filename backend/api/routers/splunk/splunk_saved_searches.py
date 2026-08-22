@@ -41,9 +41,14 @@ async def create_search(
     body = await _parse_body(request)
     name = body.get("name", "")
     search = body.get("search", "")
-    if not name or not search:
+    if not name:
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": "name and search are required"},
+            {"type": "ERROR",
+             "text": 'Cannot perform action "POST" without a target name to act on.'},
+        ]})
+    if not search:
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "ERROR", "text": "search is required"},
         ]})
 
     if get_saved_search(name):
@@ -68,7 +73,7 @@ def get_search(
     result = get_saved_search(name)
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Saved search '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return result
 
@@ -85,7 +90,7 @@ async def update_search(
     ss = update_saved_search(name, **body)
     if not ss:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Saved search '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     result = get_saved_search(name)
     return result or {}
@@ -99,7 +104,7 @@ def delete_search(
     """Delete a saved search."""
     if not delete_saved_search(name):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Saved search '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return {"messages": [{"type": "INFO", "text": f"Saved search '{name}' deleted"}]}
 
@@ -114,7 +119,7 @@ def dispatch_search(
     sid = dispatch_saved_search(name)
     if not sid:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Saved search '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return {"sid": sid}
 
@@ -129,7 +134,7 @@ def get_history(
     result = get_dispatch_history(name)
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Saved search '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return result
 

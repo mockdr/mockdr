@@ -124,10 +124,13 @@ def compare(
             ))
 
     if mock.body_error or real.body_error:
-        findings.append(Finding(
-            probe_id, "type", "$",
-            mock.body_error or "json", real.body_error or "json", why,
-        ))
+        # Both answering the same non-JSON — Atom XML when no output_mode was
+        # given — is agreement, and was reported as a difference.
+        if mock.body_error != real.body_error:
+            findings.append(Finding(
+                probe_id, "type", "$",
+                mock.body_error or "json", real.body_error or "json", why,
+            ))
         return sorted(findings, key=lambda f: (f.rank, f.path))
 
     mock_skeleton = skeleton(mock.body, significant_keys)

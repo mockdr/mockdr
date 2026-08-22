@@ -40,7 +40,9 @@ async def auth_login(
             pass
 
     if not username or not password:
-        raise HTTPException(status_code=401, detail={"messages": [
+        # A missing credential is a malformed request (400); only a wrong one
+        # is a failed authentication (401). Measured on 10.4.2.
+        raise HTTPException(status_code=400, detail={"messages": [
             {"type": "WARN", "text": "Login failed"},
         ]})
 
@@ -80,7 +82,7 @@ def get_single_user(
     result = get_user(name)
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"User '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return result
 

@@ -143,3 +143,26 @@ def build_cs_error_response(code: int, message: str) -> dict:
         "errors": [{"code": code, "message": message}],
         "resources": [],
     }
+
+
+def require_list(body: object, key: str) -> list:
+    """Return ``body[key]`` as a list, ``[]`` if absent, or refuse the request.
+
+    ``body.get("ids", [])`` handed an explicit ``null`` straight to code that
+    iterated it, and six Falcon routes answered a plain-text 500. A value
+    that is present and not a list is the caller's mistake; Falcon reports
+    it as a 400 in its ``errors`` envelope.
+    """
+    from fastapi import HTTPException  # local: utils must not import the API layer at module load
+
+    if not isinstance(body, dict) or key not in body:
+        return []
+    value = body[key]
+    # Present but null is a malformed value, not an omitted one; Falcon's
+    # schema validation refuses it, so the mock does too.
+    if not isinstance(value, list):
+        raise HTTPException(
+            status_code=400,
+            detail=build_cs_error_response(400, f"{key} must be an array"),
+        )
+    return value

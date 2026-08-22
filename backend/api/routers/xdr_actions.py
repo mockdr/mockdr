@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_actions import queries as action_queries
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Actions"])
 
@@ -20,7 +20,7 @@ def get_action_status(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get the status of a response action."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     # Cortex XDR names this parameter group_action_id; only `action_id` was
     # read, so the documented request reached the handler with an empty id.
     raw_id = request_data.get("group_action_id") or request_data.get("action_id") or ""
@@ -40,7 +40,7 @@ def get_file_retrieval_details(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get file retrieval download details for an action."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     action_id = request_data.get("action_id", "")
     result = action_queries.get_file_retrieval_details(action_id)
     if result is None:

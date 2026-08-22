@@ -54,7 +54,8 @@ async def create_kv_collection(
     name = body.get("name", "")
     if not name:
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": "Collection name is required"},
+            {"type": "ERROR",
+             "text": 'Cannot perform action "POST" without a target name to act on.'},
         ]})
     coll = create_collection(name, app, owner)
     return {"name": coll.name}
@@ -70,7 +71,7 @@ def delete_kv_collection(
     """Delete a KV Store collection."""
     if not delete_collection(name, app):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+            {"type": "ERROR", "text": f"An object with name={name} does not exist"},
         ]})
     return {"messages": [{"type": "INFO", "text": f"Collection '{name}' deleted"}]}
 
@@ -97,7 +98,7 @@ def get_all_records(
     """
     if not collection_exists(name, app):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+            {"type": "ERROR", "text": f"An object with name={name} does not exist"},
         ]})
     return get_records(
         name, app, query=query, fields=fields, sort=sort, limit=limit, skip=skip,
@@ -127,7 +128,7 @@ async def insert_kv_record(
         ]}) from exc
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+            {"type": "ERROR", "text": f"An object with name={name} does not exist"},
         ]})
     return JSONResponse(status_code=201, content={"_key": result["_key"]})
 
@@ -166,7 +167,7 @@ async def batch_find_records(
     """
     if not collection_exists(name, app):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+            {"type": "ERROR", "text": f"An object with name={name} does not exist"},
         ]})
 
     queries = await request.json()
@@ -244,7 +245,7 @@ def delete_all_kv_records(
     """Delete all records from a KV collection."""
     if not delete_all_records(name, app, query):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Collection '{name}' not found"},
+            {"type": "ERROR", "text": f"An object with name={name} does not exist"},
         ]})
     return JSONResponse(status_code=200, content={})
 
@@ -256,6 +257,9 @@ async def _parse_body(request: Request) -> dict:
         form = await request.form()
         return {k: str(v) for k, v in form.items()}
     try:
-        return cast(dict[str, Any], await request.json())
+        parsed = await request.json()
     except Exception:
         return {}
+    # A JSON `null` or array is not a parameter set; treating it as an empty
+    # one lets the route report the parameter it needed, instead of 500.
+    return cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_endpoints import commands as endpoint_commands
 from application.xdr_endpoints import queries as endpoint_queries
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Endpoints"])
 
@@ -21,7 +21,7 @@ def get_endpoints(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """List endpoints with optional filtering and pagination."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return endpoint_queries.get_endpoints(request_data)
 
 
@@ -31,7 +31,7 @@ def isolate_endpoint(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Isolate an endpoint from the network."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.isolate_endpoint(endpoint_id)
     if result is None:
@@ -48,7 +48,7 @@ def unisolate_endpoint(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Release an endpoint from network isolation."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.unisolate_endpoint(endpoint_id)
     if result is None:
@@ -65,7 +65,7 @@ def scan_endpoint(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Initiate a scan on an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.scan_endpoint(endpoint_id)
     if result is None:
@@ -82,7 +82,7 @@ def delete_endpoints(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Delete one or more endpoints."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_ids = request_data.get("endpoint_id_list", [])
     return endpoint_commands.delete_endpoints(endpoint_ids)
 
@@ -93,7 +93,7 @@ def get_policy(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get the policy applied to an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_queries.get_policy(endpoint_id)
     if result is None:
@@ -110,7 +110,7 @@ def update_agent_name(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Update the alias (display name) of an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     alias = request_data.get("alias", "")
     result = endpoint_commands.update_agent_name(endpoint_id, alias)
@@ -128,7 +128,7 @@ def terminate_process(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Terminate a process on an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.terminate_process(endpoint_id, request_data)
     if result is None:
@@ -145,7 +145,7 @@ def quarantine_file(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Quarantine a file on an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.quarantine_file(endpoint_id, request_data)
     if result is None:
@@ -162,7 +162,7 @@ def restore_file(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Restore a quarantined file on an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.restore_file(endpoint_id, request_data)
     if result is None:
@@ -179,7 +179,7 @@ def file_retrieval(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Retrieve a file from an endpoint."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_id = request_data.get("endpoint_id", "")
     result = endpoint_commands.file_retrieval(endpoint_id, request_data)
     if result is None:

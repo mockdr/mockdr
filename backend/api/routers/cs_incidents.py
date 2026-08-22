@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_incidents import commands as incident_commands
 from application.cs_incidents import queries as incident_queries
+from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Incidents"])
 
@@ -32,7 +33,7 @@ def get_incidents(
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return full incident entities for the given incident IDs."""
-    ids: list[str] = body.get("ids", [])
+    ids = require_list(body, "ids")
     return incident_queries.get_incident_entities(ids)
 
 
@@ -46,6 +47,6 @@ def incident_action(
     Body must contain ``ids`` and ``action_parameters`` (list of
     ``{name, value}`` dicts for status updates, assignment, tagging, etc.).
     """
-    ids: list[str] = body.get("ids", [])
-    action_parameters: list[dict] = body.get("action_parameters", [])
+    ids = require_list(body, "ids")
+    action_parameters = require_list(body, "action_parameters")
     return incident_commands.perform_incident_action(ids, action_parameters)

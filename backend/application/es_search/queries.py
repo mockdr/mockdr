@@ -20,9 +20,10 @@ from utils.es_query import (
     apply_source_filter,
     build_predicate,
     hit_id,
+    validate_search_body,
     wrap_as_hits,
 )
-from utils.es_response import build_es_search_response
+from utils.es_response import build_es_index_not_found, build_es_search_response
 
 # ── Index pattern routing ────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     # Capture total before pagination.
     total_before = len(records)
 
+    validate_search_body(body)
     # Apply query DSL (filter, sort, from/size).
     filtered = apply_es_query(records, body)
 
@@ -271,7 +273,16 @@ def es_mget(index: str, body: dict) -> dict:
         docs.append(found or {"_index": target, "_id": doc_id, "found": False})
 
     for doc_id in body.get("ids", []) or []:
-        found = es_get_doc(index, str(doc_id))
+        try:
+            found = es_get_doc(index, str(doc_id))
+        except (IndexNotFoundError, MultipleIndicesError):
+            # A missing index is reported per document, with the request
+            # itself still a 200 (measured on 8.15); it used to 500.
+            docs.append({
+                "_index": index, "_id": str(doc_id),
+                "error": build_es_index_not_found(index)["error"],
+            })
+            continue
         docs.append(found or {"_index": index, "_id": str(doc_id), "found": False})
 
     return {"docs": docs}

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_exception_lists import commands as exc_commands
 from application.es_exception_lists import queries as exc_queries
-from utils.es_response import build_security_solution_error
+from utils.es_response import build_kbn_error_response, build_security_solution_error
 
 router = APIRouter(tags=["ES Exception Lists"])
 
@@ -24,7 +24,7 @@ def find_lists(
     list_id: str = Query(None),
     namespace_type: str = Query(None),
     page: int = Query(1),
-    per_page: int = Query(20, ge=1, le=1000),
+    per_page: int = Query(20, ge=0, le=1000),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Find exception lists with optional filters and pagination."""
@@ -70,6 +70,7 @@ def create_list(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Create a new exception list."""
+    _require_iots(body, ("description", "name", "type"))
     return exc_commands.create_list(body)
 
 
@@ -128,7 +129,7 @@ def find_items(
     namespace_type: str = Query(None),
     tags: str = Query(None, description="Comma-separated tags"),
     page: int = Query(1),
-    per_page: int = Query(20, ge=1, le=1000),
+    per_page: int = Query(20, ge=0, le=1000),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Find exception items with optional filters and pagination."""
@@ -223,3 +224,17 @@ def delete_item(
             ),
         )
     return {}
+
+
+def _require_iots(body: dict, fields: tuple[str, ...]) -> None:
+    """Refuse a body missing io-ts-required fields the way Kibana does.
+
+    One ``Invalid value "undefined" supplied to "<field>"`` per missing
+    field, comma-joined, in schema order, in the Boom envelope. Measured on
+    8.15 for cases and exception lists.
+    """
+    missing = [f for f in fields if body.get(f) is None]
+    if missing:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, ",".join(f'Invalid value "undefined" supplied to "{f}"' for f in missing),
+        ))

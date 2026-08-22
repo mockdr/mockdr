@@ -96,7 +96,7 @@ def server_status(
         "splunkd": "running",
         "kvstore": "ready",
     }
-    entry = build_splunk_entry("server-status", status)
+    entry = build_splunk_entry("server-status", status, acl_extra={"perms": None})
     return build_splunk_envelope([entry], total=1)
 
 

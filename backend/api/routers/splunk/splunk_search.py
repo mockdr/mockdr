@@ -112,8 +112,20 @@ def list_search_jobs(
     return list_jobs()
 
 
-@router.get("/services/search/v2/jobs/export", response_model=None)
-@router.get("/services/search/jobs/export", response_model=None)
+# One decorator per method: an api_route with two methods emits two OpenAPI
+# operations under one id, which a client generator rejects as a duplicate.
+@router.get(
+    "/services/search/v2/jobs/export", response_model=None, operation_id="splunk_export_v2_get",
+)
+@router.post(
+    "/services/search/v2/jobs/export", response_model=None, operation_id="splunk_export_v2_post",
+)
+@router.get(
+    "/services/search/jobs/export", response_model=None, operation_id="splunk_export_get",
+)
+@router.post(
+    "/services/search/jobs/export", response_model=None, operation_id="splunk_export_post",
+)
 async def export_search(
     request: Request,
     search: str = Query(default=""),
@@ -123,6 +135,14 @@ async def export_search(
     current_user: dict = Depends(require_splunk_auth),
 ) -> Response:
     """One-shot blocking search export."""
+    # splunklib's Jobs.export() POSTs its parameters as a form; this route
+    # took GET only, and the 405 it answered with told the client to fix
+    # "the POST request" it had just made.
+    if request.method == "POST":
+        form = await request.form()
+        search = search or str(form.get("search", ""))
+        earliest_time = earliest_time or str(form.get("earliest_time", ""))
+        latest_time = latest_time or str(form.get("latest_time", ""))
     if not search:
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "FATAL", "text": _SEARCH_REQUIRED},

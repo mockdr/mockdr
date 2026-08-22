@@ -1,11 +1,12 @@
 """Microsoft Graph Teams endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from api.graph_auth import require_graph_auth, require_graph_write
 from application.graph.teams import queries as teams_queries
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Graph Teams"])
 
@@ -74,6 +75,12 @@ async def post_channel_message(
 ) -> JSONResponse:
     """Post a message to a channel."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("graph", 400, "Request body must be a JSON object"),
+        )
     result = teams_queries.post_channel_message(
         team_id=team_id, channel_id=channel_id, body=body,
     )

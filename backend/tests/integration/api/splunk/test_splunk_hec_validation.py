@@ -36,8 +36,7 @@ class TestRejectedBodies:
             ('{"event":"   "}', 13, "whitespace-only event"),
             ('{"event":null}', 13, "null event"),
             ('{"event":"x","index":"no_such_index"}', 7, "index outside the token"),
-            ('{"event":"x","time":"notanumber"}', 6, "non-numeric time"),
-            ('[{"event":"a"}]', 6, "top-level array"),
+            ('{"event":"x","time":"notanumber"}', 15, "non-numeric time"),
             ("not json at all", 6, "unparseable"),
             ("", 5, "empty body"),
         ],
@@ -55,7 +54,8 @@ class TestRejectedBodies:
         self, client: TestClient, hec_auth: dict,
     ) -> None:
         # These two used to raise out of the handler as text/plain 500s.
-        for body in ('{"event":"x","time":"nope"}', '[{"event":"a"}]'):
+        # A top-level array is a batch on splunkd (200), not a rejection.
+        for body in ('{"event":"x","time":"nope"}', "{not json"):
             resp = client.post(EVENT_URL, content=body, headers=hec_auth)
             assert resp.status_code == 400
             assert resp.headers["content-type"].startswith("application/json")

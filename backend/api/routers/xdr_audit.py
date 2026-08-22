@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_audit import queries as audit_queries
+from utils.xdr_response import require_request_data
 
 router = APIRouter(tags=["XDR Audit"])
 
@@ -19,7 +20,7 @@ def get_management_logs(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """List management audit logs with optional filtering and pagination."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return audit_queries.get_management_logs(request_data)
 
 
@@ -29,5 +30,5 @@ def get_agent_reports(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Return agent reports."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return audit_queries.get_agent_reports(request_data)

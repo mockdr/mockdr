@@ -63,59 +63,66 @@ async def kibana_status(request: Request) -> dict:
     }
 
 
+def _feature(
+    fid: str, name: str, order: int, category: tuple[str, str, int, str], app: list[str],
+    catalogue: list[str], saved_all: list[str], api: list[str], ui: list[str],
+) -> dict:
+    """One feature in the shape Kibana 8.15 reports (measured via /api/features)."""
+    cat_id, label, cat_order, icon = category
+    def privilege(all_: bool) -> dict:
+        return {
+            "app": app, "catalogue": catalogue,
+            "api": (
+                api if all_ else [a for a in api if "read" in a] or api[:1]
+            ),
+            "savedObject": {"all": saved_all if all_ else [], "read": [] if all_ else saved_all},
+            "ui": ui if all_ else [u for u in ui if u in ("show", "read")] or ui[:1],
+            "alerting": {}, "management": {},
+        }
+    return {
+        "id": fid, "name": name, "order": order,
+        "category": {"id": cat_id, "label": label, "order": cat_order, "euiIconType": icon},
+        "app": app, "catalogue": catalogue, "management": {}, "alerting": [],
+        "privileges": {"all": privilege(True), "read": privilege(False)},
+        "subFeatures": [],
+    }
+
+
+_SECURITY = ("securitySolution", "Security", 4000, "logoSecurity")
+_MANAGEMENT = ("management", "Management", 5000, "managementApp")
+
+
 @router.get("/api/features")
 def list_features(
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
-    """List the Kibana features this instance exposes."""
+    """List the Kibana features this instance exposes.
+
+    Three of Kibana's thirty-three, each in the full shape — order,
+    catalogue, management, alerting, subFeatures, and privileges carrying
+    api/ui/savedObject — so a client that reads any of those keys finds
+    them. Previously each feature carried a quarter of its keys.
+    """
     return [
+        _feature("siem", "Security", 1100, _SECURITY, ["securitySolution", "kibana"],
+                 ["securitySolution"], ["alert", "exception-list", "exception-list-agnostic"],
+                 ["securitySolution", "lists-all", "lists-read", "rac"],
+                 ["show", "crud"]),
+        _feature("securitySolutionCases", "Cases", 1100, _SECURITY, ["securitySolution", "kibana"],
+                 ["securitySolution"], ["cases", "cases-comments", "cases-user-actions"],
+                 ["casesSuggestUserProfiles", "bulkGetUserProfiles"],
+                 ["create_cases", "read_cases", "update_cases", "delete_cases"]),
+        _feature("fleet", "Fleet", 9020, _MANAGEMENT, ["fleet", "kibana"], ["fleet"],
+                 ["ingest-agent-policies", "fleet-agents", "ingest-package-policies"],
+                 ["fleet-all", "fleet-read"], ["read", "all"]),
+        # Two of Kibana's features report no privileges at all (measured:
+        # enterpriseSearch and monitoring). A client must cope with null.
         {
-            "id": "siem",
-            "name": "Security",
-            "category": {"id": "securitySolution", "label": "Security"},
-            "app": ["securitySolution", "kibana"],
-            "privileges": {
-                "all": {
-                    "app": ["securitySolution"],
-                    "savedObject": {"all": ["alert"], "read": []},
-                },
-                "read": {
-                    "app": ["securitySolution"],
-                    "savedObject": {"all": [], "read": ["alert"]},
-                },
-            },
-        },
-        {
-            "id": "securitySolutionCases",
-            "name": "Cases",
-            "category": {"id": "securitySolution", "label": "Security"},
-            "app": ["securitySolution", "kibana"],
-            "privileges": {
-                "all": {
-                    "app": ["securitySolution"],
-                    "savedObject": {"all": ["cases"], "read": []},
-                },
-                "read": {
-                    "app": ["securitySolution"],
-                    "savedObject": {"all": [], "read": ["cases"]},
-                },
-            },
-        },
-        {
-            "id": "fleet",
-            "name": "Fleet",
-            "category": {"id": "management", "label": "Management"},
-            "app": ["fleet", "kibana"],
-            "privileges": {
-                "all": {
-                    "app": ["fleet"],
-                    "savedObject": {"all": ["ingest-agent-policies"], "read": []},
-                },
-                "read": {
-                    "app": ["fleet"],
-                    "savedObject": {"all": [], "read": ["ingest-agent-policies"]},
-                },
-            },
+            "id": "monitoring", "name": "Stack Monitoring", "order": 3500,
+            "category": {"id": "management", "label": "Management", "order": 5000,
+                         "euiIconType": "managementApp"},
+            "app": ["monitoring", "kibana"], "catalogue": ["monitoring"],
+            "management": {}, "alerting": [], "privileges": None, "subFeatures": [],
         },
     ]
 

@@ -47,6 +47,9 @@ probes:
       auth: basic
     ignore_paths:
       - $.cluster_name
+      # A single-node install is yellow (replicas unassigned); mockdr models
+      # a healthy cluster and says green. That is fixture, not behaviour.
+      - $.status
 
   - id: es-missing-index
     endpoint: search
@@ -140,4 +143,446 @@ probes:
       method: POST
       path: /api/detection_engine/rules
       json: {name: conformance, description: probe, type: query, severity: low, risk_score: 1}
+      auth: basic
+
+  # ══ Widened coverage (2.0.5) ═══════════════════════════════════════════
+
+  # ── Elasticsearch: search features ──────────────────────────────────────
+  - id: es-count
+    endpoint: search
+    why: _count's envelope differs from _search's — no hits, a bare count.
+    request:
+      method: POST
+      path: /_count
+      json: {query: {match_all: {}}}
+      auth: basic
+
+  - id: es-aggs-terms-on-missing-index
+    endpoint: search
+    why: An aggregation against an index that is not there.
+    request:
+      method: POST
+      path: /no-such-index-conformance/_search
+      json: {size: 0, aggs: {by_x: {terms: {field: x}}}}
+      auth: basic
+
+  - id: es-aggs-unknown-type
+    endpoint: search
+    why: An aggregation type Elasticsearch does not have — which exception?
+    request:
+      method: POST
+      path: /_search
+      json: {size: 0, aggs: {a: {not_an_agg: {field: x}}}}
+      auth: basic
+
+  - id: es-size-negative
+    endpoint: search
+    why: A negative size is an illegal_argument_exception.
+    request:
+      method: POST
+      path: /_search
+      json: {size: -1}
+      auth: basic
+
+  - id: es-size-not-a-number
+    endpoint: search
+    why: A size that is not numeric.
+    request:
+      method: POST
+      path: /_search
+      json: {size: lots}
+      auth: basic
+
+  - id: es-from-too-large
+    endpoint: search
+    why: from+size beyond the 10000 window.
+    request:
+      method: POST
+      path: /_search
+      json: {from: 20000, size: 10}
+      auth: basic
+
+  - id: es-body-not-an-object
+    endpoint: search
+    why: A JSON array where a search body is expected.
+    request:
+      method: POST
+      path: /_search
+      json: [1, 2, 3]
+      auth: basic
+
+  - id: es-mget-no-docs
+    endpoint: search
+    why: _mget without docs or ids.
+    request:
+      method: POST
+      path: /_mget
+      json: {}
+      auth: basic
+
+  - id: es-mget-missing-index
+    endpoint: search
+    why: _mget against an unknown index.
+    request:
+      method: POST
+      path: /no-such-index-conformance/_mget
+      json: {ids: ["1"]}
+      auth: basic
+
+  - id: es-mapping-missing-index
+    endpoint: search
+    why: _mapping for an index that does not exist.
+    request:
+      method: GET
+      path: /no-such-index-conformance/_mapping
+      auth: basic
+
+  - id: es-index-exists-missing
+    endpoint: search
+    why: HEAD on an unknown index is a bare 404 with no body.
+    request:
+      method: HEAD
+      path: /no-such-index-conformance
+      auth: basic
+
+  - id: es-cat-indices
+    endpoint: search
+    why: _cat/indices?format=json, the inventory a client lists.
+    request:
+      method: GET
+      path: /_cat/indices
+      query: {format: json}
+      auth: basic
+
+  - id: es-cat-unknown
+    endpoint: search
+    why: A _cat endpoint that does not exist.
+    request:
+      method: GET
+      path: /_cat/no_such_thing
+      auth: basic
+
+  - id: es-root
+    endpoint: search
+    why: GET / — the banner a client reads to learn the version.
+    request:
+      method: GET
+      path: /
+      auth: basic
+    ignore_paths:
+      - $.name
+      - $.cluster_name
+      - $.cluster_uuid
+      - $.tagline
+
+  - id: es-unknown-path
+    endpoint: search
+    why: A path Elasticsearch has no handler for — the envelope says "no handler found".
+    request:
+      method: GET
+      path: /_no_such_endpoint_conformance
+      auth: basic
+
+  - id: es-bulk-empty
+    endpoint: search
+    why: _bulk with an empty body.
+    request:
+      method: POST
+      path: /_bulk
+      content: ""
+      headers: {Content-Type: application/x-ndjson}
+      auth: basic
+
+  - id: es-bulk-bad-ndjson
+    endpoint: search
+    why: _bulk with a body that is not NDJSON action lines.
+    request:
+      method: POST
+      path: /_bulk
+      content: "{not json\n"
+      headers: {Content-Type: application/x-ndjson}
+      auth: basic
+
+  - id: es-security-authenticate
+    endpoint: search
+    why: _security/_authenticate — who am I.
+    request:
+      method: GET
+      path: /_security/_authenticate
+      auth: basic
+    ignore_paths:
+      - $.roles
+      - $.metadata
+      - $.full_name
+      - $.email
+      - $.authentication_realm
+      - $.lookup_realm
+
+  - id: es-wrong-password
+    endpoint: search
+    why: Wrong Basic credentials, as opposed to none.
+    request:
+      method: GET
+      path: /_cluster/health
+      headers: {Authorization: "Basic ZWxhc3RpYzp3cm9uZw=="}
+
+  # ── Kibana: detection rules ─────────────────────────────────────────────
+  - id: kbn-rule-missing-by-id
+    endpoint: kibana
+    why: rules?id= for an id that does not exist.
+    request:
+      method: GET
+      path: /api/detection_engine/rules
+      query: {id: 00000000-0000-0000-0000-000000000000}
+      auth: basic
+
+  - id: kbn-rule-missing-by-rule-id
+    endpoint: kibana
+    why: rules?rule_id= for an unknown rule_id — a different message.
+    request:
+      method: GET
+      path: /api/detection_engine/rules
+      query: {rule_id: no-such-rule-conformance}
+      auth: basic
+
+  - id: kbn-rule-get-no-params
+    endpoint: kibana
+    why: rules with neither id nor rule_id.
+    request:
+      method: GET
+      path: /api/detection_engine/rules
+      auth: basic
+
+  - id: kbn-rule-create-missing-fields
+    endpoint: kibana
+    why: >
+      Creating a rule without required fields. The Security Solution answers
+      a 400 with a message naming the first missing field.
+    request:
+      method: POST
+      path: /api/detection_engine/rules
+      json: {name: conformance}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-rule-create-bad-type
+    endpoint: kibana
+    why: A rule type Kibana does not have.
+    request:
+      method: POST
+      path: /api/detection_engine/rules
+      json: {name: c, description: d, type: not_a_type, severity: low, risk_score: 1}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-rules-find-bad-sort
+    endpoint: kibana
+    why: _find with a sort field that is not sortable.
+    request:
+      method: GET
+      path: /api/detection_engine/rules/_find
+      query: {sort_field: no_such_field, per_page: 1}
+      auth: basic
+
+  - id: kbn-rules-find-per-page-zero
+    endpoint: kibana
+    why: per_page=0.
+    request:
+      method: GET
+      path: /api/detection_engine/rules/_find
+      query: {per_page: 0}
+      auth: basic
+
+  - id: kbn-bulk-action-unknown
+    endpoint: kibana
+    why: rules/_bulk_action with an action Kibana does not have.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/_bulk_action
+      json: {action: explode, ids: []}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-rule-delete-missing
+    endpoint: kibana
+    why: DELETE rules?rule_id= for an unknown rule.
+    request:
+      method: DELETE
+      path: /api/detection_engine/rules
+      query: {rule_id: no-such-rule-conformance}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-signals-search-empty
+    endpoint: kibana
+    why: signals/search with an empty body.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/search
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-signals-status-no-ids
+    endpoint: kibana
+    why: signals/status with neither signal_ids nor query.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {status: closed}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  # ── Kibana: cases ───────────────────────────────────────────────────────
+  - id: kbn-case-missing
+    endpoint: kibana
+    why: GET cases/{id} for an unknown case.
+    request:
+      method: GET
+      path: /api/cases/00000000-0000-0000-0000-000000000000
+      auth: basic
+
+  - id: kbn-case-create-missing-fields
+    endpoint: kibana
+    why: Creating a case with only a title.
+    request:
+      method: POST
+      path: /api/cases
+      json: {title: conformance}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-find-bad-status
+    endpoint: kibana
+    why: cases/_find with a status value Kibana does not have.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {status: exploded}
+      auth: basic
+
+  - id: kbn-case-comment-missing-case
+    endpoint: kibana
+    why: Commenting on a case that does not exist.
+    request:
+      method: POST
+      path: /api/cases/00000000-0000-0000-0000-000000000000/comments
+      json: {comment: hi, type: user, owner: securitySolution}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-patch-no-version
+    endpoint: kibana
+    why: PATCH cases without the version Kibana requires for optimistic locking.
+    request:
+      method: PATCH
+      path: /api/cases
+      json: {cases: [{id: 00000000-0000-0000-0000-000000000000, title: x}]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  # ── Kibana: exception lists ─────────────────────────────────────────────
+  - id: kbn-exception-list-missing
+    endpoint: kibana
+    why: exception_lists?list_id= for an unknown list.
+    request:
+      method: GET
+      path: /api/exception_lists
+      query: {list_id: no-such-list-conformance}
+      auth: basic
+
+  - id: kbn-exception-list-create-missing
+    endpoint: kibana
+    why: Creating an exception list without required fields.
+    request:
+      method: POST
+      path: /api/exception_lists
+      json: {name: c}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  # ── Kibana: endpoint ────────────────────────────────────────────────────
+  - id: kbn-endpoint-missing
+    endpoint: kibana
+    why: endpoint/metadata/{id} for an unknown agent.
+    request:
+      method: GET
+      path: /api/endpoint/metadata/00000000-0000-0000-0000-000000000000
+      auth: basic
+
+  - id: kbn-isolate-no-ids
+    endpoint: kibana
+    why: isolate with no endpoint_ids.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-action-missing
+    endpoint: kibana
+    why: endpoint/action/{id} for an unknown action.
+    request:
+      method: GET
+      path: /api/endpoint/action/00000000-0000-0000-0000-000000000000
+      auth: basic
+
+  # ── Kibana: platform ────────────────────────────────────────────────────
+  - id: kbn-wrong-password
+    endpoint: kibana
+    why: Wrong Basic credentials against Kibana — its own 401 shape, not ES's.
+    request:
+      method: GET
+      path: /api/spaces/space
+      headers: {Authorization: "Basic ZWxhc3RpYzp3cm9uZw=="}
+
+  - id: kbn-features
+    endpoint: kibana
+    why: /api/features, the capability list.
+    request:
+      method: GET
+      path: /api/features
+      auth: basic
+
+  - id: kbn-fleet-agents
+    endpoint: kibana
+    why: fleet/agents, the inventory.
+    request:
+      method: GET
+      path: /api/fleet/agents
+      query: {perPage: 1}
+      auth: basic
+
+  # ══ Measurements the review and fuzzing asked for ══════════════════════
+  - id: es-unknown-top-level-key
+    endpoint: search
+    why: >
+      `{"a": {...}}` as a search body. Elasticsearch refuses an unknown key
+      with parsing_exception; mockdr answered 200 with every hit.
+    request:
+      method: POST
+      path: /_search
+      json: {a: {b: 1}}
+      auth: basic
+
+  - id: es-search-source-param
+    endpoint: search
+    why: GET _search?source= carries the body in the query string.
+    request:
+      method: GET
+      path: /_search
+      query: {source: '{"query":{"bogus":{}}}', source_content_type: application/json}
+      auth: basic
+
+  - id: kbn-case-create-garbage
+    endpoint: kibana
+    why: >
+      A body with none of the case fields. mockdr created a case with an
+      empty title and answered 200.
+    request:
+      method: POST
+      path: /api/cases
+      json: {a: {b: 1}}
+      headers: {kbn-xsrf: "true"}
       auth: basic

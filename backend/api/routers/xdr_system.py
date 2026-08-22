@@ -12,7 +12,7 @@ from fastapi import APIRouter, Body, Depends
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_rbac import queries as rbac_queries
 from application.xdr_system import queries as system_queries
-from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
+from utils.xdr_response import build_xdr_list_reply, build_xdr_reply, require_request_data
 
 router = APIRouter(tags=["XDR System"])
 
@@ -74,7 +74,7 @@ def assign_tag(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Assign a tag to agents (stub)."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return build_xdr_reply({
         "assigned_count": len(request_data.get("endpoint_ids", [])),
         "tag": request_data.get("tag", ""),
@@ -87,7 +87,7 @@ def remove_tag(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Remove a tag from agents (stub)."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return build_xdr_reply({
         "removed_count": len(request_data.get("endpoint_ids", [])),
         "tag": request_data.get("tag", ""),
@@ -122,7 +122,7 @@ def add_exclusion(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Add an alert exclusion (stub)."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return build_xdr_reply({
         "exclusion_id": str(uuid.uuid4()),
         "name": request_data.get("name", ""),

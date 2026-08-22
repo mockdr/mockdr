@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.xdr_auth import require_xdr_auth
 from application.xdr_xql import queries as xql_queries
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR XQL"])
 
@@ -20,7 +20,7 @@ def start_xql_query(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Start an XQL query execution."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     query_string = request_data.get("query", "")
     return xql_queries.start_query(query_string)
 
@@ -31,7 +31,7 @@ def get_query_results(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get results for an XQL query."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     query_id = request_data.get("query_id", "")
     result = xql_queries.get_query_results(query_id)
     if result is None:

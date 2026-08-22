@@ -7,6 +7,7 @@ from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import alert_rules as rule_cmds
 from application.sentinel.queries import alert_rules as rule_queries
 from utils.sentinel.response import build_arm_error
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Alert Rules"])
 
@@ -60,6 +61,12 @@ async def create_or_update_alert_rule(
 ) -> dict:
     """Create or update an alert rule."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     kind = body.get("kind", "Scheduled")
     properties = body.get("properties", {})
     properties["kind"] = kind

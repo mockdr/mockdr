@@ -260,7 +260,9 @@ class TestErrorEnvelopeConformance:
         resp = client.post(
             "/kibana/api/cases",
             headers={**ES_BASIC_AUTH, "kbn-version": "8.19.0"},
-            json={"title": "x", "description": "y"},
+            json={"title": "x", "description": "y", "tags": [], "owner": "securitySolution",
+                  "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+                  "settings": {"syncAlerts": True}},
         )
         assert resp.status_code != 400
 

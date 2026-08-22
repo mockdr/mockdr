@@ -11,6 +11,7 @@ from application.sentinel.commands.bookmarks import (
 from domain.sentinel.bookmark import SentinelBookmark
 from repository.sentinel.bookmark_repo import sentinel_bookmark_repo
 from utils.sentinel.response import build_arm_error, build_arm_list, build_arm_resource
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Bookmarks"])
 
@@ -81,6 +82,12 @@ async def upsert_bookmark(
 ) -> dict:
     """Create or update a bookmark."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     properties = body.get("properties", {})
     bm = create_or_update_bookmark(bookmark_id, properties)
     return _bookmark_to_arm(bm)

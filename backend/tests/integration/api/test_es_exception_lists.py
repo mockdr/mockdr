@@ -143,6 +143,7 @@ class TestCreateList:
             json={
                 "name": "ID Check List",
                 "type": "detection",
+                "description": "created by test",
             },
         ).json()
         assert "id" in body
@@ -153,7 +154,7 @@ class TestCreateList:
         resp = client.post(
             "/kibana/api/exception_lists",
             headers=ES_AUTH,
-            json={"name": "No XSRF", "type": "detection"},
+            json={"name": "No XSRF", "type": "detection", "description": "created by test"},
         )
         assert resp.status_code == 400
 
@@ -168,7 +169,7 @@ class TestCreateList:
         client.post(
             "/kibana/api/exception_lists",
             headers=KBN_WRITE_HEADERS,
-            json={"name": "Findable List", "type": "detection"},
+            json={"name": "Findable List", "type": "detection", "description": "created by test"},
         )
 
         after = client.get(

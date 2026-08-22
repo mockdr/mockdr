@@ -40,7 +40,7 @@ def get_fired_alert(
             entry = build_splunk_entry(name, a, collection="alerts/fired_alerts")
             return build_splunk_envelope([entry], total=1)
     raise HTTPException(status_code=404, detail={"messages": [
-        {"type": "ERROR", "text": f"Fired alert '{name}' not found"},
+        {"type": "ERROR", "text": f'Could not find alert savedsearch_id="admin;search;{name}"'},
     ]})
 
 
@@ -55,5 +55,5 @@ def delete_fired_alert(
             store.delete(_COLLECTION, a.get("_id", ""))
             return {"messages": [{"type": "INFO", "text": f"Fired alert '{name}' deleted"}]}
     raise HTTPException(status_code=404, detail={"messages": [
-        {"type": "ERROR", "text": f"Fired alert '{name}' not found"},
+        {"type": "ERROR", "text": f'Could not find alert savedsearch_id="admin;search;{name}"'},
     ]})

@@ -2,7 +2,7 @@
 
 splunkd renders every Atom content value as a string — booleans as ``"1"`` /
 ``"0"`` — and the SDK depends on it rather than coercing. ``Job.is_done()`` is
-literally ``self._state.content["isDone"] == "1"``, so a JSON boolean makes
+literally ``self._state.content["isDone"] is True``, so a JSON boolean makes
 that comparison permanently False and the documented polling loop
 (``while not job.is_done(): sleep(.2)``) never terminates against the mock.
 """
@@ -38,27 +38,33 @@ def _job_content(client: TestClient, sid: str) -> dict:
     return dict(resp.json()["entry"][0]["content"])
 
 
-class TestJobStatusValuesAreStrings:
-    """Every content value splunkd emits is a string."""
+class TestJobStatusValuesAreNative:
+    """Job content carries native JSON types, not strings.
+
+    2.0.1 asserted the opposite — "1"/"0" for booleans, strings for counts —
+    reasoning from splunklib's `content["isDone"] == "1"`. That comparison is
+    right for the Atom XML splunklib requests, where everything is text.
+    Measured on Splunk 10.4.2, output_mode=json carries real booleans and
+    integers, on the job list and the single job alike; doneProgress is the
+    integer 1 once done.
+    """
 
     def test_is_done_uses_the_sdk_sentinel(self, client: TestClient) -> None:
         content = _job_content(client, _create_job(client))
 
         # This is the exact expression splunklib.client.Job.is_done() evaluates.
-        assert content["isDone"] == "1"
+        assert content["isDone"] is True
 
-    def test_boolean_fields_are_not_json_bools(self, client: TestClient) -> None:
+    def test_boolean_fields_are_json_bools(self, client: TestClient) -> None:
         content = _job_content(client, _create_job(client))
-
         for field in ("isDone", "isFailed", "isPaused", "isSaved"):
-            assert isinstance(content[field], str), f"{field} is not a string"
-            assert content[field] in ("0", "1"), f"{field} is {content[field]!r}"
+            assert isinstance(content[field], bool), f"{field} is {content[field]!r}"
 
-    def test_numeric_fields_are_strings(self, client: TestClient) -> None:
+    def test_numeric_fields_are_numbers(self, client: TestClient) -> None:
         content = _job_content(client, _create_job(client))
-
-        for field in ("eventCount", "resultCount", "scanCount", "ttl", "doneProgress"):
-            assert isinstance(content[field], str), f"{field} is not a string"
+        for field in ("eventCount", "resultCount", "scanCount", "ttl"):
+            assert isinstance(content[field], int) and not isinstance(content[field], bool), field
+        assert content["doneProgress"] == 1  # the integer, once done (measured)
 
     def test_job_listing_agrees_with_job_detail(self, client: TestClient) -> None:
         sid = _create_job(client)
@@ -68,7 +74,7 @@ class TestJobStatusValuesAreStrings:
         ).json()["entry"]
 
         entry = next(e for e in listed if e["content"]["sid"] == sid)
-        assert entry["content"]["isDone"] == "1"
+        assert entry["content"]["isDone"] is True
 
 
 class TestSdkPollingLoopTerminates:
@@ -78,7 +84,7 @@ class TestSdkPollingLoopTerminates:
         sid = _create_job(client)
 
         for _ in range(20):
-            if _job_content(client, sid)["isDone"] == "1":
+            if _job_content(client, sid)["isDone"] is True:
                 break
         else:
             msg = "polling loop never saw isDone == '1'"
@@ -208,7 +214,7 @@ class TestJobControl:
         )
 
         content = _job_content(client, sid)
-        assert content["isPaused"] == "1"
+        assert content["isPaused"] is True
         assert content["dispatchState"] == "PAUSED"
 
     def test_unpause_reverses_it(self, client: TestClient) -> None:
@@ -219,7 +225,7 @@ class TestJobControl:
                 data={"action": action}, headers=_auth(),
                 params={"output_mode": "json"},
             )
-        assert _job_content(client, sid)["isPaused"] == "0"
+        assert _job_content(client, sid)["isPaused"] is False
 
     def test_unknown_action_is_rejected(self, client: TestClient) -> None:
         sid = self._sid(client)
@@ -291,7 +297,7 @@ class TestDispatchLifecycle:
     def test_default_reports_done_immediately(self, client: TestClient) -> None:
         content = _job_content(client, _create_job(client))
         assert content["dispatchState"] == "DONE"
-        assert content["isDone"] == "1"
+        assert content["isDone"] is True
 
     def test_states_are_observable_with_a_dispatch_window(
         self, client: TestClient, monkeypatch: object,
@@ -309,7 +315,7 @@ class TestDispatchLifecycle:
             state = str(content["dispatchState"])
             if not seen or seen[-1] != state:
                 seen.append(state)
-            if content["isDone"] == "1":
+            if content["isDone"] is True:
                 break
             time.sleep(0.1)
 
@@ -326,7 +332,7 @@ class TestDispatchLifecycle:
         sid = _create_job(client)
 
         # Still QUEUED, but the search itself already ran.
-        assert _job_content(client, sid)["isDone"] == "0"
+        assert _job_content(client, sid)["isDone"] is False
         results = client.get(
             f"{SPLUNK_PREFIX}/services/search/v2/jobs/{sid}/results",
             headers=_auth(), params={"output_mode": "json", "count": 0},
@@ -346,4 +352,4 @@ class TestDispatchLifecycle:
         ).json()["sid"]
 
         # blocking waits for completion, so it is done when it returns.
-        assert _job_content(client, sid)["isDone"] == "1"
+        assert _job_content(client, sid)["isDone"] is True

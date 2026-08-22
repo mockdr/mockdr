@@ -1,11 +1,12 @@
 """Microsoft Graph Mail endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from api.graph_auth import require_graph_auth, require_graph_write
 from application.graph.mail import queries as mail_queries
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Graph Mail"])
 
@@ -51,6 +52,12 @@ async def send_mail(
 ) -> JSONResponse:
     """Send a mail message (returns 202 Accepted)."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("graph", 400, "Request body must be a JSON object"),
+        )
     mail_queries.send_mail(user_id=user_id, body=body)
     return JSONResponse(status_code=202, content=None)
 

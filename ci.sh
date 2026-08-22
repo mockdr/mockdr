@@ -234,13 +234,20 @@ if [ -n "$DOCKER" ]; then
 
     if $DOCKER image inspect mockdr:ci &>/dev/null; then
         $DOCKER rm -f mockdr-ci 2>/dev/null || true
-        $DOCKER run -d --name mockdr-ci -p 5001:5001 mockdr:ci
-
-        DOCKER_OK=true
+        # Its own host port: 5001 is where a dev server or the conformance
+        # stack's mockdr lives, and a smoke test that lands on one of those
+        # passes without having tested the image it just built. If the
+        # container cannot start at all, that is a failure, not a skip.
+        if $DOCKER run -d --name mockdr-ci -p 5003:5001 mockdr:ci; then
+            DOCKER_OK=true
+        else
+            DOCKER_OK=false
+        fi
         for endpoint in \
-            "http://localhost:5001/web/api/v2.1/system/status" \
-            "http://localhost:5001/splunk/services/server/info?output_mode=json" \
-            "http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01"; do
+            "http://localhost:5003/web/api/v2.1/system/status" \
+            "http://localhost:5003/splunk/services/server/info?output_mode=json" \
+            "http://localhost:5003/sentinel/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01"; do
+            [ "$DOCKER_OK" = true ] || break
             # -u is for server/info, which requires auth as on splunkd; the
             # other two are public and ignore it.
             if ! curl --fail --retry 20 --retry-delay 3 --retry-all-errors -s \

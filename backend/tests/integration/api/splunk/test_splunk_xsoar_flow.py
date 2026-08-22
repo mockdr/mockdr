@@ -51,9 +51,9 @@ class TestXsoarFlow:
         job_content = status_resp.json()["entry"][0]["content"]
         assert job_content["dispatchState"] == "DONE"
         # splunkd renders content values as strings; splunklib's Job.is_done()
-        # is literally `job_content["isDone"] == "1"`, so a JSON bool here would
+        # is literally `job_content["isDone"] is True`, so a JSON bool here would
         # make the SDK's polling loop spin forever.
-        assert job_content["isDone"] == "1"
+        assert job_content["isDone"] is True
 
         # Step 4: Get results
         results_resp = client.get(

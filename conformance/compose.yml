@@ -76,6 +76,13 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD:-Probe-Passw0rd!}
+      # Cases and Alerting refuse every request with a 500 — "Encrypted
+      # Saved Objects plugin is missing encryption key" — until this is
+      # set. Without it the real side of every cases probe was broken,
+      # and a harness comparing against a broken fixture measures nothing.
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY:-conformance-harness-encryption-key-0001}
+      - XPACK_SECURITY_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY:-conformance-harness-encryption-key-0001}
+      - XPACK_REPORTING_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY:-conformance-harness-encryption-key-0001}
     depends_on:
       elasticsearch:
         condition: service_healthy

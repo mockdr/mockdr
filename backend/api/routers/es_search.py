@@ -6,14 +6,17 @@ use when configured to talk directly to Elasticsearch.
 """
 from __future__ import annotations
 
+import json
 from fnmatch import fnmatch
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 
 from api.es_auth import require_es_auth, require_es_write
 from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
+from utils.es_query import ESQueryError
 from utils.es_response import build_es_error_response, build_es_index_not_found
+from utils.id_gen import new_hex
 
 router = APIRouter(tags=["ES Search"])
 
@@ -113,6 +116,7 @@ def authenticate(
 def es_search_all(
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
+    source: str | None = Query(default=None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Search across every index, which is what ``/_search`` with no index means.
@@ -122,7 +126,125 @@ def es_search_all(
     answering ``resource_not_found_exception`` where Elasticsearch answers
     ``parsing_exception``. Both measured against Elasticsearch 8.15.0.
     """
-    return search_queries.es_search("_all", body, ignore_unavailable=ignore_unavailable)
+    return search_queries.es_search(
+        "_all", _body_or_source(body, source), ignore_unavailable=ignore_unavailable,
+    )
+
+
+def _body_or_source(body: dict, source: str | None) -> dict:
+    """``GET _search?source=…`` carries the body in the query string.
+
+    It was ignored, so a malformed query sent that way answered 200 with
+    every hit instead of the parsing_exception Elasticsearch returns.
+    """
+    if not source:
+        return body
+    try:
+        parsed = json.loads(source)
+    except ValueError as exc:
+        raise ESQueryError(f"Failed to parse request body: {exc}") from exc
+    return parsed if isinstance(parsed, dict) else {}
+
+
+@router.get("/_count", operation_id="es_count_all_get")
+@router.post("/_count", operation_id="es_count_all_post")
+def es_count_all(
+    body: dict = Body(default={}),
+    ignore_unavailable: bool = Query(default=False),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Count across every index; the route was missing, like ``/_search`` was."""
+    return search_queries.es_count("_all", body, ignore_unavailable=ignore_unavailable)
+
+
+@router.get("/_mget", operation_id="es_mget_all_get")
+@router.post("/_mget", operation_id="es_mget_all_post")
+def es_mget_all(
+    body: dict = Body(default={}),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Fetch documents by ``docs`` entries that each name their own index."""
+    if not body.get("docs") and not body.get("ids"):
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "action_request_validation_exception",
+            "Validation Failed: 1: no documents to get;",
+        ))
+    return search_queries.es_mget("_all", body)
+
+
+@router.post("/_bulk", operation_id="es_bulk")
+@router.put("/_bulk", operation_id="es_bulk_put")
+async def es_bulk(
+    request: Request,
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Index documents from NDJSON action/source pairs.
+
+    Both refusals measured on 8.15: an empty body is parse_exception
+    "request body is required"; a body that is not JSON is
+    x_content_parse_exception with Jackson's diagnostic. Valid pairs are
+    indexed through the same path as ``PUT /{index}/_doc/{id}``.
+    """
+    raw = (await request.body()).decode("utf-8", errors="replace")
+    lines = [line for line in raw.split("\n") if line.strip()]
+    if not lines:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "parse_exception", "request body is required",
+        ))
+    items: list[dict] = []
+    i = 0
+    while i < len(lines):
+        try:
+            action = json.loads(lines[i])
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail=build_es_error_response(
+                400, "x_content_parse_exception", _jackson_message(lines[i], exc, i + 1),
+            )) from exc
+        verb = next(iter(action), "") if isinstance(action, dict) and action else ""
+        meta = action.get(verb) if isinstance(action, dict) else None
+        if verb not in _BULK_VERBS or not isinstance(meta, dict):
+            # Elasticsearch's wording, measured on 8.15 — it names the
+            # offending key, or the line's shape when there is no key.
+            found = verb or _JSON_TOKEN_OF.get(type(action), "VALUE_STRING")
+            raise HTTPException(status_code=400, detail=build_es_error_response(
+                400, "illegal_argument_exception",
+                f"Malformed action/metadata line [{i + 1}], expected field [create], "
+                f"[delete], [index] or [update] but found [{found}]",
+            ))
+        doc: dict = {}
+        if verb in ("index", "create", "update"):
+            i += 1
+            if i < len(lines):
+                try:
+                    doc = json.loads(lines[i])
+                except json.JSONDecodeError as exc:
+                    raise HTTPException(status_code=400, detail=build_es_error_response(
+                        400, "x_content_parse_exception", _jackson_message(lines[i], exc, i + 1),
+                    )) from exc
+        index = str(meta.get("_index") or "")
+        doc_id = str(meta.get("_id") or new_hex()[:20])
+        source = doc.get("doc", doc) if verb == "update" else doc
+        result = search_queries.es_index_doc(index, doc_id, source)
+        status = 201 if result.get("result") == "created" else 200
+        items.append({verb: {**result, "status": status}})
+        i += 1
+    return {"errors": False, "took": 1, "items": items}
+
+
+_BULK_VERBS = frozenset({"create", "delete", "index", "update"})
+_JSON_TOKEN_OF = {list: "START_ARRAY", str: "VALUE_STRING", int: "VALUE_NUMBER",
+                  float: "VALUE_NUMBER", type(None): "VALUE_NULL", bool: "VALUE_TRUE"}
+
+
+def _jackson_message(line: str, exc: json.JSONDecodeError, line_no: int) -> str:
+    """Elasticsearch relays Jackson's parse error, position and all."""
+    col = exc.colno + 1  # Jackson's column is one past the offending character
+    ch = line[exc.colno - 1] if 0 < exc.colno <= len(line) else ""
+    return (
+        f"[{line_no}:{col}] Unexpected character ('{ch}' (code {ord(ch) if ch else 0})): "
+        f"was expecting double-quote to start field name\n at [Source: (byte[])\"{line}\"; "
+        f"line: {line_no}, column: {col}]"
+    )
 
 
 @router.get("/{index}/_search", operation_id="es_search_get")
@@ -131,11 +253,14 @@ def es_search(
     index: str,
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
+    source: str | None = Query(default=None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Execute an Elasticsearch query DSL search against a mock index."""
     try:
-        return search_queries.es_search(index, body, ignore_unavailable=ignore_unavailable)
+        return search_queries.es_search(
+            index, _body_or_source(body, source), ignore_unavailable=ignore_unavailable,
+        )
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
 

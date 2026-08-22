@@ -11,10 +11,10 @@ def list_indexes() -> dict:
     entries = []
     for idx in indexes:
         content = {
-            "totalEventCount": str(idx.total_event_count),
+            "totalEventCount": idx.total_event_count,
             "currentDBSizeMB": str(idx.current_db_size_mb),
             "maxDataSize": idx.max_data_size,
-            "frozenTimePeriodInSecs": str(idx.frozen_time_period_in_secs),
+            "frozenTimePeriodInSecs": idx.frozen_time_period_in_secs,
             "disabled": idx.disabled,
             "datatype": idx.data_type,
             "minTime": idx.min_time,
@@ -33,10 +33,10 @@ def get_index(name: str) -> dict | None:
     if not idx:
         return None
     content = {
-        "totalEventCount": str(idx.total_event_count),
+        "totalEventCount": idx.total_event_count,
         "currentDBSizeMB": str(idx.current_db_size_mb),
         "maxDataSize": idx.max_data_size,
-        "frozenTimePeriodInSecs": str(idx.frozen_time_period_in_secs),
+        "frozenTimePeriodInSecs": idx.frozen_time_period_in_secs,
         "disabled": idx.disabled,
         "datatype": idx.data_type,
     }

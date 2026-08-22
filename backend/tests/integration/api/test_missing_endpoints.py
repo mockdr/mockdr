@@ -27,7 +27,6 @@ class TestSplunkCatalogue:
     @pytest.mark.parametrize(
         "path",
         [
-            "/splunk/services",
             "/splunk/services/apps/local",
             "/splunk/services/apps/local/search",
             "/splunk/services/messages",
@@ -37,15 +36,6 @@ class TestSplunkCatalogue:
         resp = client.get(path, headers=SPLUNK_AUTH, params={"output_mode": "json"})
         assert resp.status_code == 200
         assert "entry" in resp.json()
-
-    def test_services_lists_the_endpoints_that_exist(self, client: TestClient) -> None:
-        names = {
-            e["name"] for e in client.get(
-                "/splunk/services", headers=SPLUNK_AUTH,
-                params={"output_mode": "json"},
-            ).json()["entry"]
-        }
-        assert {"search", "data", "saved", "apps"} <= names
 
     def test_unknown_app_is_404(self, client: TestClient) -> None:
         resp = client.get(

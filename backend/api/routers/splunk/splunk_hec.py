@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from api.splunk_auth import require_hec_auth
 from application.splunk.commands.hec import submit_event, submit_events_batch, submit_raw
 from utils.splunk.hec_validation import (
+    ACK_DISABLED,
     INCORRECT_INDEX,
     NO_CHANNEL,
     NO_DATA,
@@ -48,10 +49,11 @@ def _error_response(exc: HecError) -> JSONResponse:
 def _ingest(text: str, hec_info: dict, channel: str | None, use_ack: bool) -> dict:
     """Validate and store an HEC payload, returning the HEC envelope."""
     require_channel(use_ack, channel)
-    events = parse_hec_payload(text)
-    # The first failing event, in document order, is the one reported.
-    for position, event in enumerate(events):
-        validate_event(event, hec_info, position)
+    # Validated as each is parsed, so the first failing event in document
+    # order is the one reported — even when a later one is not JSON at all.
+    events = parse_hec_payload(
+        text, on_event=lambda event, position: validate_event(event, hec_info, position),
+    )
 
     if len(events) == 1:
         result = submit_event(
@@ -146,6 +148,11 @@ def hec_ack(
     hec_info: dict = Depends(require_hec_auth),
 ) -> dict | JSONResponse:
     """Check HEC indexing acknowledgment status."""
+    channel_has_acks = bool(x_splunk_request_channel) and x_splunk_request_channel in _ISSUED_ACKS
+    if not hec_info.get("use_ack") and not channel_has_acks:
+        # A token without indexer acknowledgement has no acks to query;
+        # splunkd says so (code 14) before it looks for a channel.
+        return _error_response(HecError(*ACK_DISABLED))
     if not x_splunk_request_channel:
         return _error_response(HecError(*NO_CHANNEL))
 

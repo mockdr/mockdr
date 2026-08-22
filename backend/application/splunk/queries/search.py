@@ -12,12 +12,6 @@ from utils.splunk.response import (
     build_splunk_envelope,
 )
 
-
-def _splunk_bool(value: bool) -> str:
-    """Render a boolean the way splunkd does in Atom content: ``"1"``/``"0"``."""
-    return "1" if value else "0"
-
-
 #: The states a real search job passes through, as fractions of the dispatch
 #: window. A job reports the last state whose threshold it has passed.
 _DISPATCH_STATES: tuple[tuple[float, str], ...] = (
@@ -44,9 +38,9 @@ def _progress(job: SearchJob) -> tuple[str, float, bool]:
     reporting QUEUED, so ``finalize`` would appear to do nothing at all.
     """
     if job.settled or job.is_failed:
-        return job.dispatch_state, job.done_progress, job.is_done
+        return job.dispatch_state, _whole(job.done_progress), job.is_done
     if SPLUNK_DISPATCH_SECONDS <= 0 or job.exec_mode == "blocking":
-        return job.dispatch_state, job.done_progress, job.is_done
+        return job.dispatch_state, _whole(job.done_progress), job.is_done
 
     # A paused job's clock stops, so it keeps reporting the progress it had
     # reached rather than quietly completing while it was held.
@@ -58,7 +52,12 @@ def _progress(job: SearchJob) -> tuple[str, float, bool]:
     state = next(
         name for threshold, name in reversed(_DISPATCH_STATES) if fraction >= threshold
     )
-    return state, round(fraction, 3), state == "DONE"
+    return state, _whole(round(fraction, 3)), state == "DONE"
+
+
+def _whole(progress: float) -> int | float:
+    """Splunkd reports a finished job's progress as the integer 1 (measured)."""
+    return int(progress) if progress == int(progress) else progress
 
 
 def get_job(sid: str) -> dict | None:
@@ -74,24 +73,25 @@ def get_job(sid: str) -> dict | None:
     if not job:
         return None
 
-    # splunkd renders every Atom content value as a string, booleans as "1"/"0"
-    # — and splunklib depends on it: Job.is_done() is
-    # `self._state.content["isDone"] == "1"`. Emitting a JSON bool made that
-    # comparison permanently False, so the SDK's documented polling loop
-    # (`while not job.is_done(): sleep(.2)`) never terminated against the mock.
+    # Native JSON types. 2.0.1 stringified every value here — "1"/"0" for
+    # booleans — reasoning from splunklib's `content["isDone"] == "1"`. That
+    # comparison is right for the Atom XML splunklib actually requests, where
+    # everything is text; measured on Splunk 10.4.2, output_mode=json carries
+    # real booleans and integers, on the job list and the single job alike.
+    # The XML renderer stringifies on its own.
     state, progress, done = _progress(job)
     content = {
         "sid": job.sid,
         "dispatchState": state,
-        "doneProgress": str(progress),
-        "eventCount": str(job.event_count),
-        "resultCount": str(job.result_count),
-        "scanCount": str(job.scan_count),
-        "isDone": _splunk_bool(done),
-        "isFailed": _splunk_bool(job.is_failed),
-        "isPaused": _splunk_bool(job.is_paused),
-        "isSaved": _splunk_bool(job.is_saved),
-        "ttl": str(job.ttl),
+        "doneProgress": progress,
+        "eventCount": job.event_count,
+        "resultCount": job.result_count,
+        "scanCount": job.scan_count,
+        "isDone": done,
+        "isFailed": job.is_failed,
+        "isPaused": job.is_paused,
+        "isSaved": job.is_saved,
+        "ttl": job.ttl,
     }
     entry = build_splunk_entry(
         job.sid,
@@ -114,11 +114,11 @@ def list_jobs() -> dict:
         content = {
             "sid": job.sid,
             "dispatchState": state,
-            "doneProgress": str(progress),
-            "eventCount": str(job.event_count),
-            "resultCount": str(job.result_count),
-            "isDone": _splunk_bool(done),
-            "isFailed": _splunk_bool(job.is_failed),
+            "doneProgress": progress,
+            "eventCount": job.event_count,
+            "resultCount": job.result_count,
+            "isDone": done,
+            "isFailed": job.is_failed,
         }
         entries.append(build_splunk_entry(job.sid, content, collection="search/jobs"))
     return build_splunk_envelope(entries)

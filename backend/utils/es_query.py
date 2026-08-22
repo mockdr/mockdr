@@ -33,6 +33,53 @@ _DEFAULT_SIZE = 10
 _MAX_CLAUSE_DEPTH = 30
 
 
+#: Every key a search body may carry. Elasticsearch refuses any other with
+#: parsing_exception "Unknown key for a START_OBJECT in [x]." (measured on
+#: 8.15); mockdr ignored unknown keys and answered every hit.
+_KNOWN_TOP_LEVEL: frozenset[str] = frozenset({
+    "query", "size", "from", "sort", "aggs", "aggregations", "_source", "fields",
+    "track_total_hits", "search_after", "highlight", "collapse", "post_filter",
+    "stored_fields", "docvalue_fields", "script_fields", "min_score", "explain",
+    "version", "seq_no_primary_term", "timeout", "terminate_after", "pit",
+    "runtime_mappings", "suggest", "rescore", "indices_boost", "track_scores",
+    "profile", "slice", "knn", "ext", "stats", "rank", "retriever",
+})
+
+_JSON_TOKENS = {
+    dict: "START_OBJECT", list: "START_ARRAY", str: "VALUE_STRING", bool: "VALUE_TRUE",
+    int: "VALUE_NUMBER", float: "VALUE_NUMBER", type(None): "VALUE_NULL",
+}
+
+#: Elasticsearch's default index.max_result_window.
+MAX_RESULT_WINDOW = 10000
+
+
+def validate_search_body(body: dict) -> None:
+    """Refuse what Elasticsearch refuses before it looks at the query.
+
+    Raises:
+        ESQueryError: For an unknown top-level key, or a result window past
+            ``index.max_result_window``.
+    """
+    for key, value in body.items():
+        if key not in _KNOWN_TOP_LEVEL:
+            token = _JSON_TOKENS.get(type(value), "VALUE_STRING")
+            if value is False:
+                token = "VALUE_FALSE"
+            raise ESQueryError(f"Unknown key for a {token} in [{key}].", clause=key)
+    start = _as_bound(body.get("from"), "from") or 0
+    size = _as_bound(body.get("size"), "size")
+    size = 10 if size is None else size
+    if start + size > MAX_RESULT_WINDOW:
+        raise ESQueryError(
+            f"Result window is too large, from + size must be less than or equal to: "
+            f"[{MAX_RESULT_WINDOW}] but was [{start + size}]. See the scroll api for a more "
+            f"efficient way to request large data sets. This limit can be set by changing "
+            f"the [index.max_result_window] index level setting.",
+            es_type="search_phase_execution_exception",
+        )
+
+
 class ESQueryError(ValueError):
     """Raised when a search body is not valid Elasticsearch query DSL.
 
@@ -45,10 +92,20 @@ class ESQueryError(ValueError):
     attaches to that case and no other.
     """
 
-    def __init__(self, message: str, *, clause: str | None = None) -> None:
-        """Record the message, and the offending clause name if there is one."""
+    def __init__(
+        self, message: str, *, clause: str | None = None,
+        es_type: str = "parsing_exception", named_object: bool = False,
+    ) -> None:
+        """Record the message, the clause if any, and Elasticsearch's exception type.
+
+        ``named_object`` marks the one case that carries a ``caused_by``:
+        an unknown query or aggregation *type*. An unknown top-level key is
+        a parsing_exception too, but without the cause (measured on 8.15).
+        """
         super().__init__(message)
         self.clause = clause
+        self.es_type = es_type
+        self.named_object = named_object
 
 # ---------------------------------------------------------------------------
 # Range comparison helper
@@ -141,7 +198,9 @@ def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
         if builder is None:
             # Elasticsearch 8 says "unknown query"; "no [query] registered"
             # was the 6.x/7.x wording.
-            raise ESQueryError(f"unknown query [{query_type}]", clause=query_type)
+            raise ESQueryError(
+                f"unknown query [{query_type}]", clause=query_type, named_object=True,
+            )
         if not isinstance(body, dict):
             # A clause body of null or a scalar reached the builders as-is and
             # raised AttributeError out of the handler as a plain-text 500.
@@ -682,11 +741,12 @@ def _as_bound(value: Any, name: str) -> int | None:
     try:
         bound = int(value)
     except (TypeError, ValueError) as exc:
-        msg = f"Failed to parse int parameter [{name}] with value [{value}]"
-        raise ESQueryError(msg) from exc
+        # Elasticsearch reports Java's NumberFormatException verbatim.
+        msg = f'For input string: "{value}"'
+        raise ESQueryError(msg, es_type="number_format_exception") from exc
     if bound < 0:
         msg = f"[{name}] parameter cannot be negative, found [{bound}]"
-        raise ESQueryError(msg)
+        raise ESQueryError(msg, es_type="illegal_argument_exception")
     return bound
 
 

@@ -67,7 +67,10 @@ class SplunkOutputModeMiddleware(BaseHTTPMiddleware):
 
         if not splunk:
             return response
-        if _KVSTORE_DATA_MARKER in path:
+        if _KVSTORE_DATA_MARKER in path and response.status_code < 400:
+            # Only the data itself is JSON-only. A refusal — no such
+            # collection, a query that is not JSON — comes back as Atom XML
+            # on splunkd like any other error (measured on 10.4.2).
             return response
         if wants_json:
             return response

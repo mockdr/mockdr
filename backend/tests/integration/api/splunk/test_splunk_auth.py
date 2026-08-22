@@ -39,7 +39,7 @@ class TestLogin:
 
     def test_login_missing_credentials(self, client: TestClient) -> None:
         resp = client.post(f"{SPLUNK_PREFIX}/services/auth/login", data={})
-        assert resp.status_code == 401
+        assert resp.status_code == 400  # a missing credential is malformed (400), not wrong (401): measured
 
     def test_analyst_can_login(self, client: TestClient) -> None:
         resp = client.post(

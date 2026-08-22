@@ -25,7 +25,7 @@ def find_cases(
     tags: str = Query(None, description="Comma-separated tags"),
     owner: str = Query(None),
     page: int = Query(1),
-    per_page: int = Query(20, ge=1, le=1000, alias="perPage"),
+    per_page: int = Query(20, ge=0, le=1000, alias="perPage"),
     severity: str = Query(None),
     search: str = Query(None),
     reporters: str = Query(None, description="Comma-separated usernames"),
@@ -39,6 +39,11 @@ def find_cases(
     this endpoint but were declared on no parameter, so FastAPI dropped them
     and a filtered request returned the full unfiltered list.
     """
+    if status is not None and status not in ("open", "in-progress", "closed"):
+        # io-ts wording for a value outside the enum (measured on 8.15).
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, f'Invalid value "{status}" supplied to "status"',
+        ))
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     reporter_list = (
         [r.strip() for r in reporters.split(",") if r.strip()] if reporters else None
@@ -89,6 +94,7 @@ def create_case(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Create a new case."""
+    _require_iots(body, ("description", "tags", "title", "connector", "settings", "owner"))
     return case_commands.create_case(body)
 
 
@@ -127,7 +133,8 @@ def update_cases(
             raise HTTPException(
                 status_code=400,
                 detail=build_kbn_error_response(
-                    400, "each case requires id and version",
+                    400, 'Invalid value "undefined" supplied to "cases,version"'
+                    if case_id else 'Invalid value "undefined" supplied to "cases,id"',
                 ),
             )
 
@@ -241,3 +248,17 @@ def delete_comment(
                 f"Comment {comment_id} not found on case {case_id}",
             ),
         )
+
+
+def _require_iots(body: dict, fields: tuple[str, ...]) -> None:
+    """Refuse a body missing io-ts-required fields the way Kibana does.
+
+    One ``Invalid value "undefined" supplied to "<field>"`` per missing
+    field, comma-joined, in schema order, in the Boom envelope. Measured on
+    8.15 for cases and exception lists.
+    """
+    missing = [f for f in fields if body.get(f) is None]
+    if missing:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, ",".join(f'Invalid value "undefined" supplied to "{f}"' for f in missing),
+        ))

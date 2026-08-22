@@ -91,6 +91,11 @@ def parse_kql(query: str) -> KqlQuery:
         raise KqlError(msg)
 
     segments = _split_pipeline(text)
+    if not segments:
+        # A query that is only pipes: nothing before the first one and
+        # nothing after. `segments[0]` raised IndexError and escaped as 500.
+        msg = "A recognized query is expected"
+        raise KqlError(msg)
     table = segments[0].strip()
     if not re.fullmatch(r"[A-Za-z_][\w]*", table):
         msg = f"A recognized table name is expected, found '{table}'"

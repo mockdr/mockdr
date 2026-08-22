@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_hash_exceptions import commands as hash_commands
 from application.xdr_hash_exceptions import queries as hash_queries
+from utils.xdr_response import require_request_data
 
 router = APIRouter(tags=["XDR Hash Exceptions"])
 
@@ -38,7 +39,7 @@ def add_to_blocklist(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Add hashes to the blocklist."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     hashes = request_data.get("hash_list", [])
     return hash_commands.add_to_blocklist(hashes)
 
@@ -49,7 +50,7 @@ def remove_from_blocklist(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Remove hashes from the blocklist."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     hashes = request_data.get("hash_list", [])
     return hash_commands.remove_from_blocklist(hashes)
 
@@ -60,7 +61,7 @@ def add_to_allowlist(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Add hashes to the allowlist."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     hashes = request_data.get("hash_list", [])
     return hash_commands.add_to_allowlist(hashes)
 
@@ -71,6 +72,6 @@ def remove_from_allowlist(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Remove hashes from the allowlist."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     hashes = request_data.get("hash_list", [])
     return hash_commands.remove_from_allowlist(hashes)

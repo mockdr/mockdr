@@ -59,7 +59,8 @@ async def create_hec_token(
     name = body.get("name", "")
     if not name:
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": "Token name is required"},
+            {"type": "ERROR",
+             "text": 'Cannot perform action "POST" without a target name to act on.'},
         ]})
 
     token = HecToken(

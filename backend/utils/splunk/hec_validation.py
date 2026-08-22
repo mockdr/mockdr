@@ -10,6 +10,7 @@ returned a plain-text ``500``: a non-numeric ``time`` and a JSON array.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "INVALID_FORMAT",
     "NO_CHANNEL",
     "NO_DATA",
+    "INDEXED_FIELDS_ERROR",
+    "ACK_DISABLED",
     "QUERY_STRING_AUTH_DISABLED",
     "HecError",
     "index_allowed",
@@ -34,7 +37,9 @@ INCORRECT_INDEX = (7, "Incorrect index")
 NO_CHANNEL = (10, "Data channel is missing")
 EVENT_REQUIRED = (12, "Event field is required")
 EVENT_BLANK = (13, "Event field cannot be blank")
+INDEXED_FIELDS_ERROR = (15, "Error in handling indexed fields")
 QUERY_STRING_AUTH_DISABLED = (16, "Query string authorization is not enabled")
+ACK_DISABLED = (14, "ACK is disabled")
 
 
 
@@ -74,7 +79,9 @@ def _fail(spec: tuple[int, str], position: int | None = None) -> HecError:
     return HecError(code, text, event_number=position)
 
 
-def parse_hec_payload(text: str) -> list[dict]:
+def parse_hec_payload(
+    text: str, on_event: Callable[[dict, int], None] | None = None,
+) -> list[dict]:
     """Parse an HEC request body into a list of event objects.
 
     HEC accepts one JSON object, several separated by newlines, **and several
@@ -100,12 +107,22 @@ def parse_hec_payload(text: str) -> list[dict]:
             break
         try:
             value, end = decoder.raw_decode(stripped, index)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
+            # The stdlib decoder recurses per nesting level and gives up
+            # around a thousand deep with RecursionError, not a decode
+            # error. That escaped as a 500; to HEC it is malformed data.
             raise _fail(INVALID_FORMAT, position=len(events)) from exc
-        if not isinstance(value, dict):
-            # HEC takes objects; an array is "Invalid data format", not a batch.
-            raise _fail(INVALID_FORMAT, position=len(events))
-        events.append(value)
+        # A top-level array is accepted as a batch of its elements
+        # (measured on 10.4.2: 200 Success); anything else is not an event.
+        items = value if isinstance(value, list) else [value]
+        for item in items:
+            if not isinstance(item, dict):
+                raise _fail(INVALID_FORMAT, position=len(events))
+            events.append(item)
+            if on_event is not None:
+                # Validate as soon as it is parsed: HEC streams, so a blank
+                # event at 0 is reported before broken JSON at 1 is reached.
+                on_event(item, len(events) - 1)
         index = end
 
     if not events:
@@ -135,8 +152,9 @@ def validate_event(event: dict, token: dict, position: int = 0) -> None:
             raise _fail(EVENT_BLANK, position)
 
     if "time" in event and _as_epoch(event["time"]) is None:
-        # A non-numeric time raised ValueError out of the handler as a 500.
-        raise _fail(INVALID_FORMAT, position)
+        # A non-numeric time is an indexed-field error, code 15 — not a
+        # data-format error. Measured on 10.4.2.
+        raise _fail(INDEXED_FIELDS_ERROR, position)
 
     requested = str(event.get("index") or "").strip()
     if requested and not index_allowed(requested, token):

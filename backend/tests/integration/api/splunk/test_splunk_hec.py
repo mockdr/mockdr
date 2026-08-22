@@ -91,16 +91,38 @@ class TestHecHealth:
 class TestHecAck:
     """Tests for POST /services/collector/ack."""
 
-    def test_ack_requires_a_data_channel(self, client: TestClient) -> None:
-        # Real HEC ties acknowledgement ids to a channel; without one it
-        # answers code 10 rather than acknowledging anything.
+    def test_ack_on_a_token_without_ack_is_code_14(self, client: TestClient) -> None:
+        """A token with no indexer acknowledgement has nothing to query.
+
+        splunkd answers code 14 "ACK is disabled" before it even looks for a
+        channel (measured on 10.4.2); this asserted code 10 here.
+        """
         resp = client.post(
             f"{SPLUNK_PREFIX}/services/collector/ack",
             json={"acks": [0]},
             headers=_hec_auth(),
         )
         assert resp.status_code == 400
-        assert resp.json()["code"] == 10
+        assert resp.json() == {"text": "ACK is disabled", "code": 14}
+
+    def test_ack_with_ack_enabled_still_requires_a_channel(self, client: TestClient) -> None:
+        """With acknowledgement on, a missing channel is code 10."""
+        from repository.splunk.hec_token_repo import hec_token_repo
+
+        record = hec_token_repo.list_all()[0]
+        record.use_ack = True
+        hec_token_repo.save(record)
+        try:
+            resp = client.post(
+                f"{SPLUNK_PREFIX}/services/collector/ack",
+                json={"acks": [0]},
+                headers={"Authorization": f"Splunk {record.token}"},
+            )
+            assert resp.status_code == 400
+            assert resp.json()["code"] == 10
+        finally:
+            record.use_ack = False
+            hec_token_repo.save(record)
 
     def test_only_issued_ids_are_acknowledged(self, client: TestClient) -> None:
         channel = {"X-Splunk-Request-Channel": "test-channel"}

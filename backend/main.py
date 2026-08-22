@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from json import JSONDecodeError
@@ -318,7 +319,7 @@ from infrastructure import seed
 from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
 from utils.es_aggs import ESAggregationError
 from utils.es_query import ESQueryError
-from utils.es_response import build_es_error_response
+from utils.es_response import build_es_error_response, build_es_index_not_found
 from utils.logging import setup_logging
 from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
@@ -475,6 +476,18 @@ async def validation_exception_handler(
         message = err.get("msg", "invalid value")
         parts.append(f"{location}: {message}" if location else message)
     detail = "; ".join(parts) or "Invalid request"
+    if vendor_for_path(request.url.path) == "elasticsearch":
+        # A body of the wrong JSON type is reported as what the parser saw,
+        # not as pydantic's wording (measured on 8.15).
+        wrong = next((e for e in exc.errors() if e.get("type") == "dict_type"), None)
+        if wrong is not None:
+            found = _JSON_TOKEN_NAMES.get(type(wrong.get("input")), "VALUE_STRING")
+            content = build_es_error_response(
+                400, "parsing_exception", f"Expected [START_OBJECT] but found [{found}]",
+            )
+            for entry in (content["error"], *content["error"].get("root_cause", [])):
+                entry["line"], entry["col"] = 1, 1
+            return JSONResponse(status_code=400, content=content)
 
     # A token endpoint is not part of the API it fronts: Entra answers there in
     # OAuth 2.0's flat shape, which is what MSAL parses. Returning the resource
@@ -545,11 +558,27 @@ async def kql_exception_handler(
 async def es_aggregation_exception_handler(
     _request: Request, exc: ESAggregationError,
 ) -> JSONResponse:
-    """Answer an unusable ``aggs`` block with Elasticsearch's ``400``."""
-    return JSONResponse(
-        status_code=400,
-        content=build_es_error_response(400, "parsing_exception", str(exc)),
-    )
+    """Answer an unusable ``aggs`` block with Elasticsearch's ``400``.
+
+    An unknown aggregation *type* carries the same position and cause an
+    unknown query type does (measured on 8.15).
+    """
+    content = build_es_error_response(400, "parsing_exception", str(exc))
+    if exc.clause is not None:
+        line, col = _body_position(await _request.body(), exc.clause)
+        for entry in (content["error"], *content["error"].get("root_cause", [])):
+            entry["line"] = line
+            entry["col"] = col
+        content["error"]["caused_by"] = {
+            "type": "named_object_not_found_exception",
+            "reason": f"[{line}:{col}] unknown field [{exc.clause}]",
+        }
+    return JSONResponse(status_code=400, content=content)
+
+
+_JSON_TOKEN_NAMES = {dict: "START_OBJECT", list: "START_ARRAY", str: "VALUE_STRING",
+                     bool: "VALUE_TRUE", int: "VALUE_NUMBER", float: "VALUE_NUMBER",
+                     type(None): "VALUE_NULL"}
 
 
 def _body_position(body: bytes, clause: str) -> tuple[int, int]:
@@ -580,20 +609,40 @@ async def es_query_exception_handler(
     ``ValueError``, which reached the client as a plain-text ``500`` — an
     Elasticsearch client cannot tell that apart from the cluster falling over.
     """
-    content = build_es_error_response(400, "parsing_exception", str(exc))
+    if exc.es_type == "search_phase_execution_exception":
+        # The result-window limit is enforced per shard, so Elasticsearch
+        # reports it as a search-phase failure wrapping the argument error,
+        # with one root cause and one failed shard per shard (measured on
+        # 8.15; mockdr has one shard). Nested caused_by is as measured.
+        cause = {"type": "illegal_argument_exception", "reason": str(exc)}
+        return JSONResponse(status_code=400, content={
+            "error": {
+                "root_cause": [dict(cause)], "type": "search_phase_execution_exception",
+                "reason": "all shards failed", "phase": "query", "grouped": True,
+                "failed_shards": [{"shard": 0, "index": "mockdr", "node": "mockdr-node-1",
+                                   "reason": dict(cause)}],
+                "caused_by": {**cause, "caused_by": dict(cause)},
+            },
+            "status": 400,
+        })
+    content = build_es_error_response(400, exc.es_type, str(exc))
     if exc.clause is not None:
         # Elasticsearch reports where in the body the unknown clause sits and
         # wraps the cause. The position is found in the bytes the client
         # actually sent, not in a re-serialisation of them, so it points at
         # what they will see when they look.
-        line, col = _body_position(await _request.body(), exc.clause)
+        # GET _search?source= carries the body in the query string; the
+        # position is found in whichever the client actually sent.
+        text = await _request.body() or _request.query_params.get("source", "").encode()
+        line, col = _body_position(text, exc.clause)
         for entry in (content["error"], *content["error"].get("root_cause", [])):
             entry["line"] = line
             entry["col"] = col
-        content["error"]["caused_by"] = {
-            "type": "named_object_not_found_exception",
-            "reason": f"[{line}:{col}] unknown field [{exc.clause}]",
-        }
+        if exc.named_object:
+            content["error"]["caused_by"] = {
+                "type": "named_object_not_found_exception",
+                "reason": f"[{line}:{col}] unknown field [{exc.clause}]",
+            }
     return JSONResponse(status_code=400, content=content)
 
 
@@ -888,6 +937,22 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
     # including the SPA's own routes, and it carries the Allow header RFC 7231
     # requires so a client can correct itself.
     allowed = _allowed_methods(request)
+    if allowed and vendor == "splunk_hec":
+        # HEC answers a wrong verb with HTTP 405 and a body that says 404
+        # (measured on 10.4.2). Both halves are what a client sees.
+        return JSONResponse(
+            status_code=405,
+            content={"text": "The requested URL was not found on this server.", "code": 404},
+        )
+    if allowed and vendor == "splunk":
+        # splunkd has no 405 for this. A verb a collection does not take is a
+        # 400 — the same wording it uses for a POST with no name — and it
+        # sends no Allow header (measured on 10.4.2).
+        return JSONResponse(
+            status_code=400,
+            content={"messages": [{"type": "ERROR", "text":
+                f'Cannot perform action "{request.method}" without a target name to act on.'}]},
+        )
     if allowed:
         return JSONResponse(
             status_code=405,
@@ -904,13 +969,43 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
         # splunkd says only "Not Found" (measured on 10.4.2); the method and
         # path are something mockdr added for its own diagnostics, and a
         # client matching on the text would not find what splunkd sends.
+        if vendor == "elasticsearch":
+            # Elasticsearch has no "resource not found": a single unknown
+            # segment is an index name. One starting with "_" is invalid
+            # (400), any other is an index that does not exist (404), and
+            # an unknown _cat verb is a 405 whose error is a bare string.
+            # All three measured on 8.15.
+            inner = path[len("/elastic"):] if path.startswith("/elastic") else path
+            segments = [seg for seg in inner.split("/") if seg]
+            if segments and segments[0] == "_cat":
+                return JSONResponse(status_code=405, content={
+                    "error": f"Incorrect HTTP method for uri [{inner}] and method "
+                             f"[{request.method}], allowed: [POST]",
+                    "status": 405,
+                })
+            if len(segments) == 1:
+                name = segments[0]
+                if name.startswith("_"):
+                    detail = {
+                        "type": "invalid_index_name_exception",
+                        "reason": f"Invalid index name [{name}], must not start with '_'.",
+                        "index_uuid": "_na_", "index": name,
+                    }
+                    return JSONResponse(status_code=400, content={
+                        "error": {"root_cause": [dict(detail)], **detail}, "status": 400,
+                    })
+                return JSONResponse(status_code=404, content=build_es_index_not_found(name))
         if vendor == "splunk":
             # Two 404s, measured on 10.4.2: the search service has its own
             # dispatcher and refuses an unknown path under it as FATAL
             # "Unknown endpoint."; everywhere else splunkd says ERROR "Not
             # Found". Neither carries the method or path mockdr used to add.
-            if "/services/search/" in path:
-                content: dict = {"messages": [{"type": "FATAL", "text": "Unknown endpoint."}]}
+            if re.search(r"/services/search/jobs/[^/]+/", path):
+                # Anything under a job is resolved by sid first; an unknown
+                # sid is reported before the sub-resource is looked at.
+                content: dict = {"messages": [{"type": "FATAL", "text": "Unknown sid."}]}
+            elif "/services/search/" in path:
+                content = {"messages": [{"type": "FATAL", "text": "Unknown endpoint."}]}
             else:
                 content = build_vendor_error(vendor, 404, "Not Found")
             return JSONResponse(status_code=404, content=content)

@@ -11,7 +11,16 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_rules import commands as rule_commands
 from application.es_rules import queries as rule_queries
-from utils.es_response import build_security_solution_error
+from utils.es_response import build_kbn_error_response, build_security_solution_error
+
+_RULE_TYPES = frozenset({
+    "eql", "query", "saved_query", "threshold", "threat_match", "machine_learning",
+    "new_terms", "esql",
+})
+_RULE_TYPE_LIST = (
+    "'eql' | 'query' | 'saved_query' | 'threshold' | 'threat_match' | 'machine_learning' "
+    "| 'new_terms' | 'esql'"
+)
 
 router = APIRouter(tags=["Elastic Detection Rules"])
 
@@ -26,16 +35,17 @@ def get_rule(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Get a single detection rule by id or rule_id."""
-    result = None
-    if id:
-        result = rule_queries.get_rule(id)
-    elif rule_id:
-        result = rule_queries.get_rule_by_rule_id(rule_id)
-
+    if not id and not rule_id:
+        # Kibana's message here is a *list* (measured on 8.15).
+        raise HTTPException(status_code=400, detail={
+            "message": ['either "id" or "rule_id" must be set'], "status_code": 400,
+        })
+    result = rule_queries.get_rule(id) if id else rule_queries.get_rule_by_rule_id(rule_id)
     if result is None:
+        which = f'id: "{id}"' if id else f'rule_id: "{rule_id}"'
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(404, "rule not found"),
+            detail=build_security_solution_error(404, f"{which} not found"),
         )
     return result
 
@@ -52,6 +62,12 @@ def create_rule(
     silently defaulted, so ``{"name": "x"}`` created a rule with an empty
     query that would match nothing — reported as a success.
     """
+    # The type is a zod discriminator and is checked first; an unknown or
+    # missing one is reported before any other field (measured on 8.15).
+    if body.get("type") not in _RULE_TYPES:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: type: Invalid discriminator value. Expected " + _RULE_TYPE_LIST,
+        ))
     missing = [f for f in _REQUIRED_RULE_FIELDS if not body.get(f)]
     if missing:
         raise HTTPException(
@@ -102,25 +118,33 @@ def update_rule(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(404, f"rule {rule_id} not found"),
+            detail=build_security_solution_error(404, f'rule_id: "{rule_id}" not found'),
         )
     return result
 
 
 @router.delete("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])
 def delete_rule(
-    id: str = Query(...),
+    id: str = Query(None),
+    rule_id: str = Query(None),
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Delete a detection rule by its internal ID."""
     # Return the rule before deleting.
-    result = rule_queries.get_rule(id)
+    if not id and not rule_id:
+        raise HTTPException(status_code=400, detail={
+            "message": ['either "id" or "rule_id" must be set'], "status_code": 400,
+        })
+    # rule_id is the public identifier and what clients usually delete by;
+    # taking only id answered 400 for a perfectly formed request.
+    result = rule_queries.get_rule(id) if id else rule_queries.get_rule_by_rule_id(rule_id)
     if result is None:
+        which = f'id: "{id}"' if id else f'rule_id: "{rule_id}"'
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(404, f"rule {id} not found"),
+            detail=build_security_solution_error(404, f"{which} not found"),
         )
-    rule_commands.delete_rule(id)
+    rule_commands.delete_rule(str(result["id"]))
     return result
 
 
@@ -142,7 +166,7 @@ _ALLOWED_SORT_FIELDS = {
 @router.get("/api/detection_engine/rules/_find")
 def find_rules(
     page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=1000),
+    per_page: int = Query(20, ge=0, le=1000),
     sort_field: str = Query(None),
     sort_order: str = Query("asc"),
     filter: str = Query(None),

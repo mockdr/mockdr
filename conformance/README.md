@@ -30,6 +30,12 @@ and the Kibana Security Solution.
 
 ## Running it
 
+Kibana needs encryption keys or its Cases and Alerting APIs answer every
+request with a 500 — "Encrypted Saved Objects plugin is missing encryption
+key". `compose.yml` sets them. The first Kibana run without them made every
+cases probe a measurement of a broken fixture, which is the failure this
+harness exists to prevent on the other side.
+
 ```bash
 docker compose up -d elasticsearch
 # Kibana's service account needs a password before Kibana will start:
@@ -180,6 +186,15 @@ everywhere.
 python -m pytest tests/ -q
 ```
 
-These cover the comparison logic and need no running service. The harness
+These cover the comparison logic and need no running service.
+
+## What the numbers mean
+
+Findings are ranked: `status`, `value` and `type` are what a client branches
+on; `missing_key` and `extra_key` are shape. Both Splunk (72 probes) and
+Elastic/Kibana (57 probes) are at zero of the first kind. The hundreds of
+`missing_key` that remain are list endpoints whose real entries carry thirty
+to sixty content keys where mockdr's carry a dozen — a gap a client notices
+as a `KeyError`, not as a wrong answer. Read a run with that in mind. The harness
 makes claims about mockdr, so its own reasoning is tested: a differ that
 under-reports hides defects, and one that over-reports buries them.

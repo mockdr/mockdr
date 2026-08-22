@@ -309,3 +309,468 @@ probes:
       path: /services/collector
       headers: {Authorization: "Splunk ${hec_token}"}
       json: {event: conformance-probe, index: no_such_index_conformance}
+
+  # ══ Widened coverage (2.0.5) ═══════════════════════════════════════════
+  # Everything below was added after the first 25 probes reached zero. Each
+  # names a route mockdr serves that no probe had touched.
+
+  # ── Search job lifecycle ────────────────────────────────────────────────
+  - id: job-create-and-read
+    endpoint: management
+    why: >
+      Dispatch, then the job entry a poller reads. Structural: counts and
+      sids differ, the keys and the string-typed booleans must not.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | head 1&output_mode=json&exec_mode=blocking"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: job-list
+    endpoint: management
+    why: The job collection splunklib's jobs.list() reads.
+    request:
+      method: GET
+      path: /services/search/jobs
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: job-control-unknown-action
+    endpoint: management
+    why: A control verb splunkd does not have.
+    request:
+      method: POST
+      path: /services/search/jobs/0000000000.000000/control
+      content: "action=explode&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: job-results-missing
+    endpoint: management
+    why: Results for a job that was never dispatched.
+    request:
+      method: GET
+      path: /services/search/v2/jobs/0000000000.000000/results
+      query: {output_mode: json}
+      auth: basic
+
+  - id: job-export-no-search
+    endpoint: management
+    why: /search/jobs/export with no search string.
+    request:
+      method: POST
+      path: /services/search/jobs/export
+      content: "output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  # ── Saved searches ──────────────────────────────────────────────────────
+  - id: saved-searches-list
+    endpoint: management
+    why: The collection; entry content is what splunklib hands to the caller.
+    request:
+      method: GET
+      path: /services/saved/searches
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: saved-search-missing
+    endpoint: management
+    why: An unknown saved search, and in which envelope.
+    request:
+      method: GET
+      path: /services/saved/searches/no_such_saved_search_conformance
+      query: {output_mode: json}
+      auth: basic
+
+  - id: saved-search-create-no-name
+    endpoint: management
+    why: Creating without the required name.
+    request:
+      method: POST
+      path: /services/saved/searches
+      content: "search=search index=main&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  # ── Indexes ─────────────────────────────────────────────────────────────
+  - id: indexes-list
+    endpoint: management
+    why: data/indexes, read by clients that validate an index before writing.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: index-missing
+    endpoint: management
+    why: An unknown index by name.
+    request:
+      method: GET
+      path: /services/data/indexes/no_such_index_conformance
+      query: {output_mode: json}
+      auth: basic
+
+  - id: index-create-no-name
+    endpoint: management
+    why: Creating an index with no name.
+    request:
+      method: POST
+      path: /services/data/indexes
+      content: "output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  # ── Users, roles, context ───────────────────────────────────────────────
+  - id: current-context
+    endpoint: management
+    why: authentication/current-context — how a client learns who it is.
+    request:
+      method: GET
+      path: /services/authentication/current-context
+      query: {output_mode: json}
+      auth: basic
+
+  - id: users-list
+    endpoint: management
+    why: The user collection and its entry shape.
+    request:
+      method: GET
+      path: /services/authentication/users
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: user-missing
+    endpoint: management
+    why: An unknown user.
+    request:
+      method: GET
+      path: /services/authentication/users/no_such_user_conformance
+      query: {output_mode: json}
+      auth: basic
+
+  - id: roles-list
+    endpoint: management
+    why: authorization/roles.
+    request:
+      method: GET
+      path: /services/authorization/roles
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: login-bad-password
+    endpoint: management
+    why: auth/login with a wrong password — the envelope a client shows the user.
+    request:
+      method: POST
+      path: /services/auth/login
+      content: "username=admin&password=wrong&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+
+  - id: login-no-password
+    endpoint: management
+    why: auth/login with the password missing entirely.
+    request:
+      method: POST
+      path: /services/auth/login
+      content: "username=admin&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+
+  # ── Fired alerts ────────────────────────────────────────────────────────
+  - id: fired-alerts-list
+    endpoint: management
+    why: alerts/fired_alerts, the collection SOAR clients poll.
+    request:
+      method: GET
+      path: /services/alerts/fired_alerts
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: fired-alert-missing
+    endpoint: management
+    why: An unknown fired alert.
+    request:
+      method: GET
+      path: /services/alerts/fired_alerts/no_such_alert_conformance
+      query: {output_mode: json}
+      auth: basic
+
+  # ── KV Store ────────────────────────────────────────────────────────────
+  - id: kv-config-list
+    endpoint: management
+    why: storage/collections/config in the search app namespace.
+    request:
+      method: GET
+      path: /servicesNS/nobody/search/storage/collections/config
+      query: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: kv-collection-missing
+    endpoint: management
+    why: Data from a collection that does not exist; splunklib json.loads this.
+    request:
+      method: GET
+      path: /servicesNS/nobody/search/storage/collections/data/no_such_collection_conformance
+      auth: basic
+
+  - id: kv-query-bad-json
+    endpoint: management
+    why: A query parameter that is not JSON.
+    request:
+      method: GET
+      path: /servicesNS/nobody/search/storage/collections/data/no_such_collection_conformance
+      query: {query: "{not json"}
+      auth: basic
+
+  - id: kv-config-create-no-name
+    endpoint: management
+    why: Creating a collection with no name.
+    request:
+      method: POST
+      path: /servicesNS/nobody/search/storage/collections/config
+      content: "output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  # ── HEC variants ────────────────────────────────────────────────────────
+  - id: hec-raw-valid
+    endpoint: hec
+    why: collector/raw with a text body; the success envelope.
+    request:
+      method: POST
+      path: /services/collector/raw
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: "conformance raw event"
+
+  - id: hec-raw-empty
+    endpoint: hec
+    why: collector/raw with nothing.
+    request:
+      method: POST
+      path: /services/collector/raw
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: ""
+
+  - id: hec-health
+    endpoint: hec
+    why: The one unauthenticated health endpoint splunkd has.
+    request:
+      method: GET
+      path: /services/collector/health
+
+  - id: hec-ack-no-channel
+    endpoint: hec
+    why: Querying acks without a channel.
+    request:
+      method: POST
+      path: /services/collector/ack
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {acks: [0]}
+
+  - id: hec-event-array-body
+    endpoint: hec
+    why: A top-level JSON array, which HEC does not take as a batch.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: [{event: a}, {event: b}]
+
+  - id: hec-time-not-numeric
+    endpoint: hec
+    why: A `time` field that is not an epoch.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {event: p, time: yesterday}
+
+  - id: hec-get-not-allowed
+    endpoint: hec
+    why: GET on the collector.
+    request:
+      method: GET
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+
+  # ── Server ──────────────────────────────────────────────────────────────
+  - id: server-status
+    endpoint: management
+    why: server/status, a second server endpoint with its own content.
+    request:
+      method: GET
+      path: /services/server/status
+      query: {output_mode: json}
+      auth: basic
+
+  - id: services-root
+    endpoint: management
+    why: The service catalogue a client walks first.
+    request:
+      method: GET
+      path: /services
+      query: {output_mode: json}
+      auth: basic
+
+  - id: xml-default
+    endpoint: management
+    why: >
+      No output_mode at all: splunkd answers Atom XML. The content-type and
+      the fact that it is not JSON are what this compares.
+    request:
+      method: GET
+      path: /services/server/info
+      auth: basic
+
+  # ══ Measurements the review asked for ══════════════════════════════════
+  # Each probe below turns an inference in the code into a measurement.
+
+  - id: parser-pipe-in-quotes
+    endpoint: management
+    why: A pipe inside a quoted string is not a stage boundary.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search msg=\"a|b\" | head 5&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-stats-uppercase-by
+    endpoint: management
+    why: SPL keywords are case-insensitive; `BY` and `AS` must parse like `by`/`as`.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | stats dc(host) AS hosts, count(x) BY a, b&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-top
+    endpoint: management
+    why: What splunkd reports for top — its args grammar is not stats'.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | top limit=5 host&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-timechart
+    endpoint: management
+    why: timechart's classification and args.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | timechart span=1h count by host&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-rare-sort-dedup-tail
+    endpoint: management
+    why: Four report-stage commands whose pipeline/streamType were inferred.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | rare host | sort -count | dedup host | tail 3&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-streaming-only-with-sort
+    endpoint: management
+    why: Is a query ending in sort still "streaming"? isStreamingSearch was inferred.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=search index=x | sort -count&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-makeresults
+    endpoint: management
+    why: >
+      A command splunkd has and mockdr cannot run. Refusing it with splunkd's
+      own "Unknown search command" wording makes a mockdr limitation look
+      like a user error.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=| makeresults count=1 | head 1&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: parser-leading-pipe
+    endpoint: management
+    why: A generating command first — no `search` stage should appear.
+    request:
+      method: POST
+      path: /services/search/parser
+      content: "q=| inputlookup x.csv | head 1&output_mode=json"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+    ignore_paths: [$.remoteSearch, $.normalizedSearch]
+
+  - id: method-not-allowed-shape
+    endpoint: management
+    why: "The general 405: DELETE on server/info. Which type, which text?"
+    request:
+      method: DELETE
+      path: /services/server/info
+      query: {output_mode: json}
+      auth: basic
+
+  - id: job-subresource-of-unknown-sid
+    endpoint: management
+    why: "results_preview of a job that does not exist — Unknown sid. or Unknown endpoint.?"
+    request:
+      method: GET
+      path: /services/search/jobs/0000000000.000000/results_preview
+      query: {output_mode: json}
+      auth: basic
+
+  - id: hec-batch-second-bad
+    endpoint: hec
+    why: "[ok, blank] — position 1."
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: '{"event":"ok"}{"event":""}'
+
+  - id: hec-batch-second-bad-index
+    endpoint: hec
+    why: "[ok, bad-index] — code 7 reports 2, one higher than the position."
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: '{"event":"ok"}{"event":"p","index":"no_such_index_conformance"}'
+
+  - id: hec-batch-blank-then-unparseable
+    endpoint: hec
+    why: >
+      A streaming parser reports the blank event at 0 before it ever sees
+      the broken JSON at 1; a parse-everything-first one reports code 6 at 1.
+    request:
+      method: POST
+      path: /services/collector
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: '{"event":""}{not json'
+
+  - id: hec-raw-bad-index
+    endpoint: hec
+    why: collector/raw with ?index= outside the allow-list.
+    request:
+      method: POST
+      path: /services/collector/raw
+      query: {index: no_such_index_conformance}
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: "raw probe"

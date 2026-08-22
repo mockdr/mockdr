@@ -252,7 +252,12 @@ def execute_remote_script(
     Implements POST /remote-scripts/execute matching the real S1 API.
     Returns a simulated execution record.
     """
-    return agent_commands.execute_remote_script(body.model_dump(), current_user.get("userId"))
+    try:
+        return agent_commands.execute_remote_script(body.model_dump(), current_user.get("userId"))
+    except ValueError as exc:
+        # An unscoped action is a 400 here as on every other agent route;
+        # this one let it escape as a 500.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/agents/{agent_id}")

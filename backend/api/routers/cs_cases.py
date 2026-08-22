@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_cases import commands as case_commands
 from application.cs_cases import queries as case_queries
+from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Cases"])
 
@@ -32,7 +33,7 @@ def get_case_entities(
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return full case entities by ID list (POST body)."""
-    ids = body.get("ids", [])
+    ids = require_list(body, "ids")
     return case_queries.get_case_entities(ids)
 
 

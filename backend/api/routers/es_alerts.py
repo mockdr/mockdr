@@ -25,6 +25,11 @@ def search_alerts(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Search alerts using Elasticsearch query DSL."""
+    if not body:
+        # Joi's wording, verbatim (measured on 8.15).
+        raise HTTPException(status_code=400, detail={
+            "message": '"value" must have at least 1 children', "status_code": 400,
+        })
     return alert_queries.search_alerts(body)
 
 

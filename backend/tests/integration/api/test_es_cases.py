@@ -111,6 +111,9 @@ class TestCreateCase:
                 "description": "Created by integration test.",
                 "tags": ["test", "integration"],
                 "severity": "medium",
+                "owner": "securitySolution",
+                "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+                "settings": {"syncAlerts": True},
             },
         )
         assert resp.status_code == 200
@@ -123,6 +126,10 @@ class TestCreateCase:
             json={
                 "title": "ID Check Case",
                 "description": "Test.",
+                "tags": [],
+                "owner": "securitySolution",
+                "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+                "settings": {"syncAlerts": True},
             },
         ).json()
         assert "id" in body
@@ -149,7 +156,10 @@ class TestCreateCase:
         client.post(
             "/kibana/api/cases",
             headers=KBN_WRITE_HEADERS,
-            json={"title": "Findable Case", "description": "Test."},
+            json={"title": "Findable Case", "description": "Test.", "tags": [],
+                  "owner": "securitySolution",
+                  "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+                  "settings": {"syncAlerts": True}},
         )
 
         after = client.get(

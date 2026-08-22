@@ -6,6 +6,107 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+A thoroughness pass before 2.0.5, run with every discovery tool that had
+found bugs *after* a release now running *before* one: the full local CI
+mirror including e2e and the Docker smoke test, the conformance harness with
+four times the probes, hostile-body probing of all 462 routes, parser
+fuzzing, and an adversarial review of everything since 2.0.3.
+
+### Fixed
+
+**Crashes — 31 routes answered 500 to a malformed body, now 0.** Every one
+was an explicit `null` or `{}` defeating a dict default: one SentinelOne
+route, six CrowdStrike, twenty Cortex XDR, and one each for Splunk KV Store,
+Sentinel and Graph. Each now refuses in its vendor's 400 envelope. Found by
+hostile-body probing; the same pass had found twelve in 2.0.1. Two more
+from parser fuzzing: a bare `|` crashed the KQL parser with `IndexError`,
+and JSON nested ~20,000 deep escaped HEC's parser as `RecursionError`.
+
+**Splunk — the JSON types were an inference, and it was wrong.** 2.0.1
+stringified every job value — `"1"`/`"0"` for booleans, `"5"` for counts —
+reasoning from splunklib's `content["isDone"] == "1"`. That comparison is
+right for the Atom XML splunklib actually requests, where everything is
+text. Measured on Splunk 10.4.2, `output_mode=json` carries real booleans
+and integers, on the job list and the single job alike, and
+`doneProgress` is the integer `1` once done. Index counts are integers too
+— except `currentDBSizeMB`, which is a string. All of it is now as measured.
+
+**Splunk — eight more disagreements measured away.** `/services` does not
+exist on splunkd (404; mockdr had invented a catalogue). A verb a collection
+does not take is `400 Cannot perform action "DELETE" without a target name
+to act on.`, not 405 — the same wording as creating anything without a name.
+A missing login password is `400`, not `401`. KV Store refusals are Atom
+XML like every other splunkd error, even though its data is JSON-only. The
+parser classifies `sort` and `tail` as `events`/`SP_EVENTS` and `dedup` as
+`stateful` — three of the guesses 2.0.4 shipped were wrong — carries
+`top`/`rare`/`timechart` arguments in their own measured shapes, accepts
+`makeresults` and `inputlookup` as generating commands with no phantom
+`search` stage, and no longer splits on a `|` inside a quoted string.
+`search/jobs/export` accepts POST, which is what splunklib sends. Unknown
+saved searches, indexes and users are `Could not find object id=x`; an
+unknown fired alert is `Could not find alert savedsearch_id="admin;search;x"`.
+
+**HEC.** `invalid-event-number` is reported as the event is parsed, so a
+blank event at position 0 is reported before broken JSON at position 1 —
+splunkd streams, and a parse-everything-first mock reported the wrong one.
+A top-level JSON array is a batch, not a rejection. A non-numeric `time` is
+code 15, `Error in handling indexed fields`, not code 6. An ack query on a
+token without acknowledgement is code 14, `ACK is disabled`, before any
+channel check. `GET` on the collector is HTTP 405 carrying a body that says
+404 — reproduced as measured.
+
+**Elasticsearch — three missing root routes and six wrong exception
+types.** `POST /_count`, `/_mget` and `/_bulk` without an index did not
+exist. `_mget` on a missing index answered a plain-text 500 where
+Elasticsearch answers 200 with the error per document. A negative `size` is
+`illegal_argument_exception`, a non-numeric one `number_format_exception`,
+a result window past 10,000 a `search_phase_execution_exception` wrapping
+it with `failed_shards`, an array body `parsing_exception: Expected
+[START_OBJECT] but found [START_ARRAY]`, an unknown top-level key
+`parsing_exception: Unknown key for a START_OBJECT in [x].`, an unknown
+aggregation type the same `parsing_exception` with `caused_by` that an
+unknown query gets. `GET _search?source=` is honoured. A single unknown
+path segment is an index name — `400 invalid_index_name_exception` if it
+starts with `_`, `404 index_not_found_exception` otherwise — and an unknown
+`_cat` verb is a 405 whose `error` is a bare string. The 401 names the user
+it refused.
+
+**Kibana — what it refuses, in its words.** A rule with an unknown `type`
+is `400 [request body]: type: Invalid discriminator value. Expected 'eql' |
+'query' | …`; a rule lookup with neither `id` nor `rule_id` is a 400 whose
+`message` is a *list*; deleting by `rule_id` works and an unknown one is
+`404 rule_id: "x" not found`. A case, or an exception list, missing
+required fields is refused with io-ts's `Invalid value "undefined"
+supplied to "field"` per field, in schema order, in the Boom envelope —
+mockdr created a case from `{"a":{"b":1}}` with an empty title. An unknown
+case status is `Invalid value "x" supplied to "status"`; a patch without
+`version` names `"cases,version"`. An endpoint action without
+`endpoint_ids` is `[request body.endpoint_ids]: expected value of type
+[array] but got [undefined]`. `signals/search` with an empty body is
+`"value" must have at least 1 children`. `per_page=0` is accepted.
+`/api/features` carries every key Kibana's do — `order`, `catalogue`,
+`management`, `alerting`, `subFeatures`, and `privileges` with `api`,
+`ui` and `savedObject` — and one feature reports `privileges: null`, as
+two of Kibana's do.
+
+**Harness.** `compose.yml` sets Kibana's encryption keys; without them the
+real Cases and Alerting APIs answered every request with a 500 and the
+harness was measuring a broken fixture. The Splunk bootstrap restricts the
+real HEC token's indexes so `hec-incorrect-index` compares like with like.
+Probes: Splunk 25 → 72, Elastic/Kibana 11 → 57; `type` is significant for
+Splunk messages. The local CI mirror fails when its smoke container cannot
+start, on its own port, rather than passing against whatever else held
+5001.
+
+### Known gap, quantified
+
+With zero status, value or type disagreements left across 129 probes, the
+harness still reports 800 (Splunk) and 97 (Elastic) key-level differences,
+almost all `missing_key` on list endpoints: a real saved search, index,
+role or job carries thirty to sixty content keys; mockdr's carry a dozen. A
+client reading one of the missing keys gets a `KeyError`, not a wrong
+value. That is the remaining fidelity work, and it is a different kind.
+
 ## [2.0.4] - 2026-08-22
 
 ### Fixed

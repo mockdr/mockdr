@@ -10,6 +10,7 @@ from application.sentinel.commands import comments as comment_cmds
 from application.sentinel.commands import incidents as incident_cmds
 from application.sentinel.queries import incidents as incident_queries
 from utils.sentinel.response import build_arm_error, build_arm_resource
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Incidents"])
 
@@ -77,6 +78,12 @@ async def create_or_update_incident(
 ) -> dict:
     """Create or update an incident."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     properties = body.get("properties", {})
     incident_cmds.create_or_update_incident(incident_id, properties)
     return incident_queries.get_incident(incident_id) or {}
@@ -193,6 +200,12 @@ async def create_or_update_comment(
 ) -> dict:
     """Create or update a comment on an incident."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     message = body.get("properties", {}).get("message", "")
     comment = comment_cmds.create_or_update_comment(incident_id, comment_id, message)
     return build_arm_resource("incidentComments", comment.comment_id, {
@@ -246,6 +259,12 @@ async def create_or_update_relation(
 ) -> dict:
     """Create or update a relation (stub)."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     return cast(dict[str, Any], body)
 
 

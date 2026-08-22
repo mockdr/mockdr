@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_host_groups import commands as group_commands
 from application.cs_host_groups import queries as group_queries
+from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Host Groups"])
 
@@ -81,11 +82,11 @@ def group_action(
     if action_name not in ("add-hosts", "remove-hosts"):
         raise HTTPException(status_code=400, detail=f"unknown action: {action_name}")
 
-    group_ids: list[str] = body.get("ids", [])
+    group_ids = require_list(body, "ids")
     if not group_ids:
         raise HTTPException(status_code=400, detail="ids is required and must not be empty")
 
-    params: list[dict] = body.get("action_parameters", [])
+    params = require_list(body, "action_parameters")
     host_ids: list[str] = []
     for p in params:
         if p.get("name") == "filter":

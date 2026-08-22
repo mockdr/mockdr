@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_scripts import commands as script_commands
 from application.xdr_scripts import queries as script_queries
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error
+from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
 
 router = APIRouter(tags=["XDR Scripts"])
 
@@ -21,7 +21,7 @@ def get_scripts(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """List scripts with optional filtering and pagination."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     return script_queries.get_scripts(request_data)
 
 
@@ -31,7 +31,7 @@ def get_script_metadata(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get metadata for a single script."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     script_id = request_data.get("script_uid") or request_data.get("script_id", "")
     result = script_queries.get_script_metadata(script_id)
     if result is None:
@@ -48,7 +48,7 @@ def run_script(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Execute a script on one or more endpoints."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     endpoint_ids = request_data.get("endpoint_id_list", [])
     script_id = request_data.get("script_uid") or request_data.get("script_id", "")
     result = script_commands.run_script(endpoint_ids, script_id, request_data)
@@ -66,7 +66,7 @@ def get_execution_status(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get the execution status of a script run action."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     action_id = request_data.get("action_id", "")
     result = script_queries.get_execution_status(action_id)
     if result is None:
@@ -83,7 +83,7 @@ def get_execution_results(
     _: object = Depends(require_xdr_auth),
 ) -> dict:
     """Get the execution results of a script run action."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     action_id = request_data.get("action_id", "")
     result = script_queries.get_execution_results(action_id)
     if result is None:

@@ -97,3 +97,25 @@ def build_xdr_error(err_code: int, err_msg: str, err_extra: str | None = None) -
             "err_extra": err_extra,
         },
     }
+
+
+def require_request_data(body: object) -> dict:
+    """Return ``body["request_data"]``, or refuse the request the way XDR does.
+
+    Every XDR call carries its parameters under ``request_data``. A body with
+    none — ``{}``, ``null``, an array — used to fall through to the handler
+    with an empty dict, which then looked up an endpoint named ``""`` and
+    reported an *internal* error. A malformed request is the caller's
+    mistake, and XDR says so with a 400.
+    """
+    from fastapi import HTTPException  # local: utils must not import the API layer at module load
+
+    request_data = body.get("request_data") if isinstance(body, dict) else None
+    if not isinstance(request_data, dict):
+        raise HTTPException(
+            status_code=400,
+            detail=build_xdr_error(
+                400, "Bad Request", "request_data is required and must be an object",
+            ),
+        )
+    return request_data

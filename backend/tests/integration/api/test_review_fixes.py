@@ -57,18 +57,18 @@ class TestDispatchClockRespectsControlActions:
     def test_a_job_starts_at_the_beginning(
         self, client: TestClient, dispatch_window: None,
     ) -> None:
-        assert _state(client, _dispatch(client)) == ("QUEUED", "0")
+        assert _state(client, _dispatch(client)) == ("QUEUED", False)
 
     def test_finalize_sticks(self, client: TestClient, dispatch_window: None) -> None:
         """Deriving state from elapsed time alone made `finalize` a no-op."""
         sid = _dispatch(client)
         _control(client, sid, "finalize")
-        assert _state(client, sid) == ("DONE", "1")
+        assert _state(client, sid) == ("DONE", True)
 
     def test_cancel_sticks(self, client: TestClient, dispatch_window: None) -> None:
         sid = _dispatch(client)
         _control(client, sid, "cancel")
-        assert _state(client, sid) == ("FAILED", "1")
+        assert _state(client, sid) == ("FAILED", True)
 
     def test_touch_extends_the_ttl_without_rewinding_the_search(
         self, client: TestClient, dispatch_window: None,
@@ -84,7 +84,7 @@ class TestDispatchClockRespectsControlActions:
     ) -> None:
         sid = _dispatch(client)
         _control(client, sid, "pause")
-        assert _state(client, sid) == ("PAUSED", "0")
+        assert _state(client, sid) == ("PAUSED", False)
 
     def test_pausing_stops_the_clock(
         self, client: TestClient, dispatch_window: None,
@@ -104,11 +104,11 @@ class TestDispatchClockRespectsControlActions:
         job.published_at = time.time() - 60.0
         job.paused_at = job.published_at + 2.0
         search_job_repo.save(job)
-        assert _state(client, sid) == ("PAUSED", "0")
+        assert _state(client, sid) == ("PAUSED", False)
 
         _control(client, sid, "unpause")
         # Resumes two seconds in, where it stopped — not at the end.
-        assert _state(client, sid) == ("QUEUED", "0")
+        assert _state(client, sid) == ("QUEUED", False)
 
 
 class TestKibanaReportsTheTruth:

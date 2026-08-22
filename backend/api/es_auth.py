@@ -135,6 +135,17 @@ def _decode_api_key(header_value: str) -> dict | None:
 
 # ── Public dependencies ──────────────────────────────────────────────────────
 
+def _attempted_user(authorization: str | None) -> str:
+    """``[name] `` for a Basic attempt, as Elasticsearch's message names it."""
+    if not authorization or not authorization.lower().startswith("basic "):
+        return ""
+    try:
+        name = base64.b64decode(authorization[6:]).decode("utf-8", "replace").split(":", 1)[0]
+    except Exception:
+        return ""
+    return f"[{name}] " if name else ""
+
+
 async def optional_es_auth(request: Request) -> dict | None:
     """Return the caller's context if they authenticated, else ``None``.
 
@@ -207,7 +218,8 @@ async def require_es_auth(
             status_code=401,
             detail=_auth_error(
                 request, 401, "security_exception",
-                f"unable to authenticate user for REST request [{request.url.path}]",
+                f"unable to authenticate user {_attempted_user(authorization)}"
+                f"for REST request [{request.url.path}]",
             ),
             headers=_auth_headers(request, 401),
         )

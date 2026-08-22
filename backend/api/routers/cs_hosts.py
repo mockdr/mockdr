@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_hosts import commands as host_commands
 from application.cs_hosts import queries as host_queries
+from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Hosts"])
 
@@ -49,7 +50,7 @@ def get_hosts(
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return full host entities for the given device IDs."""
-    ids: list[str] = body.get("ids", [])
+    ids = require_list(body, "ids")
     return host_queries.get_host_entities(ids)
 
 
@@ -66,7 +67,7 @@ def device_action(
                      ``add-hosts``, ``remove-hosts``.
         body:        Dict with ``ids`` list and optional ``action_parameters``.
     """
-    ids: list[str] = body.get("ids", [])
+    ids = require_list(body, "ids")
     if not ids:
         raise HTTPException(status_code=400, detail="ids required")
 
@@ -77,7 +78,7 @@ def device_action(
     if action_name == "hide_host":
         return host_commands.hide_host(ids)
     if action_name in ("add-hosts", "remove-hosts"):
-        params = body.get("action_parameters", [])
+        params = require_list(body, "action_parameters")
         tags: list[str] = []
         for p in params:
             if p.get("name") == "FalconGroupingTags":

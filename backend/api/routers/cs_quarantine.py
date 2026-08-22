@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_quarantine import commands as quarantine_commands
 from application.cs_quarantine import queries as quarantine_queries
+from utils.cs_response import require_list
 
 router = APIRouter(tags=["CrowdStrike Quarantine"])
 
@@ -45,6 +46,6 @@ def action_quarantined_files(
 
     Body: ``{"ids": [...], "action": "release|delete|unquarantine"}``.
     """
-    ids = body.get("ids", [])
+    ids = require_list(body, "ids")
     action = body.get("action", "release")
     return quarantine_commands.action_quarantined_files(ids, action)

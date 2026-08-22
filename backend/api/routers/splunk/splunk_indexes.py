@@ -41,7 +41,8 @@ async def create_index(
 
     if not name:
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": "Index name is required"},
+            {"type": "ERROR",
+             "text": 'Cannot perform action "POST" without a target name to act on.'},
         ]})
 
     if get_index(name):
@@ -68,7 +69,7 @@ def delete_index(
     """
     if not get_index(name):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Index '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     splunk_index_repo.delete(name)
     return {"messages": [{"type": "INFO", "text": f"Index '{name}' deleted"}]}
@@ -84,6 +85,6 @@ def get_single_index(
     result = get_index(name)
     if not result:
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"Index '{name}' not found"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return result

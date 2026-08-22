@@ -7,6 +7,7 @@ from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import threat_intel as ti_cmds
 from application.sentinel.queries import threat_intel as ti_queries
 from utils.sentinel.response import build_arm_error
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Threat Intelligence"])
 
@@ -53,6 +54,12 @@ async def append_tags(
 ) -> dict:
     """Append tags to indicators."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     indicator_names = body.get("indicatorNames", [])
     tags = body.get("tags", [])
     count = ti_cmds.append_tags(indicator_names, tags)
@@ -70,6 +77,12 @@ async def replace_tags(
 ) -> dict:
     """Replace tags on indicators."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     indicator_names = body.get("indicatorNames", [])
     tags = body.get("tags", [])
     count = ti_cmds.replace_tags(indicator_names, tags)
@@ -110,6 +123,12 @@ async def create_or_update_indicator(
 ) -> dict:
     """Create or update a threat intelligence indicator."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     properties = body.get("properties", {})
     ti_cmds.create_or_update_indicator(name, properties)
     return ti_queries.get_indicator(name) or {}
@@ -147,6 +166,12 @@ async def create_indicator(
 ) -> dict:
     """Create a threat intelligence indicator with auto-generated name."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     properties = body.get("properties", {})
     indicator = ti_cmds.create_indicator(properties)
     result = ti_queries.get_indicator(indicator.name)
@@ -167,8 +192,14 @@ async def query_indicators(
 ) -> dict:
     """Query threat intelligence indicators."""
     body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
     return ti_queries.query_indicators(
-        keywords=body.get("keywords"),
+        keywords=body.get("keywords") or "",
         pattern_types=body.get("patternTypes"),
         sources=body.get("sources"),
     )

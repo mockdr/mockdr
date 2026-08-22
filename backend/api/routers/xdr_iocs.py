@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends
 
 from api.xdr_auth import require_xdr_write
 from application.xdr_iocs import commands as ioc_commands
+from utils.xdr_response import require_request_data
 
 router = APIRouter(tags=["XDR IOCs"])
 
@@ -19,7 +20,7 @@ def insert_iocs(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Push IOC indicators in JSON format."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     iocs = request_data.get("indicators", [])
     return ioc_commands.insert_iocs(iocs)
 
@@ -30,7 +31,7 @@ def enable_iocs(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Enable one or more IOC indicators."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     ioc_ids = request_data.get("ioc_id_list", [])
     return ioc_commands.enable_iocs(ioc_ids)
 
@@ -41,6 +42,6 @@ def disable_iocs(
     _: object = Depends(require_xdr_write),
 ) -> dict:
     """Disable one or more IOC indicators."""
-    request_data = body.get("request_data", {})
+    request_data = require_request_data(body)
     ioc_ids = request_data.get("ioc_id_list", [])
     return ioc_commands.disable_iocs(ioc_ids)

@@ -11,7 +11,10 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
-from utils.es_response import build_security_solution_error
+from utils.es_response import build_kbn_error_response, build_security_solution_error
+
+#: Kibana's config-schema wording for a missing array (measured on 8.15).
+_NO_ENDPOINT_IDS = "[request body.endpoint_ids]: expected value of type [array] but got [undefined]"
 
 router = APIRouter(tags=["Elastic Endpoints"])
 
@@ -76,7 +79,7 @@ def isolate_endpoint(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "endpoint_ids is required"),
+            detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
     comment = body.get("comment", "")
     result = endpoint_commands.isolate_endpoint(agent_id, comment)
@@ -100,7 +103,7 @@ def unisolate_endpoint(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "endpoint_ids is required"),
+            detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
     comment = body.get("comment", "")
     result = endpoint_commands.unisolate_endpoint(agent_id, comment)
@@ -124,7 +127,7 @@ def kill_process(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "endpoint_ids is required"),
+            detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
     params = body.get("parameters", {})
     result = endpoint_commands.kill_process(agent_id, params)
@@ -148,7 +151,7 @@ def scan_endpoint(
     if not agent_id:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "endpoint_ids is required"),
+            detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
     comment = body.get("comment", "")
     result = endpoint_commands.scan_endpoint(agent_id, comment)
