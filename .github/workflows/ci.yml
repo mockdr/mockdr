@@ -207,7 +207,9 @@ jobs:
           docker run -d --name mockdr-ci -p 5001:5001 mockdr:ci
           curl --fail --retry 20 --retry-delay 3 --retry-all-errors \
             http://localhost:5001/web/api/v2.1/system/status
-          curl --fail http://localhost:5001/splunk/services/server/info?output_mode=json
+          # server/info requires auth, as on splunkd; the mount check must
+          # authenticate, or it reports the mock broken for being right.
+          curl --fail -u admin:mockdr-admin 'http://localhost:5001/splunk/services/server/info?output_mode=json'
           curl --fail "http://localhost:5001/sentinel/providers/Microsoft.SecurityInsights/operations?api-version=2024-03-01"
           docker stop mockdr-ci
 

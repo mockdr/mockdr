@@ -148,7 +148,11 @@ test('splunk server info returns valid JSON', async ({ request }) => {
   // so reusing it here sent this request to the dev server, which answers
   // every unknown path with the SPA's index.html.
   const apiURL = process.env.E2E_API_URL ?? 'http://localhost:8001'
-  const response = await request.get(`${apiURL}/splunk/services/server/info?output_mode=json`)
+  // server/info requires auth, as on splunkd — it used to be open "for health
+  // checks", which a conformance probe against the real product disproved.
+  const response = await request.get(`${apiURL}/splunk/services/server/info?output_mode=json`, {
+    headers: { Authorization: 'Basic ' + Buffer.from('admin:mockdr-admin').toString('base64') },
+  })
   expect(response.ok()).toBeTruthy()
   const body = await response.json()
   expect(body).toHaveProperty('entry')
