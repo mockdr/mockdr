@@ -1,0 +1,8 @@
+{
+ "definition": "_ThreatFileDownloadURLSchema_200",
+ "routes": "/threats/{threat_id}/download-from-cloud",
+ "data": {
+  "downloadUrl": "",
+  "fileName": ""
+ }
+}

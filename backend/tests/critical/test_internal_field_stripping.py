@@ -39,7 +39,7 @@ class TestAgentInternalFieldStripping:
         self, client: TestClient, auth_headers: dict
     ) -> None:
         agent_id = client.get("/web/api/v2.1/agents", headers=auth_headers).json()["data"][0]["id"]
-        agent = client.get(f"/web/api/v2.1/agents/{agent_id}", headers=auth_headers).json()["data"]
+        agent = client.get(f"/web/api/v2.1/agents?ids={agent_id}", headers=auth_headers).json()["data"][0]
         for field in AGENT_INTERNAL_FIELDS:
             assert field not in agent, (
                 f"CRITICAL: agent internal field '{field}' leaked in single response"
@@ -48,16 +48,16 @@ class TestAgentInternalFieldStripping:
     def test_passphrase_only_on_dedicated_endpoint(
         self, client: TestClient, auth_headers: dict
     ) -> None:
-        """passphrase is available at /agents/{id}/passphrase but not in the agent body."""
+        """passphrase is available at /agents/passphrases?ids= but not in the agent body."""
         agent_id = client.get("/web/api/v2.1/agents", headers=auth_headers).json()["data"][0]["id"]
-        agent = client.get(f"/web/api/v2.1/agents/{agent_id}", headers=auth_headers).json()["data"]
+        agent = client.get(f"/web/api/v2.1/agents?ids={agent_id}", headers=auth_headers).json()["data"][0]
         assert "passphrase" not in agent
 
         passphrase_resp = client.get(
-            f"/web/api/v2.1/agents/{agent_id}/passphrase", headers=auth_headers
+            f"/web/api/v2.1/agents/passphrases?ids={agent_id}", headers=auth_headers
         )
         assert passphrase_resp.status_code == 200
-        assert "passphrase" in passphrase_resp.json()["data"]
+        assert "passphrase" in passphrase_resp.json()["data"][0]
 
     def test_infected_public_field_is_present(
         self, client: TestClient, auth_headers: dict

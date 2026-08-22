@@ -62,9 +62,9 @@ class TestGetAgent:
     def test_returns_single_agent(self, client: TestClient, auth_headers: dict) -> None:
         agents = client.get("/web/api/v2.1/agents", headers=auth_headers).json()["data"]
         agent_id = agents[0]["id"]
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}", headers=auth_headers)
+        resp = client.get(f"/web/api/v2.1/agents?ids={agent_id}", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json()["data"]["id"] == agent_id
+        assert resp.json()["data"][0]["id"] == agent_id
 
     def test_unknown_id_returns_404(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.get("/web/api/v2.1/agents/does-not-exist", headers=auth_headers)
@@ -72,7 +72,7 @@ class TestGetAgent:
 
     def test_no_internal_fields_in_single(self, client: TestClient, auth_headers: dict) -> None:
         agent_id = client.get("/web/api/v2.1/agents", headers=auth_headers).json()["data"][0]["id"]
-        agent = client.get(f"/web/api/v2.1/agents/{agent_id}", headers=auth_headers).json()["data"]
+        agent = client.get(f"/web/api/v2.1/agents?ids={agent_id}", headers=auth_headers).json()["data"][0]
         for field in _INTERNAL:
             assert field not in agent
 

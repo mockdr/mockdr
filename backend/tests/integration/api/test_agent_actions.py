@@ -22,7 +22,7 @@ def _agent_id(client, auth_headers) -> str:
 
 
 def _agent(client, auth_headers, aid) -> dict:
-    return client.get(f"{BASE}/agents/{aid}", headers=auth_headers).json()["data"]
+    return client.get(f"{BASE}/agents?ids={aid}", headers=auth_headers).json()["data"][0]
 
 
 class TestResolveIds:

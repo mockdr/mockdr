@@ -85,21 +85,21 @@ export const proxyApi = {
     client.get('/_dev/proxy/vendors') as Promise<SingleResponse<VendorInfo[]>>,
 }
 
-/** Webhook management API. */
+/** Webhook management API — a mockdr feature, served under /_dev, not a SentinelOne route. */
 export const webhooksApi = {
   /** List all webhook subscriptions. */
   list: (): Promise<SingleResponse<WebhookSubscription[]>> =>
-    client.get('/webhooks') as Promise<SingleResponse<WebhookSubscription[]>>,
+    client.get('/_dev/webhooks') as Promise<SingleResponse<WebhookSubscription[]>>,
 
   /** Create a webhook subscription. */
   create: (payload: Partial<WebhookSubscription>): Promise<SingleResponse<WebhookSubscription>> =>
-    client.post('/webhooks', payload) as Promise<SingleResponse<WebhookSubscription>>,
+    client.post('/_dev/webhooks', payload) as Promise<SingleResponse<WebhookSubscription>>,
 
   /** Delete a webhook subscription. */
   delete: (id: string): Promise<SingleResponse<unknown>> =>
-    client.delete(`/webhooks/${id}`) as Promise<SingleResponse<unknown>>,
+    client.delete(`/_dev/webhooks/${id}`) as Promise<SingleResponse<unknown>>,
 
   /** Fire a test event to all matching subscriptions. */
   fire: (event_type: string, payload?: unknown): Promise<SingleResponse<unknown>> =>
-    client.post('/webhooks/fire', { event_type, payload }) as Promise<SingleResponse<unknown>>,
+    client.post('/_dev/webhooks/fire', { event_type, payload }) as Promise<SingleResponse<unknown>>,
 }

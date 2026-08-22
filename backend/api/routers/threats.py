@@ -19,6 +19,7 @@ class NoteBody(BaseModel):
 
 # ── Queries ───────────────────────────────────────────────────────────────────
 
+
 @router.get("/threats")
 def list_threats(
     ids: str = Query(None),
@@ -82,28 +83,11 @@ def _download_threat_file(threat_id: str) -> Response:
     )
 
 
-@router.get("/threats/{threat_id}/fetch-file")
-def download_fetch_file(threat_id: str, _: dict = Depends(require_auth)) -> Response:
-    """Download the fetched file for the given threat (XSOAR-compatible path)."""
-    return _download_threat_file(threat_id)
-
-
-@router.get("/threats/{threat_id}/fetched-file")
+@router.get("/threats/{threat_id}/download-from-cloud")
 def download_fetched_file(threat_id: str, _: dict = Depends(require_auth)) -> Response:
     """Download the fetched file for the given threat (legacy path)."""
     return _download_threat_file(threat_id)
 
-
-@router.get("/threats/{threat_id}")
-def get_threat(threat_id: str) -> dict:
-    """Return a single threat by ID."""
-    result = threat_queries.get_threat(threat_id)
-    if not result:
-        raise HTTPException(status_code=404)
-    return result
-
-
-# ── Commands (real S1 API paths) ──────────────────────────────────────────────
 
 @router.post("/threats/analyst-verdict")
 def set_analyst_verdict(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
@@ -173,7 +157,6 @@ def add_note(
     if not result:
         raise HTTPException(status_code=404)
     return result
-
 
 
 @router.post("/threats/fetch-file")

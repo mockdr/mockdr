@@ -9,7 +9,8 @@ export const alertsApi = {
 
   /** Get a single alert by ID. */
   get: (id: string): Promise<SingleResponse<Alert>> =>
-    client.get(`/cloud-detection/alerts/${id}`) as Promise<SingleResponse<Alert>>,
+    Promise.resolve(client.get('/cloud-detection/alerts', { params: { ids: id } }) as Promise<PaginatedResponse<Alert>>)
+      .then((res) => ({ data: res.data[0] })),
 
   /** Trigger a bulk alert action. */
   action: (path: string, body: unknown): Promise<ActionResponse> =>

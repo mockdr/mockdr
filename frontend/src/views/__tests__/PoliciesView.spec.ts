@@ -154,7 +154,7 @@ describe('PoliciesView', () => {
     ;(w.vm as any).draft.mitigationMode = 'detect'
     await (w.vm as any).savePolicy()
     await flushPromises()
-    expect(mockClientPut).toHaveBeenCalledWith('/policies', expect.objectContaining({ mitigationMode: 'detect' }), expect.any(Object))
+    expect(mockClientPut).toHaveBeenCalledWith('/sites/site-1/policy', expect.objectContaining({ mitigationMode: 'detect' }))
   })
 
   it('savePolicy does nothing when draft is null', async () => {
@@ -236,7 +236,7 @@ describe('PoliciesView', () => {
   it('loadPolicy loads policy with siteId param for site scope', async () => {
     mount(PoliciesView, { global: { stubs } })
     await flushPromises()
-    expect(mockClientGet).toHaveBeenCalledWith('/policies', expect.objectContaining({ params: { siteId: 'site-1' } }))
+    expect(mockClientGet).toHaveBeenCalledWith('/sites/site-1/policy')
   })
 
   it('loadPolicy loads policy with groupId param for group scope', async () => {
@@ -247,7 +247,7 @@ describe('PoliciesView', () => {
     mockClientGet.mockClear()
     await (w.vm as any).loadPolicy()
     await flushPromises()
-    expect(mockClientGet).toHaveBeenCalledWith('/policies', expect.objectContaining({ params: { groupId: 'grp-1' } }))
+    expect(mockClientGet).toHaveBeenCalledWith('/groups/grp-1/policy')
   })
 
   it('loadGroupsForSite clears groups when no site selected', async () => {

@@ -1,6 +1,6 @@
 """Integration tests for agent sub-resource endpoints.
 
-Covers /agents/{id}/processes, /agents/{id}/applications, and the count
+Covers /agents/processes?ids=, /agents/applications?ids=, and the count
 endpoint. These routes exercise agent query methods not covered elsewhere.
 """
 from fastapi.testclient import TestClient
@@ -15,12 +15,12 @@ class TestAgentProcesses:
                             headers={"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
                             ).json()["data"]
         agent_id = agents[0]["id"]
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}/processes")
+        resp = client.get(f"/web/api/v2.1/agents/processes?ids={agent_id}")
         assert resp.status_code == 401
 
     def test_returns_data_and_pagination(self, client: TestClient, auth_headers: dict) -> None:
         agent_id = self._first_agent_id(client, auth_headers)
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}/processes", headers=auth_headers)
+        resp = client.get(f"/web/api/v2.1/agents/processes?ids={agent_id}", headers=auth_headers)
         assert resp.status_code == 200
         body = resp.json()
         assert "data" in body
@@ -30,18 +30,12 @@ class TestAgentProcesses:
 
     def test_processes_have_required_fields(self, client: TestClient, auth_headers: dict) -> None:
         agent_id = self._first_agent_id(client, auth_headers)
-        processes = client.get(f"/web/api/v2.1/agents/{agent_id}/processes",
+        processes = client.get(f"/web/api/v2.1/agents/processes?ids={agent_id}",
                                headers=auth_headers).json()["data"]
         if processes:
             proc = processes[0]
             for field in ("pid", "processName", "executablePath"):
                 assert field in proc, f"Required field '{field}' missing from process"
-
-    def test_limit_parameter(self, client: TestClient, auth_headers: dict) -> None:
-        agent_id = self._first_agent_id(client, auth_headers)
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}/processes",
-                          headers=auth_headers, params={"limit": 5})
-        assert len(resp.json()["data"]) <= 5
 
 
 class TestAgentApplications:
@@ -50,7 +44,7 @@ class TestAgentApplications:
 
     def test_returns_data_and_pagination(self, client: TestClient, auth_headers: dict) -> None:
         agent_id = self._first_agent_id(client, auth_headers)
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}/applications", headers=auth_headers)
+        resp = client.get(f"/web/api/v2.1/agents/applications?ids={agent_id}", headers=auth_headers)
         assert resp.status_code == 200
         body = resp.json()
         assert "data" in body
@@ -60,28 +54,22 @@ class TestAgentApplications:
         self, client: TestClient, auth_headers: dict
     ) -> None:
         agent_id = self._first_agent_id(client, auth_headers)
-        apps = client.get(f"/web/api/v2.1/agents/{agent_id}/applications",
+        apps = client.get(f"/web/api/v2.1/agents/applications?ids={agent_id}",
                           headers=auth_headers).json()["data"]
         if apps:
             app = apps[0]
             for field in ('name', 'version', 'publisher'):  # AgentApplicationsSchema (2.1 swagger)
                 assert field in app, f"Required field '{field}' missing from application"
 
-    def test_limit_parameter(self, client: TestClient, auth_headers: dict) -> None:
-        agent_id = self._first_agent_id(client, auth_headers)
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}/applications",
-                          headers=auth_headers, params={"limit": 5})
-        assert len(resp.json()["data"]) <= 5
-
 
 class TestAgentPassphrase:
     def test_returns_passphrase(self, client: TestClient, auth_headers: dict) -> None:
         agent_id = client.get("/web/api/v2.1/agents",
                               headers=auth_headers).json()["data"][0]["id"]
-        resp = client.get(f"/web/api/v2.1/agents/{agent_id}/passphrase", headers=auth_headers)
+        resp = client.get(f"/web/api/v2.1/agents/passphrases?ids={agent_id}", headers=auth_headers)
         assert resp.status_code == 200
-        assert "passphrase" in resp.json()["data"]
-        assert len(resp.json()["data"]["passphrase"]) > 0
+        assert "passphrase" in resp.json()["data"][0]
+        assert len(resp.json()["data"][0]["passphrase"]) > 0
 
 
 class TestAgentListFilters:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from api.auth import require_admin, require_write
 from api.dto.common import FilterBody
@@ -37,18 +37,6 @@ def list_alerts(
     """Return a filtered, paginated list of cloud-detection alerts."""
     params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
     return alert_queries.list_alerts(params, cursor, limit)
-
-
-@router.get("/cloud-detection/alerts/{alert_id}")
-def get_alert(alert_id: str) -> dict:
-    """Return a single alert by ID."""
-    result = alert_queries.get_alert(alert_id)
-    if not result:
-        raise HTTPException(status_code=404)
-    return result
-
-
-# ── Commands ──────────────────────────────────────────────────────────────────
 
 
 @router.post("/cloud-detection/alerts/analyst-verdict")

@@ -1,0 +1,272 @@
+{
+ "definition": "policies_schemas_EnrichedPolicySchema_200",
+ "routes": "/sites/{site_id}/policy",
+ "data": {
+  "networkQuarantineOn": false,
+  "autoImmuneOn": false,
+  "autoDecommissionOn": false,
+  "isDefault": false,
+  "cloudValidationOn": null,
+  "researchOn": false,
+  "autoMitigationAction": "",
+  "autoDecommissionDays": 0,
+  "mitigationMode": "detect",
+  "createdAt": "2018-02-27T04:49:26.257525Z",
+  "agentNotification": false,
+  "engines": {
+   "reputation": "on",
+   "preExecution": "on",
+   "preExecutionSuspicious": "on",
+   "executables": "on",
+   "dataFiles": "on",
+   "exploits": "on",
+   "penetration": "on",
+   "pup": "on",
+   "lateralMovement": "on",
+   "remoteShell": "on",
+   "applicationControl": "on",
+   "idr": "on",
+   "driftDetection": "on",
+   "networkProtection": "on"
+  },
+  "mitigationModeSuspicious": "detect",
+  "scanNewAgents": false,
+  "antiTamperingOn": false,
+  "signedDriverBlockingOn": false,
+  "unsignedDriverBlockingOn": false,
+  "driverBlocking": false,
+  "informationalAlertsOn": false,
+  "agentUiOn": false,
+  "snapshotsOn": false,
+  "agentLoggingOn": false,
+  "monitorOnExecute": false,
+  "monitorOnWrite": false,
+  "ioc": false,
+  "iocAttributes": {
+   "url": false,
+   "dns": false,
+   "process": false,
+   "file": false,
+   "ip": false,
+   "registry": false,
+   "scheduledTask": false,
+   "login": false,
+   "fds": false,
+   "behavioralIndicators": false,
+   "dllModuleLoad": false,
+   "crossProcess": false,
+   "commandScripts": false,
+   "autoInstallBrowserExtensions": false,
+   "dataMasking": false,
+   "smartFileMonitoring": false,
+   "namedPipe": false,
+   "namedPipeExtended": false,
+   "driver": false,
+   "windowsEventLogs": false,
+   "windowsEventLogsExtended": false,
+   "openDirectoryActivity": false,
+   "profileActivity": false,
+   "userSubstitution": false,
+   "externalDeviceActivity": false
+  },
+  "dvAttributesPerEventType": {
+   "url": {
+    "dvEventTypeUrl": false
+   },
+   "dns": {
+    "dvEventTypeDns": false,
+    "dvEventTypeExtendedDns": false
+   },
+   "process": {
+    "dvEventTypeProcessCreation": false,
+    "dvEventTypeProcessModification": false,
+    "dvEventTypeProcessExit": false
+   },
+   "file": {
+    "fullDiskScan": false,
+    "dvEventTypeFileCreation": false,
+    "dvEventTypeFileModification": false,
+    "dvEventTypeFileDeletion": false,
+    "dvEventTypeFileRename": false
+   },
+   "ip": {
+    "dvEventTypeIpConnect": false,
+    "dvEventTypeIpListen": false
+   },
+   "registry": {
+    "dvEventTypeRegistryKeySecurityChanged": false,
+    "dvEventTypeRegistryKeyCreated": false,
+    "dvEventTypeRegistryKeyRename": false,
+    "dvEventTypeRegistryKeyDelete": false,
+    "dvEventTypeRegistryKeyExport": false,
+    "dvEventTypeRegistryKeyImport": false,
+    "dvEventTypeRegistryValueCreated": false,
+    "dvEventTypeRegistryValueModified": false,
+    "dvEventTypeRegistryValueDeleted": false
+   },
+   "scheduledTask": {
+    "dvEventTypeScheduledTaskRegister": false,
+    "dvEventTypeScheduledTaskUpdate": false,
+    "dvEventTypeScheduledTaskDelete": false,
+    "dvEventTypeScheduledTaskStart": false,
+    "dvEventTypeScheduledTaskTrigger": false
+   },
+   "login": {
+    "dvEventTypeLoginLoggedIn": false,
+    "dvEventTypeLoginLoggedOut": false
+   },
+   "behavioralIndicators": {
+    "dvEventTypeBehavioralIndicators": false
+   },
+   "dllModuleLoad": {
+    "dvEventTypeDllModuleLoad": false
+   },
+   "crossProcess": {
+    "dvEventTypeCrossProcessOpenProcess": false,
+    "dvEventTypeCrossProcessDuplicateProcess": false,
+    "dvEventTypeCrossProcessDuplicateThread": false,
+    "dvEventTypeCrossProcessRemoteThread": false
+   },
+   "commandScripts": {
+    "dvEventTypeCommandScripts": false
+   },
+   "autoInstallBrowserExtensions": {
+    "autoInstallBrowserExtensions": false
+   },
+   "dataMasking": {
+    "dataMasking": false
+   },
+   "smartFileMonitoring": {
+    "smartFileMonitoring": false
+   },
+   "namedPipe": {
+    "dvEventTypeNamedPipeCreation": false,
+    "dvEventTypeNamedPipeConnection": false
+   },
+   "namedPipeExtended": {
+    "namedPipeExtended": false
+   },
+   "driver": {
+    "dvEventTypeDriverLoad": false
+   },
+   "windowsEventLogs": {
+    "dvEventTypeWindowsEventLogCreation": false
+   },
+   "windowsEventLogsExtended": {
+    "windowsEventLogsExtended": false
+   },
+   "openDirectoryActivity": {
+    "dvEventTypeOpenDirectoryAddAttributeValue": false,
+    "dvEventTypeOpenDirectoryAddMemberToGroup": false,
+    "dvEventTypeOpenDirectoryCreateGroup": false,
+    "dvEventTypeOpenDirectoryCreateUser": false,
+    "dvEventTypeOpenDirectoryDeleteGroup": false,
+    "dvEventTypeOpenDirectoryDeleteUser": false,
+    "dvEventTypeOpenDirectoryDisableUser": false,
+    "dvEventTypeOpenDirectoryEnableUser": false,
+    "dvEventTypeOpenDirectoryModifyPassword": false,
+    "dvEventTypeOpenDirectoryRemoveAttributeValue": false,
+    "dvEventTypeOpenDirectoryRemoveMemberFromGroup": false,
+    "dvEventTypeOpenDirectorySetAttributeValues": false,
+    "dvEventTypeOpenDirectorySetMembersOfGroup": false
+   },
+   "profileActivity": {
+    "dvEventTypeProfileAddition": false,
+    "dvEventTypeProfileRemoval": false
+   },
+   "userSubstitution": {
+    "dvEventTypeSu": false,
+    "dvEventTypeSudo": false
+   },
+   "externalDeviceActivity": {
+    "dvEventTypeExternalDeviceConnect": false,
+    "dvEventTypeExternalDeviceDisconnect": false
+   }
+  },
+  "iocSupported": false,
+  "inheritedFrom": null,
+  "updatedAt": "2018-02-27T04:49:26.257525Z",
+  "userId": "225494730938493804",
+  "userFullName": "",
+  "allowRemoteShell": false,
+  "autoFileUpload": {
+   "enabled": false,
+   "includeBenignFiles": null,
+   "maxFileSize": null,
+   "maxDailyFileUpload": null,
+   "maxLocalDiskUsage": null,
+   "maxFileSizeLimit": null,
+   "maxDailyFileUploadLimit": null,
+   "maxLocalDiskUsageLimit": null
+  },
+  "agentUi": {
+   "agentUiOn": false,
+   "threatPopUpNotifications": false,
+   "devicePopUpNotifications": false,
+   "showSuspicious": false,
+   "showAgentWarnings": false,
+   "showDeviceTab": false,
+   "showQuarantineTab": false,
+   "showSupport": false,
+   "maxEventAgeDays": 0,
+   "contactFreeText": null,
+   "contactCompany": null,
+   "contactEmail": null,
+   "contactPhoneNumber": null,
+   "contactDirectMessage": null,
+   "contactSupportWebsite": null,
+   "contactOther": null
+  },
+  "remoteScriptOrchestration": {
+   "maxFileSize": null,
+   "maxFileSizeLimit": null,
+   "maxDailyFileUpload": null,
+   "maxDailyFileUploadLimit": null,
+   "alwaysUploadStreamToCloud": null,
+   "maxDailyFileDownload": null,
+   "maxDailyFileDownloadLimit": null,
+   "maxLocalPackageDiskUsage": null,
+   "maxLocalPackageDiskUsageLimit": null
+  },
+  "isDvPolicyPerEventType": false,
+  "remoteOpsForensics": {
+   "enabled": false,
+   "parsedArtifactsDestination": "local",
+   "maximumFileSizeUpload": null,
+   "maximumFileSizeUploadLimit": null,
+   "maximumDailyUpload": null,
+   "maximumDailyUploadLimit": null,
+   "cpuLimit": null
+  },
+  "removeMacros": false,
+  "removeMacrosMl": false,
+  "identityUpdateInterval": 0,
+  "identityReportInterval": 0,
+  "identityThrottlingInterval": 0,
+  "identityEndpointReporting": "disabled",
+  "identityOn": false,
+  "forensicsAutoTriggering": {
+   "macosProfileId": null,
+   "macosEnabled": false,
+   "windowsProfileId": null,
+   "windowsEnabled": false,
+   "linuxProfileId": null,
+   "linuxEnabled": false,
+   "macosProfileName": null,
+   "windowsProfileName": null,
+   "linuxProfileName": null
+  },
+  "allowUnprotectByApprovedProcess": false,
+  "identityConfigurationSettings": {
+   "identityThresholdMonitoring": false,
+   "identityMaxMemoryUsage": 0,
+   "identityMaxMemoryLimit": 0,
+   "identityMaxDefinedMemoryLimit": 0,
+   "identityMaxCpuThreshold": 0
+  },
+  "logCollectorEnabled": false,
+  "driftDetectionDelayTime": 0,
+  "networkProtectionInfra": false,
+  "fwForNetworkQuarantineEnabled": false
+ }
+}

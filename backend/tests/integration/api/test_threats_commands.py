@@ -8,7 +8,7 @@ POST /threats/mark-as-threat
 POST /threats/mark-as-resolved
 POST /threats/{id}/notes
 GET  /threats/{id}/notes
-GET  /threats/{id}/fetched-file
+GET  /threats/{id}/download-from-cloud
 POST /threats/fetch-file
 POST /threats/dv-add-to-blacklist
 POST /threats/dv-mark-as-threat
@@ -62,7 +62,7 @@ class TestIncidentStatus:
             headers=auth_headers,
             json={"filter": {"ids": [tid]}, "data": {"incidentStatus": "resolved"}},
         )
-        threat = client.get(f"{BASE}/threats/{tid}", headers=auth_headers).json()["data"]
+        threat = client.get(f"{BASE}/threats?ids={tid}", headers=auth_headers).json()["data"][0]
         assert threat["threatInfo"]["incidentStatus"] == "resolved"
 
 
@@ -110,7 +110,7 @@ class TestMitigate:
             headers=auth_headers,
             json={"filter": {"ids": [tid]}},
         )
-        threat = client.get(f"{BASE}/threats/{tid}", headers=auth_headers).json()["data"]
+        threat = client.get(f"{BASE}/threats?ids={tid}", headers=auth_headers).json()["data"][0]
         assert threat["threatInfo"]["mitigationStatus"] == "quarantined"
 
 
@@ -205,14 +205,14 @@ class TestFetchFile:
             headers=auth_headers,
             json={"filter": {"ids": [tid]}, "data": {}},
         )
-        resp = client.get(f"{BASE}/threats/{tid}/fetched-file", headers=auth_headers)
+        resp = client.get(f"{BASE}/threats/{tid}/download-from-cloud", headers=auth_headers)
         assert resp.status_code == 200
 
     def test_download_without_fetch_returns_404(
         self, client: TestClient, auth_headers: dict
     ) -> None:
         tid = _first_threat(client, auth_headers)["id"]
-        resp = client.get(f"{BASE}/threats/{tid}/fetched-file", headers=auth_headers)
+        resp = client.get(f"{BASE}/threats/{tid}/download-from-cloud", headers=auth_headers)
         assert resp.status_code == 404
 
 

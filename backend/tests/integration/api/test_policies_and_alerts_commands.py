@@ -1,6 +1,6 @@
 """Integration tests for policies and alert command endpoints.
 
-Covers GET/PUT /policies and POST /cloud-detection/alerts/analyst-verdict,
+Covers GET/PUT /tenant/policy, /sites/{id}/policy, /groups/{id}/policy and POST /cloud-detection/alerts/analyst-verdict,
 /cloud-detection/alerts/incident.
 """
 from fastapi.testclient import TestClient
@@ -9,20 +9,19 @@ from fastapi.testclient import TestClient
 
 class TestGetPolicy:
     def test_returns_policy_data(self, client: TestClient, auth_headers: dict) -> None:
-        resp = client.get("/web/api/v2.1/policies", headers=auth_headers)
+        resp = client.get("/web/api/v2.1/tenant/policy", headers=auth_headers)
         assert resp.status_code == 200
         assert "data" in resp.json()
 
     def test_requires_auth(self, client: TestClient) -> None:
-        assert client.get("/web/api/v2.1/policies").status_code == 401
+        assert client.get("/web/api/v2.1/tenant/policy").status_code == 401
 
     def test_filter_by_site_id_returns_data(
         self, client: TestClient, auth_headers: dict
     ) -> None:
         sites = client.get("/web/api/v2.1/sites", headers=auth_headers).json()["data"]["sites"]
         site_id = sites[0]["id"]
-        resp = client.get("/web/api/v2.1/policies", headers=auth_headers,
-                          params={"siteId": site_id})
+        resp = client.get(f"/web/api/v2.1/sites/{site_id}/policy", headers=auth_headers)
         assert resp.status_code == 200
 
     def test_filter_by_group_id_returns_data(
@@ -30,8 +29,7 @@ class TestGetPolicy:
     ) -> None:
         groups = client.get("/web/api/v2.1/groups", headers=auth_headers).json()["data"]
         group_id = groups[0]["id"]
-        resp = client.get("/web/api/v2.1/policies", headers=auth_headers,
-                          params={"groupId": group_id})
+        resp = client.get(f"/web/api/v2.1/groups/{group_id}/policy", headers=auth_headers)
         assert resp.status_code == 200
 
 
@@ -42,12 +40,12 @@ class TestUpdatePolicy:
         sites = client.get("/web/api/v2.1/sites", headers=auth_headers).json()["data"]["sites"]
         site_id = sites[0]["id"]
         payload = {"data": {"autoVaccination": True}}
-        resp = client.put("/web/api/v2.1/policies", headers=auth_headers,
+        resp = client.put("/web/api/v2.1/tenant/policy", headers=auth_headers,
                           json=payload, params={"siteId": site_id})
         assert resp.status_code == 200
 
     def test_put_requires_auth(self, client: TestClient) -> None:
-        assert client.put("/web/api/v2.1/policies", json={}).status_code == 401
+        assert client.put("/web/api/v2.1/tenant/policy", json={}).status_code == 401
 
 
 # ── Alert commands ────────────────────────────────────────────────────────────

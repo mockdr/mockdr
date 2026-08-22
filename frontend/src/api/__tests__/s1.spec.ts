@@ -72,22 +72,22 @@ describe('agentsApi', () => {
 
   it('get returns promise', () => {
     expect(isPromise(agentsApi.get('a1'))).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/agents/a1')
+    expect(mockGet).toHaveBeenCalledWith('/agents', { params: { ids: 'a1' } })
   })
 
   it('passphrase returns promise', () => {
     expect(isPromise(agentsApi.passphrase('a1'))).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/agents/a1/passphrase')
+    expect(mockGet).toHaveBeenCalledWith('/agents/passphrases', { params: { ids: 'a1' } })
   })
 
   it('processes returns promise', () => {
     expect(isPromise(agentsApi.processes('a1'))).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/agents/a1/processes', expect.any(Object))
+    expect(mockGet).toHaveBeenCalledWith('/agents/processes', { params: { ids: 'a1' } })
   })
 
   it('applications returns promise', () => {
     expect(isPromise(agentsApi.applications('a1'))).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/agents/a1/applications', expect.any(Object))
+    expect(mockGet).toHaveBeenCalledWith('/agents/applications', { params: { ids: 'a1' } })
   })
 
   it('action returns promise', () => {
@@ -113,7 +113,7 @@ describe('alertsApi', () => {
 
   it('get returns promise', () => {
     expect(isPromise(alertsApi.get('alert-1'))).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/cloud-detection/alerts/alert-1')
+    expect(mockGet).toHaveBeenCalledWith('/cloud-detection/alerts', { params: { ids: 'alert-1' } })
   })
 
   it('action returns promise', () => {
@@ -134,7 +134,7 @@ describe('threatsApi', () => {
 
   it('get returns promise', () => {
     expect(isPromise(threatsApi.get('t1'))).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/threats/t1')
+    expect(mockGet).toHaveBeenCalledWith('/threats', { params: { ids: 't1' } })
   })
 
   it('timeline returns promise', () => {
@@ -306,22 +306,22 @@ describe('webhooksApi', () => {
 
   it('list returns promise', () => {
     expect(isPromise(webhooksApi.list())).toBe(true)
-    expect(mockGet).toHaveBeenCalledWith('/webhooks')
+    expect(mockGet).toHaveBeenCalledWith('/_dev/webhooks')
   })
 
   it('create returns promise', () => {
     expect(isPromise(webhooksApi.create({ url: 'https://example.com', eventTypes: ['alert'] }))).toBe(true)
-    expect(mockPost).toHaveBeenCalledWith('/webhooks', expect.any(Object))
+    expect(mockPost).toHaveBeenCalledWith('/_dev/webhooks', expect.any(Object))
   })
 
   it('delete returns promise', () => {
     expect(isPromise(webhooksApi.delete('wh-1'))).toBe(true)
-    expect(mockDelete).toHaveBeenCalledWith('/webhooks/wh-1')
+    expect(mockDelete).toHaveBeenCalledWith('/_dev/webhooks/wh-1')
   })
 
   it('fire returns promise', () => {
     expect(isPromise(webhooksApi.fire('alert', { data: 'test' }))).toBe(true)
-    expect(mockPost).toHaveBeenCalledWith('/webhooks/fire', expect.any(Object))
+    expect(mockPost).toHaveBeenCalledWith('/_dev/webhooks/fire', expect.any(Object))
   })
 })
 

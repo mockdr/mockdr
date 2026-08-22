@@ -131,7 +131,7 @@ class TestExportPolicyKeys:
     def test_policy_site_scope_survives_roundtrip(
         self, client: TestClient, auth_headers: dict
     ) -> None:
-        """Site-scoped policies must be retrievable via GET /policies?siteId after import."""
+        """Site-scoped policies must be retrievable via GET /sites/{id}/policy after import."""
         snap = client.get("/web/api/v2.1/_dev/export", headers=auth_headers).json()
         site_policies = [p for p in snap["policies"] if p["scopeType"] == "site"]
         assert len(site_policies) > 0, "Seed must contain at least one site policy"
@@ -140,7 +140,7 @@ class TestExportPolicyKeys:
 
         site_id = site_policies[0]["scopeId"]
         resp = client.get(
-            f"/web/api/v2.1/policies?siteId={site_id}", headers=auth_headers
+            f"/web/api/v2.1/sites/{site_id}/policy", headers=auth_headers
         )
         assert resp.status_code == 200
         assert resp.json()["data"] is not None

@@ -12,6 +12,11 @@ const MITIGATION_MODES = ['protect', 'detect', 'none']
 type ScopeType = 'site' | 'group'
 const scopeType = ref<ScopeType>('site')
 
+function policyPath(): string | null {
+  if (scopeType.value === 'site') return selectedSite.value ? `/sites/${selectedSite.value.id}/policy` : null
+  return selectedGroup.value ? `/groups/${selectedGroup.value.id}/policy` : null
+}
+
 // ── Data ───────────────────────────────────────────────────────────────────────
 const sites        = ref<Site[]>([])
 const selectedSite = ref<Site | null>(null)
@@ -55,15 +60,13 @@ async function loadGroupsForSite(): Promise<void> {
 
 // ── Policy loading / saving ────────────────────────────────────────────────────
 async function loadPolicy(): Promise<void> {
-  const params = scopeType.value === 'site'
-    ? selectedSite.value  ? { siteId:  selectedSite.value.id  } : null
-    : selectedGroup.value ? { groupId: selectedGroup.value.id } : null
-
-  if (!params) { policy.value = null; draft.value = null; return }
+  // The 2.1 API scopes a policy by path: /sites/{id}/policy, /groups/{id}/policy.
+  const path = policyPath()
+  if (!path) { policy.value = null; draft.value = null; return }
 
   policyLoading.value = true
   try {
-    const res = await client.get('/policies', { params }) as { data: Policy }
+    const res = await client.get(path) as { data: Policy }
     policy.value = res.data
     draft.value  = null
   } finally {
@@ -73,14 +76,13 @@ async function loadPolicy(): Promise<void> {
 
 async function savePolicy(): Promise<void> {
   if (!draft.value) return
-  const params = scopeType.value === 'site'
-    ? selectedSite.value  ? { siteId:  selectedSite.value.id  } : null
-    : selectedGroup.value ? { groupId: selectedGroup.value.id } : null
-  if (!params) return
+  // The 2.1 API scopes a policy by path: /sites/{id}/policy, /groups/{id}/policy.
+  const path = policyPath()
+  if (!path) return
 
   saving.value = true
   try {
-    await client.put('/policies', draft.value, { params })
+    await client.put(path, draft.value)
     await loadPolicy()
   } finally {
     saving.value = false

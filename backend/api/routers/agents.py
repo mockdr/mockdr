@@ -56,6 +56,7 @@ def list_tags(
 
 @router.get("/agents/passphrases")
 def list_passphrases(
+    ids: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),
     sortBy: str = Query(None),
@@ -183,41 +184,6 @@ def agent_action(
 # ── Per-agent endpoints ────────────────────────────────────────────────────────
 
 
-@router.get("/agents/{agent_id}/passphrase")
-def get_passphrase(agent_id: str) -> dict:
-    """Return the disk-encryption passphrase for the given agent."""
-    result = agent_queries.get_agent_passphrase(agent_id)
-    if not result:
-        raise HTTPException(status_code=404)
-    return result
-
-
-@router.get("/agents/{agent_id}/processes")
-def get_processes(
-    agent_id: str,
-    cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
-) -> dict:
-    """Return a paginated list of running processes for the given agent."""
-    result = agent_queries.get_agent_processes(agent_id, cursor, limit)
-    if not result:
-        raise HTTPException(status_code=404)
-    return result
-
-
-@router.get("/agents/{agent_id}/applications")
-def get_agent_apps(
-    agent_id: str,
-    cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
-) -> dict:
-    """Return a paginated list of installed applications for the given agent."""
-    result = agent_queries.get_agent_applications(agent_id, cursor, limit)
-    if not result:
-        raise HTTPException(status_code=404)
-    return result
-
-
 @router.post("/agents/{agent_id}/actions/fetch-files")
 def fetch_files(
     agent_id: str,
@@ -272,12 +238,3 @@ def execute_remote_script(
         # An unscoped action is a 400 here as on every other agent route;
         # this one let it escape as a 500.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("/agents/{agent_id}")
-def get_agent(agent_id: str) -> dict:
-    """Return a single agent by ID."""
-    result = agent_queries.get_agent(agent_id)
-    if not result:
-        raise HTTPException(status_code=404)
-    return result

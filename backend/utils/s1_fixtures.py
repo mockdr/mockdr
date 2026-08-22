@@ -80,7 +80,25 @@ def restrict_item(item: dict, definition: str) -> dict:
     template = data[0] if isinstance(data, list) and data else data
     if not isinstance(template, dict):
         return item
-    return {k: v for k, v in deep_complete(template, item).items() if k in template}
+    return _restrict(template, deep_complete(template, item))
+
+
+def _restrict(template: dict, value: dict) -> dict:
+    """Drop keys the template does not declare, at every level of nesting."""
+    out: dict = {}
+    for key, val in value.items():
+        if key not in template:
+            continue
+        tmpl = template[key]
+        if isinstance(val, dict) and isinstance(tmpl, dict):
+            out[key] = _restrict(tmpl, val)
+        elif (
+            isinstance(val, list) and isinstance(tmpl, list) and tmpl and isinstance(tmpl[0], dict)
+        ):
+            out[key] = [_restrict(tmpl[0], i) if isinstance(i, dict) else i for i in val]
+        else:
+            out[key] = val
+    return out
 
 
 def restrict_s1(payload: dict, definition: str) -> dict:

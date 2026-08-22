@@ -5,6 +5,7 @@ POST   /web/api/v2.1/webhooks          — create a new subscription
 GET    /web/api/v2.1/webhooks/{id}     — get a single subscription
 DELETE /web/api/v2.1/webhooks/{id}     — delete a subscription
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import require_admin
@@ -12,16 +13,18 @@ from api.dto.requests import WebhookCreateBody, WebhookFireBody
 from application.webhooks import commands as webhook_commands
 from application.webhooks import queries as webhook_queries
 
+# Outbound webhooks are a mockdr feature, not a SentinelOne API: they live
+# under /_dev like the rest of the control surface.
 router = APIRouter(tags=["Webhooks"])
 
 
-@router.get("/webhooks")
+@router.get("/_dev/webhooks")
 def list_webhooks() -> dict:
     """Return all webhook subscriptions."""
     return webhook_queries.list_webhooks()
 
 
-@router.post("/webhooks")
+@router.post("/_dev/webhooks")
 def create_webhook(body: WebhookCreateBody, _: dict = Depends(require_admin)) -> dict:
     """Create a new webhook subscription."""
     try:
@@ -30,7 +33,7 @@ def create_webhook(body: WebhookCreateBody, _: dict = Depends(require_admin)) ->
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/webhooks/{webhook_id}")
+@router.get("/_dev/webhooks/{webhook_id}")
 def get_webhook(webhook_id: str) -> dict:
     """Return a single webhook subscription by ID."""
     result = webhook_queries.get_webhook(webhook_id)
@@ -39,16 +42,17 @@ def get_webhook(webhook_id: str) -> dict:
     return result
 
 
-@router.delete("/webhooks/{webhook_id}")
+@router.delete("/_dev/webhooks/{webhook_id}")
 def delete_webhook(webhook_id: str, _: dict = Depends(require_admin)) -> dict:
     """Delete a webhook subscription by ID."""
     return webhook_commands.delete_webhook(webhook_id)
 
 
-@router.post("/webhooks/fire")
+@router.post("/_dev/webhooks/fire")
 def fire_webhook_event(body: WebhookFireBody, _: dict = Depends(require_admin)) -> dict:
     """Fire a test event to all matching active webhook subscriptions."""
     from domain.webhook import ALL_EVENT_TYPES  # noqa: PLC0415
+
     if body.event_type not in ALL_EVENT_TYPES:
         raise HTTPException(status_code=400, detail=f"Invalid event_type: {body.event_type}")
     webhook_commands.fire_event(body.event_type, body.payload or {})

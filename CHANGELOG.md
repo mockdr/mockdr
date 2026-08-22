@@ -132,6 +132,21 @@ Defender for Endpoint 642 → 0 on 30; Cortex XDR 277 → 0 on 20.
   bare list, not a paged envelope; `insert_cef_alerts` takes CEF *lines* as
   the product does — a string used to crash it with `AttributeError`.
 
+**No more mock-only SentinelOne routes — the UI runs on the real API.** The
+mock served twelve routes the 2.1 API does not have (`/agents/{id}`,
+`/agents/{id}/passphrase|processes|applications`, `/threats/{id}`,
+`/threats/{id}/fetch-file`, `/cloud-detection/alerts/{id}`,
+`/hashes/{hash}/reputation`, `/policies`, `/webhooks`) and its own frontend
+depended on them, which proved nothing. They are gone: the UI reads single
+entities as the product does (`/agents?ids=`, `/threats?ids=`,
+`/cloud-detection/alerts?ids=`, `/agents/passphrases|processes|applications?ids=`),
+policies through their scopes (`/sites/{id}/policy`, `/groups/{id}/policy`,
+`/accounts/{id}/policy`, `/tenant/policy`), the fetched file through
+`/threats/{id}/download-from-cloud`; and the outbound webhooks — a mockdr
+feature, not a SentinelOne API — live under `/_dev/webhooks` with the rest
+of the control surface. Every mounted SentinelOne route now has a spec path
+(35 compared, 0 drift).
+
 ### Known limits
 
 Graph `/beta/` routes are served but cannot be judged by the v1.0 metadata.

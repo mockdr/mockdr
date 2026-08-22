@@ -45,7 +45,7 @@ class TestViewerReadOnly:
         assert resp.status_code == 403
 
     def test_viewer_cannot_create_webhook(self, client: TestClient) -> None:
-        resp = client.post("/web/api/v2.1/webhooks", headers=_VIEWER,
+        resp = client.post("/web/api/v2.1/_dev/webhooks", headers=_VIEWER,
                            json={"url": "http://localhost", "event_types": []})
         assert resp.status_code == 403
 
@@ -113,7 +113,7 @@ class TestSOCAnalystPermissions:
         assert resp.status_code == 403
 
     def test_soc_cannot_create_webhook(self, client: TestClient) -> None:
-        resp = client.post("/web/api/v2.1/webhooks", headers=_SOC,
+        resp = client.post("/web/api/v2.1/_dev/webhooks", headers=_SOC,
                            json={"url": "http://localhost", "event_types": []})
         assert resp.status_code == 403
 

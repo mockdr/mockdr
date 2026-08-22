@@ -52,16 +52,16 @@ class TestListThreats:
 class TestGetThreat:
     def test_returns_single_threat(self, client: TestClient, auth_headers: dict) -> None:
         tid = client.get("/web/api/v2.1/threats", headers=auth_headers).json()["data"][0]["id"]
-        resp = client.get(f"/web/api/v2.1/threats/{tid}", headers=auth_headers)
+        resp = client.get(f"/web/api/v2.1/threats?ids={tid}", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json()["data"]["id"] == tid
+        assert resp.json()["data"][0]["id"] == tid
 
     def test_unknown_id_returns_404(self, client: TestClient, auth_headers: dict) -> None:
         assert client.get("/web/api/v2.1/threats/nope", headers=auth_headers).status_code == 404
 
     def test_no_internal_fields_in_single(self, client: TestClient, auth_headers: dict) -> None:
         tid = client.get("/web/api/v2.1/threats", headers=auth_headers).json()["data"][0]["id"]
-        threat = client.get(f"/web/api/v2.1/threats/{tid}", headers=auth_headers).json()["data"]
+        threat = client.get(f"/web/api/v2.1/threats?ids={tid}", headers=auth_headers).json()["data"][0]
         for field in _INTERNAL:
             assert field not in threat
 

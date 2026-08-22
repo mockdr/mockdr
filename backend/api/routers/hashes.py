@@ -13,15 +13,6 @@ def _lookup_hash(hash_value: str) -> dict:
     return {"data": {"verdict": "undefined"}}
 
 
-@router.get("/hashes/{hash_value}/reputation")
-def get_hash_reputation(hash_value: str) -> dict:
-    """Return the reputation for a given file hash value.
-
-    This is the canonical path used by XSOAR and the real S1 API.
-    """
-    return _lookup_hash(hash_value)
-
-
 @router.get("/hashes/{hash_value}/verdict")
 def get_hash_verdict(hash_value: str) -> dict:
     """Return the verdict for a given file hash value (legacy alias)."""
