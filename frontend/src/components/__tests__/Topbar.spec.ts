@@ -155,4 +155,20 @@ describe('Topbar', () => {
       expect(mockGo).toHaveBeenCalledWith(0)
     }
   })
+
+  it('returns to /login when switching to a token the backend refuses', async () => {
+    const { usersApi } = await import('../../api/misc')
+    vi.mocked(usersApi.loginByToken).mockRejectedValueOnce(new Error('401'))
+    const w = shallowMount(Topbar)
+    await flushPromises()
+    const userBtn = w.findAll('button').find(b => b.text().includes('Admin') || b.text().includes('Viewer') || b.text().includes('SOC') || b.text().includes('User'))
+    if (userBtn) await userBtn.trigger('click')
+    await flushPromises()
+    const viewerBtn = w.findAll('button').filter(b => b.text().includes('Viewer')).at(-1)
+    expect(viewerBtn).toBeDefined()
+    await viewerBtn!.trigger('click')
+    await flushPromises()
+    expect(mockGo).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/login')
+  })
 })
