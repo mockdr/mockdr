@@ -57,6 +57,17 @@ Defender path without `/stats`; `data/vendor-specs/crowdstrike_swagger.json`
 was a CloudFront error page; `get_threat` bypassed the shared
 `public_threat` serializer.
 
+**Cortex XDR `get_alerts_multi_events` has a reference, a route and the
+bridge uses it.** Elastic's `panw_cortex_xdr` integration reads the same
+API and carries a transcription of its replies (v1: the alert with its
+`events` list; v2: flattened) as its test mock; reduced to key paths under
+the Elastic License (`scripts/cortex_alerts_spec.py`,
+`data/vendor-specs/xdr_alerts_multi_events_reduced.json`). The mock now
+serves `POST /public_api/v1/alerts/get_alerts_multi_events/` (same filters
+and paging as `get_alerts_by_filter_data`) completed to that shape, and
+the Splunk bridge's `pan:xdr:alert` events are that route's alert — the
+2.1.0 known limit is closed. Cortex XDR: 34 routes compared, 0 drift.
+
 **What the same review listed below its top three — done.** Seed data
 names nobody real: documentation IP ranges (RFC 5737) and reserved
 `.example`/`.test` domains replace Faker's routable addresses and
@@ -239,9 +250,8 @@ the sourcetypes are the add-ons': `ms:defender:atp:alerts`,
 `pan:xdr:incident`, `pan:xdr:alert`, `pan:xdr:endpoint` (were plural).
 Defender events are checked against add-on events recorded in
 `splunk/attack_data` (`data/vendor-specs/splunk_ta_samples_reduced.json`,
-`scripts/splunk_ta_samples_spec.py`). Known limit: the PAN add-on fetches
-alerts with `get_alerts_multi_events`, which has no public recording; the
-alert object recorded under `get_incident_extra_data` stands in.
+`scripts/splunk_ta_samples_spec.py`). (The PAN add-on's `get_alerts_multi_events` shape was unknown when this
+was written; the entry above closes it.)
 
 ### Removed
 

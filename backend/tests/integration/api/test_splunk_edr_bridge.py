@@ -201,16 +201,13 @@ class TestBridgeEventIsTheApiObject:
         ).json()["reply"]["endpoints"]
         assert _keys(_events("pan:xdr:endpoint")) == _keys(api)
 
-    def test_cortex_alerts_are_the_recorded_alert_object(self, client: TestClient) -> None:
-        incidents = client.post(
-            "/xdr/public_api/v1/incidents/get_incidents/", json={"request_data": {}}, headers=_xdr()
-        ).json()["reply"]["incidents"]
-        extra = client.post(
-            "/xdr/public_api/v1/incidents/get_incident_extra_data/",
-            json={"request_data": {"incident_id": incidents[0]["incident_id"]}},
+    def test_cortex_alerts_are_what_get_alerts_multi_events_lists(self, client: TestClient) -> None:
+        api = client.post(
+            "/xdr/public_api/v1/alerts/get_alerts_multi_events/",
+            json={"request_data": {}},
             headers=_xdr(),
-        ).json()["reply"]
-        assert _keys(_events("pan:xdr:alert")) == _keys(extra["alerts"]["data"])
+        ).json()["reply"]["alerts"]
+        assert _keys(_events("pan:xdr:alert")) == _keys(api)
 
 
 class TestBridgeEventTime:

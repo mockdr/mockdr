@@ -94,7 +94,11 @@ def main() -> int:
             by_route[route] = [template] if template else []
     # The transcribed reference adds routes no recording covers, and fields a
     # recording happened to omit: both become defaults too.
-    for extra in ("xdr_openapi_reduced.json", "xdr_connector_reduced.json"):
+    for extra in (
+        "xdr_openapi_reduced.json",
+        "xdr_connector_reduced.json",
+        "xdr_alerts_multi_events_reduced.json",
+    ):
         transcribed = ROOT / "data" / "vendor-specs" / extra
         if not transcribed.exists():
             continue

@@ -74,3 +74,49 @@ def get_original_alerts(alert_ids: list[str]) -> dict:
             alerts.append(asdict(alert))
 
     return build_xdr_list_reply(alerts, total_count=len(alerts), key="alerts")
+
+
+#: The alert fields ``get_alerts_multi_events`` carries at the top level
+#: (Elastic's transcription, ``xdr_alerts_multi_events_reduced.json``); the
+#: per-event fields live under ``events``.
+_MULTI_EVENT_TOP = frozenset({
+    "action", "action_pretty", "alert_id", "category", "description",
+    "detection_timestamp", "endpoint_id", "host_ip", "host_name",
+    "is_whitelisted", "mitre_tactic_id_and_name", "mitre_technique_id_and_name",
+    "name", "severity", "source", "starred",
+})
+
+
+def multi_events_alert(record: dict) -> dict:
+    """A stored alert in the ``get_alerts_multi_events`` (v1) form.
+
+    The alert keeps its own fields; what describes the triggering event —
+    who, when, what kind — moves into the single item of ``events``. The
+    route's fixture completes both to the transcribed shape.
+    """
+    alert = {k: v for k, v in record.items() if k in _MULTI_EVENT_TOP}
+    alert["events"] = [
+        {
+            "event_type": record.get("event_type"),
+            "event_timestamp": record.get("detection_timestamp"),
+            "user_name": record.get("user_name"),
+            "agent_host_boot_time": None,
+        }
+    ]
+    return alert
+
+
+def get_alerts_multi_events(request_data: dict) -> dict:
+    """List alerts with their events, as the Splunk and Elastic integrations read them.
+
+    Same filters and pagination as ``get_alerts_by_filter_data``.
+    """
+    all_alerts = [asdict(a) for a in xdr_alert_repo.list_all()]
+    all_alerts = apply_xdr_filters(
+        all_alerts, request_data.get("filters"), _ALERT_FILTER_FIELDS,
+    )
+    total = len(all_alerts)
+    search_from = request_data.get("search_from", 0)
+    search_to = request_data.get("search_to", search_from + 100)
+    page = [multi_events_alert(a) for a in all_alerts[search_from:search_to]]
+    return build_xdr_list_reply(page, total_count=total, key="alerts")

@@ -14,10 +14,10 @@ sourcetype:
   ``ms:defender:machines`` from ``/api/machines``.
 - Splunk Add-on for Palo Alto Networks (Splunkbase 7523): ``pan:xdr:incident``
   from ``incidents/get_incidents``, ``pan:xdr:alert`` and ``pan:xdr:endpoint``.
-  The add-on fetches alerts with ``get_alerts_multi_events``, which has no
-  public recording; the alert object recorded under
-  ``get_incident_extra_data`` (``reply.alerts.data[*]``) is the same alert
-  and stands in. Endpoints carry the ``endpoints/get_endpoint`` object.
+  The add-on fetches alerts with ``get_alerts_multi_events``; an event is
+  that route's alert object (Elastic's transcription of the reply,
+  ``data/vendor-specs/xdr_alerts_multi_events_reduced.json``). Endpoints
+  carry the ``endpoints/get_endpoint`` object.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from datetime import datetime
 from application.mde_alerts.queries import resource as mde_alert_resource
 from application.mde_machines.queries import resource as mde_machine_resource
 from application.threats.queries import public_threat
+from application.xdr_alerts.queries import multi_events_alert
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.s1_fixtures import complete_item
 from utils.strip import strip_fields
@@ -88,8 +89,10 @@ def xdr_incident(record: dict) -> dict:
 
 
 def xdr_alert(record: dict) -> dict:
-    """An alert as ``get_incident_extra_data`` records it (see module doc)."""
-    return complete_xdr_item(record, "incidents_get_incident_extra_data", "alerts.data")
+    """An alert as ``alerts/get_alerts_multi_events`` lists it."""
+    return complete_xdr_item(
+        multi_events_alert(record), "alerts_get_alerts_multi_events", "alerts"
+    )
 
 
 def xdr_endpoint(record: dict) -> dict:

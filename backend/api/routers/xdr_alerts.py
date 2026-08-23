@@ -27,6 +27,17 @@ def get_alerts(
     return alert_queries.get_alerts(request_data)
 
 
+@router.post("/alerts/get_alerts_multi_events/")
+@xdr_shape("alerts_get_alerts_multi_events")
+def get_alerts_multi_events(
+    body: dict = Body(default={}),
+    _: object = Depends(require_xdr_auth),
+) -> dict:
+    """Alerts with their events — what the Splunk add-on and Elastic integration poll."""
+    request_data = require_request_data(body)
+    return alert_queries.get_alerts_multi_events(request_data)
+
+
 @router.post("/alerts/get_original_alerts/")
 @xdr_shape("alerts_get_original_alerts")
 def get_original_alerts(

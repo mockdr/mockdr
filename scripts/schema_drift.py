@@ -354,6 +354,7 @@ PLATFORMS = {
             SPECS / "xdr_openapi_reduced.json",
             SPECS / "xdr_core_samples_reduced.json",
             SPECS / "xdr_connector_reduced.json",
+            SPECS / "xdr_alerts_multi_events_reduced.json",
         ],
         "auth": lambda c: {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"},
         "prepare": _xdr_prepare,

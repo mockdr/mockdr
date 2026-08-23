@@ -50,7 +50,7 @@ Sourcetypes and events follow the Splunk Add-on for Microsoft Security: each eve
 | `pan:xdr:alert` | `cortex_xdr` | `pan:xdr` | Alert created |
 | `pan:xdr:endpoint` | `cortex_xdr` | `pan:xdr` | Endpoint status change |
 
-Sourcetypes follow the Splunk Add-on for Palo Alto Networks; each event is the object `incidents/get_incidents` / `endpoints/get_endpoint` lists. The add-on reads alerts with `get_alerts_multi_events`, which has no public recording — the alert object recorded under `get_incident_extra_data` stands in.
+Sourcetypes follow the Splunk Add-on for Palo Alto Networks; each event is the object `incidents/get_incidents`, `alerts/get_alerts_multi_events` or `endpoints/get_endpoint` lists (reference for the alert: `data/vendor-specs/xdr_alerts_multi_events_reduced.json`).
 
 ## Notable Event Generation
 

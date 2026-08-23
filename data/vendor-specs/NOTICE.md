@@ -12,6 +12,7 @@ vendored here, where it came from, and under which terms:
 | `mde_docs_reduced.json` | `github.com/MicrosoftDocs/defender-docs`, `defender-endpoint/api/*.md` | CC BY 4.0 (docs) | Reduced to route → example key paths and entity property names (`scripts/mde_docs_spec.py`) |
 | `xsoar-samples/`, `xdr_samples_reduced.json`, `xdr_core_samples_reduced.json`, `mde_samples_reduced.json` | `github.com/demisto/content`, `Packs/*/Integrations/*/test_data/` | MIT | Recorded responses as published (see `xsoar-samples/README.md`), plus their key paths |
 | `xdr_openapi_reduced.json` | `github.com/tommynsong/cortex-mcp-custom-tools-openapi` (community transcription of the Cortex XDR reference) | **No licence** | **Key paths only** — nothing from the repository is vendored (`scripts/cortex_openapi_spec.py`) |
+| `xdr_alerts_multi_events_reduced.json` | `github.com/elastic/integrations`, `packages/panw_cortex_xdr/data_stream/alerts/_dev/deploy/docker/http-mock-config.yml` (Elastic's transcription of `get_alerts_multi_events` replies, placeholder values) | Elastic License 2.0 | **Key paths only** (`scripts/cortex_alerts_spec.py`) |
 | `xdr_connector_reduced.json` | MIT-licensed connector code, one cited source per route (see the file's `_provenance`) | MIT | Key paths only |
 | `splunk_ta_samples_reduced.json` | `github.com/splunk/attack_data`, `datasets/suspicious_behaviour/alerts/defender_atp_alerts.log` | Apache-2.0 | Reduced to sourcetype → key paths (`scripts/splunk_ta_samples_spec.py`) |
 

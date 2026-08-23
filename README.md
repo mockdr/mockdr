@@ -382,7 +382,7 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | --------------- | ------------------------------------------------------------ |
 | Auth            | Standard API key or advanced SHA-256 digest (`x-xdr-auth-id`) |
 | Incidents       | List, get, update, extra data                                |
-| Alerts          | List by filter, original alerts, insert (parsed, CEF)        |
+| Alerts          | List by filter, list with events (`get_alerts_multi_events`), original alerts, insert (parsed, CEF) |
 | Endpoints       | List, get, isolate, unisolate, scan, policy                  |
 | Scripts         | List, get, execute, execution status/results                 |
 | IOCs            | Insert (`tim_insert_jsons`)                                  |
