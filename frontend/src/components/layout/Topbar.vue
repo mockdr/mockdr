@@ -53,10 +53,15 @@ const currentRole = computed(() => {
   return t?.role ?? 'User'
 })
 
-function switchToken(token: string): void {
-  auth.login(token)
+async function switchToken(token: string): Promise<void> {
   showUserMenu.value = false
-  router.go(0)
+  try {
+    await auth.login(token)
+    router.go(0)
+  } catch {
+    // auth.login cleared the token; the client's interceptor reported why
+    router.push('/login')
+  }
 }
 
 function logout(): void {

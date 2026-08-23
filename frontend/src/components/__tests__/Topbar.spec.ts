@@ -12,6 +12,10 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+vi.mock('../../api/misc', () => ({
+  usersApi: { loginByToken: vi.fn().mockResolvedValue({ data: { id: 'u1', fullName: 'Viewer' } }) },
+}))
+
 vi.mock('../../api/alerts', () => ({
   alertsApi: {
     list: vi.fn().mockResolvedValue({
@@ -146,7 +150,8 @@ describe('Topbar', () => {
     const viewerBtn = w.findAll('button').find(b => b.text().includes('Viewer'))
     if (viewerBtn) {
       await viewerBtn.trigger('click')
-      // switchToken calls router.go(0) to reload
+      await flushPromises()
+      // switchToken awaits the login, then reloads
       expect(mockGo).toHaveBeenCalledWith(0)
     }
   })
