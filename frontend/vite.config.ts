@@ -21,9 +21,20 @@ export default defineConfig({
     proxy: {
       // Every API root the backend serves. A root missing here falls through
       // to the SPA and answers index.html with a 200 — HTML parsed as JSON.
+      // Console routes share some prefixes (/splunk/search is a page, /splunk/
+      // services/... is the API): a browser navigation asks for text/html and
+      // stays with the SPA; an XHR does not and is proxied.
       ...Object.fromEntries(
         ['/web/api', '/cs', '/mde', '/graph', '/sentinel', '/xdr', '/splunk', '/elastic', '/kibana'].map(
-          (root) => [root, { target: 'http://localhost:8001', changeOrigin: true }],
+          (root) => [
+            root,
+            {
+              target: 'http://localhost:8001',
+              changeOrigin: true,
+              bypass: (req: { headers: { accept?: string } }) =>
+                req.headers.accept?.includes('text/html') ? '/index.html' : undefined,
+            },
+          ],
         ),
       ),
       '/_dev': {
