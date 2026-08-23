@@ -129,6 +129,26 @@ source product), and an incident carries exactly its nine fields
 (`IncidentID`, `HostID`, `IncidentStartTime`/`EndTime`, `FineScore`, `State`,
 `IncidentType`, `LateralMovement`, `FalconHostLink`). A test keeps every
 bridge event within the recorded key set.
+The live bridge (events on mutation) now builds the same shapes as the
+seeder; it had kept the legacy `DetectionSummaryEvent`.
+
+**Splunk EDR bridge — the other vendors' events as their add-ons index
+them.** The SentinelOne App for Splunk, the Splunk Add-on for Microsoft
+Security and the Splunk Add-on for Palo Alto Networks each write the
+product's API object as one event. The bridge wrote the mock's internal
+records instead — a Defender alert lacked 30 documented keys (`id`,
+`computerDnsName`, `aadTenantId`, the evidence fields, …) and carried
+`alertId`; a Cortex incident lacked `xdr_url`, `notes`, `host_count`. Bridge
+events are now the serialization the list route answers, key for key
+(`application/splunk/edr_shapes.py`, shared by seeder and live bridge), and
+the sourcetypes are the add-ons': `ms:defender:atp:alerts`,
+`ms:defender:machines` (were `ms:defender:endpoint:alerts|machines`),
+`pan:xdr:incident`, `pan:xdr:alert`, `pan:xdr:endpoint` (were plural).
+Defender events are checked against add-on events recorded in
+`splunk/attack_data` (`data/vendor-specs/splunk_ta_samples_reduced.json`,
+`scripts/splunk_ta_samples_spec.py`). Known limit: the PAN add-on fetches
+alerts with `get_alerts_multi_events`, which has no public recording; the
+alert object recorded under `get_incident_extra_data` stands in.
 
 ### Removed
 

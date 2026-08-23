@@ -13,7 +13,7 @@ from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
 
 
-def _resource(record: dict) -> dict:
+def resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
     # The docs' machine has none of these; loggedOnUsers has its own route.
     for key in ("groupName", "loggedOnUsers", "agentVersion"):
@@ -42,7 +42,7 @@ def list_machines(
     Returns:
         OData list response with paginated machine records.
     """
-    records = [_resource(asdict(m)) for m in mde_machine_repo.list_all()]
+    records = [resource(asdict(m)) for m in mde_machine_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -73,7 +73,7 @@ def get_machine(machine_id: str) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    return _resource(asdict(machine))
+    return resource(asdict(machine))
 
 
 def get_machine_logon_users(machine_id: str) -> dict | None:

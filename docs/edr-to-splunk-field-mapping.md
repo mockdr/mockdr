@@ -20,20 +20,20 @@ The `_raw` field contains the JSON-serialized S1 API response object. Field extr
 |------------|-------|--------|---------|
 | `CrowdStrike:Event:Streams:JSON` | `crowdstrike` | `CrowdStrike:Event:Streams` | Detection/Incident events |
 
-Event structure uses `metadata.eventType` + `event.*` fields:
-- `DetectionSummaryEvent` — from detections
-- `IncidentSummaryEvent` — from incidents
+Event structure uses `metadata.eventType` + `event.*` fields, as recorded from the Falcon Event Streams API (`data/vendor-specs/cs_event_streams_reduced.json`):
+- `EppDetectionSummaryEvent` — from detections (`DetectionSummaryEvent` is the legacy type)
+- `IncidentSummaryEvent` — from incidents, exactly nine fields
 
-Key fields: `event.ComputerName`, `event.UserName`, `event.DetectName`, `event.Severity`, `event.SeverityName`, `event.FileName`, `event.CommandLine`, `event.SHA256String`
+Key fields: `event.Hostname`, `event.UserName`, `event.Name`, `event.Severity` (10–100), `event.SeverityName`, `event.FileName`, `event.CommandLine`, `event.SHA256String`
 
 ## Microsoft Defender → Splunk
 
 | Sourcetype | Index | Source | Trigger |
 |------------|-------|--------|---------|
-| `ms:defender:endpoint:alerts` | `msdefender` | `ms:defender:endpoint` | Alert created |
-| `ms:defender:endpoint:machines` | `msdefender` | `ms:defender:endpoint` | Machine status change |
+| `ms:defender:atp:alerts` | `msdefender` | `ms:defender` | Alert created |
+| `ms:defender:machines` | `msdefender` | `ms:defender` | Machine status change |
 
-Fields mirror the MDE API alert/machine JSON objects.
+Sourcetypes and events follow the Splunk Add-on for Microsoft Security: each event is the `/api/alerts` (evidence expanded) or `/api/machines` object as the API serves it. Reference: `data/vendor-specs/splunk_ta_samples_reduced.json` (recorded add-on events from `splunk/attack_data`).
 
 ## Elastic Security → Splunk
 
@@ -46,9 +46,11 @@ Fields mirror the MDE API alert/machine JSON objects.
 
 | Sourcetype | Index | Source | Trigger |
 |------------|-------|--------|---------|
-| `pan:xdr:incidents` | `cortex_xdr` | `pan:xdr` | Incident created |
-| `pan:xdr:alerts` | `cortex_xdr` | `pan:xdr` | Alert created |
-| `pan:xdr:endpoints` | `cortex_xdr` | `pan:xdr` | Endpoint status change |
+| `pan:xdr:incident` | `cortex_xdr` | `pan:xdr` | Incident created |
+| `pan:xdr:alert` | `cortex_xdr` | `pan:xdr` | Alert created |
+| `pan:xdr:endpoint` | `cortex_xdr` | `pan:xdr` | Endpoint status change |
+
+Sourcetypes follow the Splunk Add-on for Palo Alto Networks; each event is the object `incidents/get_incidents` / `endpoints/get_endpoint` lists. The add-on reads alerts with `get_alerts_multi_events`, which has no public recording — the alert object recorded under `get_incident_extra_data` stands in.
 
 ## Notable Event Generation
 

@@ -35,9 +35,9 @@ MockDR includes a full-fidelity Splunk Enterprise REST API mock that runs on the
 |-------|-------------|-------------|
 | `sentinelone` | SentinelOne events | `sentinelone:channel:threats`, `sentinelone:channel:agents`, `sentinelone:channel:activities` |
 | `crowdstrike` | CrowdStrike events | `CrowdStrike:Event:Streams:JSON` |
-| `msdefender` | Microsoft Defender events | `ms:defender:endpoint:alerts`, `ms:defender:endpoint:machines` |
+| `msdefender` | Microsoft Defender events | `ms:defender:atp:alerts`, `ms:defender:machines` |
 | `elastic_security` | Elastic Security events | `elastic:security:alerts`, `elastic:security:endpoints` |
-| `cortex_xdr` | Cortex XDR events | `pan:xdr:incidents`, `pan:xdr:alerts`, `pan:xdr:endpoints` |
+| `cortex_xdr` | Cortex XDR events | `pan:xdr:incident`, `pan:xdr:alert`, `pan:xdr:endpoint` |
 | `notable` | ES notable events | `stash` |
 | `main` | Default index | (any) |
 

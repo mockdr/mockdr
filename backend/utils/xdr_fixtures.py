@@ -89,3 +89,16 @@ def _shaped(result: Any, slug: str) -> Any:
             "reply": [deep_complete(defaults[0], i) if isinstance(i, dict) else i for i in reply],
         }
     return result
+
+
+def complete_xdr_item(record: dict, slug: str, path: str) -> dict:
+    """``record`` completed against the list template at ``path`` of route ``slug``.
+
+    ``path`` walks the recorded reply to a list (``"incidents"``,
+    ``"alerts.data"``); the list's first item is the template.
+    """
+    node: Any = _fixture(slug)
+    for key in path.split("."):
+        node = node.get(key, {}) if isinstance(node, dict) else {}
+    template = node[0] if isinstance(node, list) and node and isinstance(node[0], dict) else {}
+    return deep_complete(template, record) if template else record

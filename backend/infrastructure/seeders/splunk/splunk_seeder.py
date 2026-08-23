@@ -73,14 +73,14 @@ _SAVED_SEARCHES = [
     ),
     SavedSearch(
         name="Microsoft Defender Alerts",
-        search='search index=msdefender sourcetype="ms:defender:endpoint:alerts"',
+        search='search index=msdefender sourcetype="ms:defender:atp:alerts"',
         description="Microsoft Defender for Endpoint alerts",
         dispatch_earliest_time="-24h@h",
         dispatch_latest_time="now",
     ),
     SavedSearch(
         name="Cortex XDR Incidents",
-        search='search index=cortex_xdr sourcetype="pan:xdr:incidents"',
+        search='search index=cortex_xdr sourcetype="pan:xdr:incident"',
         description="Cortex XDR incidents",
         dispatch_earliest_time="-7d@d",
         dispatch_latest_time="now",

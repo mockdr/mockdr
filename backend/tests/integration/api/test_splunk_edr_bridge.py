@@ -8,7 +8,10 @@ and an ``IncidentSummaryEvent`` carries exactly its nine fields.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import secrets
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -77,3 +80,134 @@ class TestCrowdStrikeEventStreamsShape:
         kinds = {e["metadata"]["eventType"] for e in _crowdstrike_events()}
         assert "EppDetectionSummaryEvent" in kinds
         assert "DetectionSummaryEvent" not in kinds  # the legacy type
+
+
+# ── The other add-ons index the API object itself ─────────────────────────
+
+_TA_REFERENCE = _REFERENCE.with_name("splunk_ta_samples_reduced.json")
+
+
+def _events(sourcetype: str) -> list[dict]:
+    out = []
+    for e in splunk_event_repo.list_all():
+        record = e if isinstance(e, dict) else e.__dict__
+        if record.get("sourcetype") == sourcetype:
+            out.append(json.loads(record["raw"]))
+    return out
+
+
+_S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+
+
+def _mde(client: TestClient) -> dict[str, str]:
+    resp = client.post(
+        "/mde/oauth2/v2.0/token",
+        data={
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials",
+        },
+    )
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
+def _xdr() -> dict[str, str]:
+    nonce = secrets.token_hex(32)
+    timestamp = str(int(time.time() * 1000))
+    digest = hashlib.sha256(("xdr-admin-secret" + nonce + timestamp).encode()).hexdigest()
+    return {
+        "x-xdr-auth-id": "1",
+        "x-xdr-nonce": nonce,
+        "x-xdr-timestamp": timestamp,
+        "Authorization": digest,
+    }
+
+
+def _keys(items: list[dict]) -> set[str]:
+    out: set[str] = set()
+    for item in items:
+        out |= _observed(item)
+    return out
+
+
+class TestAddOnSourcetypes:
+    """The sourcetypes are the ones the vendors' add-ons document."""
+
+    def test_sourcetypes_are_the_add_ons(self, client: TestClient) -> None:
+        present = {
+            (e if isinstance(e, dict) else e.__dict__)["sourcetype"]
+            for e in splunk_event_repo.list_all()
+        }
+        expected = {
+            "sentinelone:channel:threats",
+            "sentinelone:channel:agents",
+            "sentinelone:channel:activities",
+            "ms:defender:atp:alerts",
+            "ms:defender:machines",
+            "pan:xdr:incident",
+            "pan:xdr:alert",
+            "pan:xdr:endpoint",
+        }
+        assert expected <= present
+        invented = {s for s in present if s.startswith(("ms:defender:endpoint", "pan:xdr:")) and s.endswith("s")}
+        assert not invented, invented
+
+
+class TestBridgeEventIsTheApiObject:
+    """An add-on writes what the list route answers, key for key."""
+
+    def test_sentinelone_threats(self, client: TestClient) -> None:
+        api = client.get("/web/api/v2.1/threats?limit=50", headers=_S1).json()["data"]
+        assert _keys(_events("sentinelone:channel:threats")) == _keys(api)
+
+    def test_sentinelone_agents(self, client: TestClient) -> None:
+        api = client.get("/web/api/v2.1/agents?limit=100", headers=_S1).json()["data"]
+        assert _keys(_events("sentinelone:channel:agents")) == _keys(api)
+
+    def test_sentinelone_activities(self, client: TestClient) -> None:
+        api = client.get("/web/api/v2.1/activities?limit=100", headers=_S1).json()["data"]
+        assert _keys(_events("sentinelone:channel:activities")) <= _keys(api)
+
+    def test_defender_alerts(self, client: TestClient) -> None:
+        api = client.get("/mde/api/alerts", headers=_mde(client)).json()["value"]
+        assert _keys(_events("ms:defender:atp:alerts")) == _keys(api)
+
+    def test_defender_alerts_match_the_recorded_add_on_events(self, client: TestClient) -> None:
+        recorded = set(json.loads(_TA_REFERENCE.read_text())["ms:defender:atp:alerts"]["paths"])
+        # recorded in 2021; these three have since left the documented alert
+        retired = {
+            "domains",
+            "loggedOnUsers",
+            "loggedOnUsers[*].accountName",
+            "loggedOnUsers[*].domainName",
+            "evidence[*].registryValueName",
+        }
+        missing = (recorded - retired) - _keys(_events("ms:defender:atp:alerts"))
+        assert not missing, sorted(missing)
+
+    def test_defender_machines(self, client: TestClient) -> None:
+        api = client.get("/mde/api/machines", headers=_mde(client)).json()["value"]
+        assert _keys(_events("ms:defender:machines")) == _keys(api)
+
+    def test_cortex_incidents(self, client: TestClient) -> None:
+        api = client.post(
+            "/xdr/public_api/v1/incidents/get_incidents/", json={"request_data": {}}, headers=_xdr()
+        ).json()["reply"]["incidents"]
+        assert _keys(_events("pan:xdr:incident")) == _keys(api)
+
+    def test_cortex_endpoints(self, client: TestClient) -> None:
+        api = client.post(
+            "/xdr/public_api/v1/endpoints/get_endpoint/", json={"request_data": {}}, headers=_xdr()
+        ).json()["reply"]["endpoints"]
+        assert _keys(_events("pan:xdr:endpoint")) == _keys(api)
+
+    def test_cortex_alerts_are_the_recorded_alert_object(self, client: TestClient) -> None:
+        incidents = client.post(
+            "/xdr/public_api/v1/incidents/get_incidents/", json={"request_data": {}}, headers=_xdr()
+        ).json()["reply"]["incidents"]
+        extra = client.post(
+            "/xdr/public_api/v1/incidents/get_incident_extra_data/",
+            json={"request_data": {"incident_id": incidents[0]["incident_id"]}},
+            headers=_xdr(),
+        ).json()["reply"]
+        assert _keys(_events("pan:xdr:alert")) == _keys(extra["alerts"]["data"])

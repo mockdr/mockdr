@@ -11,7 +11,7 @@ from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
 
 
-def _resource(record: dict) -> dict:
+def resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
     return complete_mde(to_mde_resource(record, "alertId"), "alert")
 
@@ -37,7 +37,7 @@ def list_alerts(
     Returns:
         OData list response with paginated alert records.
     """
-    records = [_resource(asdict(a)) for a in mde_alert_repo.list_all()]
+    records = [resource(asdict(a)) for a in mde_alert_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -68,4 +68,4 @@ def get_alert(alert_id: str) -> dict | None:
     alert = mde_alert_repo.get(alert_id)
     if not alert:
         return None
-    return _resource(asdict(alert))
+    return resource(asdict(alert))

@@ -32,8 +32,13 @@ FILTER_SPECS = [
 ]
 
 
-def _public(record: dict) -> dict:
-    """ThreatSchema declares no ``agentDetectionInfo.agentComputerName``; it stays internal."""
+def public_threat(record: dict) -> dict:
+    """The record as the API lists it.
+
+    Internal fields and the undeclared ``agentDetectionInfo.agentComputerName``
+    are removed.
+    """
+    record = strip_fields(record, _INTERNAL)
     info = record.get("agentDetectionInfo")
     if isinstance(info, dict) and "agentComputerName" in info:
         record = {
@@ -51,7 +56,7 @@ def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, THREAT_CURSOR)
     return build_list_response(
-        [_public(strip_fields(r, _INTERNAL)) for r in page],
+        [public_threat(r) for r in page],
         next_cursor,
         total,
         definition="threats.schemas_ThreatSchema_many_200",
@@ -75,7 +80,8 @@ def get_threat_timeline(threat_id: str) -> dict | None:
         threat.timeline,
         None,
         len(threat.timeline),
-        definition="threat_analysis.schemas_TimelineViewSchema_many_200", strict=True,
+        definition="threat_analysis.schemas_TimelineViewSchema_many_200",
+        strict=True,
     )
 
 

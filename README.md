@@ -565,9 +565,9 @@ All five EDR vendor data sets are **replayed into Splunk indexes** with realisti
 | ------------------ | ------------------------------------ | --------------------------------------------------------------------------------------------- |
 | `sentinelone`      | S1 threats, agents, activities       | `sentinelone:channel:threats`, `sentinelone:channel:agents`, `sentinelone:channel:activities` |
 | `crowdstrike`      | CS detections, incidents             | `CrowdStrike:Event:Streams:JSON`                                                              |
-| `msdefender`       | MDE alerts, machines                 | `ms:defender:endpoint:alerts`, `ms:defender:endpoint:machines`                                |
+| `msdefender`       | MDE alerts, machines                 | `ms:defender:atp:alerts`, `ms:defender:machines`                                |
 | `elastic_security` | Elastic alerts, endpoints            | `elastic:security:alerts`, `elastic:security:endpoints`                                       |
-| `cortex_xdr`       | XDR incidents, alerts, endpoints     | `pan:xdr:incidents`, `pan:xdr:alerts`, `pan:xdr:endpoints`                                    |
+| `cortex_xdr`       | XDR incidents, alerts, endpoints     | `pan:xdr:incident`, `pan:xdr:alert`, `pan:xdr:endpoint`                                    |
 | `notable`          | ES notable events from all 5 vendors | `stash`                                                                                       |
 | `main`             | Default index                        | —                                                                                             |
 | `_internal`        | Splunk internal logs                 | —                                                                                             |

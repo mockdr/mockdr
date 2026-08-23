@@ -12,6 +12,7 @@ import json
 import time
 import uuid
 
+from application.splunk import edr_shapes as shapes
 from domain.event_bus import (
     DomainEvent,
     event_bus,
@@ -40,11 +41,11 @@ def register_bridge() -> None:
 
 def _handle_s1_threat(event: DomainEvent) -> None:
     """Bridge S1 threat to Splunk event + notable."""
-    payload = event.payload
+    payload = shapes.s1_threat(event.payload)
     _create_splunk_event(
-        index="sentinelone",
-        sourcetype="sentinelone:channel:threats",
-        source="sentinelone:api",
+        index=shapes.S1_INDEX,
+        sourcetype=shapes.S1_THREATS,
+        source=shapes.S1_SOURCE,
         payload=payload,
         event_time=event.timestamp,
     )
@@ -84,10 +85,10 @@ def _handle_s1_threat(event: DomainEvent) -> None:
 def _handle_s1_agent_updated(event: DomainEvent) -> None:
     """Bridge S1 agent status change to Splunk event."""
     _create_splunk_event(
-        index="sentinelone",
-        sourcetype="sentinelone:channel:agents",
-        source="sentinelone:api",
-        payload=event.payload,
+        index=shapes.S1_INDEX,
+        sourcetype=shapes.S1_AGENTS,
+        source=shapes.S1_SOURCE,
+        payload=shapes.s1_agent(event.payload),
         event_time=event.timestamp,
     )
 
@@ -95,10 +96,10 @@ def _handle_s1_agent_updated(event: DomainEvent) -> None:
 def _handle_s1_activity(event: DomainEvent) -> None:
     """Bridge S1 activity log entry to Splunk event."""
     _create_splunk_event(
-        index="sentinelone",
-        sourcetype="sentinelone:channel:activities",
-        source="sentinelone:api",
-        payload=event.payload,
+        index=shapes.S1_INDEX,
+        sourcetype=shapes.S1_ACTIVITIES,
+        source=shapes.S1_SOURCE,
+        payload=shapes.s1_activity(event.payload),
         event_time=event.timestamp,
     )
 
@@ -111,107 +112,59 @@ def _map_s1_severity(confidence: str) -> str:
 # ── CrowdStrike ────────────────────────────────────────────────────────────
 
 def _handle_cs_detection(event: DomainEvent) -> None:
-    """Bridge CS detection to Splunk event + notable."""
-    payload = event.payload
-    cs_event = {
-        "metadata": {
-            "customerIDString": "3061c7ff3b634e22b38274d4b586558e",
-            "offset": int(time.time() * 1000),
-            "eventType": "DetectionSummaryEvent",
-            "eventCreationTime": int(event.timestamp * 1000),
-            "version": "1.0",
-        },
-        "event": {
-            "ProcessStartTime": int(event.timestamp),
-            "ComputerName": payload.get("hostname", ""),
-            "UserName": payload.get("user_name", ""),
-            "DetectName": payload.get("detect_name", ""),
-            "DetectDescription": payload.get("detect_description", ""),
-            "Severity": payload.get("max_severity", 3),
-            "SeverityName": payload.get("max_severity_displayname", "Medium"),
-            "FileName": payload.get("filename", ""),
-            "FilePath": payload.get("filepath", ""),
-            "CommandLine": payload.get("cmdline", ""),
-            "SHA256String": payload.get("sha256", ""),
-            "MachineDomain": payload.get("machine_domain", ""),
-            "FalconHostLink": f"https://falcon.crowdstrike.com/activity/detections/detail/"
-                              f"{payload.get('detection_id', '')}",
-        },
-    }
+    """Bridge a CS detection as the ``EppDetectionSummaryEvent`` Event Streams emits."""
+    cs_event = shapes.cs_detection(event.payload, event.timestamp)
     _create_splunk_event(
-        index="crowdstrike",
-        sourcetype="CrowdStrike:Event:Streams:JSON",
-        source="CrowdStrike:Event:Streams",
+        index=shapes.CS_INDEX,
+        sourcetype=shapes.CS_SOURCETYPE,
+        source=shapes.CS_SOURCE,
         payload=cs_event,
         event_time=event.timestamp,
     )
-    severity = int(payload.get("max_severity", 0))
-    if severity >= 3:
+    fields = cs_event["event"]
+    severity = fields["Severity"]
+    if isinstance(severity, int) and severity >= 50:
         _create_notable(
             rule_name="CrowdStrike - Detection Alert",
             rule_title="CrowdStrike Detection Alert",
             security_domain="endpoint",
-            severity=_map_cs_severity(severity),
+            severity=shapes.cs_notable_severity(severity),
             src="",
-            dest=str(payload.get("hostname", "")),
-            user=str(payload.get("user_name", "")),
+            dest=str(fields["Hostname"]),
+            user=str(fields["UserName"]),
             description=(
-                f"CS Detection: {payload.get('detect_name', 'Unknown')} "
-                f"on {payload.get('hostname', 'Unknown')}"
+                f"CS Detection: {fields['Name'] or 'Unknown'} on {fields['Hostname'] or 'Unknown'}"
             ),
             drilldown_search=(
-                f'search index=crowdstrike '
-                f'sourcetype="CrowdStrike:Event:Streams:JSON" '
-                f'event.ComputerName="{payload.get("hostname", "")}"'
+                f'search index=crowdstrike sourcetype="{shapes.CS_SOURCETYPE}" '
+                f'event.CompositeId="{fields["CompositeId"]}"'
             ),
             edr_vendor="crowdstrike",
-            edr_entity_id=str(payload.get("detection_id", event.entity_id)),
+            edr_entity_id=str(fields["CompositeId"] or event.entity_id),
             event_time=event.timestamp,
         )
 
 
 def _handle_cs_incident(event: DomainEvent) -> None:
-    """Bridge CS incident to Splunk event."""
-    payload = event.payload
-    cs_event = {
-        "metadata": {
-            "customerIDString": "3061c7ff3b634e22b38274d4b586558e",
-            "offset": int(time.time() * 1000),
-            "eventType": "IncidentSummaryEvent",
-            "eventCreationTime": int(event.timestamp * 1000),
-            "version": "1.0",
-        },
-        "event": payload,
-    }
+    """Bridge a CS incident as the ``IncidentSummaryEvent`` Event Streams emits."""
     _create_splunk_event(
-        index="crowdstrike",
-        sourcetype="CrowdStrike:Event:Streams:JSON",
-        source="CrowdStrike:Event:Streams",
-        payload=cs_event,
+        index=shapes.CS_INDEX,
+        sourcetype=shapes.CS_SOURCETYPE,
+        source=shapes.CS_SOURCE,
+        payload=shapes.cs_incident(event.payload, event.timestamp),
         event_time=event.timestamp,
     )
-
-
-def _map_cs_severity(severity: int) -> str:
-    """Map CS numeric severity to Splunk string."""
-    if severity >= 5:
-        return "critical"
-    if severity >= 4:
-        return "high"
-    if severity >= 3:
-        return "medium"
-    return "low"
 
 
 # ── Microsoft Defender ─────────────────────────────────────────────────────
 
 def _handle_mde_alert(event: DomainEvent) -> None:
     """Bridge MDE alert to Splunk event + notable."""
-    payload = event.payload
+    payload = shapes.mde_alert(event.payload)
     _create_splunk_event(
-        index="msdefender",
-        sourcetype="ms:defender:endpoint:alerts",
-        source="ms:defender:endpoint",
+        index=shapes.MDE_INDEX,
+        sourcetype=shapes.MDE_ALERTS,
+        source=shapes.MDE_SOURCE,
         payload=payload,
         event_time=event.timestamp,
     )
@@ -227,10 +180,10 @@ def _handle_mde_alert(event: DomainEvent) -> None:
             user=str(payload.get("relatedUser", {}).get("userName", "")),
             description=f"MDE Alert: {payload.get('title', 'Unknown')} "
                         f"on {payload.get('computerDnsName', 'Unknown')}",
-            drilldown_search=f'search index=msdefender sourcetype="ms:defender:endpoint:alerts" '
-                             f'alertId="{payload.get("alertId", "")}"',
+            drilldown_search=f'search index=msdefender sourcetype="{shapes.MDE_ALERTS}" '
+                             f'id="{payload.get("id", "")}"',
             edr_vendor="msdefender",
-            edr_entity_id=str(payload.get("alertId", event.entity_id)),
+            edr_entity_id=str(payload.get("id", event.entity_id)),
             event_time=event.timestamp,
         )
 
@@ -238,10 +191,10 @@ def _handle_mde_alert(event: DomainEvent) -> None:
 def _handle_mde_machine(event: DomainEvent) -> None:
     """Bridge MDE machine update to Splunk event."""
     _create_splunk_event(
-        index="msdefender",
-        sourcetype="ms:defender:endpoint:machines",
-        source="ms:defender:endpoint",
-        payload=event.payload,
+        index=shapes.MDE_INDEX,
+        sourcetype=shapes.MDE_MACHINES,
+        source=shapes.MDE_SOURCE,
+        payload=shapes.mde_machine(event.payload),
         event_time=event.timestamp,
     )
 
@@ -279,11 +232,11 @@ def _handle_es_alert(event: DomainEvent) -> None:
 
 def _handle_xdr_incident(event: DomainEvent) -> None:
     """Bridge XDR incident to Splunk event + notable."""
-    payload = event.payload
+    payload = shapes.xdr_incident(event.payload)
     _create_splunk_event(
-        index="cortex_xdr",
-        sourcetype="pan:xdr:incidents",
-        source="pan:xdr",
+        index=shapes.XDR_INDEX,
+        sourcetype=shapes.XDR_INCIDENTS,
+        source=shapes.XDR_SOURCE,
         payload=payload,
         event_time=event.timestamp,
     )
@@ -296,7 +249,7 @@ def _handle_xdr_incident(event: DomainEvent) -> None:
         dest=", ".join(payload.get("hosts", [])[:3]),
         user=", ".join(payload.get("users", [])[:3]),
         description=f"XDR Incident: {payload.get('description', 'Unknown')}",
-        drilldown_search=f'search index=cortex_xdr sourcetype="pan:xdr:incidents" '
+        drilldown_search=f'search index=cortex_xdr sourcetype="{shapes.XDR_INCIDENTS}" '
                          f'incident_id="{payload.get("incident_id", "")}"',
         edr_vendor="cortex_xdr",
         edr_entity_id=str(payload.get("incident_id", event.entity_id)),
@@ -307,10 +260,10 @@ def _handle_xdr_incident(event: DomainEvent) -> None:
 def _handle_xdr_alert(event: DomainEvent) -> None:
     """Bridge XDR alert to Splunk event."""
     _create_splunk_event(
-        index="cortex_xdr",
-        sourcetype="pan:xdr:alerts",
-        source="pan:xdr",
-        payload=event.payload,
+        index=shapes.XDR_INDEX,
+        sourcetype=shapes.XDR_ALERTS,
+        source=shapes.XDR_SOURCE,
+        payload=shapes.xdr_alert(event.payload),
         event_time=event.timestamp,
     )
 
