@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-23
+
 Response *shapes* are now measured, not typed from memory. Every mounted
 route of every platform is compared against a public reference, each used
 for what it can prove: Splunk, Elasticsearch and Kibana against the real
@@ -210,7 +212,11 @@ adds carry type-correct defaults or the vendor's documented example, not
 real data. The current CrowdStrike cases model
 (`OperationsGetCasesByIDsResponseVM`) is not modelled; only the documented
 query and tag routes are served. Defender's two OAuth token endpoints are
-Azure AD, not the product API, and are not compared.
+Azure AD, not the product API, and are not compared. The Splunk bridge's
+Cortex XDR alert events use the alert object recorded under
+`get_incident_extra_data`; the add-on's own `get_alerts_multi_events`
+reply has no public recording. Removed routes and renamed bridge
+sourcetypes make this a minor, not a patch, release.
 
 ## [2.0.5] - 2026-08-22
 
