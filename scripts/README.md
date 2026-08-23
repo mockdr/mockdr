@@ -32,6 +32,7 @@ into `data/vendor-specs/` (sources and licences: `data/vendor-specs/NOTICE.md`).
 | `xsoar_samples_spec.py` | `data/vendor-specs/xsoar-samples/` | `xdr_samples_reduced.json`, `xdr_core_samples_reduced.json`, `mde_samples_reduced.json` |
 | `cortex_alerts_spec.py` | `elastic/integrations` (downloaded) | `xdr_alerts_multi_events_reduced.json` (key paths only) |
 | `cortex_openapi_spec.py` | community Cortex XDR OpenAPI clone | `xdr_openapi_reduced.json` (key paths only) |
+| `s1_channel_fields_spec.py` | `splunk/SA-SentinelOneDevices` (downloaded) | `s1_splunk_channel_fields.json` (field names only) |
 | `splunk_ta_samples_spec.py` | `splunk/attack_data` (downloaded) | `splunk_ta_samples_reduced.json` |
 
 Fixture generators turn a reference into the default shape a route is

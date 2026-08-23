@@ -246,3 +246,15 @@ class TestBridgeEventTime:
                 auth=auth,
             )
             assert r.json()["results"], f"index={index} is empty in the last 90 days"
+
+
+class TestSentinelOneChannelAgents:
+    """Splunk's SA-SentinelOneDevices reads these fields from the agents channel."""
+
+    def test_agent_events_carry_every_field_the_add_on_reads(self, client: TestClient) -> None:
+        reference = json.loads(_REFERENCE.with_name("s1_splunk_channel_fields.json").read_text())
+        expected = set(reference["sentinelone:channel:agents"]["fields"])
+        events = _events("sentinelone:channel:agents")
+        assert events
+        missing = expected - _keys(events)
+        assert not missing, sorted(missing)

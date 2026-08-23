@@ -68,6 +68,14 @@ and paging as `get_alerts_by_filter_data`) completed to that shape, and
 the Splunk bridge's `pan:xdr:alert` events are that route's alert — the
 2.1.0 known limit is closed. Cortex XDR: 34 routes compared, 0 drift.
 
+**The SentinelOne agents channel has a reference too.** Splunk's own
+`SA-SentinelOneDevices` reads `sentinelone:channel:agents` for Enterprise
+Security assets and names the 39 fields it expects — the `GET /agents`
+object's (`uuid`, `agentVersion`, `lastActiveDate`,
+`networkInterfaces{}.physical`, …). Reduced to field names
+(`scripts/s1_channel_fields_spec.py`); a test keeps every bridge event
+carrying all of them.
+
 **What the same review listed below its top three — done.** Seed data
 names nobody real: documentation IP ranges (RFC 5737) and reserved
 `.example`/`.test` domains replace Faker's routable addresses and

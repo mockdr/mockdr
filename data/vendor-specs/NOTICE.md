@@ -14,6 +14,7 @@ vendored here, where it came from, and under which terms:
 | `xdr_openapi_reduced.json` | `github.com/tommynsong/cortex-mcp-custom-tools-openapi` (community transcription of the Cortex XDR reference) | **No licence** | **Key paths only** — nothing from the repository is vendored (`scripts/cortex_openapi_spec.py`) |
 | `xdr_alerts_multi_events_reduced.json` | `github.com/elastic/integrations`, `packages/panw_cortex_xdr/data_stream/alerts/_dev/deploy/docker/http-mock-config.yml` (Elastic's transcription of `get_alerts_multi_events` replies, placeholder values) | Elastic License 2.0 | **Key paths only** (`scripts/cortex_alerts_spec.py`) |
 | `xdr_connector_reduced.json` | MIT-licensed connector code, one cited source per route (see the file's `_provenance`) | MIT | Key paths only |
+| `s1_splunk_channel_fields.json` | `github.com/splunk/SA-SentinelOneDevices`, `default/savedsearches.conf` (the fields Splunk's SA reads from `sentinelone:channel:agents`) | **No licence** | **Field names only** (`scripts/s1_channel_fields_spec.py`) |
 | `splunk_ta_samples_reduced.json` | `github.com/splunk/attack_data`, `datasets/suspicious_behaviour/alerts/defender_atp_alerts.log` | Apache-2.0 | Reduced to sourcetype → key paths (`scripts/splunk_ta_samples_spec.py`) |
 
 Not vendored: the SentinelOne 2.1 swagger (`scripts/fetch_swagger.sh` downloads
