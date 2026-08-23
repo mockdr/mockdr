@@ -9,7 +9,6 @@ over it, so a client reading any declared field finds it.
 
 from __future__ import annotations
 
-import copy
 import json
 from functools import cache
 from pathlib import Path
@@ -27,11 +26,22 @@ def _fixture(definition: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def _blank(default: object) -> object:
+    """A fresh value for a key the record lacks: [] for a list, a rebuilt object, or the scalar."""
+    if isinstance(default, list):
+        return []
+    if isinstance(default, dict):
+        return {k: _blank(v) for k, v in default.items()}
+    return default
+
+
 def deep_complete(defaults: dict, actual: dict) -> dict:
     """``actual`` with every key of ``defaults`` it lacks filled in, recursively."""
     # A list in the defaults is a template for items the record provides;
     # a record without the list gets [] — never a one-item list of blanks.
-    out = {k: ([] if isinstance(v, list) else copy.deepcopy(v)) for k, v in defaults.items()}
+    # Scalars are immutable and shared; a nested object is rebuilt from its
+    # template so the caller can mutate the result freely.
+    out = {k: _blank(v) for k, v in defaults.items()}
     for key, value in actual.items():
         template = defaults.get(key)
         if isinstance(value, dict) and isinstance(template, dict):

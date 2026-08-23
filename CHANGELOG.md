@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-23
+
 The TEAMS.md review of 2.1.0 (86 perspectives over the code) converged on
 three things; this is them.
 
@@ -67,6 +69,12 @@ serves `POST /public_api/v1/alerts/get_alerts_multi_events/` (same filters
 and paging as `get_alerts_by_filter_data`) completed to that shape, and
 the Splunk bridge's `pan:xdr:alert` events are that route's alert — the
 2.1.0 known limit is closed. Cortex XDR: 34 routes compared, 0 drift.
+
+**Completion without deepcopy.** Every completed list item deep-copied its
+whole default template — 200 000 `copy.deepcopy` calls for twenty threat
+pages. Scalars are immutable and are shared now; only nested objects are
+rebuilt. `GET /threats` 66 → 14 ms, and the load test's read scenario (50
+workers) p99 1030 → 349 ms, back under its 500 ms gate.
 
 **The SentinelOne agents channel has a reference too.** Splunk's own
 `SA-SentinelOneDevices` reads `sentinelone:channel:agents` for Enterprise

@@ -9,7 +9,6 @@ against the fixture's template item.
 
 from __future__ import annotations
 
-import copy
 import functools
 import inspect
 import json
@@ -31,12 +30,23 @@ def _fixture(slug: str) -> dict:
     return data.get("reply", {}) if isinstance(data, dict) else {}  # dict or list template
 
 
+def _blank(default: Any) -> Any:
+    """A fresh value for a key the record lacks: [] for a list, a rebuilt object, or the scalar."""
+    if isinstance(default, list):
+        return []
+    if isinstance(default, dict):
+        return {k: _blank(v) for k, v in default.items()}
+    return default
+
+
 def deep_complete(defaults: Any, actual: Any) -> Any:
     """``actual`` completed against ``defaults``; a list against its template item."""
     if isinstance(defaults, dict) and isinstance(actual, dict):
         # A list in the defaults is a template for items the reply provides;
         # a reply without the list gets [] — never a one-item list of blanks.
-        out = {k: ([] if isinstance(v, list) else copy.deepcopy(v)) for k, v in defaults.items()}
+        # Scalars are immutable and shared; a nested object is rebuilt from its
+        # template so the caller can mutate the result freely.
+        out = {k: _blank(v) for k, v in defaults.items()}
         for key, value in actual.items():
             out[key] = deep_complete(defaults.get(key), value) if key in defaults else value
         return out

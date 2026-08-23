@@ -13,7 +13,6 @@ are deep-merged over it. A client that reads any declared property finds it.
 """
 from __future__ import annotations
 
-import copy
 import json
 from functools import cache
 from pathlib import Path
@@ -96,7 +95,8 @@ def _fixture_for(resource_type: str, kind: str) -> dict:
 
 def fixture_properties(resource_type: str, kind: str = "") -> dict:
     """A fresh copy of the spec-declared property bag for a resource, or ``{}``."""
-    return copy.deepcopy(_fixture_for(resource_type, kind).get("properties") or {})
+    fresh = _blank(_fixture_for(resource_type, kind).get("properties") or {})
+    return fresh if isinstance(fresh, dict) else {}
 
 
 def deep_complete(defaults: dict, actual: dict) -> dict:
@@ -106,13 +106,23 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
     and gains the declared siblings; lists and scalars from ``actual`` win
     untouched. ``defaults`` is never mutated.
     """
-    out = copy.deepcopy(defaults)
+    out = {k: _blank(v) for k, v in defaults.items()}
     for key, value in actual.items():
-        if isinstance(value, dict) and isinstance(out.get(key), dict):
-            out[key] = deep_complete(out[key], value)
+        template = defaults.get(key)
+        if isinstance(value, dict) and isinstance(template, dict):
+            out[key] = deep_complete(template, value)
         else:
             out[key] = value
     return out
+
+
+def _blank(default: object) -> object:
+    """A fresh value for a missing key: lists and objects rebuilt, scalars shared."""
+    if isinstance(default, list):
+        return [_blank(i) for i in default]
+    if isinstance(default, dict):
+        return {k: _blank(v) for k, v in default.items()}
+    return default
 
 
 def build_arm_resource(
