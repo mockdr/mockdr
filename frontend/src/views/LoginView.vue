@@ -29,8 +29,8 @@ async function login(): Promise<void> {
           <Shield class="w-6 h-6 text-white" />
         </div>
         <div>
-          <div class="text-s1-text text-xl font-bold">Mock S1</div>
-          <div class="text-s1-muted text-sm">Hypervisor Platform</div>
+          <div class="text-s1-text text-xl font-bold">mockdr</div>
+          <div class="text-s1-muted text-sm">Multi-EDR Mock Server</div>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ async function login(): Promise<void> {
       </div>
 
       <p class="text-center text-xs text-s1-muted mt-4">
-        Mock S1 · Development Environment
+        mockdr · Development Environment
       </p>
     </div>
   </div>

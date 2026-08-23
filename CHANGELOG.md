@@ -6,6 +6,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+The TEAMS.md review of 2.1.0 (86 perspectives over the code) converged on
+three things; this is them.
+
+### Fixed
+
+**Bridge events are dated by their records, not by November 2023.** The
+Splunk bridge seeder and the Sentinel incident seeder stamped every event
+with a fixed epoch (`1700000000`, 2023-11-14) while the records they carried
+said 2026 — `search index=msdefender earliest=-24h` found nothing, nor did
+the seeded ES saved searches (`-24h@h`), nor a Sentinel client filtering
+`createdTimeUtc`. An add-on indexes an object at its own time, so a bridge
+event's `_time` is now the record's timestamp (`utils/event_time.py`:
+`createdAt`, `alertCreationTime`, `creation_time`, `detection_timestamp`,
+…). The seeder's second pass over SentinelOne activities is gone — the
+repository already bridges every activity live, so twenty were indexed
+twice. Tests: every bridge event's `_time` equals its record's timestamp;
+`earliest=-90d` finds events in every vendor index.
+
+**Traffic cannot grow the process until it dies.** Collections written per
+request are capped with oldest-first eviction (`CAPS` in `store.py`):
+Splunk events 100 000, notables 20 000, search jobs and sessions 5 000,
+Elasticsearch documents 100 000, agent uploads 200, and every OAuth token
+collection 5 000 — a client that fetched a token per request used to keep
+all of them forever. Request bodies have a ceiling (`MOCKDR_MAX_BODY_BYTES`,
+16 MiB; `413` before any byte is read). `/_dev/fault-injection` delays are
+bounded at 60 s. `/metrics` labels requests by the matched route's template
+(`/web/api/v2.1/groups/{group_id}`), so probing unknown paths no longer
+adds a label set per path.
+
+**A webhook receiver's answer counts.** Delivery recorded any HTTP response
+as `success`, a 500 included. A 5xx is now retried like a connection error
+and a 4xx is recorded as a rejection without retry; only 2xx/3xx is a
+delivery. The `/_dev/webhook-sink` (public by design, it receives what the
+mock sends) no longer stores `Authorization`, `Cookie` or API-key headers
+for admins to read back.
+
+**The map matches the territory.** ADR-001 said reads take no lock (they
+do); SECURITY.md promised `X-XSS-Protection: 1; mode=block` (the code sends
+`0`, as OWASP recommends); ADR-009 was titled ADR-010; the FastAPI title and
+the console's login and breadcrumb still said "SentinelOne Mock API" /
+"Mock S1" / "Hypervisor" and the sidebar "7 platforms"; the coverage gate
+was 55 % in CI and 85 % in the docs (it is 85 % everywhere now — measured
+89 %); `CORS_ORIGINS` defaulted to a port nothing listens on; the README
+did not know `ES_*_PASSWORD`, `SPLUNK_SESSION_TTL_SECONDS` or the new
+`MOCKDR_MAX_BODY_BYTES`; the Vite dev proxy forwarded only `/web/api` and
+`/_dev`, so the 61 vendor views got `index.html` as JSON on port 3000; the
+Bruno and Postman collections still carried two removed Cortex routes and a
+Defender path without `/stats`; `data/vendor-specs/crowdstrike_swagger.json`
+was a CloudFront error page; `get_threat` bypassed the shared
+`public_threat` serializer.
+
+### Added
+
+- `data/vendor-specs/NOTICE.md`: every vendored reference with its source,
+  licence and what of it is kept (key paths only for the Elastic-licensed
+  Event Streams recordings and the unlicensed Cortex transcription).
+- CI job `hostile-inputs`: `scripts/fuzz_parsers.py` and
+  `scripts/hostile_probe.py` run on every push — they found their bugs
+  after a release until 2.0.5 made them a release step.
+
 ## [2.1.0] - 2026-08-23
 
 Response *shapes* are now measured, not typed from memory. Every mounted

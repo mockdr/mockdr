@@ -39,6 +39,22 @@ def _normalize_path(path: str) -> str:
     return path
 
 
+def _route_label(scope: Scope) -> str | None:
+    """The matched route's full path template (routing has run by response time).
+
+    FastAPI keeps an included router's prefix beside the route, in its
+    "effective route context" (``scope["fastapi"]``), so the route's own
+    ``path`` is read through that when present.
+    """
+    context = (scope.get("fastapi") or {}).get("effective_route_context")
+    template = getattr(context, "path", None)
+    if not isinstance(template, str) or not template:
+        template = getattr(scope.get("route"), "path", None)
+    if not isinstance(template, str):
+        return None
+    return _normalize_path(template)
+
+
 def _record(method: str, path: str, status_code: int, duration: float) -> None:
     """Thread-safe recording of a single request observation."""
     with _lock:
@@ -109,9 +125,13 @@ class MetricsMiddleware:
         status_code = 500  # default; overwritten by response start
 
         async def send_wrapper(message: MutableMapping[str, Any]) -> None:
-            nonlocal status_code
+            nonlocal status_code, normalized
             if message["type"] == "http.response.start":
                 status_code = message["status"]
+                # The matched route's template is the series label, so ids
+                # collapse and a probe of a path no route owns cannot add a
+                # label set that lives forever.
+                normalized = _route_label(scope) or "{unmatched}"
             await send(message)
 
         start = time.perf_counter()

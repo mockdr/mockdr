@@ -127,13 +127,13 @@ class TestPathNormalization:
     def test_uuid_normalized(self, client: TestClient, auth_headers: dict) -> None:
         reset_metrics()
         client.get(
-            f"{BASE}/agents/550e8400-e29b-41d4-a716-446655440000",
+            f"{BASE}/threats/550e8400-e29b-41d4-a716-446655440000/timeline",
             headers=auth_headers,
         )
         resp = client.get("/metrics")
         body = resp.text
         assert "550e8400-e29b-41d4-a716-446655440000" not in body
-        assert "/agents/{id}" in body
+        assert "/threats/{threat_id}/timeline" in body  # the route's own template
 
     def test_numeric_id_normalized(
         self, client: TestClient, auth_headers: dict,
@@ -143,7 +143,7 @@ class TestPathNormalization:
         resp = client.get("/metrics")
         body = resp.text
         assert "123456" not in body
-        assert "/groups/{id}" in body
+        assert "/groups/{group_id}" in body
 
 
 class TestMetricsSkipPaths:

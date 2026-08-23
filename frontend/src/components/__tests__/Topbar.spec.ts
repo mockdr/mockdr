@@ -46,10 +46,10 @@ describe('Topbar', () => {
     expect(w.text()).toContain('Endpoints')
   })
 
-  it('renders Hypervisor breadcrumb prefix', async () => {
+  it('renders the mockdr breadcrumb prefix', async () => {
     const w = shallowMount(Topbar)
     await flushPromises()
-    expect(w.text()).toContain('Hypervisor')
+    expect(w.text()).toContain('mockdr')
   })
 
   it('shows unread count badge when alerts exist', async () => {

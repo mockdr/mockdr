@@ -62,7 +62,7 @@ addopts = [
     "--dist", "loadfile",
     "--cov=.",
     "--cov-report=term-missing",
-    "--cov-fail-under=55",
+    "--cov-fail-under=85",
     "-v",
 ]
 filterwarnings = [

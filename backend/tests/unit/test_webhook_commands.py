@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import json
 import threading
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,6 +11,13 @@ from application.webhooks.commands import create_webhook, delete_webhook, fire_e
 from domain.webhook import ALL_EVENT_TYPES
 from infrastructure.seed import generate_all
 from repository.webhook_repo import webhook_repo
+
+
+def _ok(status: int = 200) -> MagicMock:
+    """A response the sender treats as delivered."""
+    response = MagicMock()
+    response.status_code = status
+    return response
 
 
 def _join_webhook_threads(timeout: float = 5.0) -> None:
@@ -131,6 +138,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_delivers_to_matching_subscription(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1", "threatInfo": {}})
         _join_webhook_threads()
@@ -138,18 +146,21 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_skips_non_matching_event_type(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.created"])  # not "threat.updated"
         fire_event("threat.updated", {"id": "t1"})
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post")
     def test_skips_inactive_subscription(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], active=False)
         fire_event("threat.updated", {"id": "t1"})
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post")
     def test_sends_bearer_auth_when_secret_set(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], secret="my-secret")
         fire_event("threat.updated", {"id": "t1"})
         call_kwargs = mock_post.call_args
@@ -158,6 +169,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_sends_hmac_signature_when_secret_set(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], secret="my-secret")
         fire_event("threat.updated", {"id": "t1"})
         call_kwargs = mock_post.call_args
@@ -170,6 +182,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_no_auth_headers_when_no_secret(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], secret="")
         fire_event("threat.updated", {"id": "t1"})
         call_kwargs = mock_post.call_args
@@ -179,6 +192,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_event_type_header_set(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1"})
         call_kwargs = mock_post.call_args
@@ -187,6 +201,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_strips_threat_internal_fields(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         """Threat payload must not include notes or timeline."""
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1", "notes": [{"text": "x"}], "timeline": []})
@@ -198,6 +213,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_strips_agent_internal_fields(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         """Agent payload must not include passphrase or localIp."""
         self._create_sub(["agent.offline"])
         fire_event("agent.offline", {"id": "a1", "passphrase": "secret", "localIp": "10.0.0.1"})
@@ -209,6 +225,7 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post", side_effect=Exception("connection refused"))
     def test_delivery_failure_does_not_raise(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         """Transport errors should be swallowed (best-effort delivery)."""
         self._create_sub(["threat.updated"])
         # Should not raise
@@ -216,12 +233,14 @@ class TestFireEvent:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_no_subscriptions_is_noop(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         """If no subscriptions exist, fire_event returns without calling httpx."""
         fire_event("threat.updated", {"id": "t1"})
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post")
     def test_multiple_subscriptions_all_called(self, mock_post) -> None:
+        mock_post.return_value = _ok()
         self._create_sub(["threat.updated"])
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1"})

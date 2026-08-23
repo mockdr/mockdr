@@ -35,9 +35,9 @@ describe('LoginView', () => {
     expect(w.exists()).toBe(true)
   })
 
-  it('renders the Mock S1 brand', () => {
+  it('renders the mockdr brand', () => {
     const w = shallowMount(LoginView)
-    expect(w.text()).toContain('Mock S1')
+    expect(w.text()).toContain('mockdr')
   })
 
   it('renders the Sign in heading', () => {

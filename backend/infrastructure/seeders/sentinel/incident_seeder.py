@@ -16,10 +16,11 @@ from repository.sentinel.entity_repo import sentinel_entity_repo
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
 from repository.store import store
+from utils.event_time import record_time
 from utils.id_gen import new_hex
 
-# Fixed reference epoch for deterministic seed data
-_SEED_EPOCH = 1700000000.0
+# An incident is dated at its source record's time (utils.event_time); a
+# fixed epoch here once put every seeded incident in 2023.
 
 _SENTINEL_SEVERITIES = ["High", "Medium", "Medium", "Low", "Informational"]
 _SENTINEL_STATUSES = ["New", "New", "New", "Active", "Active", "Closed"]
@@ -51,7 +52,7 @@ def _seed_from_mde() -> None:
     alerts = store.get_all("mde_alerts")
     for alert_data in alerts:
         d = asdict(alert_data) if hasattr(alert_data, "__dataclass_fields__") else alert_data.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "alertCreationTime", "firstEventTime")
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
         # Create entity
@@ -103,7 +104,7 @@ def _seed_from_s1() -> None:
     threats = store.get_all("threats")
     for threat in threats:
         d = asdict(threat) if hasattr(threat, "__dataclass_fields__") else threat.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "threatInfo.createdAt")
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
         entity_ids = []
@@ -150,7 +151,7 @@ def _seed_from_cs() -> None:
     detections = store.get_all("cs_detections")
     for det in detections:
         d = asdict(det) if hasattr(det, "__dataclass_fields__") else det.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "created_timestamp", "first_behavior")
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
         entity_ids = []
@@ -196,7 +197,7 @@ def _seed_from_es() -> None:
     alerts = store.get_all("es_alerts")
     for al in alerts:
         d = asdict(al) if hasattr(al, "__dataclass_fields__") else al.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "@timestamp", "kibana.alert.start")
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
         alert_id = f"es-{d.get('id', new_hex())}"
@@ -236,7 +237,7 @@ def _seed_from_xdr() -> None:
     incidents = store.get_all("xdr_incidents")
     for inc_data in incidents:
         d = asdict(inc_data) if hasattr(inc_data, "__dataclass_fields__") else inc_data.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "creation_time")
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(event_time))
 
         alert_id = f"xdr-{d.get('incident_id', new_hex())}"

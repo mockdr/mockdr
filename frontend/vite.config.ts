@@ -19,10 +19,13 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/web/api': {
-        target: 'http://localhost:8001',
-        changeOrigin: true,
-      },
+      // Every API root the backend serves. A root missing here falls through
+      // to the SPA and answers index.html with a 200 — HTML parsed as JSON.
+      ...Object.fromEntries(
+        ['/web/api', '/cs', '/mde', '/graph', '/sentinel', '/xdr', '/splunk', '/elastic', '/kibana'].map(
+          (root) => [root, { target: 'http://localhost:8001', changeOrigin: true }],
+        ),
+      ),
       '/_dev': {
         target: 'http://localhost:8001',
         changeOrigin: true,

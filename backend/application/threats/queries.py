@@ -68,7 +68,7 @@ def get_threat(threat_id: str) -> dict | None:
     threat = threat_repo.get(threat_id)
     if not threat:
         return None
-    return build_single_response(strip_fields(asdict(threat), _INTERNAL))
+    return build_single_response(public_threat(asdict(threat)))
 
 
 def get_threat_timeline(threat_id: str) -> dict | None:

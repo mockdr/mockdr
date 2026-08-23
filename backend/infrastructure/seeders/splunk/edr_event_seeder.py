@@ -7,7 +7,6 @@ with the correct sourcetypes and field schemas.
 from __future__ import annotations
 
 import json
-import random
 from dataclasses import asdict
 
 from application.splunk import edr_shapes as shapes
@@ -17,10 +16,12 @@ from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from repository.store import store
+from utils.event_time import record_time
 from utils.id_gen import new_hex, new_uuid
 
-# Fixed reference epoch for deterministic seed data (2023-11-14T22:13:20Z)
-_SEED_EPOCH = 1700000000.0
+# An event is indexed at its record's own time (utils.event_time). A fixed
+# epoch here once dated every bridge event in 2023, so ``earliest=-24h``
+# found nothing a client would expect.
 
 
 def seed_edr_events() -> None:
@@ -39,8 +40,8 @@ def _seed_s1_events() -> None:
     threats = store.get_all("threats")
     for threat in threats:
         d = asdict(threat) if hasattr(threat, "__dataclass_fields__") else threat.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
         d = shapes.s1_threat(d)
+        event_time = record_time(d, "threatInfo.createdAt", "threatInfo.identifiedAt")
         _save_event(shapes.S1_INDEX, shapes.S1_THREATS, shapes.S1_SOURCE, d, event_time)
 
         # Generate notable for malicious/suspicious threats
@@ -69,34 +70,20 @@ def _seed_s1_events() -> None:
     agents = store.get_all("agents")
     for agent in agents:
         d = asdict(agent) if hasattr(agent, "__dataclass_fields__") else agent.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 3)
+        event_time = record_time(d, "lastActiveDate", "updatedAt", window=86400 * 3)
         _save_event(
             shapes.S1_INDEX, shapes.S1_AGENTS, shapes.S1_SOURCE, shapes.s1_agent(d), event_time
         )
 
-    # Activities → sentinelone:channel:activities (sample)
-    activities = store.get_all("activities")
-    for activity in activities[:20]:
-        d = (
-            asdict(activity)
-            if hasattr(activity, "__dataclass_fields__")
-            else activity.__dict__.copy()
-        )
-        event_time = _SEED_EPOCH - random.uniform(0, 86400)
-        _save_event(
-            shapes.S1_INDEX,
-            shapes.S1_ACTIVITIES,
-            shapes.S1_SOURCE,
-            shapes.s1_activity(d),
-            event_time,
-        )
+    # Activities are bridged live by activity_repo (ADR-009) as the seeders
+    # create them; a second pass here wrote twenty of them twice.
 
 
 def _seed_cs_events() -> None:
     """Generate Splunk events from CrowdStrike entities, as Event Streams emits them."""
     for det in store.get_all("cs_detections"):
         d = asdict(det) if hasattr(det, "__dataclass_fields__") else det.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "created_timestamp", "first_behavior")
         cs_event = shapes.cs_detection(d, event_time)
         _save_event(shapes.CS_INDEX, shapes.CS_SOURCETYPE, shapes.CS_SOURCE, cs_event, event_time)
 
@@ -118,7 +105,7 @@ def _seed_cs_events() -> None:
 
     for inc in store.get_all("cs_incidents"):
         d = asdict(inc) if hasattr(inc, "__dataclass_fields__") else inc.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "start", "created")
         _save_event(
             shapes.CS_INDEX,
             shapes.CS_SOURCETYPE,
@@ -134,7 +121,7 @@ def _seed_mde_events() -> None:
     for alert in alerts:
         d = asdict(alert) if hasattr(alert, "__dataclass_fields__") else alert.__dict__.copy()
         d = shapes.mde_alert(d)
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "alertCreationTime", "firstEventTime")
         _save_event(shapes.MDE_INDEX, shapes.MDE_ALERTS, shapes.MDE_SOURCE, d, event_time)
 
         severity = str(d.get("severity", "")).lower()
@@ -156,7 +143,7 @@ def _seed_mde_events() -> None:
     machines = store.get_all("mde_machines")
     for machine in machines:
         d = asdict(machine) if hasattr(machine, "__dataclass_fields__") else machine.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 3)
+        event_time = record_time(d, "lastSeen", window=86400 * 3)
         _save_event(
             shapes.MDE_INDEX,
             shapes.MDE_MACHINES,
@@ -171,7 +158,7 @@ def _seed_es_events() -> None:
     alerts = store.get_all("es_alerts")
     for alert in alerts:
         d = asdict(alert) if hasattr(alert, "__dataclass_fields__") else alert.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "@timestamp", "kibana.alert.start", "timestamp")
         _save_event(
             "elastic_security", "elastic:security:alerts", "elastic:security", d, event_time
         )
@@ -194,7 +181,7 @@ def _seed_es_events() -> None:
     endpoints = store.get_all("es_endpoints")
     for ep in endpoints:
         d = asdict(ep) if hasattr(ep, "__dataclass_fields__") else ep.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 3)
+        event_time = record_time(d, "last_checkin", "@timestamp", window=86400 * 3)
         _save_event(
             "elastic_security", "elastic:security:endpoints", "elastic:security", d, event_time
         )
@@ -205,8 +192,8 @@ def _seed_xdr_events() -> None:
     incidents = store.get_all("xdr_incidents")
     for inc in incidents:
         d = asdict(inc) if hasattr(inc, "__dataclass_fields__") else inc.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
         d = shapes.xdr_incident(d)
+        event_time = record_time(d, "creation_time")
         _save_event(shapes.XDR_INDEX, shapes.XDR_INCIDENTS, shapes.XDR_SOURCE, d, event_time)
 
         _save_notable(
@@ -226,7 +213,7 @@ def _seed_xdr_events() -> None:
     alerts = store.get_all("xdr_alerts")
     for alert in alerts:
         d = asdict(alert) if hasattr(alert, "__dataclass_fields__") else alert.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 7)
+        event_time = record_time(d, "detection_timestamp", "local_insert_ts")
         _save_event(
             shapes.XDR_INDEX, shapes.XDR_ALERTS, shapes.XDR_SOURCE, shapes.xdr_alert(d), event_time
         )
@@ -234,7 +221,7 @@ def _seed_xdr_events() -> None:
     endpoints = store.get_all("xdr_endpoints")
     for ep in endpoints:
         d = asdict(ep) if hasattr(ep, "__dataclass_fields__") else ep.__dict__.copy()
-        event_time = _SEED_EPOCH - random.uniform(0, 86400 * 3)
+        event_time = record_time(d, "last_seen", window=86400 * 3)
         _save_event(
             shapes.XDR_INDEX,
             shapes.XDR_ENDPOINTS,

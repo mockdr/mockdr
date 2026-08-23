@@ -1,4 +1,4 @@
-# ADR-010: Splunk SIEM Event Bridge Architecture
+# ADR-009: Splunk SIEM Event Bridge Architecture
 
 ## Status
 

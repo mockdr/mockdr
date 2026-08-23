@@ -16,6 +16,13 @@ from infrastructure.seed import generate_all
 from repository.webhook_repo import webhook_repo
 
 
+def _ok(status: int = 200) -> MagicMock:
+    """A response the sender treats as delivered."""
+    response = MagicMock()
+    response.status_code = status
+    return response
+
+
 @pytest.fixture(autouse=True)
 def _seed_and_clear_log() -> None:
     generate_all()
@@ -97,6 +104,7 @@ class TestDeliverWithRetries:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post")
     def test_success_on_first_attempt(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok()
         sub_id = _make_sub(["threat.updated"])
         sub = webhook_repo.get(sub_id)
         _deliver_with_retries("threat.updated", sub, '{"id":"t1"}', {})
@@ -110,7 +118,8 @@ class TestDeliverWithRetries:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post")
     def test_success_on_second_attempt(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
-        mock_post.side_effect = [Exception("fail"), MagicMock()]
+        mock_post.return_value = _ok()
+        mock_post.side_effect = [Exception("fail"), _ok()]
         sub_id = _make_sub(["threat.updated"])
         sub = webhook_repo.get(sub_id)
         _deliver_with_retries("threat.updated", sub, '{"id":"t1"}', {})
@@ -126,7 +135,8 @@ class TestDeliverWithRetries:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post")
     def test_success_on_third_attempt(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
-        mock_post.side_effect = [Exception("fail1"), Exception("fail2"), MagicMock()]
+        mock_post.return_value = _ok()
+        mock_post.side_effect = [Exception("fail1"), Exception("fail2"), _ok()]
         sub_id = _make_sub(["threat.updated"])
         sub = webhook_repo.get(sub_id)
         _deliver_with_retries("threat.updated", sub, '{"id":"t1"}', {})
@@ -138,6 +148,7 @@ class TestDeliverWithRetries:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post", side_effect=Exception("always fail"))
     def test_all_retries_exhausted(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok()
         sub_id = _make_sub(["threat.updated"])
         sub = webhook_repo.get(sub_id)
         _deliver_with_retries("threat.updated", sub, '{"id":"t1"}', {})
@@ -151,6 +162,7 @@ class TestDeliverWithRetries:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post", side_effect=Exception("fail"))
     def test_exponential_backoff_delays(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok()
         sub_id = _make_sub(["threat.updated"])
         sub = webhook_repo.get(sub_id)
         _deliver_with_retries("threat.updated", sub, '{"id":"t1"}', {})
@@ -168,6 +180,7 @@ class TestFireEventRetry:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_records_delivery(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok()
         """fire_event should record delivery entries via background thread."""
         _make_sub(["threat.updated"])
         # Patch threading.Thread to run target synchronously for test determinism
@@ -188,6 +201,7 @@ class TestFireEventRetry:
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post", side_effect=Exception("fail"))
     def test_fire_event_retries_on_failure(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok()
         _make_sub(["threat.updated"])
         with patch("application.webhooks.commands.threading.Thread") as mock_thread:
             def run_inline(**kwargs: object) -> MagicMock:
@@ -204,6 +218,7 @@ class TestFireEventRetry:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_spawns_daemon_thread(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _ok()
         _make_sub(["threat.updated"])
         with patch("application.webhooks.commands.threading.Thread") as mock_thread:
             mock_thread.return_value = MagicMock()
@@ -214,6 +229,32 @@ class TestFireEventRetry:
 
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_no_subs_no_thread(self, mock_post: MagicMock) -> None:
+        mock_post.return_value = _ok()
         with patch("application.webhooks.commands.threading.Thread") as mock_thread:
             fire_event("threat.updated", {"id": "t1"})
             mock_thread.assert_not_called()
+
+
+class TestReceiverStatus:
+    """A receiver's answer decides: 5xx is retried, 4xx is final, 2xx delivered."""
+
+    @patch("application.webhooks.commands.time.sleep")
+    @patch("application.webhooks.commands.httpx.post")
+    def test_5xx_is_retried_then_fails(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok(503)
+        sub = webhook_repo.get(_make_sub(["threat.updated"]))
+        _deliver_with_retries("threat.updated", sub, "{}", {})
+        assert mock_post.call_count == 3
+        assert all(e["status"] == "failure" for e in list_entries())
+
+    @patch("application.webhooks.commands.time.sleep")
+    @patch("application.webhooks.commands.httpx.post")
+    def test_4xx_is_rejected_without_retry(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
+        mock_post.return_value = _ok(404)
+        sub = webhook_repo.get(_make_sub(["threat.updated"]))
+        _deliver_with_retries("threat.updated", sub, "{}", {})
+        assert mock_post.call_count == 1
+        mock_sleep.assert_not_called()
+        entries = list_entries()
+        assert len(entries) == 1 and entries[0]["status"] == "failure"
+        assert "404" in entries[0]["error"]

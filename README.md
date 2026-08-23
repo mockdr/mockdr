@@ -648,10 +648,13 @@ All data is **in-memory** by default -- mutations survive until server restart o
 | `SEED_COUNT_THREATS` | 30                                            | S1 threats to seed                                                                                 |
 | `SEED_COUNT_ALERTS`  | 20                                            | S1 alerts to seed                                                                                  |
 | `MOCKDR_PERSIST`     | (none)                                        | File path for JSON state persistence across restarts                                               |
-| `CORS_ORIGINS`       | `http://localhost:5173,http://localhost:8001` | Comma-separated allowed CORS origins                                                               |
+| `CORS_ORIGINS`       | `http://localhost:3000,http://localhost:8001,http://localhost:5001` | Comma-separated allowed CORS origins                                                               |
 | `MOCKDR_STRICT_TENANT` | `true`                                      | Require the tenant in an Entra token URL (`/{tenant}/oauth2/v2.0/token`) to match the mock tenant; set `false` to accept any tenant |
 | `MOCKDR_SPLUNK_DISPATCH_SECONDS` | `0`                             | How long a Splunk search job takes to reach `DONE`. `0` completes immediately and keeps responses deterministic; set e.g. `5` to make `QUEUED` → `PARSING` → `RUNNING` → `FINALIZING` observable, so a client's `isDone` polling loop is actually exercised |
 | `MOCKDR_SPLUNK_HEC_QUERY_STRING_AUTH` | `false`                 | Whether HEC honours its token as `?token=`, mirroring `inputs.conf`'s `allowQueryStringAuth`. Off by default because that is splunkd's default: a valid token sent this way is refused with `400 {"code": 16}` until the setting is on |
+| `MOCKDR_MAX_BODY_BYTES` | `16777216` (16 MiB)                        | Largest request body accepted; a larger one answers `413` before any byte is read, as a reverse proxy in front of the real products would |
+| `SPLUNK_SESSION_TTL_SECONDS` | `28800`                               | Lifetime of a Splunk session key from `/services/auth/login` |
+| `ES_ADMIN_PASSWORD`, `ES_ANALYST_PASSWORD`, `ES_VIEWER_PASSWORD` | `mock-elastic-password`, `mock-analyst-password`, `mock-viewer-password` | Passwords of the three Elasticsearch users; the only credentials that can be changed without editing a seeder |
 
 ## Middleware Stack
 

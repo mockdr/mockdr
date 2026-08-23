@@ -157,8 +157,8 @@ class DevPlaybookRunBody(BaseModel):
 
 class DevFaultInjectionBody(BaseModel):
     """POST /_dev/fault-injection."""
-    delayMs: int = 0
-    delayJitterMs: int = 0
+    delayMs: int = Field(0, ge=0, le=60_000)
+    delayJitterMs: int = Field(0, ge=0, le=60_000)
     errorRate: float = Field(0.0, ge=0.0, le=1.0)
     errorStatus: int = Field(500, ge=100, le=599)
 

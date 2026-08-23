@@ -116,7 +116,28 @@ def _deliver_with_retries(
     """
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            httpx.post(sub.url, content=body_json, headers=headers, timeout=5.0)
+            response = httpx.post(sub.url, content=body_json, headers=headers, timeout=5.0)
+            # A receiver that answers 5xx did not take the event; 4xx means it
+            # never will. Only a 2xx/3xx is a delivery.
+            if response.status_code >= 500:
+                raise httpx.HTTPStatusError(
+                    f"receiver answered {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+            if response.status_code >= 400:
+                record_delivery(DeliveryEntry(
+                    subscription_id=sub.id,
+                    event_type=event_type,
+                    status="failure",
+                    attempt=attempt,
+                    timestamp=utc_now(),
+                    error=f"receiver answered {response.status_code}",
+                ))
+                logger.error(
+                    "Webhook rejected (%d) for %s → %s", response.status_code, event_type, sub.url
+                )
+                return
             record_delivery(DeliveryEntry(
                 subscription_id=sub.id,
                 event_type=event_type,

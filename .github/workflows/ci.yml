@@ -32,8 +32,8 @@ jobs:
       - name: Type-check (mypy)
         run: mypy --strict --allow-any-generics . --ignore-missing-imports --exclude tests/
 
-      - name: Test + coverage (55% gate)
-        run: pytest --cov --cov-fail-under=55
+      - name: Test + coverage (85% gate)
+        run: pytest --cov --cov-fail-under=85
 
       - name: Critical-path tests (must all pass)
         run: pytest -m critical --no-cov
@@ -135,6 +135,30 @@ jobs:
           retention-days: 30
 
   # ── Field Drift ─────────────────────────────────────────────────────────────
+  hostile-inputs:
+    name: Hostile inputs — parser fuzzing and hostile-body probing
+    runs-on: ubuntu-latest
+    needs: [backend-quality]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      # Both found their bugs after a release until 2.0.5 made them a release
+      # step; as a job they find them before the merge.
+      - name: Fuzz the hand-written parsers
+        run: python scripts/fuzz_parsers.py
+
+      - name: Hostile bodies and parameters on every route
+        run: python scripts/hostile_probe.py
+
   field-drift:
     name: Field drift — swagger spec vs mock responses
     runs-on: ubuntu-latest

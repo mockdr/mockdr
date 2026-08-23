@@ -9,6 +9,7 @@ from application.webhook_sink import commands, queries
 public_router = APIRouter(tags=["DEV"])
 
 
+_SECRET_HEADERS = frozenset({"authorization", "cookie", "x-api-key", "x-sentinelone-token"})
 _MAX_BODY_BYTES = 1_048_576  # 1 MiB
 
 
@@ -31,7 +32,12 @@ async def receive_webhook(request: Request) -> dict:
     import json
     body = json.loads(raw)
     event_type = request.headers.get("X-S1-Webhook-Event", "")
-    headers = dict(request.headers)
+    # The sink is public (it receives what the mock's own webhooks send), and
+    # its entries are read by admins; a credential a sender attached must not
+    # travel from the one to the other.
+    headers = {
+        k: ("<redacted>" if k.lower() in _SECRET_HEADERS else v) for k, v in request.headers.items()
+    }
     return commands.capture_webhook(event_type=event_type, headers=headers, body=body)
 
 

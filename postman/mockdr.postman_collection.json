@@ -4682,9 +4682,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{mde_base_url}}/api/domains/replace-with-domain",
+                  "raw": "{{mde_base_url}}/api/domains/replace-with-domain/stats",
                   "host": [
-                    "{{mde_base_url}}/api/domains/replace-with-domain"
+                    "{{mde_base_url}}/api/domains/replace-with-domain/stats"
                   ],
                   "path": []
                 }

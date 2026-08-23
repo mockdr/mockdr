@@ -45,7 +45,7 @@ Per-token rate limiting is applied via middleware. Configure via `/_dev/rate-lim
 The following headers are set on all responses:
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
-- `X-XSS-Protection: 1; mode=block`
+- `X-XSS-Protection: 0` (the legacy auditor is disabled, as OWASP recommends; CSP-era browsers ignore it)
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
 

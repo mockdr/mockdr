@@ -24,7 +24,8 @@ class InMemoryStore:
 
 Key properties:
 - **Mutations acquire the lock** (`save`, `delete`, `append_activity`)
-- **Reads do not acquire the lock** — an intentional consistency trade-off for performance in a single-process mock
+- **Reads acquire the lock too** (`get`, `get_all`, `count`) — one `RLock` serialises every access; `get_all()` returns live references, so a read-modify-write across two calls is not atomic (see the note on `get_all` in `store.py`)
+- **Traffic-written collections are capped** (`CAPS` in `store.py`: Splunk events/notables/jobs/sessions, ES documents, OAuth tokens, agent uploads) — oldest-first eviction, so a client cannot grow the process until it dies
 - **Activity ordering** is maintained via a parallel `_activity_order` list (newest-first) rather than relying on dict insertion order
 - **Request logs** self-purge oldest entries when the 500-entry cap is exceeded
 

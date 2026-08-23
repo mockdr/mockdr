@@ -9,6 +9,21 @@ import collections
 import threading
 from typing import Any
 
+#: Collections written per request, and the most records each keeps.
+#: Dicts are insertion-ordered, so eviction is oldest-first.
+CAPS: dict[str, int] = {
+    "splunk_events": 100_000,
+    "splunk_notables": 20_000,
+    "splunk_search_jobs": 5_000,
+    "splunk_sessions": 5_000,
+    "es_documents": 100_000,
+    "agent_uploads": 200,
+    "cs_oauth_tokens": 5_000,
+    "mde_oauth_tokens": 5_000,
+    "graph_oauth_tokens": 5_000,
+    "sentinel_oauth_tokens": 5_000,
+}
+
 
 class InMemoryStore:
     """Thread-safe in-memory key-value store organised into named collections."""
@@ -223,9 +238,19 @@ class InMemoryStore:
             return dict(self._collections[collection])
 
     def save(self, collection: str, id: str, record: Any) -> None:
-        """Persist a record under the given ID in the named collection."""
+        """Persist a record under the given ID in the named collection.
+
+        Collections that grow with traffic rather than with seed data are
+        capped (``CAPS``): past the cap, the oldest record is dropped so a
+        client that polls for a token per request cannot grow the process
+        until it dies.
+        """
         with self._lock:
-            self._collections[collection][id] = record
+            records = self._collections[collection]
+            cap = CAPS.get(collection)
+            if cap is not None and id not in records and len(records) >= cap:
+                records.pop(next(iter(records)))
+            records[id] = record
             self._notify()
 
     def delete(self, collection: str, id: str) -> bool:

@@ -211,3 +211,41 @@ class TestBridgeEventIsTheApiObject:
             headers=_xdr(),
         ).json()["reply"]
         assert _keys(_events("pan:xdr:alert")) == _keys(extra["alerts"]["data"])
+
+
+class TestBridgeEventTime:
+    """An add-on indexes an object at its own time, so ``_time`` is the record's."""
+
+    def test_every_bridge_event_is_dated_by_its_record(self, client: TestClient) -> None:
+        from utils.event_time import parse_epoch
+
+        keys = {
+            "sentinelone:channel:threats": ("threatInfo", "createdAt"),
+            "ms:defender:atp:alerts": ("alertCreationTime",),
+            "pan:xdr:incident": ("creation_time",),
+            "pan:xdr:alert": ("detection_timestamp",),
+        }
+        for e in splunk_event_repo.list_all():
+            record = e if isinstance(e, dict) else e.__dict__
+            path = keys.get(record["sourcetype"])
+            if not path:
+                continue
+            payload = json.loads(record["raw"])
+            for key in path:
+                payload = payload[key]
+            assert abs(parse_epoch(payload) - record["time"]) < 1, record["sourcetype"]
+
+    def test_time_bounded_searches_see_every_vendor(self, client: TestClient) -> None:
+        auth = ("admin", "mockdr-admin")
+        for index in ("sentinelone", "crowdstrike", "msdefender", "cortex_xdr", "elastic_security"):
+            r = client.post(
+                "/splunk/services/search/jobs",
+                data={
+                    "search": f"search index={index} earliest=-90d",
+                    "exec_mode": "oneshot",
+                    "output_mode": "json",
+                    "count": 0,
+                },
+                auth=auth,
+            )
+            assert r.json()["results"], f"index={index} is empty in the last 90 days"

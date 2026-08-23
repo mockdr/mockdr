@@ -1,0 +1,24 @@
+# Third-party references under `data/vendor-specs/`
+
+mockdr's response shapes are measured against public references. What is
+vendored here, where it came from, and under which terms:
+
+| Files | Source | Licence | What is kept |
+|---|---|---|---|
+| `sentinel_2024-03-01_*.json`, `sentinel_2025-10-01-preview_openapi.json`, `sentinel-common/`, `common-types/` | `github.com/Azure/azure-rest-api-specs` (`specification/securityinsights/…`) | MIT | The specs as published |
+| `graph_v1.0_reduced.json`, `graph_v1.0_types.json`, `graph_beta_reduced.json` | `github.com/microsoftgraph/msgraph-metadata` (`openapi/v1.0`, `openapi/beta`) | MIT | Reduced to route → schema key paths |
+| `crowdstrike_gofalcon_reduced.json` | `github.com/CrowdStrike/gofalcon` (generated from the Falcon swagger) | MIT | Reduced to operation → 200-payload key paths (`scripts/gofalcon_spec.py`) |
+| `cs_event_streams_reduced.json` | `github.com/elastic/integrations`, `packages/crowdstrike/data_stream/falcon/_dev/test/pipeline/*.log` | Elastic License 2.0 | **Key names per event type only** — no recorded events are vendored (`scripts/cs_event_streams_spec.py`) |
+| `mde_docs_reduced.json` | `github.com/MicrosoftDocs/defender-docs`, `defender-endpoint/api/*.md` | CC BY 4.0 (docs) | Reduced to route → example key paths and entity property names (`scripts/mde_docs_spec.py`) |
+| `xsoar-samples/`, `xdr_samples_reduced.json`, `xdr_core_samples_reduced.json`, `mde_samples_reduced.json` | `github.com/demisto/content`, `Packs/*/Integrations/*/test_data/` | MIT | Recorded responses as published (see `xsoar-samples/README.md`), plus their key paths |
+| `xdr_openapi_reduced.json` | `github.com/tommynsong/cortex-mcp-custom-tools-openapi` (community transcription of the Cortex XDR reference) | **No licence** | **Key paths only** — nothing from the repository is vendored (`scripts/cortex_openapi_spec.py`) |
+| `xdr_connector_reduced.json` | MIT-licensed connector code, one cited source per route (see the file's `_provenance`) | MIT | Key paths only |
+| `splunk_ta_samples_reduced.json` | `github.com/splunk/attack_data`, `datasets/suspicious_behaviour/alerts/defender_atp_alerts.log` | Apache-2.0 | Reduced to sourcetype → key paths (`scripts/splunk_ta_samples_spec.py`) |
+
+Not vendored: the SentinelOne 2.1 swagger (`scripts/fetch_swagger.sh` downloads
+it into `data/`, which is gitignored). Values in the mock's fixtures are
+type-correct defaults or the vendor's documented examples, never a
+recording's data.
+
+A reference proves what a real reply carries; a recording never proves what
+it does not. Which side counts is set per source in `scripts/schema_drift.py`.

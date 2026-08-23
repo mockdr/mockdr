@@ -13,6 +13,7 @@ from starlette.routing import Match
 
 from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
+from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import HeadMethodMiddleware
 from api.middleware.metrics import MetricsMiddleware
@@ -353,8 +354,12 @@ register_splunk_bridge()
 register_sentinel_bridge()
 
 app = FastAPI(
-    title="SentinelOne Mock API",
-    description="Full-fidelity SentinelOne Management Console API v2.1 mock server",
+    title="mockdr",
+    description=(
+        "Multi-EDR mock server: SentinelOne, CrowdStrike Falcon, Defender for Endpoint, "
+        "Microsoft Graph, Microsoft Sentinel, Cortex XDR, Splunk and Elastic/Kibana APIs, "
+        "measured against the real products and their public references."
+    ),
     version=APP_VERSION,
     docs_url=None,
     redoc_url=None,
@@ -392,6 +397,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
+app.add_middleware(BodyLimitMiddleware)    # outermost: 413 before any body is read
 app.add_middleware(MetricsMiddleware)         # outermost — runs first, captures all timings
 
 

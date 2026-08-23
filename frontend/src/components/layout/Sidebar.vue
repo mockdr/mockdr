@@ -186,7 +186,7 @@ const sections = computed(() => {
         </div>
         <div>
           <div class="text-s1-text text-sm font-bold leading-tight">mockdr</div>
-          <div class="text-s1-muted text-[10px]">7 platforms</div>
+          <div class="text-s1-muted text-[10px]">8 platforms</div>
         </div>
       </div>
     </div>

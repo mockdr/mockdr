@@ -69,7 +69,7 @@ function logout(): void {
   <header class="h-14 bg-s1-card border-b border-s1-border flex items-center px-6 gap-4 shrink-0">
     <!-- Breadcrumb -->
     <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-sm flex-1">
-      <span class="text-s1-muted">Hypervisor</span>
+      <span class="text-s1-muted">mockdr</span>
       <template v-for="(crumb, i) in breadcrumb" :key="i">
         <span class="text-s1-muted">/</span>
         <span :class="i === breadcrumb.length - 1 ? 'text-s1-text font-medium' : 'text-s1-muted'">{{ crumb }}</span>
