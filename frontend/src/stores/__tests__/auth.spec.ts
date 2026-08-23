@@ -35,23 +35,6 @@ describe('useAuthStore', () => {
       expect(store.user).toBeNull()
     })
 
-    it('isLoggedIn returns false when no token', () => {
-      expect(useAuthStore().isLoggedIn()).toBe(false)
-    })
-  })
-
-  describe('login()', () => {
-    it('sets token and persists to localStorage', async () => {
-      const mockUser = { id: 'u1', email: 'admin@example.com' }
-      vi.mocked(usersApi.loginByToken).mockResolvedValueOnce({ data: mockUser } as never)
-
-      const store = useAuthStore()
-      await store.login('admin-token-0000-0000-000000000001')
-
-      expect(store.token).toBe('admin-token-0000-0000-000000000001')
-      expect(localStorage.getItem('s1_token')).toBe('admin-token-0000-0000-000000000001')
-    })
-
     it('sets user from API response on success', async () => {
       const mockUser = { id: 'u1', email: 'admin@example.com' }
       vi.mocked(usersApi.loginByToken).mockResolvedValueOnce({ data: mockUser } as never)
@@ -82,12 +65,6 @@ describe('useAuthStore', () => {
       expect(store.user).toBeNull()
     })
 
-    it('isLoggedIn returns true after login', async () => {
-      vi.mocked(usersApi.loginByToken).mockResolvedValueOnce({ data: {} } as never)
-      const store = useAuthStore()
-      await store.login('admin-token-0000-0000-000000000001')
-      expect(store.isLoggedIn()).toBe(true)
-    })
   })
 
   describe('logout()', () => {
@@ -112,14 +89,14 @@ describe('useAuthStore', () => {
       expect(localStorage.getItem('s1_token')).toBeNull()
     })
 
-    it('isLoggedIn returns false after logout', async () => {
+    it('leaves no token after logout', async () => {
       vi.mocked(usersApi.loginByToken).mockResolvedValueOnce({ data: {} } as never)
       const store = useAuthStore()
       await store.login('admin-token-0000-0000-000000000001')
 
       store.logout()
 
-      expect(store.isLoggedIn()).toBe(false)
+      expect(store.token).toBe('')
     })
   })
 

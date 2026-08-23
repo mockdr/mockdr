@@ -17,7 +17,7 @@ Every script prints what it is for at the top of its file; this is the map.
 |---|---|
 | `schema_drift.py <sentinel\|graph\|crowdstrike\|mde\|xdr\|sentinelone>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. |
 | `load_test.py` | Concurrent stress test; exit 0 iff p99 < 500 ms and errors < 1 %. |
-| `../conformance/` | Splunk / Elasticsearch / Kibana against the real products (see its README). |
+| `../conformance/` | Splunk / Elasticsearch / Kibana against the real products; also a weekly/on-demand CI workflow (`conformance.yml`). |
 
 ## Run when a vendor reference changes
 

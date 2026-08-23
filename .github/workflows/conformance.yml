@@ -1,0 +1,75 @@
+name: Conformance — mockdr against the real products
+
+# The differential harness (conformance/) runs real Splunk, Elasticsearch and
+# Kibana next to the mock and compares answers key for key. It is too slow
+# for every push (Splunk takes minutes to provision), so it runs weekly, on
+# demand, and when the harness or the two mocks it measures change.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "conformance/**"
+      - "backend/api/routers/splunk/**"
+      - "backend/application/splunk/**"
+      - "backend/application/es_**"
+      - "backend/utils/splunk/**"
+      - "backend/utils/es_*.py"
+      - "backend/infrastructure/fixtures/splunk/**"
+      - ".github/workflows/conformance.yml"
+
+jobs:
+  harness:
+    name: Splunk / Elasticsearch / Kibana probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: conformance
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install the harness's dependencies
+        run: pip install 'httpx>=0.27' 'PyYAML>=6.0'
+
+      # Kibana needs its service account's password set before it starts, so
+      # Elasticsearch comes up first.
+      - name: Start Elasticsearch, Splunk and mockdr
+        run: docker compose up -d --build --wait --wait-timeout 900 elasticsearch splunk mockdr
+
+      - name: Set the kibana_system password and start Kibana
+        run: |
+          curl -sf -u elastic:'Probe-Passw0rd!' -X POST \
+            http://localhost:19200/_security/user/kibana_system/_password \
+            -H 'Content-Type: application/json' -d '{"password":"Probe-Passw0rd!"}'
+          docker compose up -d --wait --wait-timeout 300 kibana
+
+      - name: Wait for the Splunk KV store
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sk -u admin:'Probe-Passw0rd!' "https://localhost:18089/services/kvstore/status?output_mode=json" \
+               | grep -q '"status":"ready"'; then echo ready; exit 0; fi
+            sleep 10
+          done
+          echo "KV store never became ready"; exit 1
+
+      - name: Elasticsearch + Kibana probes
+        run: python -m harness.runner probes/elastic.yaml
+
+      - name: Splunk probes
+        run: python -m harness.runner probes/splunk.yaml
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail=200 mockdr splunk kibana
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

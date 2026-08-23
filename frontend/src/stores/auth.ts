@@ -51,10 +51,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('s1_token')
   }
 
-  /** Returns true when a non-empty token is present. */
-  function isLoggedIn(): boolean {
-    return !!token.value
-  }
-
-  return { token, user, login, logout, isLoggedIn }
+  return { token, user, login, logout }
 })

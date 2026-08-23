@@ -30,6 +30,10 @@ and the Kibana Security Solution.
 
 ## Running it
 
+CI runs the whole harness on an amd64 runner — weekly, on demand
+(`workflow_dispatch`), and on pushes that touch the harness or the Splunk
+and Elastic mocks (`.github/workflows/conformance.yml`). Locally:
+
 Kibana needs encryption keys or its Cases and Alerting APIs answer every
 request with a 500 — "Encrypted Saved Objects plugin is missing encryption
 key". `compose.yml` sets them. The first Kibana run without them made every
