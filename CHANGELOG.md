@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+- `ci.sh` runs the hostile-inputs step CI runs; the weekly workflow also
+  runs `scripts/load_test.py`; the release checklist ends with the GitHub
+  Release (2.1.0 and 2.2.0 had tags but no Release page — created).
+
 ## [2.2.0] - 2026-08-23
 
 The TEAMS.md review of 2.1.0 (86 perspectives over the code) converged on

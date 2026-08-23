@@ -73,3 +73,35 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
+
+  load:
+    name: Load test — p99 < 500 ms, errors < 1 %
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start the backend
+        run: |
+          uvicorn main:app --host 127.0.0.1 --port 8001 --no-access-log &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8001/web/api/v2.1/system/status >/dev/null && break
+            sleep 1
+          done
+
+      # The read scenario (50 workers) is the sensitive one: it caught the
+      # per-item deepcopy in the completion helpers (p99 1 s) before 2.2.0.
+      - name: Run the load test
+        run: python ../scripts/load_test.py --base-url http://127.0.0.1:8001/web/api/v2.1

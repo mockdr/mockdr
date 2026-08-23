@@ -16,7 +16,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | Script | Purpose |
 |---|---|
 | `schema_drift.py <sentinel\|graph\|crowdstrike\|mde\|xdr\|sentinelone>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. |
-| `load_test.py` | Concurrent stress test; exit 0 iff p99 < 500 ms and errors < 1 %. |
+| `load_test.py` | Concurrent stress test; exit 0 iff p99 < 500 ms and errors < 1 %. Also a weekly CI job (`conformance.yml`). |
 | `../conformance/` | Splunk / Elasticsearch / Kibana against the real products; also a weekly/on-demand CI workflow (`conformance.yml`). |
 
 ## Run when a vendor reference changes
@@ -56,3 +56,4 @@ Run them from the repository root with the backend's interpreter:
 4. `load_test.py` passes.
 5. Version in `backend/config.py`, `backend/pyproject.toml`, `frontend/package.json`; a `## [x.y.z]` section in CHANGELOG.md (`tests/unit/test_version.py` checks all four).
 6. Push, wait for CI on the release commit, then tag `vX.Y.Z` — never before.
+7. `gh release create vX.Y.Z --title "mockdr vX.Y.Z" --notes-file <the CHANGELOG section> --verify-tag` — a tag without a Release is invisible to anyone reading the repository page (2.1.0 shipped that way).

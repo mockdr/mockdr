@@ -215,6 +215,12 @@ else
     fail "Field drift — server failed to start"
 fi
 
+# ── Hostile inputs ────────────────────────────────────────────────────────────
+step "Hostile inputs — parser fuzzing and hostile-body probing"
+
+run "Fuzz the hand-written parsers" python "$ROOT/scripts/fuzz_parsers.py"
+run "Hostile bodies on every route" python "$ROOT/scripts/hostile_probe.py"
+
 # ── Secret Scanning ───────────────────────────────────────────────────────────
 step "Secret scanning — gitleaks"
 
