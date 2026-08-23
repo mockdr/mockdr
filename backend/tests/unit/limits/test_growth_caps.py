@@ -46,5 +46,13 @@ def test_unmatched_paths_share_one_metrics_series(client: TestClient) -> None:
         client.get(f"/no/such/route/{i}")
     text = client.get("/metrics").text
     assert "/no/such/route" not in text
-    # the SPA catch-all is one series, however many paths are probed
-    assert text.count('path="/{full_path:path}",status="200"') == 1
+    # One series however many paths are probed: the SPA catch-all when the
+    # built frontend is present, "{unmatched}" (404) when it is not.
+    series = [
+        line
+        for line in text.splitlines()
+        if line.startswith('http_requests_total{method="GET"')
+        and ('path="/{full_path:path}"' in line or 'path="{unmatched}"' in line)
+    ]
+    assert len(series) == 1, series
+    assert series[0].endswith(" 5")
