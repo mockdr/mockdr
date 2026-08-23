@@ -81,7 +81,7 @@ onMounted(() => fetchConfig())
             @click="draftEnabled = !draftEnabled"
             class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
             :class="draftEnabled ? 'bg-s1-primary' : 'bg-s1-hover'"
-          >
+           aria-label="Toggle rate limiting">
             <span
               class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"
               :class="draftEnabled ? 'translate-x-6' : 'translate-x-1'"

@@ -96,12 +96,12 @@ const EVENT_TYPE_COLOR: Record<string, string> = {
       />
       <div class="flex gap-3 items-end">
         <div class="flex-1">
-          <label class="text-xs text-s1-muted mb-1 block">From</label>
-          <input v-model="fromDate" type="datetime-local" class="input w-full text-sm" />
+          <label for="dv-from" class="text-xs text-s1-muted mb-1 block">From</label>
+          <input id="dv-from" v-model="fromDate" type="datetime-local" class="input w-full text-sm" />
         </div>
         <div class="flex-1">
-          <label class="text-xs text-s1-muted mb-1 block">To</label>
-          <input v-model="toDate" type="datetime-local" class="input w-full text-sm" />
+          <label for="dv-to" class="text-xs text-s1-muted mb-1 block">To</label>
+          <input id="dv-to" v-model="toDate" type="datetime-local" class="input w-full text-sm" />
         </div>
         <button v-if="!running" @click="runQuery" class="btn-primary flex items-center gap-2">
           <Play class="w-4 h-4" /> Run Query

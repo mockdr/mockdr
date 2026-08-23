@@ -120,12 +120,12 @@ onMounted(fetchTokens)
           </select>
         </div>
         <div>
-          <label class="block text-xs text-s1-muted mb-1">Event JSON</label>
-          <input v-model="testEvent" class="w-full bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text font-mono" />
+          <label for="hec-event" class="block text-xs text-s1-muted mb-1">Event JSON</label>
+          <input id="hec-event" v-model="testEvent" class="w-full bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text font-mono" />
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <button @click="submitTestEvent" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm flex items-center gap-2">
+        <button @click="submitTestEvent" class="px-4 py-2 bg-yellow-700 hover:bg-yellow-800 text-white rounded-lg text-sm flex items-center gap-2">
           <Send class="w-3.5 h-3.5" /> Submit
         </button>
         <span v-if="submitResult" class="text-sm text-s1-muted">{{ submitResult }}</span>

@@ -250,7 +250,7 @@ const STATUS_COLOR: Record<string, string> = {
                     <button @click="confirmDelete(site)" class="text-xs text-s1-danger hover:opacity-80 flex items-center gap-0.5">
                       <Check class="w-3.5 h-3.5" /> Confirm
                     </button>
-                    <button @click="confirmDeleteId = null" class="text-xs text-s1-muted hover:opacity-80">
+                    <button @click="confirmDeleteId = null" class="text-xs text-s1-muted hover:opacity-80" aria-label="Cancel delete">
                       <X class="w-3.5 h-3.5" />
                     </button>
                   </template>

@@ -160,6 +160,7 @@ function modeClass(val: string): string {
         <select
           v-if="sites.length"
           v-model="selectedSite"
+          aria-label="Site"
           @change="onSiteChange"
           :disabled="!!draft"
           class="input w-48 text-sm disabled:opacity-50"
@@ -171,10 +172,10 @@ function modeClass(val: string): string {
         <select
           v-if="scopeType === 'group'"
           v-model="selectedGroup"
+          aria-label="Group"
           @change="onGroupChange"
           :disabled="!!draft || groupsLoading"
-          class="input w-48 text-sm disabled:opacity-50"
-         aria-label="Group">
+          class="input w-48 text-sm disabled:opacity-50">
           <option v-if="!groups.length" :value="null" disabled>No groups</option>
           <option v-for="g in groups" :key="g.id" :value="g">{{ g.name }} ({{ g.id.slice(-6) }})</option>
         </select>

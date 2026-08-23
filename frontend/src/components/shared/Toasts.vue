@@ -7,7 +7,7 @@ const store = useNotificationsStore()
 
 <template>
   <div
-    class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]"
+    class="fixed top-16 right-4 z-50 flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]"
     role="status"
     aria-live="polite"
     aria-atomic="false"
@@ -25,7 +25,7 @@ const store = useNotificationsStore()
       <span class="flex-1">{{ n.text }}</span>
       <button
         type="button"
-        class="text-s1-muted hover:text-s1-text"
+        class="text-s1-muted hover:text-s1-text min-w-6 min-h-6 flex items-center justify-center"
         aria-label="Dismiss notification"
         @click="store.dismiss(n.id)"
       >

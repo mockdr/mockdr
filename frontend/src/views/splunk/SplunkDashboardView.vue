@@ -177,7 +177,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Events by Index</h3>
         <div class="h-48">
-          <Doughnut v-if="!loading && indexes.length" :data="eventsByIndexChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && indexes.length" :data="eventsByIndexChartData" :options="chartOptions" aria-label="Events by Index" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>
@@ -186,7 +186,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Notables by Severity</h3>
         <div class="h-48">
-          <Bar v-if="!loading && notables.length" :data="notableSeverityChartData" :options="barChartOptions" />
+          <Bar v-if="!loading && notables.length" :data="notableSeverityChartData" :options="barChartOptions" aria-label="Notables by Severity" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>

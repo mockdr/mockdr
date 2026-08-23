@@ -192,7 +192,7 @@ onMounted(() => fetchIndicators())
               </td>
               <td class="table-cell text-sm text-s1-subtle truncate max-w-[200px]">{{ ind.title }}</td>
               <td class="table-cell" @click.stop>
-                <button @click="deleteIndicator(ind.indicatorId)" class="btn-ghost text-red-400 p-1">
+                <button @click="deleteIndicator(ind.indicatorId)" class="btn-ghost text-red-400 p-1" aria-label="Delete indicator">
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </td>

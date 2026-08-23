@@ -126,7 +126,7 @@ onMounted(fetchList)
             <td class="px-5 py-3 text-s1-muted capitalize">{{ ex.mode }}</td>
             <td class="px-5 py-3 text-s1-muted text-xs">{{ ex.createdAt?.slice(0, 10) }}</td>
             <td class="px-5 py-3">
-              <button @click="removeExclusion(ex.id)" class="text-s1-muted hover:text-s1-danger transition-colors">
+              <button @click="removeExclusion(ex.id)" class="text-s1-muted hover:text-s1-danger transition-colors" aria-label="Remove exclusion">
                 <Trash2 class="w-4 h-4" />
               </button>
             </td>

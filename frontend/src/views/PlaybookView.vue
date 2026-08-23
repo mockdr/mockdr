@@ -526,7 +526,7 @@ onUnmounted(stopPolling)
                   <option value="resolve_all_threats">resolve_all_threats</option>
                   <option value="heal_all_agents">heal_all_agents</option>
                 </select>
-                <button @click="removeStep(idx)" class="p-1 text-s1-muted hover:text-s1-danger transition-colors shrink-0">
+                <button @click="removeStep(idx)" class="p-1 text-s1-muted hover:text-s1-danger transition-colors shrink-0" aria-label="Remove step">
                   <X class="w-3.5 h-3.5" />
                 </button>
               </div>

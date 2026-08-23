@@ -146,7 +146,7 @@ onUnmounted(() => clearTimeout(debounceTimer))
             <td class="px-5 py-3 text-s1-muted capitalize">{{ entry.osType || 'all' }}</td>
             <td class="px-5 py-3 text-s1-muted text-xs">{{ entry.createdAt?.slice(0, 10) }}</td>
             <td class="px-5 py-3">
-              <button @click="deleteEntry(entry.id)" class="text-s1-muted hover:text-s1-danger transition-colors">
+              <button @click="deleteEntry(entry.id)" class="text-s1-muted hover:text-s1-danger transition-colors" aria-label="Delete entry">
                 <Trash2 class="w-4 h-4" />
               </button>
             </td>

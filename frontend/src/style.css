@@ -165,7 +165,16 @@ tr.table-row:focus-visible {
 }
 
 /* Selection checkboxes: a 24 px target (WCAG 2.2 2.5.8) without a label element. */
+td > input[type="checkbox"],
+th > input[type="checkbox"],
 input[type="checkbox"].accent-s1-primary {
   width: 1.5rem;
   height: 1.5rem;
+}
+
+/* Icon-only row actions are 24 px targets (WCAG 2.2 2.5.8). */
+td button,
+button.btn-ghost {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
 }

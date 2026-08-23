@@ -538,7 +538,7 @@ const ACTIONS: ActionItem[] = [
                   class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-s1-primary/20 text-s1-primary font-medium"
                 >
                   {{ tag.key }}: {{ tag.value }}
-                  <button @click="removeTag(tag.id)" :disabled="actionLoading" class="hover:text-s1-danger transition-colors">
+                  <button @click="removeTag(tag.id)" :disabled="actionLoading" class="hover:text-s1-danger transition-colors" aria-label="Remove tag">
                     <X class="w-3 h-3" />
                   </button>
                 </span>

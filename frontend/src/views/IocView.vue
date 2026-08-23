@@ -108,8 +108,8 @@ onMounted(fetchList)
           </select>
         </div>
         <div>
-          <label class="text-xs text-s1-muted mb-1 block">Value</label>
-          <input v-model="form.value" placeholder="IP, domain, hash, URL…" class="input w-full text-sm font-mono" />
+          <label for="ioc-value" class="text-xs text-s1-muted mb-1 block">Value</label>
+          <input id="ioc-value" v-model="form.value" placeholder="IP, domain, hash, URL…" class="input w-full text-sm font-mono" />
         </div>
         <div>
           <label class="text-xs text-s1-muted mb-1 block">Name (optional)</label>
@@ -135,7 +135,7 @@ onMounted(fetchList)
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
             <th scope="col" class="px-4 py-3">
-              <input
+              <input aria-label="Select row"
                 type="checkbox"
                 :checked="selected.size === items.length && items.length > 0"
                 @change="toggleAll"

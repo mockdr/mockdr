@@ -164,7 +164,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">OS Platform Distribution</h3>
         <div class="h-40">
-          <Doughnut v-if="!loading && machines.length" :data="platformChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && machines.length" :data="platformChartData" :options="chartOptions" aria-label="OS Platform Distribution" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>
@@ -173,7 +173,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Alert Severity</h3>
         <div class="h-40">
-          <Doughnut v-if="!loading && alerts.length" :data="severityChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && alerts.length" :data="severityChartData" :options="chartOptions" aria-label="Alert Severity" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>
@@ -182,7 +182,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Machine Risk Score</h3>
         <div class="h-40">
-          <Doughnut v-if="!loading && machines.length" :data="riskChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && machines.length" :data="riskChartData" :options="chartOptions" aria-label="Machine Risk Score" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>

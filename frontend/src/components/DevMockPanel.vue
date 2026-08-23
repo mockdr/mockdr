@@ -80,7 +80,7 @@ function onOpen(): void {
             <Bug class="w-4 h-4 text-s1-primary" />
             <span class="text-s1-primary font-semibold text-sm">DEV Mock Controls</span>
           </div>
-          <button @click="isOpen = false" class="text-s1-muted hover:text-s1-text transition-colors">
+          <button @click="isOpen = false" class="text-s1-muted hover:text-s1-text transition-colors" aria-label="Close dev panel">
             <X class="w-4 h-4" />
           </button>
         </div>

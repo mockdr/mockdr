@@ -178,7 +178,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Incident Severity</h3>
         <div class="h-40">
-          <Doughnut v-if="!loading && incidents.length" :data="severityChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && incidents.length" :data="severityChartData" :options="chartOptions" aria-label="Incident Severity" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>
@@ -187,7 +187,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Alert Source</h3>
         <div class="h-40">
-          <Doughnut v-if="!loading && alerts.length" :data="alertSourceChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && alerts.length" :data="alertSourceChartData" :options="chartOptions" aria-label="Alert Source" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>
@@ -196,7 +196,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Endpoint OS</h3>
         <div class="h-40">
-          <Doughnut v-if="!loading && endpoints.length" :data="endpointOsChartData" :options="chartOptions" />
+          <Doughnut v-if="!loading && endpoints.length" :data="endpointOsChartData" :options="chartOptions" aria-label="Endpoint OS" />
           <div v-else-if="!loading" class="flex items-center justify-center h-full text-s1-muted text-sm">No data</div>
           <LoadingSkeleton v-else :rows="3" />
         </div>

@@ -137,7 +137,7 @@ onMounted(() => fetchHooks())
             </div>
             <div class="text-[11px] text-s1-muted mt-1">Created {{ hook.createdAt.slice(0, 10) }}</div>
           </div>
-          <button @click="deleteHook(hook.id)" class="shrink-0 text-s1-muted hover:text-s1-danger transition-colors">
+          <button @click="deleteHook(hook.id)" class="shrink-0 text-s1-muted hover:text-s1-danger transition-colors" aria-label="Delete hook">
             <Trash2 class="w-4 h-4" />
           </button>
         </div>
@@ -151,7 +151,7 @@ onMounted(() => fetchHooks())
           <div class="card w-full max-w-md mx-4 p-6 space-y-4">
             <div class="flex items-center justify-between">
               <h2 class="text-s1-text font-semibold">New Webhook</h2>
-              <button @click="showCreate = false" class="text-s1-muted hover:text-s1-text transition-colors">
+              <button @click="showCreate = false" class="text-s1-muted hover:text-s1-text transition-colors" aria-label="Close">
                 <X class="w-4 h-4" />
               </button>
             </div>

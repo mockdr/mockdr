@@ -195,7 +195,7 @@ onMounted(async () => {
               <div class="text-sm text-s1-text font-medium truncate">{{ list.name }}</div>
               <div class="text-xs text-s1-muted">{{ list.type }} | {{ list.total_items ?? 0 }} items</div>
             </div>
-            <button @click.stop="deleteList(list.id, list.namespace_type)" class="btn-ghost p-1 text-red-400 ml-2 shrink-0">
+            <button @click.stop="deleteList(list.id, list.namespace_type)" class="btn-ghost p-1 text-red-400 ml-2 shrink-0" aria-label="Delete list">
               <Trash2 class="w-3 h-3" />
             </button>
           </div>
@@ -274,7 +274,7 @@ onMounted(async () => {
               </td>
               <td class="table-cell text-xs text-s1-muted">{{ item.created_at?.slice(0, 10) }}</td>
               <td class="table-cell" @click.stop>
-                <button @click="deleteItem(item.id)" class="btn-ghost text-red-400 p-1">
+                <button @click="deleteItem(item.id)" class="btn-ghost text-red-400 p-1" aria-label="Delete item">
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </td>

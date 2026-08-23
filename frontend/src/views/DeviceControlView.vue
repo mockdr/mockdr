@@ -219,7 +219,7 @@ const ACTION_COLOR: Record<string, string> = {
                 ><Trash2 class="w-3.5 h-3.5" /></button>
                 <template v-else-if="confirmDeleteId === rule.id">
                   <button @click="confirmDelete(rule)" class="text-xs text-s1-danger hover:opacity-80">Confirm</button>
-                  <button @click="confirmDeleteId = null" class="text-xs text-s1-muted hover:opacity-80">
+                  <button @click="confirmDeleteId = null" class="text-xs text-s1-muted hover:opacity-80" aria-label="Cancel delete">
                     <X class="w-3.5 h-3.5" />
                   </button>
                 </template>
@@ -239,7 +239,7 @@ const ACTION_COLOR: Record<string, string> = {
       <div class="card w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-bold text-s1-text">{{ modalMode === 'create' ? 'New Rule' : 'Edit Rule' }}</h2>
-          <button @click="closeModal" class="text-s1-muted hover:text-s1-text"><X class="w-5 h-5" /></button>
+          <button @click="closeModal" class="text-s1-muted hover:text-s1-text" aria-label="Close modal"><X class="w-5 h-5" /></button>
         </div>
 
         <div class="space-y-3">

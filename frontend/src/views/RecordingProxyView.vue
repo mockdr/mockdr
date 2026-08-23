@@ -274,7 +274,7 @@ onMounted(() => fetchAll())
               @click="toggleVendor(v.vendor)"
             >
               <div class="flex items-center gap-3">
-                <input
+                <input aria-label="Select row"
                   type="checkbox"
                   :checked="vendorDrafts[v.vendor]?.enabled"
                   @click.stop="vendorDrafts[v.vendor].enabled = !vendorDrafts[v.vendor].enabled"

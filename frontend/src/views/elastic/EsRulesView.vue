@@ -252,7 +252,7 @@ onMounted(() => fetchRules())
                   @click="toggleEnabled(rule)"
                   class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
                   :class="rule.enabled ? 'bg-purple-500' : 'bg-gray-600'"
-                >
+                 aria-label="Toggle rule enabled">
                   <span
                     class="inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform"
                     :class="rule.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'"
@@ -269,7 +269,7 @@ onMounted(() => fetchRules())
                 </div>
               </td>
               <td class="table-cell" @click.stop>
-                <button @click="deleteRule(rule.id)" class="btn-ghost text-red-400 p-1">
+                <button @click="deleteRule(rule.id)" class="btn-ghost text-red-400 p-1" aria-label="Delete rule">
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
               </td>

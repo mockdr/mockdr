@@ -164,7 +164,7 @@ const STATE_COLOR: Record<string, string> = {
       <div class="card w-full max-w-md p-6 space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-bold text-s1-text">{{ modalMode === 'create' ? 'New Account' : 'Edit Account' }}</h2>
-          <button @click="closeModal" class="text-s1-muted hover:text-s1-text"><X class="w-5 h-5" /></button>
+          <button @click="closeModal" class="text-s1-muted hover:text-s1-text" aria-label="Close modal"><X class="w-5 h-5" /></button>
         </div>
 
         <div class="space-y-3">
