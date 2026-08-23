@@ -42,6 +42,9 @@ def test_oversized_body_is_refused_before_it_is_read(client: TestClient) -> None
 
 
 def test_unmatched_paths_share_one_metrics_series(client: TestClient) -> None:
+    from api.middleware.metrics import reset_metrics
+
+    reset_metrics()
     for i in range(5):
         client.get(f"/no/such/route/{i}")
     text = client.get("/metrics").text
@@ -51,8 +54,8 @@ def test_unmatched_paths_share_one_metrics_series(client: TestClient) -> None:
     series = [
         line
         for line in text.splitlines()
-        if line.startswith('http_requests_total{method="GET"')
-        and ('path="/{full_path:path}"' in line or 'path="{unmatched}"' in line)
+        if line.startswith('http_requests_total{method="GET"') and "/metrics" not in line
     ]
     assert len(series) == 1, series
+    assert 'path="/{full_path:path}"' in series[0] or 'path="{unmatched}"' in series[0]
     assert series[0].endswith(" 5")
