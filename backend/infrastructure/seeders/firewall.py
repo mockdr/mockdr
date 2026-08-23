@@ -4,6 +4,7 @@ import random
 from faker import Faker
 
 from domain.firewall_rule import FirewallRule
+from infrastructure.safe_net import doc_ipv4
 from infrastructure.seeders._shared import rand_after, rand_ago
 from repository.firewall_repo import firewall_repo
 from utils.id_gen import new_id
@@ -63,7 +64,7 @@ def seed_firewall_rules(
             localHost={"type": "any", "values": []},
             remoteHost={"type": "any", "values": []},
             remoteHosts=(
-                [{"type": "addresses", "values": [fake.ipv4_public()]}]
+                [{"type": "addresses", "values": [doc_ipv4()]}]
                 if has_remote_ip else [{"type": "any", "values": []}]
             ),
             application={"type": "any", "values": []},

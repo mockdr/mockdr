@@ -7,6 +7,8 @@ services:
     environment:
       - SEED_COUNT_AGENTS=60
       - SEED_COUNT_THREATS=30
+    # Persistence (MOCKDR_PERSIST) needs a writable path: mount a volume for
+    # it; with read_only the snapshot save fails and is only logged.
     read_only: true
     security_opt:
       - no-new-privileges:true

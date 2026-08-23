@@ -2,12 +2,16 @@
 import hashlib
 import hmac
 import json
-import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from application.webhooks.commands import create_webhook, delete_webhook, fire_event
+from application.webhooks.commands import (
+    create_webhook,
+    delete_webhook,
+    fire_event,
+    wait_for_deliveries,
+)
 from domain.webhook import ALL_EVENT_TYPES
 from infrastructure.seed import generate_all
 from repository.webhook_repo import webhook_repo
@@ -21,10 +25,8 @@ def _ok(status: int = 200) -> MagicMock:
 
 
 def _join_webhook_threads(timeout: float = 5.0) -> None:
-    """Wait for all daemon webhook-delivery threads to finish."""
-    for t in threading.enumerate():
-        if t.daemon and t.is_alive() and t.name.startswith("Thread"):
-            t.join(timeout=timeout)
+    """Wait for every submitted webhook delivery to finish."""
+    wait_for_deliveries(timeout)
 
 
 @pytest.fixture(autouse=True)
@@ -141,6 +143,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1", "threatInfo": {}})
+        wait_for_deliveries()
         _join_webhook_threads()
         mock_post.assert_called_once()
 
@@ -149,6 +152,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.created"])  # not "threat.updated"
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post")
@@ -156,6 +160,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], active=False)
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post")
@@ -163,6 +168,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], secret="my-secret")
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         call_kwargs = mock_post.call_args
         headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers", {})
         assert headers["Authorization"] == "Bearer my-secret"
@@ -172,6 +178,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], secret="my-secret")
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         call_kwargs = mock_post.call_args
         headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers", {})
         body_json = call_kwargs.kwargs.get("content") or call_kwargs[1].get("content", "")
@@ -185,6 +192,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.updated"], secret="")
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         call_kwargs = mock_post.call_args
         headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers", {})
         assert "Authorization" not in headers
@@ -195,6 +203,7 @@ class TestFireEvent:
         mock_post.return_value = _ok()
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         call_kwargs = mock_post.call_args
         headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers", {})
         assert headers["X-S1-Webhook-Event"] == "threat.updated"
@@ -205,6 +214,7 @@ class TestFireEvent:
         """Threat payload must not include notes or timeline."""
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1", "notes": [{"text": "x"}], "timeline": []})
+        wait_for_deliveries()
         call_kwargs = mock_post.call_args
         body_json = call_kwargs.kwargs.get("content") or call_kwargs[1].get("content", "")
         body = json.loads(body_json)
@@ -217,6 +227,7 @@ class TestFireEvent:
         """Agent payload must not include passphrase or localIp."""
         self._create_sub(["agent.offline"])
         fire_event("agent.offline", {"id": "a1", "passphrase": "secret", "localIp": "10.0.0.1"})
+        wait_for_deliveries()
         call_kwargs = mock_post.call_args
         body_json = call_kwargs.kwargs.get("content") or call_kwargs[1].get("content", "")
         body = json.loads(body_json)
@@ -230,12 +241,14 @@ class TestFireEvent:
         self._create_sub(["threat.updated"])
         # Should not raise
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
 
     @patch("application.webhooks.commands.httpx.post")
     def test_no_subscriptions_is_noop(self, mock_post) -> None:
         mock_post.return_value = _ok()
         """If no subscriptions exist, fire_event returns without calling httpx."""
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post")
@@ -244,5 +257,6 @@ class TestFireEvent:
         self._create_sub(["threat.updated"])
         self._create_sub(["threat.updated"])
         fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         _join_webhook_threads()
         assert mock_post.call_count == 2

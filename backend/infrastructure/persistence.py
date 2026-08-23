@@ -44,6 +44,15 @@ class PersistenceManager:
                 msg = f"expected a JSON object, got {type(snapshot).__name__}"
                 raise ValueError(msg)
             from application.dev.commands import import_state
+            from config import APP_VERSION
+
+            written_by = snapshot.get("_version")
+            if written_by != APP_VERSION:
+                logger.warning(
+                    "%s was written by mockdr %s, this is %s; records whose "
+                    "shape changed between the two are skipped below",
+                    self._path, written_by or "an unversioned release", APP_VERSION,
+                )
             result = import_state(snapshot)["data"]
         except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError):
             logger.warning("Failed to load %s, will seed fresh", self._path, exc_info=True)

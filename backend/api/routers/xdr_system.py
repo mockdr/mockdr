@@ -6,6 +6,7 @@ All POST endpoints use ``{"request_data": {...}}`` body wrapper.
 
 from __future__ import annotations
 
+import random
 import time
 
 from fastapi import APIRouter, Body, Depends
@@ -17,6 +18,11 @@ from utils.xdr_fixtures import xdr_shape
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply, require_request_data
 
 router = APIRouter(tags=["XDR System"])
+
+
+def _recent_ms() -> int:
+    """An epoch-millisecond timestamp within the last day, so a time-bounded client sees it."""
+    return int((time.time() - random.uniform(0, 86400)) * 1000)  # noqa: S311
 
 
 # ── System ────────────────────────────────────────────────────────────────────
@@ -125,7 +131,7 @@ def list_exclusions(
             "ALERT_WHITELIST_ID": 1,
             "ALERT_WHITELIST_NAME": "Benign PowerShell Scripts",
             "ALERT_WHITELIST_COMMENT": "Exclude known-good PowerShell automation",
-            "ALERT_WHITELIST_MODIFY_TIME": 1700000000000,
+            "ALERT_WHITELIST_MODIFY_TIME": _recent_ms(),
             "ALERT_WHITELIST_HITS": 0,
         },
     ]
@@ -176,7 +182,7 @@ def get_device_control_violations(
             "vendor": "SanDisk",
             "product": "Cruzer",
             "serial": "ABC123",
-            "timestamp": 1700000000000,
+            "timestamp": _recent_ms(),
             "ip_address": "10.10.1.100",
             "violation_type": "blocked",
         },

@@ -37,7 +37,9 @@ WORKDIR /app/backend
 # Security endpoints are also available on the same port.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/web/api/v2.1/system/status')"]
-RUN adduser --disabled-password --gecos '' appuser
+# The user is created after the COPYs, so own what was copied: a
+# MOCKDR_PERSIST path inside the image must be writable by the process.
+RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
 USER appuser
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5001"]

@@ -5,6 +5,7 @@ from faker import Faker
 
 from config import SEED_COUNT_AGENTS
 from domain.agent import Agent
+from infrastructure.safe_net import doc_domain, doc_ipv4
 from infrastructure.seeders._shared import (
     _AD_DOMAIN,
     AD_GROUPS_POOL,
@@ -102,7 +103,7 @@ def seed_agents(
             scan_outcome = "none"
 
         local_ip = fake.ipv4_private()
-        ext_ip = fake.ipv4_public()
+        ext_ip = doc_ipv4()
         ext_ip_prefix = ".".join(ext_ip.split(".")[:3])
         iface_name = "Ethernet0" if os_type == "windows" else "eth0"
         mac_addr = fake.mac_address()
@@ -136,7 +137,7 @@ def seed_agents(
                 s1_tags.append({
                     "assignedAt": rand_ago(30),
                     "assignedBy": random.choice([
-                        "SVC-JUPYTER", "admin@corp.com", "automation",
+                        "SVC-JUPYTER", "admin@acmecorp.example", "automation",
                     ]),
                     "assignedById": new_id(),
                     "id": tag_def.id,
@@ -224,7 +225,7 @@ def seed_agents(
             isHyperAutomate=None,
             externalIp=ext_ip,
             lastIpToMgmt=local_ip,
-            domain=fake.domain_name(),
+            domain=doc_domain(),
             networkStatus=random.choice(
                 ["connected"] * 7 + ["disconnected"] * 2 + ["disconnecting"]
             ),

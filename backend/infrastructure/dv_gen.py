@@ -9,6 +9,7 @@ import re
 from faker import Faker
 
 from infrastructure.process_gen import PROCESS_CATALOG
+from infrastructure.safe_net import doc_domain, doc_ipv4
 from infrastructure.seeders._shared import DV_EVENT_TYPES, rand_ago
 from repository.agent_repo import agent_repo
 from utils.id_gen import new_id
@@ -113,7 +114,7 @@ def generate_dv_events(count: int = 50, query_body: dict | None = None) -> list[
             "agentId":          agent_id,
             "agentOs":          agent_os,
             "agentIp":          agent_ip,
-            "agentDomain":      _fake.domain_name(),
+            "agentDomain":      doc_domain(),
             "agentGroupId":    new_id(),
             "agentInfected":   False,
             "agentIsActive":   True,
@@ -133,7 +134,7 @@ def generate_dv_events(count: int = 50, query_body: dict | None = None) -> list[
             "pid":              str(random.randint(100, 65535)),
             "parentPid":        str(random.randint(1, 1000)),
             "srcIp":            agent_ip,
-            "dstIp":            _fake.ipv4_public(),
+            "dstIp":            doc_ipv4(),
             "dstPort":          random.randint(1, 65535),
             "srcPort":          random.randint(1024, 65535),
             "fileFullName":     _fake.file_path(),
@@ -141,7 +142,7 @@ def generate_dv_events(count: int = 50, query_body: dict | None = None) -> list[
             "fileSha1":         _fake.sha1(),
             "fileMd5":          _fake.md5(),
             "registryPath":     f"HKLM\\SOFTWARE\\{_fake.word()}\\{_fake.word()}",
-            "dnsRequest":       _fake.domain_name(),
-            "dnsResponse":      _fake.ipv4_public(),
+            "dnsRequest":       doc_domain(subdomain=True),
+            "dnsResponse":      doc_ipv4(),
         })
     return events

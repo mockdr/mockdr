@@ -6,6 +6,7 @@ import random
 from faker import Faker
 
 from domain.graph.sign_in_log import GraphSignInLog
+from infrastructure.safe_net import doc_ipv4
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.sign_in_log_repo import graph_sign_in_log_repo
@@ -125,7 +126,7 @@ def seed_graph_sign_in_logs(fake: Faker, user_ids: list[str]) -> None:
             userId=uid,
             appId=app_id,
             appDisplayName=app_name,
-            ipAddress=fake.ipv4_public(),
+            ipAddress=doc_ipv4(),
             clientAppUsed=random.choices(_CLIENT_APPS, weights=_CLIENT_APP_WEIGHTS, k=1)[0],
             location=location,
             status=status,

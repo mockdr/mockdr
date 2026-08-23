@@ -4,7 +4,7 @@ import hmac
 import json
 from unittest.mock import MagicMock, patch
 
-from application.webhooks.commands import fire_event
+from application.webhooks.commands import fire_event, wait_for_deliveries
 from domain.webhook import WebhookSubscription
 from repository.webhook_repo import webhook_repo
 
@@ -30,8 +30,10 @@ class TestWebhookDelivery:
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_sends_post_to_subscriber(self, mock_post: MagicMock) -> None:
         """fire_event should POST to the subscriber URL."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription()
         fire_event("threat.created", {"id": "t1", "threatInfo": {"threatName": "test"}})
+        wait_for_deliveries()
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args
@@ -42,8 +44,10 @@ class TestWebhookDelivery:
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_includes_event_type_header(self, mock_post: MagicMock) -> None:
         """The X-S1-Webhook-Event header should contain the event type."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription()
         fire_event("threat.created", {"id": "t1"})
+        wait_for_deliveries()
 
         headers = mock_post.call_args.kwargs.get("headers", {})
         assert headers["X-S1-Webhook-Event"] == "threat.created"
@@ -51,8 +55,10 @@ class TestWebhookDelivery:
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_includes_bearer_auth(self, mock_post: MagicMock) -> None:
         """Secret should be sent as Bearer token in Authorization header."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription(secret="webhook-secret-123")
         fire_event("threat.created", {"id": "t1"})
+        wait_for_deliveries()
 
         headers = mock_post.call_args.kwargs.get("headers", {})
         assert headers["Authorization"] == "Bearer webhook-secret-123"
@@ -60,10 +66,12 @@ class TestWebhookDelivery:
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_includes_hmac_signature(self, mock_post: MagicMock) -> None:
         """X-S1-Signature should contain a valid HMAC-SHA256 of the body."""
+        mock_post.return_value = MagicMock(status_code=200)
         secret = "hmac-test-secret"
         self._create_subscription(secret=secret)
         payload = {"id": "t1", "threatInfo": {"threatName": "Trojan.GenericKD"}}
         fire_event("threat.created", payload)
+        wait_for_deliveries()
 
         call_kwargs = mock_post.call_args
         body_json = call_kwargs.kwargs.get("content", "")
@@ -78,8 +86,10 @@ class TestWebhookDelivery:
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_without_secret_has_no_auth_headers(self, mock_post: MagicMock) -> None:
         """Subscriptions without a secret should not have auth headers."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription(secret="")
         fire_event("threat.created", {"id": "t1"})
+        wait_for_deliveries()
 
         headers = mock_post.call_args.kwargs.get("headers", {})
         assert "Authorization" not in headers
@@ -88,23 +98,29 @@ class TestWebhookDelivery:
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_only_targets_matching_subscribers(self, mock_post: MagicMock) -> None:
         """Only subscriptions matching the event type should receive the event."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription(event_types=["alert.created"])
         fire_event("threat.created", {"id": "t1"})
+        wait_for_deliveries()
         mock_post.assert_not_called()
 
     @patch("application.webhooks.commands.httpx.post", side_effect=ConnectionError("refused"))
     def test_fire_event_logs_delivery_failure(self, mock_post: MagicMock) -> None:
         """Delivery failures should be logged, not raised."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription()
         # Should not raise
         fire_event("threat.created", {"id": "t1"})
+        wait_for_deliveries()
 
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_strips_internal_threat_fields(self, mock_post: MagicMock) -> None:
         """Internal fields (notes, timeline) should be stripped from threat payloads."""
+        mock_post.return_value = MagicMock(status_code=200)
         self._create_subscription()
         payload = {"id": "t1", "threatInfo": {}, "notes": ["secret"], "timeline": []}
         fire_event("threat.created", payload)
+        wait_for_deliveries()
 
         body_json = mock_post.call_args.kwargs.get("content", "")
         body = json.loads(body_json)

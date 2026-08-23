@@ -638,7 +638,7 @@ search index=sentinelone OR index=crowdstrike OR index=msdefender
 
 All data is **in-memory** by default -- mutations survive until server restart or `/_dev/reset`.
 
-**Optional persistence:** set `MOCKDR_PERSIST=/path/to/state.json` to save state across restarts. The server debounces writes (2 s) and uses atomic file replacement to prevent corruption.
+**Optional persistence:** set `MOCKDR_PERSIST=/path/to/state.json` to save state across restarts. The server debounces writes (2 s) and uses atomic file replacement to prevent corruption. The snapshot records the version that wrote it; loading one from another release logs which, and a snapshot whose records no longer parse is moved to `state.json.corrupt` and the server seeds fresh rather than serve a hollowed-out store. In Docker the path must be on a writable volume — the compose file runs the container `read_only`.
 
 ## Configuration
 

@@ -1,6 +1,7 @@
 """Unit tests for webhook retry logic and delivery log."""
 from __future__ import annotations
 
+import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,6 +11,7 @@ from application.webhooks.commands import (
     _deliver_with_retries,
     create_webhook,
     fire_event,
+    wait_for_deliveries,
 )
 from application.webhooks.delivery_log import DeliveryEntry, clear, list_entries, record
 from infrastructure.seed import generate_all
@@ -175,64 +177,55 @@ class TestDeliverWithRetries:
 
 
 class TestFireEventRetry:
-    """Tests for fire_event dispatching to background threads."""
+    """fire_event hands deliveries to the bounded pool and records each attempt."""
 
     @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_records_delivery(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
         mock_post.return_value = _ok()
-        """fire_event should record delivery entries via background thread."""
         _make_sub(["threat.updated"])
-        # Patch threading.Thread to run target synchronously for test determinism
-        with patch("application.webhooks.commands.threading.Thread") as mock_thread:
-            mock_thread.return_value = MagicMock()
-            # Capture the target function and call it inline
-            def run_inline(**kwargs: object) -> MagicMock:
-                m = MagicMock()
-                m.start = lambda: kwargs["target"](*kwargs["args"])
-                return m
-            mock_thread.side_effect = run_inline
-
-            fire_event("threat.updated", {"id": "t1"})
+        fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         entries = list_entries()
         assert len(entries) == 1
         assert entries[0]["status"] == "success"
 
     @patch("application.webhooks.commands.time.sleep")
-    @patch("application.webhooks.commands.httpx.post", side_effect=Exception("fail"))
+    @patch("application.webhooks.commands.httpx.post", side_effect=Exception("down"))
     def test_fire_event_retries_on_failure(self, mock_post: MagicMock, mock_sleep: MagicMock) -> None:
-        mock_post.return_value = _ok()
         _make_sub(["threat.updated"])
-        with patch("application.webhooks.commands.threading.Thread") as mock_thread:
-            def run_inline(**kwargs: object) -> MagicMock:
-                m = MagicMock()
-                m.start = lambda: kwargs["target"](*kwargs["args"])
-                return m
-            mock_thread.side_effect = run_inline
-
-            fire_event("threat.updated", {"id": "t1"})
+        fire_event("threat.updated", {"id": "t1"})
+        wait_for_deliveries()
         assert mock_post.call_count == MAX_RETRIES
         entries = list_entries()
         assert len(entries) == MAX_RETRIES
         assert all(e["status"] == "failure" for e in entries)
 
     @patch("application.webhooks.commands.httpx.post")
-    def test_fire_event_spawns_daemon_thread(self, mock_post: MagicMock) -> None:
+    def test_fire_event_submits_one_delivery_per_subscription(self, mock_post: MagicMock) -> None:
         mock_post.return_value = _ok()
         _make_sub(["threat.updated"])
-        with patch("application.webhooks.commands.threading.Thread") as mock_thread:
-            mock_thread.return_value = MagicMock()
+        _make_sub(["threat.updated"])
+        with patch("application.webhooks.commands._DELIVERIES.submit") as submit:
+            submit.return_value = MagicMock()
             fire_event("threat.updated", {"id": "t1"})
-            mock_thread.assert_called_once()
-            call_kwargs = mock_thread.call_args.kwargs
-            assert call_kwargs["daemon"] is True
+            assert submit.call_count == 2
+        wait_for_deliveries()
 
     @patch("application.webhooks.commands.httpx.post")
-    def test_fire_event_no_subs_no_thread(self, mock_post: MagicMock) -> None:
-        mock_post.return_value = _ok()
-        with patch("application.webhooks.commands.threading.Thread") as mock_thread:
+    def test_fire_event_no_subs_submits_nothing(self, mock_post: MagicMock) -> None:
+        with patch("application.webhooks.commands._DELIVERIES.submit") as submit:
             fire_event("threat.updated", {"id": "t1"})
-            mock_thread.assert_not_called()
+            submit.assert_not_called()
+
+    def test_delivery_threads_are_daemons(self) -> None:
+        """Shutdown never waits on a receiver."""
+        from application.webhooks.commands import _DELIVERIES
+
+        _DELIVERIES.submit(lambda: None)
+        wait_for_deliveries()
+        workers = [t for t in threading.enumerate() if t.name.startswith("webhook-")]
+        assert workers and all(t.daemon for t in workers)
 
 
 class TestReceiverStatus:

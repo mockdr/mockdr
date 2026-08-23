@@ -6,6 +6,7 @@ import random
 from faker import Faker
 
 from domain.mde_alert import MdeAlert
+from infrastructure.safe_net import doc_ipv4
 from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.mde_shared import (
     MDE_ALERT_CATEGORIES,
@@ -104,7 +105,7 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
                     "svchost.exe", "python.exe",
                 ])
             elif entity_type == "Ip":
-                item["ipAddress"] = fake.ipv4_public()
+                item["ipAddress"] = doc_ipv4()
             elif entity_type == "User":
                 item["accountName"] = fake.user_name()
                 item["domainName"] = "ACMECORP"

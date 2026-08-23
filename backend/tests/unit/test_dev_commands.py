@@ -164,7 +164,7 @@ class TestImportState:
         total = result["data"]["imported"]
         # Should be the sum of all records across all collections.
         # Exclude non-collection meta keys (_activity_order, _proxy_config).
-        _meta_keys = {"_activity_order", "_proxy_config"}
+        _meta_keys = {"_activity_order", "_proxy_config", "_version"}
         expected = sum(len(snap.get(k, [])) for k in snap if k not in _meta_keys)
         assert total == expected
 

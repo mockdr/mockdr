@@ -339,6 +339,11 @@ def export_state() -> dict:
     for collection in _MAPPING_COLLECTIONS:
         snapshot[collection] = dict(store.get_all_with_keys(collection))
     snapshot["_activity_order"] = store.get_activity_order()
+    # The writer's version: a snapshot from another release is loaded, but
+    # the log says which release wrote it when records are skipped.
+    from config import APP_VERSION
+
+    snapshot["_version"] = APP_VERSION
 
     # Persist proxy config (vendor connections survive restarts).
     from application.proxy import queries as proxy_queries

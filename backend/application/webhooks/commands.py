@@ -5,8 +5,10 @@ import hashlib
 import hmac
 import json
 import logging
+import queue
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import asdict
 from typing import Any
 
@@ -23,8 +25,48 @@ from utils.internal_fields import AGENT_INTERNAL_FIELDS
 logger = logging.getLogger(__name__)
 
 # Retry configuration
+class _DeliveryPool:
+    """A fixed set of daemon threads draining a queue of delivery calls."""
+
+    def __init__(self, workers: int) -> None:
+        self._queue: queue.Queue[tuple[Callable[..., None], tuple[object, ...]]] = queue.Queue()
+        self._open = 0  # submitted, not yet finished
+        self._cv = threading.Condition()
+        for n in range(workers):
+            threading.Thread(
+                target=self._run, name=f"webhook-{n}", daemon=True
+            ).start()
+
+    def submit(self, fn: Callable[..., None], *args: object) -> None:
+        with self._cv:
+            self._open += 1
+        self._queue.put((fn, args))
+
+    def wait(self, timeout: float) -> None:
+        with self._cv:
+            self._cv.wait_for(lambda: self._open == 0, timeout=timeout)
+
+    def _run(self) -> None:
+        while True:
+            fn, args = self._queue.get()
+            try:
+                fn(*args)
+            except Exception:  # noqa: BLE001 - a worker must outlive any delivery
+                logger.exception("Webhook delivery crashed")
+            finally:
+                with self._cv:
+                    self._open -= 1
+                    self._cv.notify_all()
+
+
 MAX_RETRIES = 3
 BACKOFF_BASE = 1  # seconds; delays will be 1s, 2s, 4s
+
+# Deliveries run on a bounded pool of daemon workers: a scenario that fires
+# hundreds of events at several receivers queues, instead of starting a
+# sleeping thread per subscription per event — and shutdown never waits on
+# a receiver (ThreadPoolExecutor's threads would be joined at exit).
+_DELIVERIES = _DeliveryPool(workers=8)
 
 # Fields present on mock domain objects that are NOT part of the real S1 API.
 # Stripped from every webhook delivery so the payload matches the real format.
@@ -207,9 +249,9 @@ def fire_event(event_type: str, payload: dict[str, Any]) -> None:
 
     for sub in subscriptions:
         headers = _build_headers(event_type, sub, body_json)
-        t = threading.Thread(
-            target=_deliver_with_retries,
-            args=(event_type, sub, body_json, headers),
-            daemon=True,
-        )
-        t.start()
+        _DELIVERIES.submit(_deliver_with_retries, event_type, sub, body_json, headers)
+
+
+def wait_for_deliveries(timeout: float = 5.0) -> None:
+    """Block until every submitted delivery has finished (tests)."""
+    _DELIVERIES.wait(timeout)

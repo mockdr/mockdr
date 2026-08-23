@@ -7,6 +7,7 @@ import random
 from faker import Faker
 
 from domain.cs_ioc import CsIoc
+from infrastructure.safe_net import doc_domain, doc_ipv4
 from infrastructure.seeders._shared import ago, rand_ago
 from infrastructure.seeders.cs_shared import (
     CS_IOC_ACTIONS,
@@ -55,9 +56,9 @@ def _generate_ioc_value(fake: Faker, ioc_type: str) -> str:
     if ioc_type == "md5":
         return hashlib.md5(fake.binary(length=16), usedforsecurity=False).hexdigest()  # noqa: S324
     if ioc_type == "domain":
-        return fake.domain_name()
+        return doc_domain()
     if ioc_type == "ipv4":
-        return fake.ipv4_public()
+        return doc_ipv4()
     if ioc_type == "ipv6":
         return fake.ipv6()
     return fake.sha256()

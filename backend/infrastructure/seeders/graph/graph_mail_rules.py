@@ -53,7 +53,7 @@ def seed_graph_mail_rules(fake: Faker, user_ids: list[str]) -> None:
                     {
                         "emailAddress": {
                             "name": "Personal",
-                            "address": "user0.personal@gmail.com",
+                            "address": "user0.personal@personal-mail.example",
                         },
                     },
                 ],
@@ -80,7 +80,7 @@ def seed_graph_mail_rules(fake: Faker, user_ids: list[str]) -> None:
                     {
                         "emailAddress": {
                             "name": "External HR",
-                            "address": "hr@external-consulting.com",
+                            "address": "hr@external-consulting.example",
                         },
                     },
                 ],
@@ -101,7 +101,7 @@ def seed_graph_mail_rules(fake: Faker, user_ids: list[str]) -> None:
                     {
                         "emailAddress": {
                             "name": "Archive",
-                            "address": "archive@competitor.com",
+                            "address": "archive@competitor.example",
                         },
                     },
                 ],

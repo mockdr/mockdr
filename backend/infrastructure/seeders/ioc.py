@@ -5,6 +5,7 @@ from collections.abc import Callable
 from faker import Faker
 
 from domain.ioc import IOC
+from infrastructure.safe_net import doc_ipv4
 from infrastructure.seeders._shared import MALWARE_NAMES, ago, rand_ago
 from repository.ioc_repo import ioc_repo
 from utils.id_gen import new_id
@@ -19,7 +20,7 @@ def seed_iocs(fake: Faker) -> None:
         fake: Shared :class:`~faker.Faker` instance (seeded externally).
     """
     value_map: dict[str, Callable[[], str]] = {
-        "IPV4":   fake.ipv4_public,
+        "IPV4":   doc_ipv4,
         "IPV6":   fake.ipv6,
         "DNS":    fake.domain_name,
         "URL":    fake.url,

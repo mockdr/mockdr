@@ -7,6 +7,7 @@ from faker import Faker
 
 from domain.graph.risk_detection import GraphRiskDetection
 from domain.graph.risky_user import GraphRiskyUser
+from infrastructure.safe_net import doc_ipv4
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.risk_detection_repo import graph_risk_detection_repo
@@ -93,7 +94,7 @@ def seed_graph_identity_protection(fake: Faker, user_ids: list[str]) -> None:
             riskLevel=risk_level,
             riskState="atRisk",
             riskDetail="none",
-            ipAddress=fake.ipv4_public(),
+            ipAddress=doc_ipv4(),
             location={
                 "city": fake.city(),
                 "state": fake.state(),

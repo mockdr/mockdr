@@ -4,6 +4,7 @@ import random
 from faker import Faker
 
 from domain.exclusion import Exclusion
+from infrastructure.safe_net import doc_domain
 from infrastructure.seeders._shared import rand_after, rand_ago
 from repository.exclusion_repo import exclusion_repo
 from repository.site_repo import site_repo
@@ -30,7 +31,7 @@ def seed_exclusions(
             "path": fake.file_path(),
             "white_hash": fake.sha1(),
             "certificate": f"CN={fake.company()}",
-            "browser": fake.domain_name(),
+            "browser": doc_domain(),
         }
         is_global = random.random() > 0.4
         ex_site_id = random.choice(site_ids)

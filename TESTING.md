@@ -573,7 +573,23 @@ jobs:
     needs: [backend-quality, frontend-quality]
     steps:
       - playwright test                       # All critical flows must pass
+
+  hostile-inputs:
+    needs: [backend-quality]
+    steps:
+      - python scripts/fuzz_parsers.py        # No unintended parser exception
+      - python scripts/hostile_probe.py       # No crash path on any route
+
+  field-drift:
+    needs: [backend-quality]
+    steps:
+      - python scripts/field_drift.py --require-spec   # S1 responses vs the 2.1 swagger
 ```
+
+The remaining jobs (secret scanning, Docker build, Trivy, SBOM) gate the
+image. What runs before a release but not in CI — the conformance harness,
+`schema_drift.py`, `load_test.py` — is listed with the release checklist in
+`scripts/README.md`.
 
 **There is no `--allow-no-tests` flag. There is no `|| true` after any quality command.**
 
