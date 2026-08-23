@@ -85,7 +85,7 @@ describe('vendor client interceptors', () => {
     localStorage.setItem('mde_token', 't')
     const error = { isAxiosError: true, response: { status: 401 } }
     for (const fail of captured.failure) {
-      await fail(error).catch(() => undefined)
+      await (fail(error) as Promise<unknown>).catch(() => undefined)
     }
     expect(localStorage.getItem('s1_token')).toBeNull()
     expect(localStorage.getItem('cs_token')).toBeNull()
