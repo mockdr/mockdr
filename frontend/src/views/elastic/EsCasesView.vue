@@ -110,7 +110,7 @@ onMounted(() => fetchCases())
         </div>
         <div>
           <label class="text-xs text-s1-muted">Severity</label>
-          <select v-model="newCase.severity" class="select mt-1">
+          <select v-model="newCase.severity" class="select mt-1" aria-label="Severity">
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
@@ -140,12 +140,12 @@ onMounted(() => fetchCases())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Title</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Tags</th>
-            <th class="table-header text-left">Comments</th>
-            <th class="table-header text-left">Created</th>
+            <th scope="col" class="table-header text-left">Title</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Tags</th>
+            <th scope="col" class="table-header text-left">Comments</th>
+            <th scope="col" class="table-header text-left">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -155,7 +155,7 @@ onMounted(() => fetchCases())
               v-for="c in cases" :key="c.id"
               class="table-row"
               @click="router.push(`/elastic/cases/${c.id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/elastic/cases/${c.id}`)">
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[250px]">{{ c.title }}</div>
                 <div class="text-xs text-s1-muted">by {{ c.created_by?.username ?? 'unknown' }}</div>

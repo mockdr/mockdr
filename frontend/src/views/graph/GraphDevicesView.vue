@@ -61,12 +61,12 @@ onMounted(() => fetchDevices())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Device Name</th>
-            <th class="table-header text-left">OS</th>
-            <th class="table-header text-left">Compliance</th>
-            <th class="table-header text-left">Last Sync</th>
-            <th class="table-header text-left">Owner (UPN)</th>
-            <th class="table-header text-left">Model</th>
+            <th scope="col" class="table-header text-left">Device Name</th>
+            <th scope="col" class="table-header text-left">OS</th>
+            <th scope="col" class="table-header text-left">Compliance</th>
+            <th scope="col" class="table-header text-left">Last Sync</th>
+            <th scope="col" class="table-header text-left">Owner (UPN)</th>
+            <th scope="col" class="table-header text-left">Model</th>
           </tr>
         </thead>
         <tbody>

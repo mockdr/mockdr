@@ -53,10 +53,10 @@ onMounted(() => fetchRings())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Description</th>
-            <th class="table-header text-left">Quality Deferral (days)</th>
-            <th class="table-header text-left">Feature Deferral (days)</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Description</th>
+            <th scope="col" class="table-header text-left">Quality Deferral (days)</th>
+            <th scope="col" class="table-header text-left">Feature Deferral (days)</th>
           </tr>
         </thead>
         <tbody>

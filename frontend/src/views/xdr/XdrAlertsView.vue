@@ -75,14 +75,14 @@ onMounted(() => fetchAlerts())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterSeverity" class="select">
+      <select v-model="filterSeverity" class="select" aria-label="Severity">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
       </select>
-      <select v-model="filterSource" class="select">
+      <select v-model="filterSource" class="select" aria-label="Source">
         <option value="">All Sources</option>
         <option v-for="src in uniqueSources" :key="src" :value="src">{{ src }}</option>
       </select>
@@ -96,14 +96,14 @@ onMounted(() => fetchAlerts())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Alert ID</th>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Category</th>
-            <th class="table-header text-left">Source</th>
-            <th class="table-header text-left">Action</th>
-            <th class="table-header text-left">Host</th>
-            <th class="table-header text-left">Detected</th>
+            <th scope="col" class="table-header text-left">Alert ID</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Category</th>
+            <th scope="col" class="table-header text-left">Source</th>
+            <th scope="col" class="table-header text-left">Action</th>
+            <th scope="col" class="table-header text-left">Host</th>
+            <th scope="col" class="table-header text-left">Detected</th>
           </tr>
         </thead>
         <tbody>

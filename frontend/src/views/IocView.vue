@@ -134,7 +134,7 @@ onMounted(fetchList)
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-4 py-3">
+            <th scope="col" class="px-4 py-3">
               <input
                 type="checkbox"
                 :checked="selected.size === items.length && items.length > 0"
@@ -142,11 +142,11 @@ onMounted(fetchList)
                 class="rounded-sm"
               />
             </th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">Value</th>
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Description</th>
-            <th class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3">Type</th>
+            <th scope="col" class="px-5 py-3">Value</th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">Description</th>
+            <th scope="col" class="px-5 py-3">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -156,7 +156,7 @@ onMounted(fetchList)
             :class="selected.has(ioc.uuid) ? 'bg-s1-primary/5' : ''"
           >
             <td class="px-4 py-3">
-              <input type="checkbox" :checked="selected.has(ioc.uuid)" @change="toggleSelect(ioc.uuid)" class="rounded-sm" />
+              <input type="checkbox" aria-label="Select row" :checked="selected.has(ioc.uuid)" @change="toggleSelect(ioc.uuid)" class="rounded-sm" />
             </td>
             <td class="px-5 py-3">
               <span class="text-xs font-mono px-2 py-0.5 rounded-sm bg-s1-border text-s1-text uppercase">{{ ioc.type }}</span>

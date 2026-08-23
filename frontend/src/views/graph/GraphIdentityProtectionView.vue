@@ -73,11 +73,11 @@ onMounted(() => fetchData())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">User</th>
-            <th class="table-header text-left">UPN</th>
-            <th class="table-header text-left">Risk Level</th>
-            <th class="table-header text-left">Risk State</th>
-            <th class="table-header text-left">Last Updated</th>
+            <th scope="col" class="table-header text-left">User</th>
+            <th scope="col" class="table-header text-left">UPN</th>
+            <th scope="col" class="table-header text-left">Risk Level</th>
+            <th scope="col" class="table-header text-left">Risk State</th>
+            <th scope="col" class="table-header text-left">Last Updated</th>
           </tr>
         </thead>
         <tbody>
@@ -120,11 +120,11 @@ onMounted(() => fetchData())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">User</th>
-            <th class="table-header text-left">Risk Type</th>
-            <th class="table-header text-left">Risk Level</th>
-            <th class="table-header text-left">IP Address</th>
-            <th class="table-header text-left">Detected</th>
+            <th scope="col" class="table-header text-left">User</th>
+            <th scope="col" class="table-header text-left">Risk Type</th>
+            <th scope="col" class="table-header text-left">Risk Level</th>
+            <th scope="col" class="table-header text-left">IP Address</th>
+            <th scope="col" class="table-header text-left">Detected</th>
           </tr>
         </thead>
         <tbody>

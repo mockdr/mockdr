@@ -54,7 +54,7 @@ function formatDate(ts: string): string {
     <!-- Filters -->
     <div class="card p-4 flex flex-wrap gap-3">
       <input v-model="store.filters.query" class="input flex-1 min-w-[200px]" placeholder="Search threats..." />
-      <select v-model="store.filters.classifications" class="select">
+      <select v-model="store.filters.classifications" class="select" aria-label="Classifications">
         <option value="">All Classifications</option>
         <option value="Malware">Malware</option>
         <option value="Ransomware">Ransomware</option>
@@ -62,14 +62,14 @@ function formatDate(ts: string): string {
         <option value="Exploit">Exploit</option>
         <option value="Trojan">Trojan</option>
       </select>
-      <select v-model="store.filters.mitigationStatuses" class="select">
+      <select v-model="store.filters.mitigationStatuses" class="select" aria-label="Mitigation statuses">
         <option value="">All Statuses</option>
         <option value="active">Active</option>
         <option value="mitigated">Mitigated</option>
         <option value="blocked">Blocked</option>
         <option value="suspicious">Suspicious</option>
       </select>
-      <select v-model="store.filters.incidentStatuses" class="select">
+      <select v-model="store.filters.incidentStatuses" class="select" aria-label="Incident statuses">
         <option value="">All Incidents</option>
         <option value="unresolved">Unresolved</option>
         <option value="in_progress">In Progress</option>
@@ -102,16 +102,16 @@ function formatDate(ts: string): string {
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select all rows" :checked="allSelected" @change="toggleAll" class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
             </th>
-            <th class="table-header text-left">Threat Name</th>
-            <th class="table-header text-left">Classification</th>
-            <th class="table-header text-left">Endpoint</th>
-            <th class="table-header text-left">Mitigation</th>
-            <th class="table-header text-left">Incident</th>
-            <th class="table-header text-left">Verdict</th>
-            <th class="table-header text-left">Detected</th>
+            <th scope="col" class="table-header text-left">Threat Name</th>
+            <th scope="col" class="table-header text-left">Classification</th>
+            <th scope="col" class="table-header text-left">Endpoint</th>
+            <th scope="col" class="table-header text-left">Mitigation</th>
+            <th scope="col" class="table-header text-left">Incident</th>
+            <th scope="col" class="table-header text-left">Verdict</th>
+            <th scope="col" class="table-header text-left">Detected</th>
           </tr>
         </thead>
         <tbody>
@@ -121,9 +121,9 @@ function formatDate(ts: string): string {
               v-for="threat in store.items" :key="threat.id"
               class="table-row"
               @click="router.push(`/threats/${threat.id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/threats/${threat.id}`)">
               <td class="table-cell" @click.stop>
-                <input type="checkbox"
+                <input type="checkbox" aria-label="Select row"
                   :checked="selected.has(threat.id)"
                   @change="toggleSelect(threat.id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />

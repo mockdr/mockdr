@@ -174,7 +174,7 @@ function modeClass(val: string): string {
           @change="onGroupChange"
           :disabled="!!draft || groupsLoading"
           class="input w-48 text-sm disabled:opacity-50"
-        >
+         aria-label="Group">
           <option v-if="!groups.length" :value="null" disabled>No groups</option>
           <option v-for="g in groups" :key="g.id" :value="g">{{ g.name }} ({{ g.id.slice(-6) }})</option>
         </select>

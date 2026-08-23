@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reportFailure } from './report'
 import type {
   CsResponse,
   CsHost,
@@ -29,6 +30,7 @@ csClient.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => response.data,
   (error: unknown) => {
+    void reportFailure(error, 'CrowdStrike')
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       localStorage.removeItem('cs_token')
     }

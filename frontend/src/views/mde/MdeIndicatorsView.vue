@@ -113,7 +113,7 @@ onMounted(() => fetchIndicators())
         </div>
         <div>
           <label class="text-xs text-s1-muted">Type</label>
-          <select v-model="newIndicator.indicatorType" class="select mt-1">
+          <select v-model="newIndicator.indicatorType" class="select mt-1" aria-label="Indicator type">
             <option value="IpAddress">IP Address</option>
             <option value="DomainName">Domain Name</option>
             <option value="Url">URL</option>
@@ -124,7 +124,7 @@ onMounted(() => fetchIndicators())
         </div>
         <div>
           <label class="text-xs text-s1-muted">Action</label>
-          <select v-model="newIndicator.action" class="select mt-1">
+          <select v-model="newIndicator.action" class="select mt-1" aria-label="Action">
             <option value="AlertAndBlock">Alert and Block</option>
             <option value="Alert">Alert Only</option>
             <option value="Allowed">Allowed</option>
@@ -132,7 +132,7 @@ onMounted(() => fetchIndicators())
         </div>
         <div>
           <label class="text-xs text-s1-muted">Severity</label>
-          <select v-model="newIndicator.severity" class="select mt-1">
+          <select v-model="newIndicator.severity" class="select mt-1" aria-label="Severity">
             <option value="High">High</option>
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
@@ -162,12 +162,12 @@ onMounted(() => fetchIndicators())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Value</th>
-            <th class="table-header text-left">Type</th>
-            <th class="table-header text-left">Action</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Title</th>
-            <th class="table-header w-10"></th>
+            <th scope="col" class="table-header text-left">Value</th>
+            <th scope="col" class="table-header text-left">Type</th>
+            <th scope="col" class="table-header text-left">Action</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Title</th>
+            <th scope="col" class="table-header w-10"></th>
           </tr>
         </thead>
         <tbody>

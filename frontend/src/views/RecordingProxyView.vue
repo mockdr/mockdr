@@ -429,7 +429,7 @@ onMounted(() => fetchAll())
             <select
               v-model="recordingFilter"
               class="bg-s1-bg border border-s1-border rounded-lg px-2 py-1 text-xs text-s1-text focus:outline-hidden focus:border-s1-primary"
-            >
+             aria-label="Recording filter">
               <option value="all">All vendors</option>
               <option v-for="v in vendorList" :key="v.vendor" :value="v.vendor">{{ v.label }}</option>
             </select>
@@ -453,12 +453,12 @@ onMounted(() => fetchAll())
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-s1-border text-s1-muted text-xs uppercase tracking-wider">
-                <th class="px-6 py-3 text-left font-medium">Vendor</th>
-                <th class="px-6 py-3 text-left font-medium">Method</th>
-                <th class="px-6 py-3 text-left font-medium">Status</th>
-                <th class="px-6 py-3 text-left font-medium">Path</th>
-                <th class="px-6 py-3 text-left font-medium">Content-Type</th>
-                <th class="px-6 py-3 text-left font-medium">Recorded At</th>
+                <th scope="col" class="px-6 py-3 text-left font-medium">Vendor</th>
+                <th scope="col" class="px-6 py-3 text-left font-medium">Method</th>
+                <th scope="col" class="px-6 py-3 text-left font-medium">Status</th>
+                <th scope="col" class="px-6 py-3 text-left font-medium">Path</th>
+                <th scope="col" class="px-6 py-3 text-left font-medium">Content-Type</th>
+                <th scope="col" class="px-6 py-3 text-left font-medium">Recorded At</th>
               </tr>
             </thead>
             <tbody>

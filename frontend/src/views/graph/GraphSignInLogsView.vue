@@ -51,12 +51,12 @@ onMounted(() => fetchLogs())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Time</th>
-            <th class="table-header text-left">User</th>
-            <th class="table-header text-left">Application</th>
-            <th class="table-header text-left">IP Address</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Location</th>
+            <th scope="col" class="table-header text-left">Time</th>
+            <th scope="col" class="table-header text-left">User</th>
+            <th scope="col" class="table-header text-left">Application</th>
+            <th scope="col" class="table-header text-left">IP Address</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Location</th>
           </tr>
         </thead>
         <tbody>

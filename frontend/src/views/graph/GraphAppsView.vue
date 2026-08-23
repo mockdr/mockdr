@@ -67,11 +67,11 @@ onMounted(() => fetchData())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Publisher</th>
-            <th class="table-header text-left">State</th>
-            <th class="table-header text-left">Installed</th>
-            <th class="table-header text-left">Failed</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Publisher</th>
+            <th scope="col" class="table-header text-left">State</th>
+            <th scope="col" class="table-header text-left">Installed</th>
+            <th scope="col" class="table-header text-left">Failed</th>
           </tr>
         </thead>
         <tbody>
@@ -112,9 +112,9 @@ onMounted(() => fetchData())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Description</th>
-            <th class="table-header text-left">Version</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Description</th>
+            <th scope="col" class="table-header text-left">Version</th>
           </tr>
         </thead>
         <tbody>

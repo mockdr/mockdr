@@ -69,12 +69,12 @@ onMounted(() => fetchData())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Serial Number</th>
-            <th class="table-header text-left">Model</th>
-            <th class="table-header text-left">Manufacturer</th>
-            <th class="table-header text-left">Group Tag</th>
-            <th class="table-header text-left">Enrollment State</th>
-            <th class="table-header text-left">Last Contact</th>
+            <th scope="col" class="table-header text-left">Serial Number</th>
+            <th scope="col" class="table-header text-left">Model</th>
+            <th scope="col" class="table-header text-left">Manufacturer</th>
+            <th scope="col" class="table-header text-left">Group Tag</th>
+            <th scope="col" class="table-header text-left">Enrollment State</th>
+            <th scope="col" class="table-header text-left">Last Contact</th>
           </tr>
         </thead>
         <tbody>
@@ -116,9 +116,9 @@ onMounted(() => fetchData())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Description</th>
-            <th class="table-header text-left">Last Modified</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Description</th>
+            <th scope="col" class="table-header text-left">Last Modified</th>
           </tr>
         </thead>
         <tbody>

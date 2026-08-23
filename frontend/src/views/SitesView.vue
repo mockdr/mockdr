@@ -182,13 +182,13 @@ const STATUS_COLOR: Record<string, string> = {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Account</th>
-            <th class="px-5 py-3">State</th>
-            <th class="px-5 py-3">Licenses</th>
-            <th class="px-5 py-3">Site Type</th>
-            <th class="px-5 py-3">Created</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">Account</th>
+            <th scope="col" class="px-5 py-3">State</th>
+            <th scope="col" class="px-5 py-3">Licenses</th>
+            <th scope="col" class="px-5 py-3">Site Type</th>
+            <th scope="col" class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -316,7 +316,7 @@ const STATUS_COLOR: Record<string, string> = {
             <input id="site-description" v-model="form.description" class="input w-full text-sm" placeholder="Optional" />
           </div>
           <label class="flex items-center gap-2 text-sm text-s1-text cursor-pointer">
-            <input type="checkbox" v-model="form.unlimitedLicenses" class="accent-s1-primary" />
+            <input type="checkbox" aria-label="Select row" v-model="form.unlimitedLicenses" class="accent-s1-primary" />
             Unlimited licenses
           </label>
         </div>

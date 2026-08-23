@@ -178,13 +178,13 @@ async function copyToken(): Promise<void> {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Email</th>
-            <th class="px-5 py-3">Role</th>
-            <th class="px-5 py-3">Scope</th>
-            <th class="px-5 py-3">2FA</th>
-            <th class="px-5 py-3">Last Login</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">Email</th>
+            <th scope="col" class="px-5 py-3">Role</th>
+            <th scope="col" class="px-5 py-3">Scope</th>
+            <th scope="col" class="px-5 py-3">2FA</th>
+            <th scope="col" class="px-5 py-3">Last Login</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>

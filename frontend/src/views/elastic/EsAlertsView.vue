@@ -112,14 +112,14 @@ onMounted(() => fetchAlerts())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterSeverity" class="select">
+      <select v-model="filterSeverity" class="select" aria-label="Severity">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
       </select>
-      <select v-model="filterStatus" class="select">
+      <select v-model="filterStatus" class="select" aria-label="Status">
         <option value="">All Statuses</option>
         <option value="open">Open</option>
         <option value="acknowledged">Acknowledged</option>
@@ -143,17 +143,17 @@ onMounted(() => fetchAlerts())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select row"
                 :checked="alerts.length > 0 && alerts.every(a => selected.has(a.id))"
                 @change="alerts.every(a => selected.has(a.id)) ? selected.clear() : alerts.forEach(a => selected.add(a.id))"
                 class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
             </th>
-            <th class="table-header text-left">Rule Name</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Host</th>
-            <th class="table-header text-left">Timestamp</th>
+            <th scope="col" class="table-header text-left">Rule Name</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Host</th>
+            <th scope="col" class="table-header text-left">Timestamp</th>
           </tr>
         </thead>
         <tbody>
@@ -162,7 +162,7 @@ onMounted(() => fetchAlerts())
             <tr v-for="alert in alerts" :key="alert.id" class="table-row"
               :class="selected.has(alert.id) ? 'bg-purple-500/5' : ''">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="selected.has(alert.id)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(alert.id)"
                   @change="selected.has(alert.id) ? selected.delete(alert.id) : selected.add(alert.id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
               </td>

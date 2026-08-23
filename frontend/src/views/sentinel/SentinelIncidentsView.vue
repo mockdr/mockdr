@@ -83,13 +83,13 @@ onUnmounted(() => clearInterval(timer))
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterStatus" class="select">
+      <select v-model="filterStatus" class="select" aria-label="Status">
         <option value="">All Statuses</option>
         <option value="New">New</option>
         <option value="Active">Active</option>
         <option value="Closed">Closed</option>
       </select>
-      <select v-model="filterSeverity" class="select">
+      <select v-model="filterSeverity" class="select" aria-label="Severity">
         <option value="">All Severities</option>
         <option value="High">High</option>
         <option value="Medium">Medium</option>
@@ -106,13 +106,13 @@ onUnmounted(() => clearInterval(timer))
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Title</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Provider</th>
-            <th class="table-header text-left">Alerts</th>
-            <th class="table-header text-left">Owner</th>
-            <th class="table-header text-left">Created</th>
+            <th scope="col" class="table-header text-left">Title</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Provider</th>
+            <th scope="col" class="table-header text-left">Alerts</th>
+            <th scope="col" class="table-header text-left">Owner</th>
+            <th scope="col" class="table-header text-left">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -122,7 +122,7 @@ onUnmounted(() => clearInterval(timer))
               v-for="inc in filteredIncidents" :key="inc.name"
               class="table-row"
               @click="router.push(`/sentinel/incidents/${inc.name}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/sentinel/incidents/${inc.name}`)">
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[250px]">
                   {{ inc.properties.title }}

@@ -139,14 +139,14 @@ onMounted(() => fetchRules())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterSeverity" class="select">
+      <select v-model="filterSeverity" class="select" aria-label="Severity">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
       </select>
-      <select v-model="filterEnabled" class="select">
+      <select v-model="filterEnabled" class="select" aria-label="Enabled">
         <option value="">All Status</option>
         <option value="true">Enabled</option>
         <option value="false">Disabled</option>
@@ -177,7 +177,7 @@ onMounted(() => fetchRules())
         </div>
         <div>
           <label class="text-xs text-s1-muted">Severity</label>
-          <select v-model="newRule.severity" class="select mt-1">
+          <select v-model="newRule.severity" class="select mt-1" aria-label="Severity">
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
@@ -190,7 +190,7 @@ onMounted(() => fetchRules())
         </div>
         <div>
           <label class="text-xs text-s1-muted">Type</label>
-          <select v-model="newRule.type" class="select mt-1">
+          <select v-model="newRule.type" class="select mt-1" aria-label="Type">
             <option value="query">Query</option>
             <option value="eql">EQL</option>
             <option value="threshold">Threshold</option>
@@ -212,19 +212,19 @@ onMounted(() => fetchRules())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select row"
                 :checked="rules.length > 0 && rules.every(r => selected.has(r.id))"
                 @change="rules.every(r => selected.has(r.id)) ? selected.clear() : rules.forEach(r => selected.add(r.id))"
                 class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
             </th>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Risk Score</th>
-            <th class="table-header text-left">Enabled</th>
-            <th class="table-header text-left">Type</th>
-            <th class="table-header text-left">Tags</th>
-            <th class="table-header w-10"></th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Risk Score</th>
+            <th scope="col" class="table-header text-left">Enabled</th>
+            <th scope="col" class="table-header text-left">Type</th>
+            <th scope="col" class="table-header text-left">Tags</th>
+            <th scope="col" class="table-header w-10"></th>
           </tr>
         </thead>
         <tbody>
@@ -233,7 +233,7 @@ onMounted(() => fetchRules())
             <tr v-for="rule in rules" :key="rule.id" class="table-row"
               :class="selected.has(rule.id) ? 'bg-purple-500/5' : ''">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="selected.has(rule.id)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(rule.id)"
                   @change="selected.has(rule.id) ? selected.delete(rule.id) : selected.add(rule.id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
               </td>

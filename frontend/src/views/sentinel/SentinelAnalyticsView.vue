@@ -80,11 +80,11 @@ onUnmounted(() => clearInterval(timer))
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Kind</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Enabled</th>
-            <th class="table-header text-left">Tactics</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Kind</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Enabled</th>
+            <th scope="col" class="table-header text-left">Tactics</th>
           </tr>
         </thead>
         <tbody>

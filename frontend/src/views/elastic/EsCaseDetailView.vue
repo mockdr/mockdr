@@ -187,6 +187,7 @@ onMounted(async () => {
               placeholder="Add a comment..."
             ></textarea>
             <button
+              aria-label="Add comment"
               @click="addComment()"
               :disabled="!commentText.trim() || submitting"
               class="btn-ghost flex items-center gap-1.5 text-purple-400"

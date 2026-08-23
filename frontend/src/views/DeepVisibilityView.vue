@@ -138,12 +138,12 @@ const EVENT_TYPE_COLOR: Record<string, string> = {
         <table class="w-full text-xs">
           <thead class="border-b border-s1-border">
             <tr class="text-left text-s1-muted uppercase tracking-wide">
-              <th class="px-4 py-2.5">Type</th>
-              <th class="px-4 py-2.5">Time</th>
-              <th class="px-4 py-2.5">Endpoint</th>
-              <th class="px-4 py-2.5">Process</th>
-              <th class="px-4 py-2.5">User</th>
-              <th class="px-4 py-2.5">Details</th>
+              <th scope="col" class="px-4 py-2.5">Type</th>
+              <th scope="col" class="px-4 py-2.5">Time</th>
+              <th scope="col" class="px-4 py-2.5">Endpoint</th>
+              <th scope="col" class="px-4 py-2.5">Process</th>
+              <th scope="col" class="px-4 py-2.5">User</th>
+              <th scope="col" class="px-4 py-2.5">Details</th>
             </tr>
           </thead>
           <tbody>

@@ -62,21 +62,22 @@ describe('useAuthStore', () => {
       expect(store.user).toEqual(mockUser)
     })
 
-    it('falls back to preset token metadata when API throws', async () => {
+    it('rejects and clears the token when the backend is unreachable', async () => {
       vi.mocked(usersApi.loginByToken).mockRejectedValueOnce(new Error('network error'))
 
       const store = useAuthStore()
-      const presetToken = PRESET_TOKENS[0]
-      await store.login(presetToken.token)
+      await expect(store.login(PRESET_TOKENS[0].token)).rejects.toThrow('network error')
 
-      expect(store.user).toEqual(presetToken)
+      expect(store.user).toBeNull()
+      expect(store.token).toBe('')
+      expect(localStorage.getItem('s1_token')).toBeNull()
     })
 
-    it('sets user to null when API throws and token is not a preset', async () => {
-      vi.mocked(usersApi.loginByToken).mockRejectedValueOnce(new Error('network error'))
+    it('rejects when the backend refuses the token', async () => {
+      vi.mocked(usersApi.loginByToken).mockRejectedValueOnce(new Error('401'))
 
       const store = useAuthStore()
-      await store.login('unknown-token-xyz')
+      await expect(store.login('unknown-token-xyz')).rejects.toThrow()
 
       expect(store.user).toBeNull()
     })

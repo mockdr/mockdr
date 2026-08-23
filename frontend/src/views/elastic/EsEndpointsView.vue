@@ -122,16 +122,16 @@ onMounted(() => fetchEndpoints())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select all rows" :checked="allSelected" @change="toggleAll"
                 class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
             </th>
-            <th class="table-header text-left">Hostname</th>
-            <th class="table-header text-left">OS</th>
-            <th class="table-header text-left">Agent Status</th>
-            <th class="table-header text-left">Isolation</th>
-            <th class="table-header text-left">Agent Version</th>
-            <th class="table-header text-left">Policy</th>
+            <th scope="col" class="table-header text-left">Hostname</th>
+            <th scope="col" class="table-header text-left">OS</th>
+            <th scope="col" class="table-header text-left">Agent Status</th>
+            <th scope="col" class="table-header text-left">Isolation</th>
+            <th scope="col" class="table-header text-left">Agent Version</th>
+            <th scope="col" class="table-header text-left">Policy</th>
           </tr>
         </thead>
         <tbody>
@@ -143,7 +143,7 @@ onMounted(() => fetchEndpoints())
               :class="selected.has(ep.agent_id) ? 'bg-purple-500/5' : ''"
             >
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="selected.has(ep.agent_id)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(ep.agent_id)"
                   @change="toggleSelect(ep.agent_id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-purple-500" />
               </td>

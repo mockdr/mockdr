@@ -107,8 +107,8 @@ onMounted(() => fetchUser())
         <table class="w-full">
           <thead class="border-b border-s1-border">
             <tr>
-              <th class="table-header text-left">Group Name</th>
-              <th class="table-header text-left">Description</th>
+              <th scope="col" class="table-header text-left">Group Name</th>
+              <th scope="col" class="table-header text-left">Description</th>
             </tr>
           </thead>
           <tbody>

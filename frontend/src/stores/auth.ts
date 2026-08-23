@@ -23,19 +23,24 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Authenticate with the given API token.
    *
-   * Attempts to resolve the user via the API; falls back to preset token
-   * metadata when the server is unavailable.
+   * Resolves the user via the API. A login that cannot reach the backend
+   * fails — it used to "succeed" on preset metadata and leave the user on
+   * a dashboard where every panel was silently empty.
    *
    * @param selectedToken - The API token string to activate.
+   * @throws When the backend is unreachable or rejects the token.
    */
   async function login(selectedToken: string): Promise<void> {
     token.value = selectedToken
     localStorage.setItem('s1_token', selectedToken)
     try {
       const res = await usersApi.loginByToken()
-      user.value = res.data
-    } catch {
-      user.value = PRESET_TOKENS.find((t) => t.token === selectedToken) ?? null
+      user.value = res.data ?? PRESET_TOKENS.find((t) => t.token === selectedToken) ?? null
+    } catch (error) {
+      token.value = ''
+      user.value = null
+      localStorage.removeItem('s1_token')
+      throw error
     }
   }
 

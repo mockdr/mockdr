@@ -49,11 +49,11 @@ onMounted(fetchIndexes)
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-s1-border">
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Index Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Event Count</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Size (MB)</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Data Type</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Status</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Index Name</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Event Count</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Size (MB)</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Data Type</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Status</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-s1-border">

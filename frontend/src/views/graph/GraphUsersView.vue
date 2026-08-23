@@ -54,12 +54,12 @@ onMounted(() => fetchUsers())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Display Name</th>
-            <th class="table-header text-left">UPN</th>
-            <th class="table-header text-left">Department</th>
-            <th class="table-header text-left">Job Title</th>
-            <th class="table-header text-left">Account Status</th>
-            <th class="table-header text-left">Last Sign-In</th>
+            <th scope="col" class="table-header text-left">Display Name</th>
+            <th scope="col" class="table-header text-left">UPN</th>
+            <th scope="col" class="table-header text-left">Department</th>
+            <th scope="col" class="table-header text-left">Job Title</th>
+            <th scope="col" class="table-header text-left">Account Status</th>
+            <th scope="col" class="table-header text-left">Last Sign-In</th>
           </tr>
         </thead>
         <tbody>

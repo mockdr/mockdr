@@ -444,7 +444,7 @@ onUnmounted(stopPolling)
           </div>
           <div>
             <label class="block text-xs font-medium text-s1-muted mb-1.5">Category</label>
-            <select v-model="editing.category" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary">
+            <select v-model="editing.category" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary" aria-label="Category">
               <option value="malware">malware</option>
               <option value="ransomware">ransomware</option>
               <option value="lateral">lateral</option>
@@ -454,7 +454,7 @@ onUnmounted(stopPolling)
           </div>
           <div>
             <label class="block text-xs font-medium text-s1-muted mb-1.5">Severity</label>
-            <select v-model="editing.severity" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary">
+            <select v-model="editing.severity" class="w-full bg-s1-card border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text focus:outline-hidden focus:border-s1-primary" aria-label="Severity">
               <option>CRITICAL</option>
               <option>HIGH</option>
               <option>MEDIUM</option>
@@ -517,7 +517,7 @@ onUnmounted(stopPolling)
                   :value="step.action"
                   @change="onStepActionChange(idx, ($event.target as HTMLSelectElement).value)"
                   class="bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary"
-                >
+                 aria-label="Filter by activity">
                   <option value="activity">activity</option>
                   <option value="threat">threat</option>
                   <option value="alert">alert</option>
@@ -536,7 +536,7 @@ onUnmounted(stopPolling)
                 <template v-if="step.action === 'activity'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">activityType</label>
-                    <select v-model.number="step.activityType" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
+                    <select v-model.number="step.activityType" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" aria-label="Activity type">
                       <option :value="2">PROCESS_EVENT (2)</option>
                       <option :value="6">USER_SESSION (6)</option>
                       <option :value="10">ADMIN_NOTE (10)</option>
@@ -566,13 +566,13 @@ onUnmounted(stopPolling)
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">classification</label>
-                    <select v-model="step.classification" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
+                    <select v-model="step.classification" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" aria-label="Classification">
                       <option>Trojan</option><option>Ransomware</option><option>PUA</option><option>Malware</option>
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">confidenceLevel</label>
-                    <select v-model="step.confidenceLevel" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
+                    <select v-model="step.confidenceLevel" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" aria-label="Confidence level">
                       <option>malicious</option><option>suspicious</option>
                     </select>
                   </div>
@@ -589,7 +589,7 @@ onUnmounted(stopPolling)
                 <template v-else-if="step.action === 'alert'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">severity</label>
-                    <select v-model="step.severity" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
+                    <select v-model="step.severity" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" aria-label="Severity">
                       <option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
                     </select>
                   </div>
@@ -614,7 +614,7 @@ onUnmounted(stopPolling)
                 <template v-else-if="step.action === 'agent_state'">
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">infected</label>
-                    <select v-model="step.infected" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
+                    <select v-model="step.infected" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" aria-label="Infected">
                       <option :value="true">true</option>
                       <option :value="false">false</option>
                     </select>
@@ -625,7 +625,7 @@ onUnmounted(stopPolling)
                   </div>
                   <div>
                     <label class="block text-xs text-s1-muted mb-1">networkStatus</label>
-                    <select v-model="step.networkStatus" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary">
+                    <select v-model="step.networkStatus" class="w-full bg-s1-bg border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-subtle focus:outline-hidden focus:border-s1-primary" aria-label="Network status">
                       <option>connected</option><option>disconnected</option>
                     </select>
                   </div>

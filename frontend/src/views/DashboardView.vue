@@ -93,7 +93,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">OS Distribution</h3>
         <div class="h-40">
-          <Doughnut v-if="!dash.loading" :data="osChartData" :options="chartOptions" />
+          <Doughnut v-if="!dash.loading" :data="osChartData" :options="chartOptions" aria-label="Endpoints by operating system" />
         </div>
       </div>
 
@@ -101,7 +101,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="card p-5">
         <h3 class="text-sm font-semibold text-s1-text mb-4">Agent Health</h3>
         <div class="h-40">
-          <Doughnut v-if="!dash.loading" :data="healthChartData" :options="chartOptions" />
+          <Doughnut v-if="!dash.loading" :data="healthChartData" :options="chartOptions" aria-label="Endpoints by health status" />
         </div>
       </div>
 
@@ -145,7 +145,7 @@ onUnmounted(() => clearInterval(timer))
               v-for="threat in dash.recentThreats" :key="threat.id"
               class="table-row"
               @click="router.push(`/threats/${threat.id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/threats/${threat.id}`)">
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[140px]">{{ threat.threatInfo.threatName }}</div>
                 <div class="text-xs text-s1-muted">{{ threat.agentDetectionInfo.agentComputerName }}</div>

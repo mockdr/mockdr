@@ -168,14 +168,14 @@ const ACTION_COLOR: Record<string, string> = {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Device Class</th>
-            <th class="px-5 py-3">Interface</th>
-            <th class="px-5 py-3">Action</th>
-            <th class="px-5 py-3">Access</th>
-            <th class="px-5 py-3">Vendor ID</th>
-            <th class="px-5 py-3">Status</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">Device Class</th>
+            <th scope="col" class="px-5 py-3">Interface</th>
+            <th scope="col" class="px-5 py-3">Action</th>
+            <th scope="col" class="px-5 py-3">Access</th>
+            <th scope="col" class="px-5 py-3">Vendor ID</th>
+            <th scope="col" class="px-5 py-3">Status</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -253,7 +253,7 @@ const ACTION_COLOR: Record<string, string> = {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs text-s1-muted mb-1">Action</label>
-              <select v-model="form.action" class="input w-full text-sm">
+              <select v-model="form.action" class="input w-full text-sm" aria-label="Action">
                 <option value="Allow">Allow</option>
                 <option value="Block">Block</option>
                 <option value="Read-Only">Read-Only</option>
@@ -261,7 +261,7 @@ const ACTION_COLOR: Record<string, string> = {
             </div>
             <div>
               <label class="block text-xs text-s1-muted mb-1">Status</label>
-              <select v-model="form.status" class="input w-full text-sm">
+              <select v-model="form.status" class="input w-full text-sm" aria-label="Status">
                 <option value="Enabled">Enabled</option>
                 <option value="Disabled">Disabled</option>
               </select>
@@ -272,7 +272,7 @@ const ACTION_COLOR: Record<string, string> = {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs text-s1-muted mb-1">Interface</label>
-              <select v-model="form.interface" class="input w-full text-sm">
+              <select v-model="form.interface" class="input w-full text-sm" aria-label="Interface">
                 <option value="USB">USB</option>
                 <option value="Bluetooth">Bluetooth</option>
                 <option value="Thunderbolt">Thunderbolt</option>
@@ -281,7 +281,7 @@ const ACTION_COLOR: Record<string, string> = {
             </div>
             <div>
               <label class="block text-xs text-s1-muted mb-1">Rule Type</label>
-              <select v-model="form.ruleType" class="input w-full text-sm">
+              <select v-model="form.ruleType" class="input w-full text-sm" aria-label="Rule type">
                 <option value="class">Class</option>
                 <option value="vendorId">Vendor ID</option>
                 <option value="productId">Product ID</option>
@@ -302,7 +302,7 @@ const ACTION_COLOR: Record<string, string> = {
           <!-- Access Permission -->
           <div>
             <label class="block text-xs text-s1-muted mb-1">Access Permission</label>
-            <select v-model="form.accessPermission" class="input w-full text-sm">
+            <select v-model="form.accessPermission" class="input w-full text-sm" aria-label="Access permission">
               <option value="Not-Applicable">Not Applicable</option>
               <option value="Read-Only">Read-Only</option>
               <option value="Read-Write">Read-Write</option>

@@ -145,7 +145,7 @@ onMounted(() => fetchMachines())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterPlatform" class="select">
+      <select v-model="filterPlatform" class="select" aria-label="Platform">
         <option value="">All Platforms</option>
         <option value="Windows10">Windows 10</option>
         <option value="Windows11">Windows 11</option>
@@ -153,14 +153,14 @@ onMounted(() => fetchMachines())
         <option value="Linux">Linux</option>
         <option value="macOS">macOS</option>
       </select>
-      <select v-model="filterHealth" class="select">
+      <select v-model="filterHealth" class="select" aria-label="Health">
         <option value="">All Health</option>
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
         <option value="ImpairedCommunication">Impaired</option>
         <option value="NoCommunication">No Communication</option>
       </select>
-      <select v-model="filterRisk" class="select">
+      <select v-model="filterRisk" class="select" aria-label="Risk">
         <option value="">All Risk</option>
         <option value="High">High</option>
         <option value="Medium">Medium</option>
@@ -188,15 +188,15 @@ onMounted(() => fetchMachines())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select all rows" :checked="allSelected" @change="toggleAll"
                 class="rounded-sm border-s1-border bg-s1-bg accent-green-500" />
             </th>
-            <th class="table-header text-left">Computer Name</th>
-            <th class="table-header text-left">OS Platform</th>
-            <th class="table-header text-left">Health Status</th>
-            <th class="table-header text-left">Risk Score</th>
-            <th class="table-header text-left">Last Seen</th>
+            <th scope="col" class="table-header text-left">Computer Name</th>
+            <th scope="col" class="table-header text-left">OS Platform</th>
+            <th scope="col" class="table-header text-left">Health Status</th>
+            <th scope="col" class="table-header text-left">Risk Score</th>
+            <th scope="col" class="table-header text-left">Last Seen</th>
           </tr>
         </thead>
         <tbody>
@@ -207,9 +207,9 @@ onMounted(() => fetchMachines())
               class="table-row"
               :class="selected.has(machine.machineId) ? 'bg-green-500/5' : ''"
               @click="router.push(`/defender/machines/${machine.machineId}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/defender/machines/${machine.machineId}`)">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="selected.has(machine.machineId)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(machine.machineId)"
                   @change="toggleSelect(machine.machineId)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-green-500" />
               </td>

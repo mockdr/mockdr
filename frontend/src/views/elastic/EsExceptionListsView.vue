@@ -160,7 +160,7 @@ onMounted(async () => {
         </div>
         <div>
           <label class="text-xs text-s1-muted">Type</label>
-          <select v-model="newList.type" class="select mt-1">
+          <select v-model="newList.type" class="select mt-1" aria-label="Type">
             <option value="detection">Detection</option>
             <option value="endpoint">Endpoint</option>
           </select>
@@ -179,7 +179,7 @@ onMounted(async () => {
       <div class="card overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-s1-border">
           <h3 class="text-sm font-semibold text-s1-text">Lists</h3>
-          <button @click="showCreateList = true" class="btn-ghost p-1 text-purple-400">
+          <button aria-label="Create list" @click="showCreateList = true" class="btn-ghost p-1 text-purple-400">
             <Plus class="w-3.5 h-3.5" />
           </button>
         </div>
@@ -214,7 +214,7 @@ onMounted(async () => {
               ({{ items.length }})
             </span>
           </h3>
-          <button v-if="selectedListId" @click="showCreateItem = true" class="btn-ghost p-1 text-purple-400">
+          <button v-if="selectedListId" aria-label="Add exception item" @click="showCreateItem = true" class="btn-ghost p-1 text-purple-400">
             <Plus class="w-3.5 h-3.5" />
           </button>
         </div>
@@ -253,10 +253,10 @@ onMounted(async () => {
         <table v-else-if="items.length > 0" class="w-full">
           <thead class="border-b border-s1-border">
             <tr>
-              <th class="table-header text-left">Name</th>
-              <th class="table-header text-left">Entries</th>
-              <th class="table-header text-left">Created</th>
-              <th class="table-header w-10"></th>
+              <th scope="col" class="table-header text-left">Name</th>
+              <th scope="col" class="table-header text-left">Entries</th>
+              <th scope="col" class="table-header text-left">Created</th>
+              <th scope="col" class="table-header w-10"></th>
             </tr>
           </thead>
           <tbody>

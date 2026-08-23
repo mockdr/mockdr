@@ -548,13 +548,14 @@ const ACTIONS: ActionItem[] = [
                   v-model="selectedTagId"
                   class="input flex-1 text-sm"
                   :disabled="actionLoading"
-                >
+                 aria-label="Tag id">
                   <option value="" disabled>Select a tag to assign…</option>
                   <option v-for="t in availableTags" :key="t.id" :value="t.id">
                     {{ t.key }}: {{ t.value }} ({{ t.scopeLevel }})
                   </option>
                 </select>
                 <button
+                  aria-label="Add tag"
                   @click="addTag"
                   :disabled="actionLoading || !selectedTagId"
                   class="btn-primary px-3"

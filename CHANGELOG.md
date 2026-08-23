@@ -57,8 +57,39 @@ Defender path without `/stats`; `data/vendor-specs/crowdstrike_swagger.json`
 was a CloudFront error page; `get_threat` bypassed the shared
 `public_threat` serializer.
 
+**What the same review listed below its top three — done.** Seed data
+names nobody real: documentation IP ranges (RFC 5737) and reserved
+`.example`/`.test` domains replace Faker's routable addresses and
+surname domains, and no seeded mail rule forwards to `gmail.com`. Cortex
+XDR exclusions, violations and agent reports no longer carry a fixed 2023
+timestamp. The persistence snapshot records the version that wrote it.
+Webhook deliveries run on eight daemon workers instead of a sleeping
+thread per subscription per event. The Docker image owns `/app` as
+`appuser`. ARCHITECTURE.md describes the eight platforms, the
+measured-fidelity method and the verification tooling (it had stood still
+since March); `scripts/README.md` maps every script to when it runs and
+holds the release checklist.
+
+**The console fails honestly and can be used without a mouse.** A login
+that cannot reach the backend fails with a message instead of "succeeding"
+on preset metadata and landing on an empty dashboard. Every API client
+reports a failed request to a notifications store rendered as toasts in a
+polite `aria-live` region, so the 39 views that swallow errors in a bare
+`catch {}` no longer fail silently; identical messages collapse. Rows that
+navigate on click are focusable and open on Enter; every `<th>` carries
+`scope="col"`; selection checkboxes and filter selects have accessible
+names; icon-only buttons have labels; the two dashboard charts describe
+themselves; a skip link precedes the sidebar; focus is visible;
+`prefers-reduced-motion` stops the infinite animations; the muted text,
+primary-as-text, danger badge and the Splunk search button meet WCAG AA
+contrast; checkboxes are 24 px targets. An axe-core Playwright suite
+(`e2e/accessibility.spec.ts`) fails on any serious or critical WCAG 2.2 AA
+violation on the login, dashboard, endpoints, threats and Splunk search
+pages. The Vite dev proxy now forwards every vendor root.
+
 ### Added
 
+- `frontend/e2e/accessibility.spec.ts` (axe-core), `src/stores/notifications.ts`, `Toasts.vue`.
 - `data/vendor-specs/NOTICE.md`: every vendored reference with its source,
   licence and what of it is kept (key paths only for the Elastic-licensed
   Event Streams recordings and the unlicensed Cortex transcription).

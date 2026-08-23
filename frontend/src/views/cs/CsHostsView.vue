@@ -135,13 +135,13 @@ onMounted(() => fetchHosts())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterPlatform" class="select">
+      <select v-model="filterPlatform" class="select" aria-label="Platform">
         <option value="">All Platforms</option>
         <option value="Windows">Windows</option>
         <option value="Mac">Mac</option>
         <option value="Linux">Linux</option>
       </select>
-      <select v-model="filterStatus" class="select">
+      <select v-model="filterStatus" class="select" aria-label="Status">
         <option value="">All Status</option>
         <option value="normal">Normal</option>
         <option value="contained">Contained</option>
@@ -169,17 +169,17 @@ onMounted(() => fetchHosts())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select all rows" :checked="allSelected" @change="toggleAll"
                 class="rounded-sm border-s1-border bg-s1-bg accent-red-500" />
             </th>
-            <th class="table-header text-left">Hostname</th>
-            <th class="table-header text-left">Platform</th>
-            <th class="table-header text-left">OS Version</th>
-            <th class="table-header text-left">External IP</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Agent Version</th>
-            <th class="table-header text-left">Last Seen</th>
+            <th scope="col" class="table-header text-left">Hostname</th>
+            <th scope="col" class="table-header text-left">Platform</th>
+            <th scope="col" class="table-header text-left">OS Version</th>
+            <th scope="col" class="table-header text-left">External IP</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Agent Version</th>
+            <th scope="col" class="table-header text-left">Last Seen</th>
           </tr>
         </thead>
         <tbody>
@@ -190,9 +190,9 @@ onMounted(() => fetchHosts())
               class="table-row"
               :class="selected.has(host.device_id) ? 'bg-red-500/5' : ''"
               @click="router.push(`/crowdstrike/hosts/${host.device_id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/crowdstrike/hosts/${host.device_id}`)">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="selected.has(host.device_id)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(host.device_id)"
                   @change="toggleSelect(host.device_id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-red-500" />
               </td>

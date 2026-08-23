@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reportFailure } from './report'
 import type {
   EsSearchResponse,
   KibanaListResponse,
@@ -30,6 +31,7 @@ esClient.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => response.data,
   (error) => {
+    void reportFailure(error, 'Elastic')
     if (error.response?.status === 401) {
       localStorage.removeItem('es_token')
     }
@@ -55,6 +57,7 @@ kbnClient.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => response.data,
   (error) => {
+    void reportFailure(error, 'Elastic')
     if (error.response?.status === 401) {
       localStorage.removeItem('es_token')
     }

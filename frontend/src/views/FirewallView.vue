@@ -210,15 +210,15 @@ function toggleOsType(os: string): void {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">#</th>
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Action</th>
-            <th class="px-5 py-3">Direction</th>
-            <th class="px-5 py-3">Protocol</th>
-            <th class="px-5 py-3">Remote Host</th>
-            <th class="px-5 py-3">Port</th>
-            <th class="px-5 py-3">Status</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">#</th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">Action</th>
+            <th scope="col" class="px-5 py-3">Direction</th>
+            <th scope="col" class="px-5 py-3">Protocol</th>
+            <th scope="col" class="px-5 py-3">Remote Host</th>
+            <th scope="col" class="px-5 py-3">Port</th>
+            <th scope="col" class="px-5 py-3">Status</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -306,14 +306,14 @@ function toggleOsType(os: string): void {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs text-s1-muted mb-1">Action</label>
-              <select v-model="form.action" class="input w-full text-sm">
+              <select v-model="form.action" class="input w-full text-sm" aria-label="Action">
                 <option value="Allow">Allow</option>
                 <option value="Block">Block</option>
               </select>
             </div>
             <div>
               <label class="block text-xs text-s1-muted mb-1">Status</label>
-              <select v-model="form.status" class="input w-full text-sm">
+              <select v-model="form.status" class="input w-full text-sm" aria-label="Status">
                 <option value="Enabled">Enabled</option>
                 <option value="Disabled">Disabled</option>
               </select>
@@ -324,7 +324,7 @@ function toggleOsType(os: string): void {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs text-s1-muted mb-1">Direction</label>
-              <select v-model="form.direction" class="input w-full text-sm">
+              <select v-model="form.direction" class="input w-full text-sm" aria-label="Direction">
                 <option value="any">Any</option>
                 <option value="inbound">Inbound</option>
                 <option value="outbound">Outbound</option>
@@ -332,7 +332,7 @@ function toggleOsType(os: string): void {
             </div>
             <div>
               <label class="block text-xs text-s1-muted mb-1">Protocol</label>
-              <select v-model="form.protocol" class="input w-full text-sm">
+              <select v-model="form.protocol" class="input w-full text-sm" aria-label="Protocol">
                 <option value="">Any</option>
                 <option value="TCP">TCP</option>
                 <option value="UDP">UDP</option>
@@ -358,7 +358,7 @@ function toggleOsType(os: string): void {
           <div>
             <label class="block text-xs text-s1-muted mb-1">Remote Host</label>
             <div class="flex gap-2">
-              <select v-model="form.remoteHostType" class="input text-sm w-32">
+              <select v-model="form.remoteHostType" class="input text-sm w-32" aria-label="Remote host type">
                 <option value="any">Any</option>
                 <option value="addresses">Addresses</option>
                 <option value="cidr">CIDR</option>
@@ -377,7 +377,7 @@ function toggleOsType(os: string): void {
           <div>
             <label class="block text-xs text-s1-muted mb-1">Remote Port</label>
             <div class="flex gap-2">
-              <select v-model="form.remotePortType" class="input text-sm w-32">
+              <select v-model="form.remotePortType" class="input text-sm w-32" aria-label="Remote port type">
                 <option value="any">Any</option>
                 <option value="ports">Ports</option>
                 <option value="range">Range</option>
@@ -394,7 +394,7 @@ function toggleOsType(os: string): void {
           <!-- Site (create only) -->
           <div v-if="modalMode === 'create' && sites.length">
             <label class="block text-xs text-s1-muted mb-1">Site scope (optional)</label>
-            <select v-model="form.siteId" class="input w-full text-sm">
+            <select v-model="form.siteId" class="input w-full text-sm" aria-label="Site id">
               <option value="">Global</option>
               <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>

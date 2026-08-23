@@ -81,11 +81,11 @@ onMounted(fetchTokens)
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-s1-border">
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Token</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Index</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Sourcetype</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Status</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Name</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Token</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Index</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Sourcetype</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Status</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-s1-border">
@@ -112,7 +112,7 @@ onMounted(fetchTokens)
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-xs text-s1-muted mb-1">Token</label>
-          <select v-model="testToken" class="w-full bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text">
+          <select v-model="testToken" class="w-full bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text" aria-label="Test token">
             <option value="">Select token...</option>
             <option v-for="t in tokens" :key="t.name" :value="t.content.token">
               {{ t.name }} ({{ t.content.index }})

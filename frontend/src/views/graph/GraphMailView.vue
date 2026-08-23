@@ -90,10 +90,10 @@ onMounted(() => fetchData())
         <table class="w-full">
           <thead class="border-b border-s1-border">
             <tr>
-              <th class="table-header text-left">Subject</th>
-              <th class="table-header text-left">From</th>
-              <th class="table-header text-left">Received</th>
-              <th class="table-header text-left">Status</th>
+              <th scope="col" class="table-header text-left">Subject</th>
+              <th scope="col" class="table-header text-left">From</th>
+              <th scope="col" class="table-header text-left">Received</th>
+              <th scope="col" class="table-header text-left">Status</th>
             </tr>
           </thead>
           <tbody>

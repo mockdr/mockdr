@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reportFailure } from './report'
 import type {
   ODataResponse,
   GraphTokenResponse,
@@ -51,6 +52,7 @@ graphClient.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => response.data,
   (error: unknown) => {
+    void reportFailure(error, 'Graph')
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       localStorage.removeItem('graph_token')
     }

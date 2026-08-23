@@ -8,12 +8,19 @@ const router = useRouter()
 const auth = useAuthStore()
 const selectedToken = ref(PRESET_TOKENS[0].token)
 const loading = ref(false)
+const error = ref('')
 
 async function login(): Promise<void> {
   loading.value = true
+  error.value = ''
   try {
     await auth.login(selectedToken.value)
     router.push('/dashboard')
+  } catch (e) {
+    const status = (e as { response?: { status?: number } })?.response?.status
+    error.value = status
+      ? `The backend rejected this token (${status}).`
+      : 'The backend is not reachable. Start it and try again.'
   } finally {
     loading.value = false
   }
@@ -58,6 +65,8 @@ async function login(): Promise<void> {
             </div>
           </button>
         </div>
+
+        <p v-if="error" role="alert" class="text-sm text-s1-danger mb-3">{{ error }}</p>
 
         <button
           @click="login"

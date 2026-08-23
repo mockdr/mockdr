@@ -59,11 +59,11 @@ onMounted(() => fetchLogs())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Time</th>
-            <th class="table-header text-left">Activity</th>
-            <th class="table-header text-left">Category</th>
-            <th class="table-header text-left">Result</th>
-            <th class="table-header text-left">Initiated By</th>
+            <th scope="col" class="table-header text-left">Time</th>
+            <th scope="col" class="table-header text-left">Activity</th>
+            <th scope="col" class="table-header text-left">Category</th>
+            <th scope="col" class="table-header text-left">Result</th>
+            <th scope="col" class="table-header text-left">Initiated By</th>
           </tr>
         </thead>
         <tbody>

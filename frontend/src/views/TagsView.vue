@@ -210,14 +210,14 @@ onMounted(async () => {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Key</th>
-            <th class="px-5 py-3">Value</th>
-            <th class="px-5 py-3">Scope</th>
-            <th class="px-5 py-3">Scope Path</th>
-            <th class="px-5 py-3">Endpoints</th>
-            <th class="px-5 py-3">Description</th>
-            <th class="px-5 py-3">Created</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Key</th>
+            <th scope="col" class="px-5 py-3">Value</th>
+            <th scope="col" class="px-5 py-3">Scope</th>
+            <th scope="col" class="px-5 py-3">Scope Path</th>
+            <th scope="col" class="px-5 py-3">Endpoints</th>
+            <th scope="col" class="px-5 py-3">Description</th>
+            <th scope="col" class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>

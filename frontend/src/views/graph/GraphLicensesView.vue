@@ -56,11 +56,11 @@ onMounted(() => fetchSkus())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">SKU Name</th>
-            <th class="table-header text-left">Part Number</th>
-            <th class="table-header text-left">Consumed / Enabled</th>
-            <th class="table-header text-left">Usage</th>
-            <th class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">SKU Name</th>
+            <th scope="col" class="table-header text-left">Part Number</th>
+            <th scope="col" class="table-header text-left">Consumed / Enabled</th>
+            <th scope="col" class="table-header text-left">Usage</th>
+            <th scope="col" class="table-header text-left">Status</th>
           </tr>
         </thead>
         <tbody>

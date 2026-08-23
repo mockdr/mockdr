@@ -81,12 +81,12 @@ onMounted(() => fetchScripts())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Name</th>
-            <th class="table-header text-left">Description</th>
-            <th class="table-header text-left">Type</th>
-            <th class="table-header text-left">Risk Level</th>
-            <th class="table-header text-left">Modified</th>
-            <th class="table-header text-right w-20">Run</th>
+            <th scope="col" class="table-header text-left">Name</th>
+            <th scope="col" class="table-header text-left">Description</th>
+            <th scope="col" class="table-header text-left">Type</th>
+            <th scope="col" class="table-header text-left">Risk Level</th>
+            <th scope="col" class="table-header text-left">Modified</th>
+            <th scope="col" class="table-header text-right w-20">Run</th>
           </tr>
         </thead>
         <tbody>

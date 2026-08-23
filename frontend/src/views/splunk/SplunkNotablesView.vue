@@ -79,7 +79,7 @@ onMounted(fetchNotables)
 
     <!-- Filters -->
     <div class="flex gap-3">
-      <select v-model="statusFilter" class="bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text">
+      <select v-model="statusFilter" class="bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text" aria-label="Status filter">
         <option value="">All Statuses</option>
         <option value="1">New</option>
         <option value="2">In Progress</option>
@@ -87,7 +87,7 @@ onMounted(fetchNotables)
         <option value="4">Resolved</option>
         <option value="5">Closed</option>
       </select>
-      <select v-model="severityFilter" class="bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text">
+      <select v-model="severityFilter" class="bg-s1-input border border-s1-border rounded-lg px-3 py-2 text-sm text-s1-text" aria-label="Severity filter">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -105,13 +105,13 @@ onMounted(fetchNotables)
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-s1-border">
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Rule Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Severity</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Dest</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Owner</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Time</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Actions</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Rule Name</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Severity</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Status</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Dest</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Owner</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Time</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-s1-muted uppercase">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-s1-border">
@@ -135,7 +135,7 @@ onMounted(fetchNotables)
                   :value="n.status"
                   @change="updateStatus(n.event_id, ($event.target as HTMLSelectElement).value)"
                   class="bg-s1-input border border-s1-border rounded-sm px-2 py-1 text-xs text-s1-text"
-                >
+                 aria-label="Filter by New">
                   <option value="1">New</option>
                   <option value="2">In Progress</option>
                   <option value="3">Pending</option>

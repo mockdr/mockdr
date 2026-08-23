@@ -47,13 +47,13 @@ function toggleAll(): void {
         class="input flex-1 min-w-[200px]"
         placeholder="Search hostname, IP, OS..."
       />
-      <select v-model="store.filters.osTypes" class="select">
+      <select v-model="store.filters.osTypes" class="select" aria-label="Os types">
         <option value="">All OS</option>
         <option value="windows">Windows</option>
         <option value="macos">macOS</option>
         <option value="linux">Linux</option>
       </select>
-      <select v-model="store.filters.networkStatuses" class="select">
+      <select v-model="store.filters.networkStatuses" class="select" aria-label="Network statuses">
         <option value="">All Status</option>
         <option value="connected">Connected</option>
         <option value="disconnected">Disconnected</option>
@@ -85,17 +85,17 @@ function toggleAll(): void {
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select all rows" :checked="allSelected" @change="toggleAll"
                 class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
             </th>
-            <th class="table-header text-left">Computer</th>
-            <th class="table-header text-left">IP Address</th>
-            <th class="table-header text-left">OS</th>
-            <th class="table-header text-left">Agent Version</th>
-            <th class="table-header text-left">Network</th>
-            <th class="table-header text-left">Group</th>
-            <th class="table-header text-left">Last Seen</th>
+            <th scope="col" class="table-header text-left">Computer</th>
+            <th scope="col" class="table-header text-left">IP Address</th>
+            <th scope="col" class="table-header text-left">OS</th>
+            <th scope="col" class="table-header text-left">Agent Version</th>
+            <th scope="col" class="table-header text-left">Network</th>
+            <th scope="col" class="table-header text-left">Group</th>
+            <th scope="col" class="table-header text-left">Last Seen</th>
           </tr>
         </thead>
         <tbody>
@@ -106,9 +106,9 @@ function toggleAll(): void {
               class="table-row"
               :class="store.isSelected(agent) ? 'bg-s1-primary/5' : ''"
               @click="router.push(`/endpoints/${agent.id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/endpoints/${agent.id}`)">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="store.isSelected(agent)"
+                <input type="checkbox" aria-label="Select row" :checked="store.isSelected(agent)"
                   @change="store.toggleSelect(agent)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-s1-primary" />
               </td>

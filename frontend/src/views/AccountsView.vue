@@ -112,14 +112,14 @@ const STATE_COLOR: Record<string, string> = {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">State</th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">Sites</th>
-            <th class="px-5 py-3">Agents</th>
-            <th class="px-5 py-3">Users</th>
-            <th class="px-5 py-3">Created</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">State</th>
+            <th scope="col" class="px-5 py-3">Type</th>
+            <th scope="col" class="px-5 py-3">Sites</th>
+            <th scope="col" class="px-5 py-3">Agents</th>
+            <th scope="col" class="px-5 py-3">Users</th>
+            <th scope="col" class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -174,7 +174,7 @@ const STATE_COLOR: Record<string, string> = {
           </div>
           <div>
             <label class="block text-xs text-s1-muted mb-1">Account Type</label>
-            <select v-model="form.accountType" class="input w-full text-sm">
+            <select v-model="form.accountType" class="input w-full text-sm" aria-label="Account type">
               <option value="Trial">Trial</option>
               <option value="Paid">Paid</option>
             </select>

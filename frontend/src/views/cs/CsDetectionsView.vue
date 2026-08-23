@@ -100,7 +100,7 @@ onMounted(() => fetchDetections())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterSeverity" class="select">
+      <select v-model="filterSeverity" class="select" aria-label="Severity">
         <option value="">All Severities</option>
         <option value="Critical">Critical</option>
         <option value="High">High</option>
@@ -108,7 +108,7 @@ onMounted(() => fetchDetections())
         <option value="Low">Low</option>
         <option value="Informational">Informational</option>
       </select>
-      <select v-model="filterStatus" class="select">
+      <select v-model="filterStatus" class="select" aria-label="Status">
         <option value="">All Statuses</option>
         <option value="new">New</option>
         <option value="in_progress">In Progress</option>
@@ -123,12 +123,12 @@ onMounted(() => fetchDetections())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Hostname</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Scenario</th>
-            <th class="table-header text-left">Tactic</th>
-            <th class="table-header text-left">Created</th>
+            <th scope="col" class="table-header text-left">Hostname</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Scenario</th>
+            <th scope="col" class="table-header text-left">Tactic</th>
+            <th scope="col" class="table-header text-left">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -138,7 +138,7 @@ onMounted(() => fetchDetections())
               v-for="det in detections" :key="det.composite_id"
               class="table-row"
               @click="router.push(`/crowdstrike/detections/${encodeURIComponent(det.composite_id)}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/crowdstrike/detections/${encodeURIComponent(det.composite_id)}`)">
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm">{{ det.device?.hostname ?? 'Unknown' }}</div>
                 <div class="text-xs text-s1-muted">{{ det.device?.platform_name }} | {{ det.device?.external_ip }}</div>

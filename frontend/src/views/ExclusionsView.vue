@@ -107,12 +107,12 @@ onMounted(fetchList)
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Value</th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">OS</th>
-            <th class="px-5 py-3">Mode</th>
-            <th class="px-5 py-3">Created</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Value</th>
+            <th scope="col" class="px-5 py-3">Type</th>
+            <th scope="col" class="px-5 py-3">OS</th>
+            <th scope="col" class="px-5 py-3">Mode</th>
+            <th scope="col" class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>

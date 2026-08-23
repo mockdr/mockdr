@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reportFailure } from './report'
 import type {
   SplunkEnvelope,
   SplunkSearchResults,
@@ -32,7 +33,10 @@ const splunkClient = axios.create({
 splunkClient.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => response.data,
-  (error) => Promise.reject(error),
+  (error: unknown) => {
+    void reportFailure(error, 'Splunk')
+    return Promise.reject(error)
+  },
 )
 
 // ── Server Info ───────────────────────────────────────────────────────────

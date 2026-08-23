@@ -62,7 +62,7 @@ async function runSearch(): Promise<void> {
         <button
           @click="runSearch"
           :disabled="loading"
-          class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium
+          class="px-5 py-2.5 bg-green-700 hover:bg-green-800 text-white rounded-lg text-sm font-medium
                  flex items-center gap-2 transition-colors disabled:opacity-50"
         >
           <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
@@ -86,7 +86,7 @@ async function runSearch(): Promise<void> {
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-s1-border">
-              <th
+              <th scope="col"
                 v-for="f in fields.slice(0, 8)" :key="f"
                 class="px-4 py-2 text-left text-xs font-medium text-s1-muted uppercase tracking-wider"
               >

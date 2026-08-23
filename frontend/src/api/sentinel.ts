@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reportFailure } from './report'
 import type {
   ArmResource,
   ArmList,
@@ -44,6 +45,7 @@ sentinelClient.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (r): any => r.data,
   (err) => {
+    void reportFailure(err, 'Sentinel')
     if (err.response?.status === 401) accessToken = ''
     return Promise.reject(err)
   },

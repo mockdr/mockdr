@@ -13,7 +13,7 @@ withDefaults(defineProps<{
 
 <template>
   <div class="flex flex-col items-center justify-center py-20 text-center">
-    <div class="text-4xl mb-3">{{ icon }}</div>
+    <div class="text-4xl mb-3" aria-hidden="true">{{ icon }}</div>
     <h3 class="text-s1-text font-semibold mb-1">{{ title }}</h3>
     <p class="text-s1-muted text-sm">{{ description }}</p>
   </div>

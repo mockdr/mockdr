@@ -91,13 +91,13 @@ onUnmounted(() => clearTimeout(debounceTimer))
         </div>
         <div>
           <label class="text-xs text-s1-muted mb-1 block">Type</label>
-          <select v-model="form.type" class="input w-full text-sm">
+          <select v-model="form.type" class="input w-full text-sm" aria-label="Type">
             <option value="black_hash">black_hash</option>
           </select>
         </div>
         <div>
           <label class="text-xs text-s1-muted mb-1 block">OS</label>
-          <select v-model="form.osType" class="input w-full text-sm">
+          <select v-model="form.osType" class="input w-full text-sm" aria-label="Os type">
             <option value="windows">Windows</option>
             <option value="macos">macOS</option>
             <option value="linux">Linux</option>
@@ -127,12 +127,12 @@ onUnmounted(() => clearTimeout(debounceTimer))
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Hash</th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">Description</th>
-            <th class="px-5 py-3">OS</th>
-            <th class="px-5 py-3">Created</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Hash</th>
+            <th scope="col" class="px-5 py-3">Type</th>
+            <th scope="col" class="px-5 py-3">Description</th>
+            <th scope="col" class="px-5 py-3">OS</th>
+            <th scope="col" class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>

@@ -138,7 +138,7 @@ async function confirmDelete(group: Group): Promise<void> {
         <p class="text-s1-muted text-sm">{{ total }} groups</p>
       </div>
       <div class="flex items-center gap-2">
-        <select v-model="siteFilter" class="input w-48 text-sm">
+        <select v-model="siteFilter" class="input w-48 text-sm" aria-label="Site filter">
           <option value="">All Sites</option>
           <option v-for="s in sites" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
@@ -154,12 +154,12 @@ async function confirmDelete(group: Group): Promise<void> {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-5 py-3">Name</th>
-            <th class="px-5 py-3">Site</th>
-            <th class="px-5 py-3">Type</th>
-            <th class="px-5 py-3">Agents</th>
-            <th class="px-5 py-3">Created</th>
-            <th class="px-5 py-3"></th>
+            <th scope="col" class="px-5 py-3">Name</th>
+            <th scope="col" class="px-5 py-3">Site</th>
+            <th scope="col" class="px-5 py-3">Type</th>
+            <th scope="col" class="px-5 py-3">Agents</th>
+            <th scope="col" class="px-5 py-3">Created</th>
+            <th scope="col" class="px-5 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -236,7 +236,7 @@ async function confirmDelete(group: Group): Promise<void> {
           </div>
           <div>
             <label class="block text-xs text-s1-muted mb-1">Type</label>
-            <select v-model="form.type" class="input w-full text-sm">
+            <select v-model="form.type" class="input w-full text-sm" aria-label="Type">
               <option value="static">Static</option>
               <option value="pinned">Pinned</option>
             </select>
@@ -246,7 +246,7 @@ async function confirmDelete(group: Group): Promise<void> {
             <input v-model="form.description" class="input w-full text-sm" placeholder="Optional" />
           </div>
           <label class="flex items-center gap-2 text-sm text-s1-text cursor-pointer">
-            <input type="checkbox" v-model="form.inherits" class="accent-s1-primary" />
+            <input type="checkbox" aria-label="Select row" v-model="form.inherits" class="accent-s1-primary" />
             Inherit site policy
           </label>
         </div>

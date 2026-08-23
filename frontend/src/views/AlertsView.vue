@@ -83,12 +83,12 @@ const SEVERITY_COLOR: Record<string, string> = {
       <table v-else class="w-full text-sm">
         <thead class="border-b border-s1-border">
           <tr class="text-left text-xs text-s1-muted uppercase tracking-wide">
-            <th class="px-4 py-3">Severity</th>
-            <th class="px-4 py-3">Rule</th>
-            <th class="px-4 py-3">Endpoint</th>
-            <th class="px-4 py-3">Source</th>
-            <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3">Created</th>
+            <th scope="col" class="px-4 py-3">Severity</th>
+            <th scope="col" class="px-4 py-3">Rule</th>
+            <th scope="col" class="px-4 py-3">Endpoint</th>
+            <th scope="col" class="px-4 py-3">Source</th>
+            <th scope="col" class="px-4 py-3">Status</th>
+            <th scope="col" class="px-4 py-3">Created</th>
           </tr>
         </thead>
         <tbody>

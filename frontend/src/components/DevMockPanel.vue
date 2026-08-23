@@ -155,7 +155,7 @@ function onOpen(): void {
             <div class="text-xs font-semibold text-s1-muted uppercase tracking-wide mb-1">API Base URL</div>
             <div class="bg-s1-bg rounded-sm p-2 flex items-center justify-between gap-2">
               <code class="text-[11px] text-s1-cyan font-mono">http://localhost:8001/web/api/v2.1</code>
-              <button @click="copyToken('http://localhost:8001/web/api/v2.1')" class="text-s1-muted hover:text-s1-primary transition-colors shrink-0">
+              <button aria-label="Copy API base URL" @click="copyToken('http://localhost:8001/web/api/v2.1')" class="text-s1-muted hover:text-s1-primary transition-colors shrink-0">
                 <Copy class="w-3 h-3" />
               </button>
             </div>

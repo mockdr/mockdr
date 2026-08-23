@@ -80,7 +80,7 @@ function logout(): void {
     <div class="relative">
       <button @click="toggleAlerts" aria-label="Toggle alerts" class="relative p-2 rounded-lg hover:bg-s1-hover transition-colors">
         <Bell class="w-4 h-4 text-s1-subtle" />
-        <span v-if="unreadCount > 0" class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-s1-danger rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+        <span v-if="unreadCount > 0" class="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-s1-danger rounded-full text-[10px] font-bold text-s1-bg flex items-center justify-center">
           {{ unreadCount > 99 ? '99+' : unreadCount }}
         </span>
       </button>

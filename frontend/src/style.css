@@ -9,14 +9,15 @@
   --color-s1-primary: #6e45e2;
   --color-s1-primary-dark: #5533bb;
   --color-s1-cyan: #00c2ff;
-  --color-s1-danger: #ff4b4b;
+  --color-s1-danger: #ff6b6b; /* 5.2:1 on its /15 tint (WCAG AA); buttons keep dark text */
   --color-s1-warning: #ffb547;
   --color-s1-success: #00d8a0;
   --color-s1-accent: #6e45e2;
   --color-s1-input: #0f1320;
   --color-s1-text: #e2e8f0;
-  --color-s1-muted: #64748b;
+  --color-s1-muted: #8b95a7; /* 6.1:1 on --color-s1-bg, 5.6:1 on --color-s1-card (WCAG AA) */
   --color-s1-subtle: #94a3b8;
+  --color-s1-link: #a78bfa; /* primary as *text*: 6.3:1 on bg/card; #6e45e2 is 2.9:1 */
 
   --font-sans: Inter, system-ui, sans-serif;
   --font-mono: JetBrains Mono, Fira Code, monospace;
@@ -61,11 +62,11 @@
 }
 
 @utility input {
-  @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm placeholder-s1-muted focus:outline-hidden focus:border-s1-primary transition-colors;
+  @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm placeholder-s1-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-s1-cyan focus:border-s1-primary transition-colors;
 }
 
 @utility select {
-  @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm focus:outline-hidden focus:border-s1-primary transition-colors;
+  @apply bg-s1-bg border border-s1-border rounded-lg px-3 py-2 text-s1-text text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-s1-cyan focus:border-s1-primary transition-colors;
 }
 
 @utility table-row {
@@ -115,4 +116,56 @@
 }
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Accessibility ──────────────────────────────────────────────────────── */
+
+/* Keyboard users see where they are; mouse users are not shouted at. */
+:where(button, a, [role="link"], [role="button"], [tabindex="0"]):focus-visible {
+  outline: 2px solid var(--color-s1-cyan);
+  outline-offset: 2px;
+}
+
+/* Rows that navigate on click are reachable by keyboard (see tr.table-row). */
+tr.table-row:focus-visible {
+  outline: 2px solid var(--color-s1-cyan);
+  outline-offset: -2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0.5rem;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--color-s1-primary);
+  color: white;
+}
+.skip-link:focus {
+  left: 0.5rem;
+}
+
+/* Motion is a preference: an infinite glow or spin is a decoration, not information. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The primary hue fails AA as text on the dark surfaces; links and active
+   nav items use its lighter text variant, buttons keep the saturated fill. */
+.text-s1-primary {
+  color: var(--color-s1-link);
+}
+
+/* Selection checkboxes: a 24 px target (WCAG 2.2 2.5.8) without a label element. */
+input[type="checkbox"].accent-s1-primary {
+  width: 1.5rem;
+  height: 1.5rem;
 }

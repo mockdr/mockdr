@@ -94,12 +94,12 @@ onMounted(() => fetchData())
         <table class="w-full">
           <thead class="border-b border-s1-border">
             <tr>
-              <th class="table-header text-left">CVE ID</th>
-              <th class="table-header text-left">Name</th>
-              <th class="table-header text-left">Severity</th>
-              <th class="table-header text-left">CVSS v3</th>
-              <th class="table-header text-left">Exposed Machines</th>
-              <th class="table-header text-left">Public Exploit</th>
+              <th scope="col" class="table-header text-left">CVE ID</th>
+              <th scope="col" class="table-header text-left">Name</th>
+              <th scope="col" class="table-header text-left">Severity</th>
+              <th scope="col" class="table-header text-left">CVSS v3</th>
+              <th scope="col" class="table-header text-left">Exposed Machines</th>
+              <th scope="col" class="table-header text-left">Public Exploit</th>
             </tr>
           </thead>
           <tbody>
@@ -166,14 +166,14 @@ onMounted(() => fetchData())
         <table class="w-full">
           <thead class="border-b border-s1-border">
             <tr>
-              <th class="table-header text-left">Name</th>
-              <th class="table-header text-left">Vendor</th>
-              <th class="table-header text-left">Risk</th>
-              <th class="table-header text-left">Weaknesses</th>
-              <th class="table-header text-left">Exposed</th>
-              <th class="table-header text-left">Impact</th>
-              <th class="table-header text-left">Exploit</th>
-              <th class="table-header text-left">Alert</th>
+              <th scope="col" class="table-header text-left">Name</th>
+              <th scope="col" class="table-header text-left">Vendor</th>
+              <th scope="col" class="table-header text-left">Risk</th>
+              <th scope="col" class="table-header text-left">Weaknesses</th>
+              <th scope="col" class="table-header text-left">Exposed</th>
+              <th scope="col" class="table-header text-left">Impact</th>
+              <th scope="col" class="table-header text-left">Exploit</th>
+              <th scope="col" class="table-header text-left">Alert</th>
             </tr>
           </thead>
           <tbody>

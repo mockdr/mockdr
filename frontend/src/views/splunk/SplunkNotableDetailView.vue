@@ -94,7 +94,7 @@ onMounted(fetchNotable)
               :value="notable.status"
               @change="updateNotable('status', ($event.target as HTMLSelectElement).value)"
               class="bg-s1-input border border-s1-border rounded-sm px-2 py-1 text-sm text-s1-text mt-1"
-            >
+             aria-label="Filter by New">
               <option value="1">New</option>
               <option value="2">In Progress</option>
               <option value="3">Pending</option>

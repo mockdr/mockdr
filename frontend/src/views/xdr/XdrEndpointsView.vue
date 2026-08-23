@@ -125,13 +125,13 @@ onMounted(() => fetchEndpoints())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterOs" class="select">
+      <select v-model="filterOs" class="select" aria-label="Os">
         <option value="">All OS Types</option>
         <option value="windows">Windows</option>
         <option value="linux">Linux</option>
         <option value="macos">macOS</option>
       </select>
-      <select v-model="filterStatus" class="select">
+      <select v-model="filterStatus" class="select" aria-label="Status">
         <option value="">All Statuses</option>
         <option value="connected">Connected</option>
         <option value="disconnected">Disconnected</option>
@@ -161,16 +161,16 @@ onMounted(() => fetchEndpoints())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header w-10">
-              <input type="checkbox" :checked="allSelected" @change="toggleAll"
+            <th scope="col" class="table-header w-10">
+              <input type="checkbox" aria-label="Select all rows" :checked="allSelected" @change="toggleAll"
                 class="rounded-sm border-s1-border bg-s1-bg accent-orange-500" />
             </th>
-            <th class="table-header text-left">Endpoint Name</th>
-            <th class="table-header text-left">OS Type</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">IP</th>
-            <th class="table-header text-left">Isolation</th>
-            <th class="table-header text-left">Last Seen</th>
+            <th scope="col" class="table-header text-left">Endpoint Name</th>
+            <th scope="col" class="table-header text-left">OS Type</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">IP</th>
+            <th scope="col" class="table-header text-left">Isolation</th>
+            <th scope="col" class="table-header text-left">Last Seen</th>
           </tr>
         </thead>
         <tbody>
@@ -181,9 +181,9 @@ onMounted(() => fetchEndpoints())
               class="table-row"
               :class="selected.has(ep.endpoint_id) ? 'bg-orange-500/5' : ''"
               @click="router.push(`/cortex-xdr/endpoints/${ep.endpoint_id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/cortex-xdr/endpoints/${ep.endpoint_id}`)">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" :checked="selected.has(ep.endpoint_id)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(ep.endpoint_id)"
                   @change="toggleSelect(ep.endpoint_id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-orange-500" />
               </td>

@@ -41,7 +41,7 @@ const currentPlan = ref('plan2')
       </div>
       <div class="flex items-center gap-2">
         <span class="text-xs text-s1-muted">Current plan:</span>
-        <select v-model="currentPlan" class="select">
+        <select v-model="currentPlan" class="select" aria-label="Current plan">
           <option value="plan1">Plan 1</option>
           <option value="plan2">Plan 2</option>
           <option value="defenderBusiness">Defender for Business</option>
@@ -54,20 +54,20 @@ const currentPlan = ref('plan2')
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">Feature</th>
-            <th
+            <th scope="col" class="table-header text-left">Feature</th>
+            <th scope="col"
               class="table-header text-center"
               :class="currentPlan === 'plan1' ? 'bg-blue-500/10' : ''"
             >
               Plan 1
             </th>
-            <th
+            <th scope="col"
               class="table-header text-center"
               :class="currentPlan === 'plan2' ? 'bg-blue-500/10' : ''"
             >
               Plan 2
             </th>
-            <th
+            <th scope="col"
               class="table-header text-center"
               :class="currentPlan === 'defenderBusiness' ? 'bg-blue-500/10' : ''"
             >

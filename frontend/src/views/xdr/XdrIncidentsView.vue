@@ -86,14 +86,14 @@ onMounted(() => fetchIncidents())
 
     <!-- Filter bar -->
     <div class="card p-4 flex flex-wrap gap-3">
-      <select v-model="filterSeverity" class="select">
+      <select v-model="filterSeverity" class="select" aria-label="Severity">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
       </select>
-      <select v-model="filterStatus" class="select">
+      <select v-model="filterStatus" class="select" aria-label="Status">
         <option value="">All Statuses</option>
         <option value="new">New</option>
         <option value="under_investigation">Under Investigation</option>
@@ -113,13 +113,13 @@ onMounted(() => fetchIncidents())
       <table class="w-full">
         <thead class="border-b border-s1-border">
           <tr>
-            <th class="table-header text-left">ID</th>
-            <th class="table-header text-left">Description</th>
-            <th class="table-header text-left">Severity</th>
-            <th class="table-header text-left">Status</th>
-            <th class="table-header text-left">Alerts</th>
-            <th class="table-header text-left">Assigned To</th>
-            <th class="table-header text-left">Created</th>
+            <th scope="col" class="table-header text-left">ID</th>
+            <th scope="col" class="table-header text-left">Description</th>
+            <th scope="col" class="table-header text-left">Severity</th>
+            <th scope="col" class="table-header text-left">Status</th>
+            <th scope="col" class="table-header text-left">Alerts</th>
+            <th scope="col" class="table-header text-left">Assigned To</th>
+            <th scope="col" class="table-header text-left">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -129,7 +129,7 @@ onMounted(() => fetchIncidents())
               v-for="inc in filteredIncidents" :key="inc.incident_id"
               class="table-row"
               @click="router.push(`/cortex-xdr/incidents/${inc.incident_id}`)"
-            >
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/cortex-xdr/incidents/${inc.incident_id}`)">
               <td class="table-cell">
                 <span class="text-sm font-mono text-s1-text">{{ inc.incident_id }}</span>
               </td>

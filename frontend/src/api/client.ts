@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reportFailure } from './report'
 
 /**
  * Preconfigured Axios instance for the S1 mock API.
@@ -23,6 +24,7 @@ client.interceptors.response.use(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (response): any => response.data,
   (error: unknown) => {
+    void reportFailure(error, 'SentinelOne')
     if (
       axios.isAxiosError(error) &&
       error.response?.status === 401
