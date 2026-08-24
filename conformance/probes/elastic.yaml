@@ -661,3 +661,18 @@ probes:
       - $.hits.hits
       - $._shards
       - $.hits.total.value
+
+  - id: es-date-histogram-removed-interval
+    endpoint: search
+    why: >
+      `interval` was removed from date_histogram in Elasticsearch 8; a body
+      still sending it is refused by name, with the position of the field
+      inside the reason text. mockdr read it as a calendar interval and
+      answered 200, so a client could keep an interval the real cluster
+      rejects.
+    request:
+      method: POST
+      path: /${index}/_search
+      content: '{"size":0,"aggs":{"p":{"date_histogram":{"field":"@timestamp","interval":"1d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic

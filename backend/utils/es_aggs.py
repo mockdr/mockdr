@@ -13,9 +13,11 @@ Implements the aggregations a SIEM client actually sends: ``terms``,
 from __future__ import annotations
 
 from collections import OrderedDict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
+from utils.es_datemath import _add_months, _next_unit, _round_down
+from utils.es_datemath import _zone as _datemath_zone
 from utils.es_query import build_predicate, wrap_as_hits
 from utils.nested import get_nested
 
@@ -40,10 +42,19 @@ class ESAggregationError(ValueError):
     silently empty result would be worse than the original bug.
     """
 
-    def __init__(self, message: str, *, clause: str | None = None) -> None:
-        """Record the message, and the unknown aggregation type if that is the failure."""
+    def __init__(
+        self, message: str, *, clause: str | None = None,
+        es_type: str = "parsing_exception",
+    ) -> None:
+        """Record the message, the clause if any, and the exception type.
+
+        ``x_content_parse_exception`` is how Elasticsearch reports a field the
+        aggregation does not have; it carries its position inside the reason
+        text rather than as separate members, and no cause.
+        """
         super().__init__(message)
         self.clause = clause
+        self.es_type = es_type
 
 
 
@@ -166,29 +177,66 @@ def _terms(body: dict, sub: dict, records: list[dict], index: str, depth: int) -
 def _date_histogram(
     body: dict, sub: dict, records: list[dict], index: str, depth: int,
 ) -> dict:
-    field = body.get("field", "")
-    interval = _interval_seconds(
-        body.get("fixed_interval") or body.get("calendar_interval")
-        or body.get("interval") or "1d",
-    )
+    """Bucket by time, filling the gaps the way Elasticsearch does.
 
-    groups: OrderedDict[float, list[dict]] = OrderedDict()
+    Two things were wrong here and both showed up as a broken chart rather
+    than an error. Intervals with no documents were left out entirely, so a
+    series plotted from the response jumped over quiet days instead of
+    drawing them at zero — Elasticsearch emits every bucket between the first
+    and the last unless ``min_doc_count`` says otherwise. And a calendar
+    interval was treated as a fixed number of seconds, so ``1M`` meant 30 days
+    and ``1w`` weeks that began on a Thursday, because that is the weekday the
+    epoch fell on.
+    """
+    field = body.get("field", "")
+    zone = _zone(body.get("time_zone"))
+    calendar_unit, fixed = _interval_plan(body)
+    min_doc_count = int(body.get("min_doc_count", 0))
+
+    groups: dict[datetime, list[dict]] = {}
     for record in records:
         stamp = _as_epoch(get_nested(record, field))
         if stamp is None:
             continue
-        groups.setdefault((stamp // interval) * interval, []).append(record)
+        start = _bucket_start(stamp, calendar_unit, fixed, zone)
+        groups.setdefault(start, []).append(record)
 
     buckets = []
-    for start in sorted(groups):
-        members = groups[start]
+    for start in _bucket_starts(sorted(groups), calendar_unit, fixed, min_doc_count):
+        members = groups.get(start, [])
         bucket = {
-            "key": int(start * 1000),
-            "key_as_string": datetime.fromtimestamp(start, tz=UTC).isoformat(),
+            "key": int(start.timestamp() * 1000),
+            "key_as_string": _es_timestamp(start),
             "doc_count": len(members),
         }
         buckets.append(_with_sub(bucket, sub, members, index, depth))
     return {"buckets": buckets}
+
+
+def _bucket_starts(
+    populated: list[datetime],
+    calendar_unit: str | None,
+    fixed: float,
+    min_doc_count: int,
+) -> list[datetime]:
+    """Every bucket the response should carry, in order.
+
+    With the default ``min_doc_count`` of 0 that is every interval from the
+    first populated bucket to the last, empty ones included.
+    """
+    if min_doc_count > 0 or len(populated) < 2:
+        return populated
+    starts = [populated[0]]
+    last = populated[-1]
+    # A pathological interval against a wide span would otherwise build an
+    # unbounded list; Elasticsearch caps buckets too (search.max_buckets).
+    while starts[-1] < last and len(starts) < _MAX_BUCKETS:
+        starts.append(_next_bucket(starts[-1], calendar_unit, fixed))
+    return starts
+
+
+#: Elasticsearch's search.max_buckets default, which bounds the same list.
+_MAX_BUCKETS = 65_536
 
 
 def _histogram(
@@ -206,7 +254,7 @@ def _histogram(
 
     buckets = [
         _with_sub(
-            {"key": _shrink(start), "doc_count": len(groups[start])},
+            {"key": float(start), "doc_count": len(groups[start])},
             sub, groups[start], index, depth,
         )
         for start in sorted(groups)
@@ -300,24 +348,28 @@ def _metric(agg_type: str, body: dict, records: list[dict], index: str) -> dict:
     numbers = [
         n for n in (_as_float(get_nested(r, field)) for r in records) if n is not None
     ]
+    # Every numeric metric is a double in Elasticsearch, so an average that
+    # happens to divide evenly still comes back as `30.0`. Rendering it as
+    # `30` made the mock's JSON a different document from the real one, and
+    # a strictly-typed client reads that as a different type.
     if agg_type == "stats":
         return {
             "count": len(numbers),
-            "min": _shrink(min(numbers)) if numbers else None,
-            "max": _shrink(max(numbers)) if numbers else None,
-            "avg": _shrink(sum(numbers) / len(numbers)) if numbers else None,
-            "sum": _shrink(sum(numbers)) if numbers else 0,
+            "min": min(numbers) if numbers else None,
+            "max": max(numbers) if numbers else None,
+            "avg": sum(numbers) / len(numbers) if numbers else None,
+            "sum": float(sum(numbers)) if numbers else 0.0,
         }
     if not numbers:
         # ES returns null for min/max/avg over no documents, and 0 for sum.
-        return {"value": 0 if agg_type == "sum" else None}
+        return {"value": 0.0 if agg_type == "sum" else None}
     if agg_type == "sum":
-        return {"value": _shrink(sum(numbers))}
+        return {"value": float(sum(numbers))}
     if agg_type == "avg":
-        return {"value": _shrink(sum(numbers) / len(numbers))}
+        return {"value": sum(numbers) / len(numbers)}
     if agg_type == "min":
-        return {"value": _shrink(min(numbers))}
-    return {"value": _shrink(max(numbers))}
+        return {"value": min(numbers)}
+    return {"value": max(numbers)}
 
 
 # ---------------------------------------------------------------------------
@@ -329,8 +381,22 @@ _INTERVAL_UNITS = {
     "M": 2592000, "q": 7776000, "y": 31536000,
 }
 
+#: The spellings a calendar interval takes; only a multiple of one is allowed,
+#: which is what separates ``calendar_interval`` from ``fixed_interval``.
+_CALENDAR_UNITS: dict[str, str] = {
+    "s": "s", "second": "s", "1s": "s",
+    "m": "m", "minute": "m", "1m": "m",
+    "h": "h", "hour": "h", "1h": "h",
+    "d": "d", "day": "d", "1d": "d",
+    "w": "w", "week": "w", "1w": "w",
+    "M": "M", "month": "M", "1M": "M",
+    "q": "q", "quarter": "q", "1q": "q",
+    "y": "y", "year": "y", "1y": "y",
+}
+
 
 def _interval_seconds(interval: str) -> float:
+    """A fixed interval as a span of seconds."""
     text = str(interval).strip()
     if not text:
         return 86400.0
@@ -340,6 +406,81 @@ def _interval_seconds(interval: str) -> float:
         return float(amount) * _INTERVAL_UNITS.get(unit, 86400)
     except ValueError:
         return 86400.0
+
+
+def _interval_plan(body: dict) -> tuple[str | None, float]:
+    """Read the interval as either a calendar unit or a fixed span of seconds.
+
+    Returns:
+        ``(calendar_unit, fixed_seconds)`` — exactly one is meaningful.
+    """
+    if "interval" in body and not (body.get("calendar_interval") or body.get("fixed_interval")):
+        # Removed in Elasticsearch 8: a body still sending it is refused, not
+        # read as a calendar interval. Accepting it here would let a client
+        # keep an interval the real cluster rejects.
+        msg = "[date_histogram] unknown field [interval] did you mean [fixed_interval]?"
+        raise ESAggregationError(
+            msg, clause="interval", es_type="x_content_parse_exception",
+        )
+    calendar = body.get("calendar_interval")
+    if calendar:
+        unit = _CALENDAR_UNITS.get(str(calendar).strip())
+        if unit:
+            return unit, 0.0
+        return None, _interval_seconds(calendar)
+    fixed = body.get("fixed_interval")
+    if fixed:
+        return None, _interval_seconds(fixed)
+    # Neither given: Elasticsearch's own default bucketing.
+    return "d", 0.0
+
+
+def _zone(time_zone: str | None) -> tzinfo:
+    """The zone bucket boundaries fall in; UTC unless the request says otherwise."""
+    return _datemath_zone(time_zone)
+
+
+def _bucket_start(
+    stamp: float, calendar_unit: str | None, fixed: float, zone: tzinfo,
+) -> datetime:
+    """The start of the bucket *stamp* belongs to."""
+    if calendar_unit is None:
+        # A fixed interval is anchored on the epoch, not on the data.
+        span = fixed or 86400.0
+        return datetime.fromtimestamp((stamp // span) * span, tz=UTC)
+    moment = datetime.fromtimestamp(stamp, tz=UTC).astimezone(zone)
+    if calendar_unit == "q":
+        return moment.replace(
+            month=(moment.month - 1) // 3 * 3 + 1, day=1,
+            hour=0, minute=0, second=0, microsecond=0,
+        )
+    return _round_down(moment, calendar_unit)
+
+
+def _next_bucket(start: datetime, calendar_unit: str | None, fixed: float) -> datetime:
+    """The start of the bucket after *start*."""
+    if calendar_unit is None:
+        return start + timedelta(seconds=fixed or 86400.0)
+    if calendar_unit == "q":
+        return _add_months(start, 3)
+    return _next_unit(start, calendar_unit)
+
+
+def _es_timestamp(moment: datetime) -> str:
+    """Render a bucket key the way Elasticsearch renders ``key_as_string``.
+
+    ``2026-08-01T00:00:00.000Z`` in UTC, and local time with its offset when
+    the request named a zone. ``datetime.isoformat`` writes ``+00:00`` and no
+    milliseconds, so a client parsing the string with a strict format failed
+    on every bucket.
+    """
+    base = moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}"
+    offset = moment.utcoffset() or timedelta(0)
+    if not offset:
+        return base + "Z"
+    total = int(offset.total_seconds())
+    sign = "+" if total >= 0 else "-"
+    return f"{base}{sign}{abs(total) // 3600:02d}:{abs(total) % 3600 // 60:02d}"
 
 
 def _as_float(value: Any) -> float | None:
@@ -379,8 +520,5 @@ def _range_key(lower: float | None, upper: float | None) -> str:
 
 
 def _render(value: float) -> str:
-    return str(int(value)) if float(value).is_integer() else str(value)
-
-
-def _shrink(value: float) -> float | int:
-    return int(value) if float(value).is_integer() else round(value, 6)
+    """A range bound as it appears in the bucket key — always a double."""
+    return str(float(value))

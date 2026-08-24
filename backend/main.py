@@ -565,6 +565,15 @@ async def es_aggregation_exception_handler(
     An unknown aggregation *type* carries the same position and cause an
     unknown query type does (measured on 8.15).
     """
+    if exc.es_type == "x_content_parse_exception":
+        # This one carries its position inside the reason text and nothing
+        # else — no line/col members, no cause.
+        # This exception points at the field name itself, where the others
+        # point at the value the parser was reading (measured on 8.15).
+        line, col = _key_position(await _request.body(), exc.clause or "")
+        return JSONResponse(status_code=400, content=build_es_error_response(
+            400, exc.es_type, f"[{line}:{col}] {exc}",
+        ))
     content = build_es_error_response(400, "parsing_exception", str(exc))
     if exc.clause is not None:
         line, col = _body_position(await _request.body(), exc.clause)
@@ -581,6 +590,17 @@ async def es_aggregation_exception_handler(
 _JSON_TOKEN_NAMES = {dict: "START_OBJECT", list: "START_ARRAY", str: "VALUE_STRING",
                      bool: "VALUE_TRUE", int: "VALUE_NUMBER", float: "VALUE_NUMBER",
                      type(None): "VALUE_NULL"}
+
+
+def _key_position(body: bytes, clause: str) -> tuple[int, int]:
+    """Line and column (1-based) of the field name itself."""
+    text = body.decode("utf-8", errors="replace")
+    key = text.find(f'"{clause}"')
+    if key < 0:
+        return 1, 1
+    line = text.count("\n", 0, key) + 1
+    column = key - (text.rfind("\n", 0, key) + 1) + 1
+    return line, column
 
 
 def _body_position(body: bytes, clause: str) -> tuple[int, int]:
