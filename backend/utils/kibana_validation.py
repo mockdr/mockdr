@@ -1,21 +1,39 @@
 """Refusing what Kibana refuses, in the words Kibana refuses it with.
 
-Kibana runs the query string through an io-ts codec before it looks at any
-data, and reports *every* value it could not accept in one message, joined
-with commas in the codec's own field order. Two more checks follow: a
-``perPage`` above the cap, and — only once nothing else has fired — the
-Elasticsearch-level complaint about a negative ``from`` or ``size``.
-
 mockdr accepted almost all of it silently. ``severity=nonsens`` came back as
 ``200`` with no cases, which a client reads as "there are none" rather than
 as the typo it is; ``sortField=nope`` came back sorted by something else
-entirely. Every message and every precedence below is measured against
-Kibana 8.15.
+entirely; a case was created with a severity outside the enum, and an
+exception list with a type a real Kibana refuses.
+
+Kibana speaks **four** validation dialects, and they differ in wording, in
+precedence, and in the envelope they arrive in:
+
+* **io-ts** on the Cases API — every value it could not accept in one
+  message, joined with commas in the codec's field order, then the page cap,
+  then Elasticsearch's own complaint about a negative window.
+* **io-ts with a prefix** on the exception lists — the same shape behind
+  ``[request query]`` or ``[request body]``, and paging that starts at 1.
+* **zod** on the Detection Rules — its own wording, no page cap, unknown keys
+  taken, and one rule the schema cannot express (a ``sort_field`` without its
+  ``sort_order``) that the route raises afterwards.
+* **@kbn/config-schema** on the Endpoint routes — the member named in the
+  bracket, the *first* failure only, a key it has no definition for refused,
+  and pages counted from 0.
+
+What a route raises after its schema is satisfied comes back in a different
+envelope again: ``{message, status_code}`` rather than Boom's
+``{statusCode, error, message}``. Every message and every precedence here is
+measured against Kibana 8.15.
 """
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import NamedTuple
+
+# ---------------------------------------------------------------------------
+# Finding cases (io-ts)
+# ---------------------------------------------------------------------------
 
 #: Kibana's cap, and the message it refuses a larger page with.
 MAX_PER_PAGE = 100
@@ -149,6 +167,10 @@ def _as_number(value: str | None, default: float | None) -> float | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Finding rules (zod)
+# ---------------------------------------------------------------------------
+
 #: The Detection Rules API validates with zod rather than io-ts, so it words
 #: everything differently and reports its fields in this order.
 _RULE_FIELD_ORDER: tuple[str, ...] = ("sort_field", "sort_order", "page", "per_page")
@@ -232,7 +254,7 @@ def validate_rules_find_query(params: Mapping[str, str]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Creating a case
+# Creating a case (io-ts)
 # ---------------------------------------------------------------------------
 
 #: The order the case codec reports its fields in — the six required ones
@@ -310,7 +332,7 @@ def validate_case_body(body: Mapping[str, object]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Exception lists
+# Exception lists (io-ts, behind a prefix)
 # ---------------------------------------------------------------------------
 
 #: A third dialect: io-ts again, but every message carries the `[request
