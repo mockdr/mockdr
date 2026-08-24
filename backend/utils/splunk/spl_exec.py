@@ -21,7 +21,7 @@ from utils.splunk.spl_expr import (
 )
 from utils.splunk.spl_parser import SPLCommand, SPLQuery, parse_sort_keys
 
-__all__ = ["execute_pipeline"]
+__all__ = ["execute_pipeline", "split_by"]
 
 Rows = list[dict[str, Any]]
 
@@ -283,7 +283,7 @@ _AGG_RE = re.compile(
 
 
 def _cmd_stats(rows: Rows, command: SPLCommand) -> Rows:
-    agg_text, by_fields = _split_by(command.arg)
+    agg_text, by_fields = split_by(command.arg)
     aggs = _parse_aggregations(agg_text)
     if not aggs:
         aggs = [("count", "", "count")]
@@ -370,7 +370,7 @@ def _top_or_rare(rows: Rows, command: SPLCommand, *, most_common: bool) -> Rows:
 
 
 def _cmd_timechart(rows: Rows, command: SPLCommand) -> Rows:
-    agg_text, by_fields = _split_by(command.arg)
+    agg_text, by_fields = split_by(command.arg)
     span = _span_seconds(agg_text)
     agg_text = re.sub(r"span\s*=\s*\S+", "", agg_text, flags=re.I)
     aggs = _parse_aggregations(agg_text) or [("count", "", "count")]
@@ -515,7 +515,8 @@ def _parse_aggregations(text: str) -> list[tuple[str, str, str]]:
     return aggs
 
 
-def _split_by(arg: str) -> tuple[str, list[str]]:
+def split_by(arg: str) -> tuple[str, list[str]]:
+    """Split a command argument into its aggregations and its ``by`` fields."""
     match = re.search(r"\bby\s+(.+)$", arg, re.IGNORECASE)
     if not match:
         return arg, []

@@ -28,7 +28,7 @@ import httpx
 
 from harness.bootstrap import BOOTSTRAPS, BootstrapError
 from harness.clients import Clients
-from harness.diff import Finding, Response, compare
+from harness.diff import Finding, Response, compare, compare_values
 from harness.normalize import strip_prefix
 from harness.spec import PlatformSpec, Probe, SpecError, load_spec, substitute
 
@@ -131,7 +131,7 @@ def run_platform(
                 contexts[target] = {}
                 continue
             try:
-                contexts[target] = bootstrap(spec, target, clients)
+                contexts[target] = bootstrap(spec, target, clients, seeded=seeded)
             except (BootstrapError, httpx.HTTPError) as exc:
                 # Structural probes still work with no context, and they are
                 # most of the yield. Probes that need a placeholder cannot
@@ -178,10 +178,16 @@ def run_platform(
                     not_run += 1
                     continue
 
-                findings.extend(compare(
-                    probe.id, responses["mock"], responses["real"],
-                    spec.significant_keys, probe.ignore_paths, probe.why,
-                ))
+                if probe.compare_values:
+                    findings.extend(compare_values(
+                        probe.id, responses["mock"], responses["real"],
+                        spec.volatile_fields, probe.why,
+                    ))
+                else:
+                    findings.extend(compare(
+                        probe.id, responses["mock"], responses["real"],
+                        spec.significant_keys, probe.ignore_paths, probe.why,
+                    ))
 
     if not_run:
         notes.append(

@@ -29,6 +29,10 @@ class SearchJob:
     events: list[dict[str, object]] = field(default_factory=list)
     messages: list[dict[str, str]] = field(default_factory=list)
     field_list: list[str] = field(default_factory=list)
+    #: The same fields as the results envelope describes them: splunkd marks
+    #: a group-by column with its rank and top's generated columns with what
+    #: they are, and a client rendering a table reads both.
+    field_meta: list[dict] = field(default_factory=list)
 
     ttl: int = 600
     is_saved: bool = False

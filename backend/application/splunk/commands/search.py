@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 
@@ -9,7 +10,7 @@ from domain.splunk.search_job import SearchJob
 from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.search_job_repo import search_job_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
-from utils.splunk.spl_exec import execute_pipeline
+from utils.splunk.spl_exec import execute_pipeline, split_by
 from utils.splunk.spl_parser import (
     SPLQuery,
     current_time,
@@ -140,6 +141,7 @@ def create_search_job(
         events=events,
         messages=messages,
         field_list=list(results[0].keys()) if results else [],
+        field_meta=describe_fields(parsed, results),
         is_done=True,
         published_at=now,
         touched_at=now,
@@ -268,6 +270,53 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
         # failed dispatch does.
         return [], [], messages
     return events, results, messages
+
+
+#: The columns `top` and `rare` generate, and what splunkd calls each.
+_TOP_SPECIALS = {"count": "count", "percent": "percent"}
+
+
+def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
+    """Describe the result columns the way splunkd's `fields` block does.
+
+    A group-by column carries its rank, so a client knows which columns it
+    was grouped on and in what order; one an `eval` produced carries the type
+    that eval gave it; and `top` marks the count and percentage it generated.
+    A bare list of names told a renderer none of that.
+    """
+    if not results:
+        return []
+    last_command = parsed.commands[-1] if parsed.commands else None
+    last = last_command.name if last_command else ""
+    if last == "table":
+        # `table` declares its columns, so splunkd lists every name it was
+        # given — including one no row turned out to carry.
+        names = [f.strip() for f in re.split(r"[,\s]+", last_command.arg) if f.strip()]
+    else:
+        names = list(results[0].keys())
+    by_fields = _last_group_by(parsed)
+    created = set(parsed.evals)
+
+    described: list[dict] = []
+    for name in names:
+        entry: dict = {"name": name}
+        if name in by_fields:
+            entry["groupby_rank"] = str(by_fields.index(name))
+            if name in created:
+                entry["type"] = "str" if isinstance(results[0][name], str) else "num"
+        if last in ("top", "rare") and name in _TOP_SPECIALS:
+            entry["type_special"] = _TOP_SPECIALS[name]
+        described.append(entry)
+    return described
+
+
+def _last_group_by(parsed: SPLQuery) -> list[str]:
+    """The by-fields of the last grouping command, in the order given."""
+    for command in reversed(parsed.commands):
+        if command.name in ("stats", "timechart"):
+            _, by_fields = split_by(command.arg)
+            return ["_time"] if command.name == "timechart" and not by_fields else by_fields
+    return []
 
 
 def _time_term_messages(parsed: SPLQuery) -> tuple[list[dict], bool]:

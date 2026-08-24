@@ -7,6 +7,7 @@ that decides what a difference *means*.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -14,8 +15,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from harness.diff import Response, compare
+from harness.diff import Response, compare, compare_values, strip_volatile
 from harness.normalize import mask, skeleton, strip_prefix
+from harness.seed import SEED_EPOCH, SEED_EVENTS, SEED_INDEX, _hec_payload, seed_sourcetype
 from harness.spec import SpecError, load_spec, resolve_env, substitute
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -302,3 +304,110 @@ class TestFixturesAgreeWithTheBackend:
         spec = load_spec(ROOT / "probes" / f"{name}.yaml")
         text = (ROOT.parent / source).read_text()
         assert spec.credentials["mock"].password in text
+
+
+class TestSeededValueComparison:
+    """With the same events on both sides, the rows themselves are the claim.
+
+    The structural comparison cannot see a wrong answer: a search matching
+    nothing agrees with every other search matching nothing. These probes
+    exist because `tail` reversing its output, `stats ... by` leaving its
+    groups unsorted and `_time` rendering as an epoch all passed every
+    structural probe.
+    """
+
+    VOLATILE = frozenset({"_bkt", "_indextime", "splunk_server"})
+
+    def test_identical_rows_are_no_finding(self) -> None:
+        body = {"results": [{"host": "srv-1", "count": "2"}]}
+        assert compare_values(
+            "p", _response(body=body), _response(body=dict(body)), self.VOLATILE,
+        ) == []
+
+    def test_a_differing_row_is_reported_once(self) -> None:
+        findings = compare_values(
+            "p",
+            _response(body={"results": [{"host": "srv-1", "count": "2"}]}),
+            _response(body={"results": [{"host": "srv-1", "count": "3"}]}),
+            self.VOLATILE,
+        )
+        # One finding, not one per key: a row that differs usually differs in
+        # several places, and listing each buries the answer.
+        assert len(findings) == 1
+        assert findings[0].kind == "value"
+
+    def test_row_order_is_part_of_the_comparison(self) -> None:
+        findings = compare_values(
+            "p",
+            _response(body={"results": [{"n": "1"}, {"n": "2"}]}),
+            _response(body={"results": [{"n": "2"}, {"n": "1"}]}),
+            self.VOLATILE,
+        )
+        assert len(findings) == 1
+
+    def test_the_instances_own_fields_are_dropped_first(self) -> None:
+        assert compare_values(
+            "p",
+            _response(body={"results": [{"host": "a", "_bkt": "main~0~AAA"}]}),
+            _response(body={"results": [{"host": "a", "_bkt": "main~9~ZZZ"}]}),
+            self.VOLATILE,
+        ) == []
+
+    def test_volatile_fields_are_dropped_at_every_depth(self) -> None:
+        stripped = strip_volatile(
+            {"results": [{"a": 1, "_bkt": "x", "nested": {"_indextime": "1", "b": 2}}]},
+            self.VOLATILE,
+        )
+        assert stripped == {"results": [{"a": 1, "nested": {"b": 2}}]}
+
+    def test_a_status_difference_is_still_reported(self) -> None:
+        findings = compare_values(
+            "p", _response(status=400, body={}), _response(status=200, body={}),
+            self.VOLATILE,
+        )
+        assert [f.kind for f in findings] == ["status"]
+
+
+class TestSeedPayload:
+    """What goes into both targets before a seeded probe runs."""
+
+    def test_every_event_carries_the_same_index_and_sourcetype(self) -> None:
+        lines = [json.loads(line) for line in _hec_payload("probe:test").splitlines()]
+        assert len(lines) == len(SEED_EVENTS)
+        assert {line["sourcetype"] for line in lines} == {"probe:test"}
+        assert {line["index"] for line in lines} == {SEED_INDEX}
+
+    def test_the_timestamps_are_absolute_and_an_hour_apart(self) -> None:
+        # Absolute, so a search bounded by earliest/latest means the same
+        # thing on every run.
+        times = [json.loads(line)["time"] for line in _hec_payload("s").splitlines()]
+        assert times == [SEED_EPOCH + i * 3600 for i in range(len(SEED_EVENTS))]
+
+    def test_the_sourcetype_is_unique_to_the_run(self) -> None:
+        # A real instance keeps what it is given; running twice under one
+        # sourcetype would double every count and read as a difference.
+        assert seed_sourcetype().startswith("probe:conformance:")
+
+
+class TestSeededProbesLoad:
+    """The probe file's seeded entries parse into what the runner expects."""
+
+    def test_seeded_probes_declare_both_flags(self) -> None:
+        spec = load_spec(ROOT / "probes" / "splunk.yaml")
+        seeded = [p for p in spec.probes if p.needs_seed]
+        assert seeded, "the splunk probes should include seeded ones"
+        # `compare: values` without `needs_seed` would compare a seeded mock
+        # against an empty install and report every row as a difference.
+        assert all(p.compare_values for p in seeded)
+        assert all(p.needs_seed for p in spec.probes if p.compare_values)
+
+    def test_every_seeded_probe_uses_the_bootstrap_sourcetype(self) -> None:
+        spec = load_spec(ROOT / "probes" / "splunk.yaml")
+        for probe in spec.probes:
+            if probe.needs_seed:
+                assert "${sourcetype}" in str(probe.request.content)
+
+    def test_the_volatile_field_list_is_loaded(self) -> None:
+        spec = load_spec(ROOT / "probes" / "splunk.yaml")
+        assert "_bkt" in spec.volatile_fields
+        assert "splunk_server" in spec.volatile_fields

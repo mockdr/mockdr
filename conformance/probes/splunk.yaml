@@ -31,6 +31,38 @@ credentials:
 # it. Both are compared by value: a client that branches on `code` is the
 # reason mockdr exists, and `text` is stable enough in splunkd to be worth
 # holding to.
+# What a Splunk result row says about the instance rather than about the API:
+# the bucket it came from, when it was indexed, which server holds it. Dropped
+# before a `compare: values` probe looks at a row, because two installs
+# legitimately differ in all of it.
+volatile_fields:
+  - _bkt
+  - _cd
+  - _indextime
+  - _serial
+  - _si
+  - _sourcetype
+  - splunk_server
+  - source
+  - index
+  - linecount
+  - punct
+  - timestamp
+  - eventtype
+  - tag
+  - date_hour
+  - date_mday
+  - date_minute
+  - date_month
+  - date_second
+  - date_wday
+  - date_year
+  - date_zone
+  # The envelope's own bookkeeping, which is the run and not the answer.
+  - init_offset
+  - preview
+  - post_process_count
+
 significant_keys:
   - code
   - text
@@ -860,5 +892,415 @@ probes:
       method: POST
       path: /services/search/jobs
       content: "search=search index=conformance_absent_xyz&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  # ── Seeded semantics: the same events on both sides (2.3.0) ─────────────
+  #
+  # These need --seeded, which puts the same five events into both targets'
+  # HEC before anything runs. Without it the real install matches nothing
+  # and every comparison agrees, which is how a mock's semantics stay
+  # wrong while its shapes look right.
+
+  - id: spl-stats-count
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      The simplest transforming search there is.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-by-host
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      splunkd sorts the groups by the by-fields; mockdr returned them in the order the events arrived, so the first row was whichever host the search hit first.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats count by host&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-by-two-fields
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      Two by-fields sort left to right.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats count by host, action&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-sum-by
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A numeric aggregate per group.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats sum(sev) by host&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-avg
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      How an average renders when it divides evenly.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats avg(sev)&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-dc-values
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A single-valued field is a string in splunkd's JSON, not a one-element array.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats dc(user), values(user)&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-spread
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      The spread statistics splunkd documents. mockdr reported them as unknown functions, so a dashboard asking for a standard deviation got an error where splunkd answers a number.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats stdev(sev), stdevp(sev), var(sev), varp(sev), sumsq(sev)&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-percentiles
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      Percentiles interpolate between ranks.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats median(sev), perc95(sev), perc25(sev)&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-earliest-latest
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      These read event time, which is what separates them from first() and last().
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats earliest(sev), latest(sev)&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-by-absent-field
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A row that does not carry the by-field joins no group, so this is empty rather than one group keyed on the empty string.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats count by nope&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-top-action
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      top carries _tc, the total the shares are of, and renders the share with six decimals.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | top action&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-top-limit
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      limit= is an option, not a field to count.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | top limit=1 host&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-top-showperc-false
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      So is showperc; counting it as a field produced a bucket keyed on the literal string.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | top action showperc=f&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-rare-action
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      rare orders the other way.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | rare action&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-sort-ascending
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      The sort itself.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort sev | table sev&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-sort-descending
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      And the other direction.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort -sev | table sev&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-head-after-sort
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      head keeps pipeline order.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort sev | head 2 | table sev&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-tail-after-sort
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      tail returns its rows reversed, so this leads with the largest. mockdr returned them in pipeline order, making the first row the smallest.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort sev | tail 2 | table sev&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-dedup-host
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      One row per distinct value.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | dedup host | table host&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-arithmetic
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      eval reaches the row.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort sev | eval double=sev*2 | table sev, double&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-round-precision
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      round keeps the precision it was asked for -- round(10,2) is 10.00 -- and rounds a half away from zero, where Python rounds it to even.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | head 1 | eval a=round(10,2), b=round(10.5), c=round(10.567,1) | table a, b, c&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-conditional
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A conditional, then a group-by over what it produced.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | eval x=if(sev>25,"high","low") | stats count by x&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-where-filter
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      where after the search.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | where sev > 25 | sort sev | table sev&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-rename-field
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      rename carries through to table.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | rename sev as severity | sort severity | table severity&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-table-absent-field
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A field no row has: splunkd emits no rows and says so, where mockdr invented an empty column.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | table nope&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-table-partly-absent
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      And drops it per row when another field is present.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort host | table host, nope&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-search-parenthesised-or
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A parenthesised group in the search clause. mockdr parsed the preceding word as a function call and answered 500.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} (action=allow OR action=block) | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-search-negated-group
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      The same, negated.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} NOT (action=allow) | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-search-wildcard-value
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A wildcard on the right of a comparison.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} user=a* | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-unknown-function
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      A command that cannot run is FATAL and returns no rows; mockdr reported it as a warning and answered with the rows it had reached.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | eval x=nosuchfunc(1)&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-where-unknown-function
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      The same failure from where, which splunkd names differently from eval.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | where nosuchfunc(1)&output_mode=json&exec_mode=oneshot&count=0'
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic

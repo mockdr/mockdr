@@ -249,7 +249,7 @@ def get_results(sid: str, count: int = 100, offset: int = 0) -> dict | None:
 
     return build_search_results(
         _page(job.results, count, offset),
-        fields=job.field_list,
+        fields=job.field_meta or job.field_list,
         init_offset=offset,
         messages=job.messages,
     )

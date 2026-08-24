@@ -90,6 +90,10 @@ class Probe:
     #: Marks a probe that only means something once both targets hold the
     #: same data. Skipped unless the runner is given a seeded environment.
     needs_seed: bool = False
+    #: Compare the response *values*, not the shape around them. Only useful
+    #: alongside ``needs_seed``: with both targets holding the same events,
+    #: the rows themselves are the behaviour under test.
+    compare_values: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,6 +114,11 @@ class PlatformSpec:
     #: `statusCode`. Everything else is compared structurally, because values
     #: legitimately differ between a seeded mock and a fresh install.
     significant_keys: frozenset[str] = frozenset()
+    #: Fields whose values belong to the instance rather than to the API —
+    #: bucket ids, index times, the server's own name. Dropped from every row
+    #: before a ``compare: values`` probe looks at it, because comparing them
+    #: would report the two installs' identities as a difference.
+    volatile_fields: frozenset[str] = frozenset()
 
     def probe(self, probe_id: str) -> Probe:
         """Look one probe up by id, for running a single comparison."""
@@ -210,6 +219,7 @@ def load_spec(path: Path) -> PlatformSpec:
             why=str(entry.get("why", "")),
             ignore_paths=tuple(entry.get("ignore_paths") or ()),
             needs_seed=bool(entry.get("needs_seed", False)),
+            compare_values=str(entry.get("compare", "shape")) == "values",
         ))
 
     ids = [p.id for p in probes]
@@ -222,5 +232,6 @@ def load_spec(path: Path) -> PlatformSpec:
         endpoints=endpoints,
         probes=tuple(probes),
         significant_keys=frozenset(raw.get("significant_keys") or ()),
+        volatile_fields=frozenset(raw.get("volatile_fields") or ()),
         credentials=_load_credentials(raw.get("credentials"), path),
     )

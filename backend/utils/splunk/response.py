@@ -220,7 +220,7 @@ def build_splunk_single(name: str, content: dict) -> dict:
 def build_search_results(
     results: list[dict],
     *,
-    fields: list[str] | None = None,
+    fields: list[str] | list[dict] | None = None,
     init_offset: int = 0,
     messages: list[dict[str, str]] | None = None,
 ) -> dict:
@@ -251,7 +251,9 @@ def build_search_results(
     if rendered:
         if fields is None:
             fields = list(results[0].keys())
-        envelope["fields"] = [{"name": f} for f in fields]
+        envelope["fields"] = [
+            dict(f) if isinstance(f, dict) else {"name": f} for f in fields
+        ]
         envelope["highlighted"] = {}
     else:
         envelope["post_process_count"] = 0

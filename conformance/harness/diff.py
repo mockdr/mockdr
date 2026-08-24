@@ -16,6 +16,7 @@ depend on something that will not be there.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -95,6 +96,51 @@ def _under_empty_array(path: str, empty: set[str]) -> bool:
     Probes that genuinely need both sides populated declare `needs_seed`.
     """
     return any(path.startswith(f"{a}[*]") for a in empty)
+
+
+def strip_volatile(body: Any, volatile: frozenset[str]) -> Any:
+    """Drop the members that name the instance rather than the behaviour.
+
+    A Splunk result row carries the bucket it came from, the time it was
+    indexed and the server that holds it. Comparing those would report the
+    two installs' identities as a difference on every row.
+    """
+    if isinstance(body, dict):
+        return {
+            k: strip_volatile(v, volatile)
+            for k, v in body.items() if k not in volatile
+        }
+    if isinstance(body, list):
+        return [strip_volatile(v, volatile) for v in body]
+    return body
+
+
+def compare_values(
+    probe_id: str,
+    mock: Response,
+    real: Response,
+    volatile: frozenset[str],
+    why: str = "",
+) -> list[Finding]:
+    """Compare two seeded responses member for member.
+
+    With the same events on both sides the rows *are* the behaviour, so this
+    reports the whole document rather than its skeleton. One finding, because
+    a row that differs usually differs in several places at once and listing
+    each one separately buries the answer.
+    """
+    findings: list[Finding] = []
+    if mock.status != real.status:
+        findings.append(Finding(
+            probe_id, "status", "$", str(mock.status), str(real.status), why,
+        ))
+    mock_body = json.dumps(strip_volatile(mock.body, volatile), sort_keys=True)
+    real_body = json.dumps(strip_volatile(real.body, volatile), sort_keys=True)
+    if mock_body != real_body:
+        findings.append(Finding(
+            probe_id, "value", "$", mock_body[:600], real_body[:600], why,
+        ))
+    return findings
 
 
 def compare(

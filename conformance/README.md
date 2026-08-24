@@ -28,6 +28,40 @@ That is less of a loss than it looks: Splunk and Elastic carry by far the most
 API surface mockdr implements — the SPL engine, ES query DSL, aggregations,
 and the Kibana Security Solution.
 
+## Shapes, and then meanings
+
+Most probes compare the *shape* of a reply: which keys, of which types, under
+which status. That works against an empty real install, and it is what finds
+a flattened error envelope or a missing `paging` block.
+
+It cannot find a wrong *answer*. A search that matches nothing agrees with
+every other search that matches nothing, so semantics stay invisible — which
+is how `tail` came to return its rows the wrong way round here, `stats ... by`
+to leave its groups unsorted, and `_time` to render as an epoch where splunkd
+renders ISO-8601. Each of those passed every structural probe.
+
+`--seeded` closes that. The bootstrap puts the same five events into both
+targets' HEC, under a sourcetype unique to the run, and the probes marked
+
+```yaml
+    needs_seed: true
+    compare: values
+```
+
+then run the same search against both and compare the rows themselves rather
+than their skeletons. The fields that belong to the instance rather than to
+the API — bucket ids, index times, the server's own name — are listed under
+`volatile_fields` in the probe file and dropped before the comparison.
+
+A seeded probe has to establish its own row order: the order splunkd returns
+raw events in is a property of how they landed in buckets, not something it
+documents. `| sort <field>` before the command under test is enough.
+
+Two differences are left in place deliberately, both measured and both
+recorded in `backend/tests/unit/splunk/test_spl_against_splunk.py`: splunkd's
+lazy field extraction, which depends on sourcetype configuration this mock
+does not model, and the raw event order above.
+
 ## Running it
 
 CI runs the whole harness on an amd64 runner — weekly, on demand

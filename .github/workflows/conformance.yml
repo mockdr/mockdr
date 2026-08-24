@@ -63,8 +63,12 @@ jobs:
       - name: Elasticsearch + Kibana probes
         run: python -m harness.runner probes/elastic.yaml
 
+      # `--seeded` puts the same five events into both targets' HEC first,
+      # so the probes that compare result *values* have something to compare.
+      # Without it a search matches nothing on the real side and every
+      # semantic comparison agrees.
       - name: Splunk probes
-        run: python -m harness.runner probes/splunk.yaml
+        run: python -m harness.runner probes/splunk.yaml --seeded
 
       - name: Logs on failure
         if: failure()

@@ -15,12 +15,18 @@ from __future__ import annotations
 import httpx
 
 from harness.clients import Clients
+from harness.seed import SeedError, await_indexed, seed_sourcetype, seed_splunk
 from harness.spec import PlatformSpec
 
 #: mockdr's seeded HEC token. Fixed on purpose — reproducibility is a feature
 #: of the mock, and a probe that had to discover it would be testing the
 #: discovery endpoint rather than the one it names.
 MOCK_HEC_TOKEN = "11111111-1111-1111-1111-111111111111"
+
+#: mockdr's own tokens are restricted per index, and the one above may only
+#: write to `sentinelone`. The seed events go to `main`, which is the index
+#: the real instance's token is restricted to and the one every install has.
+MOCK_SEED_HEC_TOKEN = "33333333-3333-3333-3333-333333333333"
 
 
 class BootstrapError(Exception):
@@ -35,16 +41,23 @@ PREFERRED_HEC_INPUT = "conformance"
 
 
 def bootstrap_splunk(
-    spec: PlatformSpec, target: str, clients: Clients,
+    spec: PlatformSpec, target: str, clients: Clients, *, seeded: bool = False,
 ) -> dict[str, str]:
     """Ensure both targets have a usable HEC token, and report which.
 
     The real Splunk generates its own token, so it has to be read back rather
     than assumed: `http-event-collector create` ignores a requested value and
     mints one. mockdr's is seeded and known.
+
+    With ``seeded``, the same events go into both targets afterwards and the
+    sourcetype they carry is reported as a placeholder, so the semantic
+    probes can search for exactly them.
     """
     if target == "mock":
-        return {"hec_token": MOCK_HEC_TOKEN}
+        return _with_seed(
+            spec, target, clients, MOCK_HEC_TOKEN,
+            seed_token=MOCK_SEED_HEC_TOKEN, seeded=seeded,
+        )
 
     if "management" not in spec.endpoints:
         raise BootstrapError("splunk spec has no 'management' endpoint")
@@ -69,7 +82,9 @@ def bootstrap_splunk(
     name = PREFERRED_HEC_INPUT if PREFERRED_HEC_INPUT in inputs else next(iter(inputs), None)
     if name is not None:
         _restrict_indexes(clients, spec, target, name, inputs[name])
-        return {"hec_token": str(inputs[name]["token"])}
+        return _with_seed(
+            spec, target, clients, str(inputs[name]["token"]), seeded=seeded,
+        )
 
     raise BootstrapError(
         "the real Splunk has no HEC token. Create one with:\n"
@@ -84,6 +99,31 @@ def bootstrap_splunk(
 #: unrestricted HEC accepts any index name, even one that does not exist,
 #: with 200 (measured on 10.4.2). `main` because it exists on every install.
 _PROBE_INDEX = "main"
+
+
+#: One sourcetype for the whole run, so both targets search the same events.
+_RUN_SOURCETYPE = seed_sourcetype()
+
+
+def _with_seed(
+    spec: PlatformSpec, target: str, clients: Clients, token: str, *,
+    seeded: bool, seed_token: str = "",
+) -> dict[str, str]:
+    """Report the HEC token, and put the seed events behind it when asked.
+
+    ``seed_token`` separates the two jobs: the token the probes authenticate
+    with is not always one that may write to the seed index.
+    """
+    context = {"hec_token": token}
+    if not seeded:
+        return context
+    try:
+        seed_splunk(target, clients, seed_token or token, _RUN_SOURCETYPE)
+        await_indexed(spec, target, clients, _RUN_SOURCETYPE)
+    except SeedError as exc:
+        raise BootstrapError(str(exc)) from exc
+    context["sourcetype"] = _RUN_SOURCETYPE
+    return context
 
 
 def _restrict_indexes(
@@ -109,9 +149,13 @@ def _restrict_indexes(
 
 
 def bootstrap_elastic(
-    spec: PlatformSpec, target: str, clients: Clients,
+    spec: PlatformSpec, target: str, clients: Clients, *, seeded: bool = False,  # noqa: ARG001
 ) -> dict[str, str]:
     """Report an index that exists on this target.
+
+    ``seeded`` is part of the bootstrap signature the runner calls; seeding
+    Elasticsearch needs index creation on both sides, which mockdr does not
+    offer yet, so the Elastic probes stay structural.
 
     Structural probes do not need one, but any probe that reads documents
     does, and which index exists differs: mockdr seeds its own names, a fresh
