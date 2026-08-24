@@ -74,6 +74,17 @@ filters Kibana does not have and spelled the page size its own way — a client
 written against the mock sent a query the real one refuses, so those are gone
 and the UI now sends what a real client sends.
 
+**splunkd checks its query three ways; mockdr checked none of them.** The
+output mode, the sort direction and every argument name are validated against
+the handler's own list, and each has its own wording: a mode splunkd does not
+know is `Invalid output mode specified (x).`, one it knows but the handler
+will not serve is a WARN naming it, a sort direction outside asc/desc is
+`Unknown sort order "x".`, and an argument a collection does not declare is
+refused by name. The job collection is the exception on two counts, both
+measured rather than assumed: it sorts on several keys at once, so it pairs
+each `sort_key` with a `sort_dir` and refuses a mismatch, and it takes any
+argument because it has a dispatcher of its own.
+
 **Smaller ones, all measured the same way.** SPL: `tail` reverses its rows,
 `stats ... by` sorts its groups and drops a row missing a by-field, `top`
 carries `_tc` and six decimals of percentage, `table` drops a field a row does
