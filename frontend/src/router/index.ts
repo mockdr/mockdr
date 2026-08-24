@@ -121,19 +121,28 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const token = localStorage.getItem('s1_token')
   if (!to.meta['public'] && !token) return '/login'
-  // Hydrate the auth store if a token exists in localStorage but the store is empty
-  if (token) {
-    // Lazy import to avoid circular dependency — Pinia must be installed by the time this runs
-    import('../stores/auth').then(({ useAuthStore }) => {
-      const authStore = useAuthStore()
-      if (!authStore.token) {
-        authStore.login(token)
-      }
-    })
+  if (!token) return true
+
+  // A reload lands straight on a protected route with the store empty, so the
+  // stored token is adopted here. Awaited: an import left dangling outlived
+  // the navigation — and, in the test environment, its teardown. A token the
+  // backend refuses ends at /login rather than on an empty dashboard.
+  const { useAuthStore } = await import('../stores/auth')
+  const auth = useAuthStore()
+  // The store reads the token from localStorage when it is created, so what
+  // a cold load actually lacks is the user behind it — the name and role the
+  // topbar shows.
+  if (!auth.user) {
+    try {
+      await auth.login(token)
+    } catch {
+      return '/login'
+    }
   }
+  return true
 })
 
 export default router

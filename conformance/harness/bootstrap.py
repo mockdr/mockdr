@@ -194,6 +194,10 @@ def _await_allocated_shards(spec: PlatformSpec, target: str, clients: Clients) -
     ``_shards.failures`` (``no_shard_available_action_exception``). The mock
     has no shards to fail, so the harness would report the difference as
     drift — a measurement of the moment, not of either product.
+
+    "Settled" is not "green": a single-node install leaves every replica
+    unassigned for good and stays yellow, which is its healthy state. What
+    must be over is *movement* — nothing initializing, nothing relocating.
     """
     if target != "real":
         return
@@ -213,10 +217,14 @@ def _await_allocated_shards(spec: PlatformSpec, target: str, clients: Clients) -
             f"{response.text[:200]}",
         )
     health = response.json()
-    if health.get("timed_out") or health.get("unassigned_shards"):
+    if health.get("timed_out") or health.get("initializing_shards") or health.get(
+        "relocating_shards"
+    ):
         raise BootstrapError(
-            f"{target} still has {health.get('unassigned_shards')} unassigned shard(s) "
-            f"after 120s (status {health.get('status')}) — probing now would "
+            f"{target} is still moving shards after 120s "
+            f"(status {health.get('status')}, "
+            f"{health.get('initializing_shards')} initializing, "
+            f"{health.get('relocating_shards')} relocating) — probing now would "
             f"measure the allocation, not the API",
         )
 

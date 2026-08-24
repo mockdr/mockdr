@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**The guard that was too strict.** The shard-allocation wait added above
+refused to probe until `unassigned_shards` reached zero — which on a
+single-node Elasticsearch never happens, because every replica is
+permanently unassigned and yellow is its healthy state (the probe file says
+so itself, three lines away). It waits for *movement* to end now: nothing
+initializing, nothing relocating.
+
+**The navigation guard fired an import it never waited for.** It called
+`import('../stores/auth').then(…)` and moved on, so the promise outlived the
+navigation — in the test environment it resolved after teardown, which is
+what the frontend job caught — and it called `login()` without catching,
+which became an unhandled rejection the moment a failed login started
+throwing. It is awaited now, it hydrates the *user* (the store reads the
+token from `localStorage` when it is created, so the old condition never
+fired), and a token the backend refuses ends at `/login` rather than on an
+empty dashboard. `src/router/__tests__/guard.spec.ts` covers all four paths;
+the guard had no test at all.
+
 **Sentinel resources completed what they already had.** The ARM completion
 helper built a default for every declared property and then overwrote most of
 them — 14 000 discarded objects per incident page. It builds only what the
