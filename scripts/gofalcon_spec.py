@@ -54,7 +54,10 @@ def models(repo: Path) -> dict[str, list[tuple[str, str]]]:
 
 
 def _base(go_type: str) -> tuple[str, bool]:
-    """('Name', is_array) for ``[]*Name``, ``*Name``, ``map[string]Name``…"""
+    """Return ``("Name", is_array)`` for ``[]*Name``, ``*Name``, ``map[string]Name``.
+
+    The gofalcon models spell an optional array of models as any of those.
+    """
     is_array = go_type.startswith("[]")
     t = go_type.lstrip("[]*").replace("models.", "")
     if t.startswith("map["):
@@ -98,10 +101,13 @@ def main(repo: Path) -> int:
         reduced[f"{method} {path}"] = {"id": op, "model": model, "paths": flatten(model, defs)}
     OUT.write_text(json.dumps(reduced, indent=1) + "\n")
     print(
-        f"models: {len(defs)}  operations: {len(ops)}  with 200 payload: {len(reduced)} → {OUT.relative_to(ROOT)}"
+        f"models: {len(defs)}  operations: {len(ops)}  "
+        f"with 200 payload: {len(reduced)} → {OUT.relative_to(ROOT)}"
     )
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/gofalcon")))
+    # S108: the default is the clone path the module docstring documents, not a
+    # file this script creates.
+    raise SystemExit(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/gofalcon")))  # noqa: S108

@@ -1,9 +1,8 @@
 """Cortex XDR Alert query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_alert_repo import xdr_alert_repo
+from utils.serde import record_dict
 from utils.xdr_filters import apply_xdr_filters
 from utils.xdr_response import build_xdr_list_reply
 
@@ -44,7 +43,7 @@ def get_alerts(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching alerts.
     """
-    all_alerts = [asdict(a) for a in xdr_alert_repo.list_all()]
+    all_alerts = [record_dict(a) for a in xdr_alert_repo.list_all()]
 
     all_alerts = apply_xdr_filters(
         all_alerts, request_data.get("filters"), _ALERT_FILTER_FIELDS,
@@ -71,7 +70,7 @@ def get_original_alerts(alert_ids: list[str]) -> dict:
     for aid in alert_ids:
         alert = xdr_alert_repo.get(aid)
         if alert:
-            alerts.append(asdict(alert))
+            alerts.append(record_dict(alert))
 
     return build_xdr_list_reply(alerts, total_count=len(alerts), key="alerts")
 
@@ -111,7 +110,7 @@ def get_alerts_multi_events(request_data: dict) -> dict:
 
     Same filters and pagination as ``get_alerts_by_filter_data``.
     """
-    all_alerts = [asdict(a) for a in xdr_alert_repo.list_all()]
+    all_alerts = [record_dict(a) for a in xdr_alert_repo.list_all()]
     all_alerts = apply_xdr_filters(
         all_alerts, request_data.get("filters"), _ALERT_FILTER_FIELDS,
     )

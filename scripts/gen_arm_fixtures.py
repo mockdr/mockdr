@@ -100,7 +100,8 @@ def main() -> int:
         (OUT / f"{name}.json").write_text(json.dumps(fixture, indent=2, ensure_ascii=False) + "\n")
         flat = json.dumps(fixture)
         print(
-            f"  {name:42} {len(fixture):3} top-level keys, {len(flat):5} bytes  ({file}:{definition})"
+            f"  {name:42} {len(fixture):3} top-level keys, "
+            f"{len(flat):5} bytes  ({file}:{definition})"
         )
     return 0
 

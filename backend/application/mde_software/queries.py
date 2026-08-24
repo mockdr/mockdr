@@ -1,13 +1,12 @@
 """Microsoft Defender for Endpoint Software (TVM) query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_software_repo import mde_software_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
+from utils.serde import record_dict
 
 
 def _machine_refs_for(software_id: str) -> list[dict]:
@@ -62,7 +61,7 @@ def list_software(
     Returns:
         OData list response with paginated software records.
     """
-    records = [_with_exposed_count(asdict(s)) for s in mde_software_repo.list_all()]
+    records = [_with_exposed_count(record_dict(s)) for s in mde_software_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -90,7 +89,7 @@ def get_software(software_id: str) -> dict | None:
     software = mde_software_repo.get(software_id)
     if not software:
         return None
-    return _with_exposed_count(asdict(software))
+    return _with_exposed_count(record_dict(software))
 
 
 def get_software_machine_references(software_id: str) -> dict | None:

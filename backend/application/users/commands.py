@@ -1,5 +1,4 @@
 import secrets
-from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 
 from domain.user import User
@@ -9,6 +8,7 @@ from repository.user_repo import user_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.internal_fields import USER_INTERNAL_FIELDS
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 _TOKEN_TTL_DAYS = 180
@@ -88,7 +88,7 @@ def create_user(data: dict) -> dict:
         "expiresAt": _expires_at(),
     })
 
-    result = strip_fields(asdict(user), USER_INTERNAL_FIELDS)
+    result = strip_fields(record_dict(user), USER_INTERNAL_FIELDS)
     result["apiToken"] = token   # expose only at creation time
     return {"data": result}
 
@@ -121,7 +121,7 @@ def update_user(user_id: str, data: dict) -> dict | None:
         _sync_token_role(user)
 
     user_repo.save(user)
-    return {"data": strip_fields(asdict(user), USER_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(user), USER_INTERNAL_FIELDS)}
 
 
 def _sync_token_role(user: User) -> None:

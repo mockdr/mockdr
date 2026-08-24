@@ -1,12 +1,11 @@
 """Read-side handlers for Microsoft Graph Directory Roles."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.directory_role_repo import graph_directory_role_repo
 from repository.graph.user_repo import graph_user_repo
 from repository.store import store
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_directory_roles() -> dict:
@@ -15,7 +14,7 @@ def list_directory_roles() -> dict:
     Returns:
         OData list response containing directory role records.
     """
-    records = [asdict(r) for r in graph_directory_role_repo.list_all()]
+    records = [record_dict(r) for r in graph_directory_role_repo.list_all()]
     return build_graph_list_response(
         value=records,
         context="https://graph.microsoft.com/v1.0/$metadata#directoryRoles",
@@ -41,7 +40,7 @@ def get_role_members(role_id: str) -> dict:
             user = graph_user_repo.get(uid)
             if user is not None:
                 # A directoryObject collection names each item's concrete type.
-                members.append({"@odata.type": "#microsoft.graph.user", **asdict(user)})
+                members.append({"@odata.type": "#microsoft.graph.user", **record_dict(user)})
 
     return build_graph_list_response(
         value=members,

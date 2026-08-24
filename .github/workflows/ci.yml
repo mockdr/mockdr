@@ -44,6 +44,11 @@ jobs:
       - name: SAST (bandit)
         run: bandit -r . -x ./tests,./.venv -ll
 
+      # The reducers and probes are the fidelity tooling; they were the only
+      # Python in the repository nothing linted.
+      - name: Lint the scripts (ruff)
+        run: ruff check ../scripts
+
       - name: License compliance (pip-licenses)
         # Exclude own package — BSL 1.1, not in deny-list scope
         run: |

@@ -81,6 +81,7 @@ ENDPOINTS: dict[str, tuple[str, str, str]] = {
 
 
 def load_spec() -> dict[str, Any] | None:
+    """The vendored SentinelOne 2.1 swagger, or None when it was never fetched."""
     if not SWAGGER_PATH.exists():
         return None
     with open(SWAGGER_PATH) as f:
@@ -322,7 +323,7 @@ def start_server() -> subprocess.Popen[bytes]:
             "uvicorn",
             "main:app",
             "--host",
-            "0.0.0.0",
+            "127.0.0.1",  # the probe talks to its own process only
             "--port",
             "8001",
         ],
@@ -380,6 +381,7 @@ def _reconcile(spec_keys: set[str], mock_keys: set[str]) -> tuple[set[str], set[
 
 
 def main() -> int:
+    """Compare the mock responses with the swagger and report the drift."""
     parser = argparse.ArgumentParser(
         description="Detect field drift between mock API and Swagger spec"
     )

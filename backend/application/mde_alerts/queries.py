@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_alert_repo import mde_alert_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def resource(record: dict) -> dict:
@@ -37,7 +36,7 @@ def list_alerts(
     Returns:
         OData list response with paginated alert records.
     """
-    records = [resource(asdict(a)) for a in mde_alert_repo.list_all()]
+    records = [resource(record_dict(a)) for a in mde_alert_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -68,4 +67,4 @@ def get_alert(alert_id: str) -> dict | None:
     alert = mde_alert_repo.get(alert_id)
     if not alert:
         return None
-    return resource(asdict(alert))
+    return resource(record_dict(alert))

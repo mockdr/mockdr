@@ -1,9 +1,8 @@
 """Cortex XDR Action query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_action_repo import xdr_action_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_reply
 
 
@@ -28,7 +27,7 @@ def get_action_status(action_id: str) -> dict | None:
         action.status = "completed"
         xdr_action_repo.save(action)
 
-    return build_xdr_reply(asdict(action))
+    return build_xdr_reply(record_dict(action))
 
 
 def get_file_retrieval_details(action_id: str) -> dict | None:

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_indicator_repo import mde_indicator_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def _resource(record: dict) -> dict:
@@ -35,7 +34,7 @@ def list_indicators(
     Returns:
         OData list response with paginated indicator records.
     """
-    records = [_resource(asdict(ind)) for ind in mde_indicator_repo.list_all()]
+    records = [_resource(record_dict(ind)) for ind in mde_indicator_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -62,4 +61,4 @@ def get_indicator(indicator_id: str) -> dict | None:
     indicator = mde_indicator_repo.get(indicator_id)
     if not indicator:
         return None
-    return _resource(asdict(indicator))
+    return _resource(record_dict(indicator))

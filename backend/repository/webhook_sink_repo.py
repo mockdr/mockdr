@@ -1,10 +1,9 @@
 """Repository for WebhookSinkEntry records backed by InMemoryStore."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from domain.webhook_sink_entry import WebhookSinkEntry
 from repository.store import store
+from utils.serde import record_dict
 
 
 class WebhookSinkRepository:
@@ -20,7 +19,7 @@ class WebhookSinkRepository:
         Args:
             entry: The ``WebhookSinkEntry`` to persist.
         """
-        store.append_webhook_sink(entry.id, asdict(entry))
+        store.append_webhook_sink(entry.id, record_dict(entry))
 
     def list_recent(self) -> list[WebhookSinkEntry]:
         """Return all webhook sink entries in newest-first order.

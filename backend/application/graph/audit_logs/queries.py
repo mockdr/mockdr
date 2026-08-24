@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Audit Logs."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.audit_log_repo import graph_audit_log_repo
 from repository.graph.sign_in_log_repo import graph_sign_in_log_repo
 from utils.graph_odata import (
@@ -11,6 +9,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_sign_in_logs(
@@ -32,7 +31,7 @@ def list_sign_in_logs(
     Returns:
         OData list response dict.
     """
-    records = [asdict(s) for s in graph_sign_in_log_repo.list_all()]
+    records = [record_dict(s) for s in graph_sign_in_log_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -72,7 +71,7 @@ def list_audit_logs(
     Returns:
         OData list response dict.
     """
-    records = [asdict(a) for a in graph_audit_log_repo.list_all()]
+    records = [record_dict(a) for a in graph_audit_log_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)

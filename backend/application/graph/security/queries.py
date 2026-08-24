@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Security API."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from domain.graph.ti_indicator import GraphTiIndicator
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
@@ -11,6 +9,7 @@ from repository.graph.ti_indicator_repo import graph_ti_indicator_repo
 from utils.dt import utc_now
 from utils.graph_odata import apply_graph_filter
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 # ── Alerts v2 ─────────────────────────────────────────────────────────────────
 
@@ -33,7 +32,7 @@ def list_alerts_v2(
     Returns:
         OData list response dict.
     """
-    records = [asdict(a) for a in graph_security_alert_repo.list_all()]
+    records = [record_dict(a) for a in graph_security_alert_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -64,7 +63,7 @@ def get_alert_v2(alert_id: str) -> dict | None:
     alert = graph_security_alert_repo.get(alert_id)
     if alert is None:
         return None
-    return asdict(alert)
+    return record_dict(alert)
 
 
 def update_alert_v2(alert_id: str, body: dict) -> dict | None:
@@ -87,7 +86,7 @@ def update_alert_v2(alert_id: str, body: dict) -> dict | None:
             setattr(alert, field_name, body[field_name])
 
     graph_security_alert_repo.save(alert)
-    return asdict(alert)
+    return record_dict(alert)
 
 
 # ── Incidents ─────────────────────────────────────────────────────────────────
@@ -113,7 +112,7 @@ def list_incidents(
     Returns:
         OData list response dict.
     """
-    records = [asdict(inc) for inc in graph_security_incident_repo.list_all()]
+    records = [record_dict(inc) for inc in graph_security_incident_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -155,7 +154,7 @@ def get_incident(
     if incident is None:
         return None
 
-    result = asdict(incident)
+    result = record_dict(incident)
     if expand and "alerts" in expand:
         result["alerts"] = _expand_alerts(result.get("alert_ids", []))
     result.pop("alert_ids", None)
@@ -169,7 +168,7 @@ def _expand_alerts(alert_ids: list[str]) -> list[dict]:
     for aid in alert_ids:
         alert = graph_security_alert_repo.get(aid)
         if alert:
-            alerts.append(asdict(alert))
+            alerts.append(record_dict(alert))
     return alerts
 
 
@@ -277,7 +276,7 @@ def list_secure_scores(
     Returns:
         OData list response dict.
     """
-    records = [asdict(s) for s in graph_secure_score_repo.list_all()]
+    records = [record_dict(s) for s in graph_secure_score_repo.list_all()]
 
     total = len(records)
     page = records[skip : skip + top]
@@ -310,7 +309,7 @@ def list_ti_indicators(
     Returns:
         OData list response dict.
     """
-    records = [asdict(ti) for ti in graph_ti_indicator_repo.list_all()]
+    records = [record_dict(ti) for ti in graph_ti_indicator_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -357,7 +356,7 @@ def create_ti_indicator(body: dict) -> dict:
         lastReportedDateTime=now,
     )
     graph_ti_indicator_repo.save(ti)
-    return asdict(ti)
+    return record_dict(ti)
 
 
 def delete_ti_indicator(indicator_id: str) -> bool:

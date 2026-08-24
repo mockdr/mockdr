@@ -1,12 +1,11 @@
 """CrowdStrike Falcon Quarantine query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_quarantine_repo import cs_quarantine_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.serde import record_dict
 
 
 def query_quarantined_file_ids(
@@ -26,7 +25,7 @@ def query_quarantined_file_ids(
     Returns:
         CS ID response envelope with quarantined file IDs.
     """
-    records = [asdict(f) for f in cs_quarantine_repo.list_all()]
+    records = [record_dict(f) for f in cs_quarantine_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     if sort:
@@ -54,5 +53,5 @@ def get_quarantined_file_entities(ids: list[str]) -> dict:
     for file_id in ids:
         qf = cs_quarantine_repo.get(file_id)
         if qf:
-            entities.append(asdict(qf))
+            entities.append(record_dict(qf))
     return build_cs_entity_response(entities)

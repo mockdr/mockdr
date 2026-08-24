@@ -1,12 +1,11 @@
 """CrowdStrike Falcon User Management query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_user_repo import cs_user_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.serde import record_dict
 
 
 def _public(record: dict) -> dict:
@@ -31,7 +30,7 @@ def query_user_ids(
     Returns:
         CS ID response envelope with user UUIDs.
     """
-    records = [_public(asdict(u)) for u in cs_user_repo.list_all()]
+    records = [_public(record_dict(u)) for u in cs_user_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     if sort:
@@ -59,5 +58,5 @@ def get_user_entities(ids: list[str]) -> dict:
     for user_id in ids:
         user = cs_user_repo.get(user_id)
         if user:
-            entities.append(_public(asdict(user)))
+            entities.append(_public(record_dict(user)))
     return build_cs_entity_response(entities)

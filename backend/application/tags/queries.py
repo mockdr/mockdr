@@ -1,13 +1,12 @@
 """Read-only queries for scoped tag definitions."""
 
-from dataclasses import asdict
-
 from repository.agent_repo import agent_repo
 from repository.group_repo import group_repo
 from repository.site_repo import site_repo
 from repository.tag_repo import tag_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import TAG_CURSOR, build_list_response, paginate
+from utils.serde import record_dict
 
 FILTER_SPECS = [
     FilterSpec("ids", "id", "in"),
@@ -127,7 +126,7 @@ def list_tags(params: dict, cursor: str | None, limit: int) -> dict:
 
     scope_set = _resolve_scope_ids(params, include_parents, include_children)
 
-    records = [asdict(t) for t in tag_repo.list_all()]
+    records = [record_dict(t) for t in tag_repo.list_all()]
 
     # Scope filtering
     if scope_set is not None:

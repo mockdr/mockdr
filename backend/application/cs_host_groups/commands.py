@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import uuid as _uuid
-from dataclasses import asdict
 
 from domain.cs_host_group import CsHostGroup
 from repository.cs_host_group_repo import cs_host_group_repo
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_response import build_cs_action_response, build_cs_entity_response
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def create_host_group(body: dict) -> dict:
@@ -34,7 +34,7 @@ def create_host_group(body: dict) -> dict:
         modified_timestamp=now,
     )
     cs_host_group_repo.save(group)
-    return build_cs_entity_response([asdict(group)])
+    return build_cs_entity_response([record_dict(group)])
 
 
 def update_host_group(body: dict) -> dict:
@@ -62,7 +62,7 @@ def update_host_group(body: dict) -> dict:
     group.modified_by = body.get("modified_by", "api-client")
     group.modified_timestamp = utc_now()
     cs_host_group_repo.save(group)
-    return build_cs_entity_response([asdict(group)])
+    return build_cs_entity_response([record_dict(group)])
 
 
 def delete_host_groups(ids: list[str]) -> dict:

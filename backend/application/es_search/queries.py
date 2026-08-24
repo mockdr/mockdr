@@ -7,7 +7,6 @@ response envelopes.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import asdict
 from fnmatch import fnmatch
 
 from repository.es_alert_repo import es_alert_repo
@@ -24,6 +23,7 @@ from utils.es_query import (
     wrap_as_hits,
 )
 from utils.es_response import build_es_index_not_found, build_es_search_response
+from utils.serde import record_dict
 
 # ── Index pattern routing ────────────────────────────────────────────────────
 
@@ -127,9 +127,9 @@ def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tupl
         # Alerts are rendered as ECS here rather than at the response boundary,
         # so a query written against the real field names (`host.name`,
         # `kibana.alert.severity`) filters and aggregates correctly too.
-        records += [to_ecs_document(asdict(a), idx) for a in es_alert_repo.list_all()]
+        records += [to_ecs_document(record_dict(a), idx) for a in es_alert_repo.list_all()]
     if any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
-        records += [asdict(ep) for ep in es_endpoint_repo.list_all()]
+        records += [record_dict(ep) for ep in es_endpoint_repo.list_all()]
     return records, idx
 
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict
 
 from domain.event_bus import MdeMachineUpdated, event_bus
 from domain.mde_machine import MdeMachine
@@ -14,6 +13,7 @@ from repository.mde_machine_repo import mde_machine_repo
 from utils.dt import utc_now
 from utils.mde_fixtures import complete_mde
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def _publish_machine_updated(machine: MdeMachine) -> None:
@@ -27,7 +27,7 @@ def _publish_machine_updated(machine: MdeMachine) -> None:
     event_bus.publish(
         MdeMachineUpdated(
             entity_id=machine.machineId,
-            payload=to_mde_resource(asdict(machine), "machineId"),
+            payload=to_mde_resource(record_dict(machine), "machineId"),
             timestamp=time.time(),
         )
     )
@@ -62,7 +62,7 @@ def _create_action(
         requestorComment=comment,
     )
     mde_machine_action_repo.save(action)
-    return complete_mde(to_mde_resource(asdict(action), "actionId"), "machineaction")
+    return complete_mde(to_mde_resource(record_dict(action), "actionId"), "machineaction")
 
 
 def isolate_machine(machine_id: str, body: dict) -> dict | None:

@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Device Management / Intune."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.detected_app_repo import graph_detected_app_repo
 from repository.graph.managed_device_repo import graph_managed_device_repo
 from repository.store import store
@@ -13,6 +11,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_managed_devices(
@@ -38,7 +37,7 @@ def list_managed_devices(
     Returns:
         OData list response dict.
     """
-    records = [asdict(d) for d in graph_managed_device_repo.list_all()]
+    records = [record_dict(d) for d in graph_managed_device_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -73,7 +72,7 @@ def get_managed_device(device_id: str) -> dict | None:
     device = graph_managed_device_repo.get(device_id)
     if device is None:
         return None
-    return asdict(device)
+    return record_dict(device)
 
 
 def list_detected_apps(
@@ -89,7 +88,7 @@ def list_detected_apps(
     Returns:
         OData list response dict.
     """
-    records = [asdict(a) for a in graph_detected_app_repo.list_all()]
+    records = [record_dict(a) for a in graph_detected_app_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
     next_link = (
@@ -122,7 +121,7 @@ def get_detected_app_devices(app_id: str) -> dict:
         for did in device_ids:
             device = graph_managed_device_repo.get(did)
             if device is not None:
-                devices.append(asdict(device))
+                devices.append(record_dict(device))
 
     return build_graph_list_response(
         value=devices,

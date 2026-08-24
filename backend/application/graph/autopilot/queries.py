@@ -1,11 +1,10 @@
 """Read-side handlers for Microsoft Graph Windows Autopilot."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.autopilot_device_repo import graph_autopilot_device_repo
 from repository.graph.autopilot_profile_repo import graph_autopilot_profile_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_autopilot_devices(
@@ -21,7 +20,7 @@ def list_autopilot_devices(
     Returns:
         OData list response dict.
     """
-    records = [asdict(d) for d in graph_autopilot_device_repo.list_all()]
+    records = [record_dict(d) for d in graph_autopilot_device_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
     next_link = (
@@ -50,7 +49,7 @@ def list_autopilot_profiles(
     Returns:
         OData list response dict.
     """
-    records = [asdict(p) for p in graph_autopilot_profile_repo.list_all()]
+    records = [record_dict(p) for p in graph_autopilot_profile_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
     next_link = (

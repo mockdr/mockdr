@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Users."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.user_repo import graph_user_repo
 from repository.store import store
 from utils.graph_odata import (
@@ -13,6 +11,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_users(
@@ -40,7 +39,7 @@ def list_users(
     Returns:
         OData list response dict.
     """
-    records = [asdict(u) for u in graph_user_repo.list_all()]
+    records = [record_dict(u) for u in graph_user_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -79,7 +78,7 @@ def get_user(user_id: str) -> dict | None:
     user = graph_user_repo.get(user_id)
     if user is None:
         return None
-    return asdict(user)
+    return record_dict(user)
 
 
 def get_user_member_of(user_id: str) -> dict:
@@ -129,7 +128,7 @@ def get_user_mail_rules(user_id: str) -> dict:
         if isinstance(rule, dict):
             record = dict(rule)
         else:
-            record = asdict(rule)
+            record = record_dict(rule)
         if record.get("_user_id") == user_id:
             record.pop("_user_id", None)
             rules.append(record)

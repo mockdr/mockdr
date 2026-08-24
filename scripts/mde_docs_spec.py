@@ -1,5 +1,5 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E402, PLR0912, PLR2004
-"""Reduce the Defender for Endpoint API docs into a route → shape map.
+r"""Reduce the Defender for Endpoint API docs into a route → shape map.
 
 Microsoft publishes no machine-readable spec for the MDE API, but the docs
 are versioned as Markdown in ``github.com/MicrosoftDocs/defender-docs``
@@ -173,10 +173,14 @@ def main(repo: Path) -> int:
     OUT.write_text(json.dumps(reduced, indent=1) + "\n")
     with_shape = sum(1 for v in routes.values() if v["paths"])
     print(
-        f"pages: {len(pages)}  routes: {len(routes)} ({with_shape} with a response example)  entities: {len(entities)} → {OUT.relative_to(ROOT)}"
+        f"pages: {len(pages)}  routes: {len(routes)} "
+        f"({with_shape} with a response example)  entities: {len(entities)} "
+        f"→ {OUT.relative_to(ROOT)}"
     )
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/defender-docs")))
+    # S108: the default is the clone path the module docstring documents, not a
+    # file this script creates.
+    raise SystemExit(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/defender-docs")))  # noqa: S108

@@ -1,13 +1,12 @@
 """Elastic Security Cases query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
 from utils.es_case_serde import serialise_case, serialise_comment, status_counts
 from utils.es_pagination import paginate_kibana
 from utils.es_response import build_kibana_cases_response
+from utils.serde import record_dict
 
 #: Sort fields the Cases API accepts, mapped to the stored field.
 _CASE_SORT_FIELDS = {
@@ -56,7 +55,7 @@ def find_cases(
     Returns:
         Kibana paginated list response.
     """
-    records = [asdict(c) for c in es_case_repo.list_all()]
+    records = [record_dict(c) for c in es_case_repo.list_all()]
 
     if status:
         records = [r for r in records if r["status"] == status]
@@ -103,7 +102,7 @@ def get_case(case_id: str) -> dict | None:
     case = es_case_repo.get(case_id)
     if not case:
         return None
-    return serialise_case(asdict(case))
+    return serialise_case(record_dict(case))
 
 
 def get_case_comments(case_id: str) -> list[dict] | None:
@@ -119,7 +118,7 @@ def get_case_comments(case_id: str) -> list[dict] | None:
     if not case:
         return None
     comments = es_case_comment_repo.get_by_case_id(case_id)
-    return [serialise_comment(asdict(c)) for c in comments]
+    return [serialise_comment(record_dict(c)) for c in comments]
 
 
 def get_case_activity(case_id: str) -> list[dict] | None:
@@ -140,7 +139,7 @@ def get_case_activity(case_id: str) -> list[dict] | None:
     comments = es_case_comment_repo.get_by_case_id(case_id)
     activities = []
     for c in comments:
-        entry = asdict(c)
+        entry = record_dict(c)
         entry["action"] = "comment" if c.type == "user" else c.type
         activities.append(entry)
     return activities

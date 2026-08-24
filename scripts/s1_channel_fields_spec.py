@@ -43,6 +43,7 @@ _OWN = {
 
 
 def main() -> int:
+    """Write the reduced reference and report what it holds."""
     with urllib.request.urlopen(SOURCE, timeout=60) as resp:
         text = resp.read().decode()
     block = text.split("sourcetype=\"sentinelone:channel:agents\"", 1)[1]
@@ -58,7 +59,8 @@ def main() -> int:
         if name not in _OWN and not name.startswith("s1_"):
             names.add(name)
     # dedup uuid · rex field=modelName · mvappend(groupName, siteName)
-    for m in re.finditer(r"\bdedup\s+([A-Za-z][A-Za-z0-9_]*)|\bfield=([A-Za-z][A-Za-z0-9_]*)", block):
+    dedup_or_rex = r"\bdedup\s+([A-Za-z][A-Za-z0-9_]*)|\bfield=([A-Za-z][A-Za-z0-9_]*)"
+    for m in re.finditer(dedup_or_rex, block):
         names.add(m.group(1) or m.group(2))
     for m in re.finditer(r"mvappend\(([^()]*)\)", block):
         for part in m.group(1).split(","):

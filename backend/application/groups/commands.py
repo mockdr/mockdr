@@ -5,8 +5,8 @@ POST   /groups                  → create_group
 PUT    /groups/{id}             → update_group
 PUT    /groups/{id}/move-agents → move_agents_to_group
 """
+
 import uuid
-from dataclasses import asdict
 
 from domain.group import Group
 from repository.group_repo import group_repo
@@ -14,6 +14,7 @@ from repository.site_repo import site_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.internal_fields import GROUP_INTERNAL_FIELDS
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 
@@ -58,7 +59,7 @@ def create_group(data: dict) -> dict:
         accountName=account_name,
     )
     group_repo.save(group)
-    return {"data": strip_fields(asdict(group), GROUP_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(group), GROUP_INTERNAL_FIELDS)}
 
 
 def delete_group(group_id: str) -> dict | None:
@@ -152,4 +153,4 @@ def update_group(group_id: str, data: dict) -> dict | None:
             setattr(group, field, data[field])
     group.updatedAt = utc_now()
     group_repo.save(group)
-    return {"data": strip_fields(asdict(group), GROUP_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(group), GROUP_INTERNAL_FIELDS)}

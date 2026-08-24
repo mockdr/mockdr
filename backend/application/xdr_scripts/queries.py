@@ -1,10 +1,9 @@
 """Cortex XDR Script query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_action_repo import xdr_action_repo
 from repository.xdr_script_repo import xdr_script_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 
@@ -34,7 +33,7 @@ def get_scripts(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching scripts.
     """
-    all_scripts = [_script_to_api(asdict(s)) for s in xdr_script_repo.list_all()]
+    all_scripts = [_script_to_api(record_dict(s)) for s in xdr_script_repo.list_all()]
 
     script_type = request_data.get("script_type")
     if script_type:
@@ -61,7 +60,7 @@ def get_script_metadata(script_id: str) -> dict | None:
     script = xdr_script_repo.get(script_id)
     if not script:
         return None
-    return build_xdr_reply(_script_to_api(asdict(script)))
+    return build_xdr_reply(_script_to_api(record_dict(script)))
 
 
 def get_execution_status(action_id: str) -> dict | None:
@@ -85,7 +84,7 @@ def get_execution_status(action_id: str) -> dict | None:
         action.status = "completed"
         xdr_action_repo.save(action)
 
-    return build_xdr_reply(asdict(action))
+    return build_xdr_reply(record_dict(action))
 
 
 def get_execution_results(action_id: str) -> dict | None:

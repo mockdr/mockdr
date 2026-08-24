@@ -1,10 +1,9 @@
 """Cortex XDR Incident query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_alert_repo import xdr_alert_repo
 from repository.xdr_incident_repo import xdr_incident_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 
@@ -21,7 +20,7 @@ def get_incidents(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching incidents.
     """
-    all_incidents = [asdict(i) for i in xdr_incident_repo.list_all()]
+    all_incidents = [record_dict(i) for i in xdr_incident_repo.list_all()]
 
     filters = request_data.get("filters", [])
     for f in filters:
@@ -77,8 +76,11 @@ def get_incident_extra_data(incident_id: str) -> dict | None:
             })
 
     return build_xdr_reply({
-        "incident": asdict(incident),
-        "alerts": {"total_count": len(linked_alerts), "data": [asdict(a) for a in linked_alerts]},
+        "incident": record_dict(incident),
+        "alerts": {
+            "total_count": len(linked_alerts),
+            "data": [record_dict(a) for a in linked_alerts],
+        },
         "network_artifacts": {"total_count": len(network_artifacts), "data": network_artifacts},
         "file_artifacts": {"total_count": 0, "data": []},
     })

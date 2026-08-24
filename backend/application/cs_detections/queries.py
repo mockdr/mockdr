@@ -1,12 +1,11 @@
 """CrowdStrike Falcon Detection query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_detection_repo import cs_detection_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.serde import record_dict
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
@@ -43,7 +42,7 @@ def query_detection_ids(
     Returns:
         CS ID response envelope.
     """
-    records = [asdict(d) for d in cs_detection_repo.list_all()]
+    records = [record_dict(d) for d in cs_detection_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -66,5 +65,5 @@ def get_detection_entities(ids: list[str]) -> dict:
     for composite_id in ids:
         detection = cs_detection_repo.get(composite_id)
         if detection:
-            entities.append(asdict(detection))
+            entities.append(record_dict(detection))
     return build_cs_entity_response(entities)

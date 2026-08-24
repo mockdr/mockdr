@@ -1,11 +1,10 @@
 """CrowdStrike Falcon Host command handlers (mutations)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_response import build_cs_action_response
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def contain_host(ids: list[str]) -> dict:
@@ -99,5 +98,5 @@ def tag_hosts(ids: list[str], tags: list[str], action: str) -> dict:
         host.tags = current_tags
         host.modified_timestamp = utc_now()
         cs_host_repo.save(host)
-        affected.append(asdict(host))
+        affected.append(record_dict(host))
     return build_cs_action_response(affected)

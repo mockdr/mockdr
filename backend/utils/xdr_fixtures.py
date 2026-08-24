@@ -46,9 +46,15 @@ def deep_complete(defaults: Any, actual: Any) -> Any:
         # a reply without the list gets [] — never a one-item list of blanks.
         # Scalars are immutable and shared; a nested object is rebuilt from its
         # template so the caller can mutate the result freely.
-        out = {k: _blank(v) for k, v in defaults.items()}
+        out: dict = {}
+        for key, template in defaults.items():
+            # Only a key the reply lacks needs a default built for it.
+            out[key] = (
+                deep_complete(template, actual[key]) if key in actual else _blank(template)
+            )
         for key, value in actual.items():
-            out[key] = deep_complete(defaults.get(key), value) if key in defaults else value
+            if key not in defaults:
+                out[key] = value
         return out
     if isinstance(defaults, list) and isinstance(actual, list) and defaults:
         template = defaults[0]

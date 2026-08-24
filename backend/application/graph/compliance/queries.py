@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Compliance Policies and Device Configurations."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.compliance_policy_repo import graph_compliance_policy_repo
 from repository.graph.device_configuration_repo import graph_device_configuration_repo
 from utils.graph_odata import (
@@ -10,6 +8,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def _convert_odata_type(rec: dict) -> dict:
@@ -35,7 +34,7 @@ def list_compliance_policies(
     Returns:
         OData list response dict.
     """
-    records = [_convert_odata_type(asdict(p)) for p in graph_compliance_policy_repo.list_all()]
+    records = [_convert_odata_type(record_dict(p)) for p in graph_compliance_policy_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -73,7 +72,9 @@ def list_device_configurations(
     Returns:
         OData list response dict.
     """
-    records = [_convert_odata_type(asdict(c)) for c in graph_device_configuration_repo.list_all()]
+    records = [
+        _convert_odata_type(record_dict(c)) for c in graph_device_configuration_repo.list_all()
+    ]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)

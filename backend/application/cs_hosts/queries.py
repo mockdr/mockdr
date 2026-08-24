@@ -1,12 +1,11 @@
 """CrowdStrike Falcon Host query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.serde import record_dict
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
@@ -45,7 +44,7 @@ def query_host_ids(
     Returns:
         CS ID response envelope.
     """
-    records = [asdict(h) for h in cs_host_repo.list_all()]
+    records = [record_dict(h) for h in cs_host_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -68,7 +67,7 @@ def get_host_entities(ids: list[str]) -> dict:
     for device_id in ids:
         host = cs_host_repo.get(device_id)
         if host:
-            entities.append(asdict(host))
+            entities.append(record_dict(host))
     return build_cs_entity_response(entities)
 
 
@@ -92,7 +91,7 @@ def query_host_ids_scroll(
     Returns:
         CS ID response with scroll-style pagination metadata.
     """
-    records = [asdict(h) for h in cs_host_repo.list_all()]
+    records = [record_dict(h) for h in cs_host_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -130,7 +129,7 @@ def get_host_count(filter_fql: str | None) -> dict:
     Returns:
         CS entity response with a single resource containing the count.
     """
-    records = [asdict(h) for h in cs_host_repo.list_all()]
+    records = [record_dict(h) for h in cs_host_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     return build_cs_entity_response([{"count": len(records)}])

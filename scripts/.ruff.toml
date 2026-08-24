@@ -1,0 +1,23 @@
+# The reducers and probes are held to the backend's rules — they carry
+# `# ruff: noqa` headers written for that set — with the allowances a
+# throwaway-safe script earns: it prints, it takes untyped JSON, and its
+# randomness is seed data, never a secret.
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "N", "D", "UP", "B", "ANN", "S"]
+ignore = [
+    "D100",   # module docstring is present on all of these; the rule fires on __main__ blocks
+    "D104",
+    "S101",   # assert: a script's own sanity check
+    "S105",
+    "S106",
+    "S107",
+    "S310",   # urlopen with a literal https URL declared in the file
+    "S311",   # random for seed data, never for secrets
+    "ANN401", # a reducer walks arbitrary JSON
+]
+
+[lint.pydocstyle]
+convention = "google"

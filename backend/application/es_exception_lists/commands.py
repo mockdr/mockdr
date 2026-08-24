@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict
 
 from domain.es_exception_item import EsExceptionItem
 from domain.es_exception_list import EsExceptionList
 from repository.es_exception_item_repo import es_exception_item_repo
 from repository.es_exception_list_repo import es_exception_list_repo
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 # ── Exception Lists ──────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ def create_list(data: dict) -> dict:
         updated_by=data.get("created_by", "elastic"),
     )
     es_exception_list_repo.save(el)
-    return asdict(el)
+    return record_dict(el)
 
 
 def update_list(data: dict) -> dict | None:
@@ -70,7 +70,7 @@ def update_list(data: dict) -> dict | None:
     el.version += 1
 
     es_exception_list_repo.save(el)
-    return asdict(el)
+    return record_dict(el)
 
 
 def delete_list(list_id: str) -> bool:
@@ -126,7 +126,7 @@ def create_item(data: dict) -> dict:
         updated_by=data.get("created_by", "elastic"),
     )
     es_exception_item_repo.save(item)
-    return asdict(item)
+    return record_dict(item)
 
 
 def update_item(data: dict) -> dict | None:
@@ -160,7 +160,7 @@ def update_item(data: dict) -> dict | None:
     item.updated_by = data.get("updated_by", "elastic")
 
     es_exception_item_repo.save(item)
-    return asdict(item)
+    return record_dict(item)
 
 
 def delete_item(item_id: str) -> bool:

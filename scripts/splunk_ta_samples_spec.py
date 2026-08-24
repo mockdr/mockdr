@@ -36,7 +36,8 @@ SAMPLES = {
 }
 
 
-def observed(value, prefix: str = "", depth: int = 0) -> set[str]:
+def observed(value: object, prefix: str = "", depth: int = 0) -> set[str]:
+    """Every dotted key path a JSON value carries."""
     out: set[str] = set()
     if depth > 8:
         return out
@@ -51,6 +52,7 @@ def observed(value, prefix: str = "", depth: int = 0) -> set[str]:
 
 
 def main() -> int:
+    """Write the reduced reference and report what it holds."""
     reduced = {}
     for sourcetype, (url, note) in SAMPLES.items():
         with urllib.request.urlopen(url, timeout=60) as resp:

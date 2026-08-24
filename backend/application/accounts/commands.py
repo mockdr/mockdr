@@ -3,12 +3,12 @@
 POST /accounts      → create_account
 PUT  /accounts/{id} → update_account
 """
-from dataclasses import asdict
 
 from domain.account import Account
 from repository.account_repo import account_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 def create_account(data: dict) -> dict:
@@ -38,7 +38,7 @@ def create_account(data: dict) -> dict:
         expiration=data.get("expiration"),
     )
     account_repo.save(account)
-    return {"data": asdict(account)}
+    return {"data": record_dict(account)}
 
 
 def increment_site_count(account_id: str) -> None:
@@ -86,4 +86,4 @@ def update_account(account_id: str, data: dict) -> dict | None:
             setattr(account, field, data[field])
     account.updatedAt = utc_now()
     account_repo.save(account)
-    return {"data": asdict(account)}
+    return {"data": record_dict(account)}

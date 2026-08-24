@@ -1,12 +1,11 @@
 """CrowdStrike Falcon Custom IOC query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_ioc_repo import cs_ioc_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_list_response
+from utils.serde import record_dict
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
@@ -46,7 +45,7 @@ def search_iocs(
     Returns:
         CS list response envelope with full IOC entities and pagination.
     """
-    records = [asdict(i) for i in cs_ioc_repo.list_all()]
+    records = [record_dict(i) for i in cs_ioc_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -74,7 +73,7 @@ def query_ioc_ids(
     """
     from utils.cs_response import build_cs_id_response
 
-    records = [asdict(i) for i in cs_ioc_repo.list_all()]
+    records = [record_dict(i) for i in cs_ioc_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -129,5 +128,5 @@ def get_ioc_entities(ids: list[str]) -> dict:
     for ioc_id in ids:
         ioc = cs_ioc_repo.get(ioc_id)
         if ioc:
-            entities.append(asdict(ioc))
+            entities.append(record_dict(ioc))
     return build_cs_entity_response(entities)

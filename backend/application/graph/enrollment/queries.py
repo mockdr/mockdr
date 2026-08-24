@@ -1,12 +1,11 @@
 """Read-side handlers for Microsoft Graph Intune Enrollment / Update Rings / Device Categories."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.device_category_repo import graph_device_category_repo
 from repository.graph.enrollment_restriction_repo import graph_enrollment_restriction_repo
 from repository.graph.update_ring_repo import graph_update_ring_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_update_rings(
@@ -22,7 +21,7 @@ def list_update_rings(
     Returns:
         OData list response dict.
     """
-    records = [asdict(r) for r in graph_update_ring_repo.list_all()]
+    records = [record_dict(r) for r in graph_update_ring_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
     next_link = (
@@ -55,7 +54,7 @@ def list_enrollment_restrictions(
     """
     records = []
     for restriction in graph_enrollment_restriction_repo.list_all():
-        rec = asdict(restriction)
+        rec = record_dict(restriction)
         rec["@odata.type"] = rec.pop("odata_type", "")
         records.append(rec)
 
@@ -87,7 +86,7 @@ def list_device_categories(
     Returns:
         OData list response dict.
     """
-    records = [asdict(c) for c in graph_device_category_repo.list_all()]
+    records = [record_dict(c) for c in graph_device_category_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
     next_link = (

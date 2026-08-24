@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import UTC, datetime
 
 from repository.mde_machine_action_repo import mde_machine_action_repo
@@ -11,6 +10,7 @@ from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def _resource(record: dict) -> dict:
@@ -72,7 +72,7 @@ def list_machine_actions(
     Returns:
         OData list response with paginated machine action records.
     """
-    records = [_resource(_auto_promote(asdict(a))) for a in mde_machine_action_repo.list_all()]
+    records = [_resource(_auto_promote(record_dict(a))) for a in mde_machine_action_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -99,7 +99,7 @@ def get_machine_action(action_id: str) -> dict | None:
     action = mde_machine_action_repo.get(action_id)
     if not action:
         return None
-    return _resource(_auto_promote(asdict(action)))
+    return _resource(_auto_promote(record_dict(action)))
 
 
 def get_package_uri(action_id: str) -> dict | None:

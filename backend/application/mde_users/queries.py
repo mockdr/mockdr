@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_machine_repo import mde_machine_repo
 from utils.mde_response import build_mde_list_response
+from utils.serde import record_dict
 
 
 def get_user_machines(user_id: str) -> dict:
@@ -28,7 +27,7 @@ def get_user_machines(user_id: str) -> dict:
             acct = user.get("accountName", "").lower()
             domain = user.get("accountDomain", "").lower()
             if acct == user_id.lower() or f"{domain}\\{acct}" == user_id.lower():
-                matched.append(asdict(machine))
+                matched.append(record_dict(machine))
                 break
     return build_mde_list_response(matched)
 
@@ -60,5 +59,5 @@ def get_user_alerts(user_id: str) -> dict:
     alerts: list[dict] = []
     for machine_id in machine_ids:
         machine_alerts = mde_alert_repo.get_by_machine_id(machine_id)
-        alerts.extend(asdict(a) for a in machine_alerts)
+        alerts.extend(record_dict(a) for a in machine_alerts)
     return build_mde_list_response(alerts)

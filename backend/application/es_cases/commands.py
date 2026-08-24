@@ -4,7 +4,6 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
-from dataclasses import asdict
 
 from domain.es_case import EsCase
 from domain.es_case_comment import EsCaseComment
@@ -12,6 +11,7 @@ from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
 from utils.dt import utc_now
 from utils.es_case_serde import serialise_case, serialise_comment
+from utils.serde import record_dict
 
 
 def create_case(data: dict) -> dict:
@@ -43,7 +43,7 @@ def create_case(data: dict) -> dict:
         updated_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
     )
     es_case_repo.save(case)
-    return serialise_case(asdict(case))
+    return serialise_case(record_dict(case))
 
 
 def _next_version(current: str) -> str:
@@ -96,7 +96,7 @@ def update_case(case_id: str, data: dict) -> dict | None:
         case.closed_by = None
 
     es_case_repo.save(case)
-    return serialise_case(asdict(case))
+    return serialise_case(record_dict(case))
 
 
 def delete_case(case_id: str) -> bool:
@@ -150,7 +150,7 @@ def add_comment(case_id: str, data: dict) -> dict | None:
     case.updated_at = now
     es_case_repo.save(case)
 
-    return serialise_comment(asdict(comment))
+    return serialise_comment(record_dict(comment))
 
 
 def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
@@ -181,7 +181,7 @@ def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
     )
 
     es_case_comment_repo.save(comment)
-    return serialise_comment(asdict(comment))
+    return serialise_comment(record_dict(comment))
 
 
 def delete_comment(case_id: str, comment_id: str) -> bool:

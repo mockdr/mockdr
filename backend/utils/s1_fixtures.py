@@ -37,13 +37,13 @@ def _blank(default: object) -> object:
 
 def deep_complete(defaults: dict, actual: dict) -> dict:
     """``actual`` with every key of ``defaults`` it lacks filled in, recursively."""
-    # A list in the defaults is a template for items the record provides;
-    # a record without the list gets [] — never a one-item list of blanks.
-    # Scalars are immutable and shared; a nested object is rebuilt from its
-    # template so the caller can mutate the result freely.
-    out = {k: _blank(v) for k, v in defaults.items()}
-    for key, value in actual.items():
-        template = defaults.get(key)
+    out: dict = {}
+    for key, template in defaults.items():
+        if key not in actual:
+            # Only a key the record lacks needs a default built for it.
+            out[key] = _blank(template)
+            continue
+        value = actual[key]
         if isinstance(value, dict) and isinstance(template, dict):
             out[key] = deep_complete(template, value)
         elif (
@@ -56,8 +56,11 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
         elif value is None and isinstance(template, (dict, list)):
             # The product answers an object of nulls, not a null object
             # (``containerInfo: {"id": null, …}``), so keep the declared shape.
-            out[key] = template
+            out[key] = _blank(template)
         else:
+            out[key] = value
+    for key, value in actual.items():
+        if key not in defaults:
             out[key] = value
     return out
 

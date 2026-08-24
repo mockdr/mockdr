@@ -1,12 +1,11 @@
 """Read-side handlers for Microsoft Graph Identity Protection."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.risk_detection_repo import graph_risk_detection_repo
 from repository.graph.risky_user_repo import graph_risky_user_repo
 from utils.graph_odata import apply_graph_filter
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_risky_users(
@@ -24,7 +23,7 @@ def list_risky_users(
     Returns:
         OData list response dict.
     """
-    records = [asdict(u) for u in graph_risky_user_repo.list_all()]
+    records = [record_dict(u) for u in graph_risky_user_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -55,7 +54,7 @@ def get_risky_user(user_id: str) -> dict | None:
     user = graph_risky_user_repo.get(user_id)
     if user is None:
         return None
-    return asdict(user)
+    return record_dict(user)
 
 
 def list_risk_detections(
@@ -73,7 +72,7 @@ def list_risk_detections(
     Returns:
         OData list response dict.
     """
-    records = [asdict(d) for d in graph_risk_detection_repo.list_all()]
+    records = [record_dict(d) for d in graph_risk_detection_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)

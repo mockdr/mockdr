@@ -1,12 +1,11 @@
 """Write-only application commands for the webhook sink."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from domain.webhook_sink_entry import WebhookSinkEntry
 from repository.webhook_sink_repo import webhook_sink_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 def capture_webhook(event_type: str, headers: dict, body: dict) -> dict:
@@ -28,7 +27,7 @@ def capture_webhook(event_type: str, headers: dict, body: dict) -> dict:
         body=body,
     )
     webhook_sink_repo.append(entry)
-    return {"data": asdict(entry)}
+    return {"data": record_dict(entry)}
 
 
 def clear_sink() -> dict:

@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict, replace
+from dataclasses import replace
 
 from domain.es_rule import EsRule
 from repository.es_rule_repo import es_rule_repo
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 class UnknownBulkActionError(ValueError):
@@ -202,7 +203,7 @@ def _rule_to_dict(rule: EsRule) -> dict:
     RuleResponse carries are filled in — nineteen were missing, including the
     mandatory ``to``.
     """
-    d = asdict(rule)
+    d = record_dict(rule)
     d["from"] = d.pop("from_field", "now-6m")
     for key, value in _RULE_RESPONSE_DEFAULTS.items():
         d.setdefault(key, value.copy() if isinstance(value, (dict, list)) else value)

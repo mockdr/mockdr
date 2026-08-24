@@ -4,7 +4,6 @@ POST /sites   → create_site
 PUT  /sites/{id} → update_site
 DELETE /sites/{id} → delete_site
 """
-from dataclasses import asdict
 
 from application.accounts.commands import decrement_site_count, increment_site_count
 from domain.site import Site
@@ -15,6 +14,7 @@ from repository.site_repo import site_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.internal_fields import SITE_INTERNAL_FIELDS
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 
@@ -61,7 +61,7 @@ def create_site(data: dict) -> dict:
     )
     site_repo.save(site)
     increment_site_count(account_id)
-    return {"data": strip_fields(asdict(site), SITE_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
 def update_site(site_id: str, data: dict) -> dict | None:
@@ -90,7 +90,7 @@ def update_site(site_id: str, data: dict) -> dict | None:
             setattr(site, field, data[field])
     site.updatedAt = utc_now()
     site_repo.save(site)
-    return {"data": strip_fields(asdict(site), SITE_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
 def reactivate_site(site_id: str) -> dict | None:
@@ -109,7 +109,7 @@ def reactivate_site(site_id: str) -> dict | None:
     site.expiration = None
     site.updatedAt = utc_now()
     site_repo.save(site)
-    return {"data": strip_fields(asdict(site), SITE_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
 def expire_site(site_id: str) -> dict | None:
@@ -129,7 +129,7 @@ def expire_site(site_id: str) -> dict | None:
     site.expiration = now
     site.updatedAt = now
     site_repo.save(site)
-    return {"data": strip_fields(asdict(site), SITE_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
 def delete_site(site_id: str) -> dict | None:

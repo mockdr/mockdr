@@ -1,8 +1,8 @@
 """Repository for RequestLog entries backed by InMemoryStore."""
-from dataclasses import asdict
 
 from domain.request_log import RequestLog
 from repository.store import store
+from utils.serde import record_dict
 
 
 class RequestLogRepository:
@@ -18,7 +18,7 @@ class RequestLogRepository:
         Args:
             log: The ``RequestLog`` to persist.
         """
-        store.append_request_log(log.id, asdict(log))
+        store.append_request_log(log.id, record_dict(log))
 
     def list_recent(self) -> list[RequestLog]:
         """Return all request log entries in newest-first order.

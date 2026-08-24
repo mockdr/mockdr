@@ -1,13 +1,12 @@
 """Read-side handlers for Microsoft Graph Authentication Methods."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.user_registration_detail_repo import (
     graph_user_registration_detail_repo,
 )
 from utils.graph_odata import apply_graph_filter, apply_odata_orderby
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_registration_details(
@@ -25,7 +24,7 @@ def list_registration_details(
     Returns:
         OData list response dict.
     """
-    records = [asdict(d) for d in graph_user_registration_detail_repo.list_all()]
+    records = [record_dict(d) for d in graph_user_registration_detail_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)

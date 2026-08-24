@@ -9,7 +9,9 @@ this reads a local clone and keeps only the facts — the key paths a 200
 response declares — in ``data/vendor-specs/xdr_openapi_reduced.json``. A
 transcription proves what a real reply carries, not what it does not.
 
-    git clone --depth 1 https://github.com/tommynsong/cortex-mcp-custom-tools-openapi /tmp/cortex-openapi
+    git clone --depth 1 \
+        https://github.com/tommynsong/cortex-mcp-custom-tools-openapi \
+        /tmp/cortex-openapi
     backend/.venv/bin/python scripts/cortex_openapi_spec.py /tmp/cortex-openapi
 """
 
@@ -79,4 +81,6 @@ def main(clone: Path) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/cortex-openapi")))
+    # S108: the default is the clone path the module docstring documents, not a
+    # file this script creates.
+    raise SystemExit(main(Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/cortex-openapi")))  # noqa: S108

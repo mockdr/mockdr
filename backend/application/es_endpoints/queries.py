@@ -1,12 +1,11 @@
 """Elastic Security endpoint query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.es_endpoint_repo import es_endpoint_repo
 from utils.es_endpoint_serde import to_endpoint_entry
 from utils.es_pagination import paginate_kibana
 from utils.es_response import build_kibana_endpoint_response
+from utils.serde import record_dict
 
 
 def list_endpoints(
@@ -30,7 +29,7 @@ def list_endpoints(
     Returns:
         Kibana paginated list response.
     """
-    records = [asdict(ep) for ep in es_endpoint_repo.list_all()]
+    records = [record_dict(ep) for ep in es_endpoint_repo.list_all()]
 
     if hostname:
         hostname_lower = hostname.lower()
@@ -64,4 +63,4 @@ def get_endpoint(agent_id: str) -> dict | None:
     ep = es_endpoint_repo.get(agent_id)
     if not ep:
         return None
-    return to_endpoint_entry(asdict(ep))
+    return to_endpoint_entry(record_dict(ep))

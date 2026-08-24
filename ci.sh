@@ -91,6 +91,9 @@ run_backend() {
     _run "BE: Critical-path tests" \
         .venv/bin/pytest -m critical --no-cov -n auto
 
+    _run "BE: Lint the scripts (ruff)" \
+        .venv/bin/ruff check ../scripts
+
     _run "BE: Security audit (pip-audit)" \
         .venv/bin/pip-audit
 

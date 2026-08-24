@@ -1,14 +1,13 @@
 """Read-side handlers for Microsoft Graph Applications."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.application_repo import graph_application_repo
 from utils.graph_odata import (
     apply_graph_filter,
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_applications(
@@ -28,7 +27,7 @@ def list_applications(
     Returns:
         OData list response dict.
     """
-    records = [asdict(app) for app in graph_application_repo.list_all()]
+    records = [record_dict(app) for app in graph_application_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)

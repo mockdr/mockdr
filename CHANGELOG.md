@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+**Serialisation was the request.** The weekly load test — new to CI, and the
+first run of it since 2.1.0 — failed on the runner: read p99 812 ms against
+a 500 ms gate. Three causes, all in the path every response takes:
+
+- `dataclasses.asdict` deep-copies every leaf it walks, and every query
+  called it per record: 11 700 `_asdict_inner` calls for one `GET /threats`.
+  `utils/serde.record_dict` rebuilds mutable containers and shares scalars —
+  same isolation from the store, same output, none of the copying.
+- `deep_complete` built a default for every declared key and then threw
+  away the ones the record supplied. It builds only what is missing now.
+- `SecurityHeadersMiddleware` was a `BaseHTTPMiddleware`, which wraps every
+  one of the 561 routes in an anyio task group; it is pure ASGI now.
+
+`GET /threats` 7.1 → 3.4 ms; the load test passes with room (read p99 449 ms
+pinned to two cores, 186 ms at the concurrency CI uses). No response shape
+changes: 199 routes compared across six platforms, 0 drift.
+
+**The scripts were the only Python nothing linted.** `scripts/` has a ruff
+config of its own (the backend's rules, with the allowances a script earns)
+and is checked in CI and by `ci.sh`; the 34 findings that had accumulated
+are fixed, including a probe that bound to `0.0.0.0` to talk to itself.
+
+### Changed
+
+- `scripts/load_test.py` takes `--concurrency`: the CI job scales the
+  scenarios to a 2-vCPU runner, where a 50-deep queue measures the runner's
+  cores rather than the mock's work. Release runs keep the full counts.
+
 - `ci.sh` runs the hostile-inputs step CI runs; the weekly workflow also
   runs `scripts/load_test.py`; the release checklist ends with the GitHub
   Release (2.1.0 and 2.2.0 had tags but no Release page — created).

@@ -1,11 +1,11 @@
 import time
-from dataclasses import asdict
 
 from domain.activity import Activity
 from domain.event_bus import ActivityCreated, event_bus
 from repository.store import store
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 class ActivityRepository:
@@ -60,7 +60,7 @@ class ActivityRepository:
         # every agent action was invisible downstream.
         event_bus.publish(ActivityCreated(
             entity_id=activity.id,
-            payload=asdict(activity),
+            payload=record_dict(activity),
             timestamp=time.time(),
         ))
         return activity

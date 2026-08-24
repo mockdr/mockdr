@@ -1,13 +1,13 @@
 """Read-only application queries for webhook subscriptions."""
-from dataclasses import asdict
 
 from application.webhooks.delivery_log import list_entries as _list_delivery_entries
 from repository.webhook_repo import webhook_repo
+from utils.serde import record_dict
 
 
 def list_webhooks() -> dict:
     """Return all webhook subscriptions with secrets masked."""
-    return {"data": [_mask_secret(asdict(sub)) for sub in webhook_repo.list_all()]}
+    return {"data": [_mask_secret(record_dict(sub)) for sub in webhook_repo.list_all()]}
 
 
 def _mask_secret(d: dict) -> dict:
@@ -22,7 +22,7 @@ def get_webhook(webhook_id: str) -> dict | None:
     sub = webhook_repo.get(webhook_id)
     if not sub:
         return None
-    return {"data": _mask_secret(asdict(sub))}
+    return {"data": _mask_secret(record_dict(sub))}
 
 
 def list_deliveries() -> dict:

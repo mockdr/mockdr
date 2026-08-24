@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict
 
 from domain.event_bus import MdeAlertCreated, event_bus
 from domain.mde_alert import MdeAlert
@@ -11,6 +10,7 @@ from repository.mde_alert_repo import mde_alert_repo
 from utils.dt import utc_now
 from utils.mde_fixtures import complete_mde
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def update_alert(alert_id: str, body: dict) -> dict | None:
@@ -51,7 +51,7 @@ def update_alert(alert_id: str, body: dict) -> dict | None:
         alert.resolvedTime = now
 
     mde_alert_repo.save(alert)
-    return complete_mde(to_mde_resource(asdict(alert), "alertId"), "alert")
+    return complete_mde(to_mde_resource(record_dict(alert), "alertId"), "alert")
 
 
 def create_alert_by_reference(body: dict) -> dict:
@@ -87,7 +87,7 @@ def create_alert_by_reference(body: dict) -> dict:
     mde_alert_repo.save(alert)
 
     # Bridge the alert into Splunk and Sentinel (ADR-009).
-    payload = to_mde_resource(asdict(alert), "alertId")
+    payload = to_mde_resource(record_dict(alert), "alertId")
     event_bus.publish(MdeAlertCreated(
         entity_id=alert.alertId,
         payload=payload,

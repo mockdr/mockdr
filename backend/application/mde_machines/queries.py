@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
@@ -11,6 +9,7 @@ from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def resource(record: dict) -> dict:
@@ -42,7 +41,7 @@ def list_machines(
     Returns:
         OData list response with paginated machine records.
     """
-    records = [resource(asdict(m)) for m in mde_machine_repo.list_all()]
+    records = [resource(record_dict(m)) for m in mde_machine_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -73,7 +72,7 @@ def get_machine(machine_id: str) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    return resource(asdict(machine))
+    return resource(record_dict(machine))
 
 
 def get_machine_logon_users(machine_id: str) -> dict | None:
@@ -105,7 +104,7 @@ def get_machine_alerts(machine_id: str) -> dict | None:
         return None
     alerts = mde_alert_repo.get_by_machine_id(machine_id)
     return build_mde_list_response(
-        [to_mde_resource(asdict(a), "alertId") for a in alerts],
+        [to_mde_resource(record_dict(a), "alertId") for a in alerts],
     )
 
 
@@ -256,7 +255,7 @@ def get_machine_vulnerabilities(machine_id: str) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    all_vulns = [asdict(v) for v in mde_vulnerability_repo.list_all()]
+    all_vulns = [record_dict(v) for v in mde_vulnerability_repo.list_all()]
     machines = mde_machine_repo.list_all()
     machine_idx = next(
         (i for i, m in enumerate(machines) if m.machineId == machine_id),

@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict
 
 from domain.es_action_response import EsActionResponse
 from repository.es_action_response_repo import es_action_response_repo
 from repository.es_endpoint_repo import es_endpoint_repo
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def _create_action(
@@ -40,7 +40,7 @@ def _create_action(
     if comment:
         action_resp.parameters["comment"] = comment
     es_action_response_repo.save(action_resp)
-    return asdict(action_resp)
+    return record_dict(action_resp)
 
 
 def isolate_endpoint(agent_id: str, comment: str = "") -> dict | None:
@@ -128,7 +128,7 @@ def list_actions(agent_id: str | None = None) -> list[dict]:
         actions = es_action_response_repo.get_by_agent_id(agent_id)
     else:
         actions = es_action_response_repo.list_all()
-    return [asdict(a) for a in actions]
+    return [record_dict(a) for a in actions]
 
 
 def get_action(action_id: str) -> dict | None:
@@ -143,4 +143,4 @@ def get_action(action_id: str) -> dict | None:
     action = es_action_response_repo.get(action_id)
     if not action:
         return None
-    return asdict(action)
+    return record_dict(action)

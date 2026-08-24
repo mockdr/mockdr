@@ -1,10 +1,10 @@
-from dataclasses import asdict
 
 from domain.ioc import IOC
 from repository.activity_repo import activity_repo
 from repository.ioc_repo import ioc_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 def create_ioc(body: dict) -> dict:
@@ -34,7 +34,7 @@ def create_ioc(body: dict) -> dict:
         activity_type=4001,
         description=f"IOC created: {ioc.type} = {ioc.value}",
     )
-    return {"data": asdict(ioc)}
+    return {"data": record_dict(ioc)}
 
 
 def bulk_create_iocs(items: list[dict]) -> dict:

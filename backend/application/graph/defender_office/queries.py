@@ -1,14 +1,13 @@
 """Read-side handlers for Microsoft Graph Defender for Office 365 API."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from domain.graph.threat_assessment import GraphThreatAssessment
 from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.attack_simulation_repo import graph_attack_simulation_repo
 from repository.graph.threat_assessment_repo import graph_threat_assessment_repo
 from utils.dt import utc_now
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 # ── Attack Simulations ────────────────────────────────────────────────────────
 
@@ -25,7 +24,7 @@ def list_attack_simulations(
     Returns:
         OData list response dict.
     """
-    records = [asdict(s) for s in graph_attack_simulation_repo.list_all()]
+    records = [record_dict(s) for s in graph_attack_simulation_repo.list_all()]
 
     total = len(records)
     page = records[skip : skip + top]
@@ -56,7 +55,7 @@ def list_threat_assessments(
     Returns:
         OData list response dict.
     """
-    records = [asdict(a) for a in graph_threat_assessment_repo.list_all()]
+    records = [record_dict(a) for a in graph_threat_assessment_repo.list_all()]
 
     total = len(records)
     page = records[skip : skip + top]
@@ -93,4 +92,4 @@ def create_threat_assessment(body: dict) -> dict:
         requestSource=body.get("requestSource", "administrator"),
     )
     graph_threat_assessment_repo.save(assessment)
-    return asdict(assessment)
+    return record_dict(assessment)

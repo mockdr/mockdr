@@ -1,9 +1,8 @@
 """Cortex XDR Endpoint query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 
@@ -19,7 +18,7 @@ def get_endpoints(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching endpoints.
     """
-    all_endpoints = [asdict(e) for e in xdr_endpoint_repo.list_all()]
+    all_endpoints = [record_dict(e) for e in xdr_endpoint_repo.list_all()]
 
     filters = request_data.get("filters", [])
     for f in filters:

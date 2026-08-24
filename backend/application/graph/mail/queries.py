@@ -1,14 +1,13 @@
 """Read-side handlers for Microsoft Graph Mail."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from domain.graph.mail_message import GraphMailMessage
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.mail_folder_repo import graph_mail_folder_repo
 from repository.graph.mail_message_repo import graph_mail_message_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def _strip_internal(record: dict) -> dict:
@@ -36,7 +35,7 @@ def list_messages(
     all_messages = graph_mail_message_repo.list_all()
     records: list[dict] = []
     for msg in all_messages:
-        d = asdict(msg) if not isinstance(msg, dict) else dict(msg)
+        d = record_dict(msg) if not isinstance(msg, dict) else dict(msg)
         if d.get("_user_id") != user_id:
             continue
         if folder_id and d.get("_folder_id") != folder_id:
@@ -70,7 +69,7 @@ def get_message(user_id: str, message_id: str) -> dict | None:
     msg = graph_mail_message_repo.get(f"{user_id}:{message_id}")
     if msg is None:
         return None
-    d = asdict(msg) if not isinstance(msg, dict) else dict(msg)
+    d = record_dict(msg) if not isinstance(msg, dict) else dict(msg)
     return _strip_internal(d)
 
 
@@ -86,7 +85,7 @@ def list_mail_folders(user_id: str) -> dict:
     all_folders = graph_mail_folder_repo.list_all()
     records: list[dict] = []
     for folder in all_folders:
-        d = asdict(folder) if not isinstance(folder, dict) else dict(folder)
+        d = record_dict(folder) if not isinstance(folder, dict) else dict(folder)
         if d.get("_user_id") != user_id:
             continue
         records.append(_strip_internal(d))
@@ -115,7 +114,7 @@ def send_mail(user_id: str, body: dict) -> dict:
     # Find Sent Items folder for this user
     sent_folder_id = ""
     for folder in graph_mail_folder_repo.list_all():
-        d = asdict(folder) if not isinstance(folder, dict) else dict(folder)
+        d = record_dict(folder) if not isinstance(folder, dict) else dict(folder)
         if d.get("_user_id") == user_id and d.get("displayName") == "Sent Items":
             sent_folder_id = d.get("id", "")
             break

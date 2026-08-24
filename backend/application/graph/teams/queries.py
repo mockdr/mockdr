@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Teams."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from domain.graph.channel_message import GraphChannelMessage
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.graph.graph_shared import graph_uuid
@@ -10,6 +8,7 @@ from repository.graph.channel_message_repo import graph_channel_message_repo
 from repository.graph.channel_repo import graph_channel_repo
 from repository.graph.team_repo import graph_team_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def _strip_internal(record: dict) -> dict:
@@ -29,7 +28,7 @@ def list_teams() -> dict:
     Returns:
         OData list response dict.
     """
-    records = [asdict(t) for t in graph_team_repo.list_all()]
+    records = [record_dict(t) for t in graph_team_repo.list_all()]
     return build_graph_list_response(
         value=records,
         context="https://graph.microsoft.com/v1.0/$metadata#teams",
@@ -48,7 +47,7 @@ def get_team(team_id: str) -> dict | None:
     team = graph_team_repo.get(team_id)
     if team is None:
         return None
-    return asdict(team)
+    return record_dict(team)
 
 
 def list_channels(team_id: str) -> dict:
@@ -63,7 +62,7 @@ def list_channels(team_id: str) -> dict:
     all_channels = graph_channel_repo.list_all()
     records: list[dict] = []
     for ch in all_channels:
-        d = asdict(ch) if not isinstance(ch, dict) else dict(ch)
+        d = record_dict(ch) if not isinstance(ch, dict) else dict(ch)
         if d.get("_team_id") != team_id:
             continue
         records.append(_strip_internal(d))
@@ -94,7 +93,7 @@ def list_channel_messages(
     all_messages = graph_channel_message_repo.list_all()
     records: list[dict] = []
     for msg in all_messages:
-        d = asdict(msg) if not isinstance(msg, dict) else dict(msg)
+        d = record_dict(msg) if not isinstance(msg, dict) else dict(msg)
         if d.get("_team_id") != team_id or d.get("_channel_id") != channel_id:
             continue
         records.append(_strip_internal(d))
@@ -141,4 +140,4 @@ def post_channel_message(
         _channel_id=channel_id,
     )
     graph_channel_message_repo.save(msg)
-    return _strip_internal(asdict(msg))
+    return _strip_internal(record_dict(msg))

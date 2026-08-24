@@ -1,7 +1,7 @@
-from dataclasses import asdict
 
 from repository.policy_repo import policy_repo
 from utils.pagination import build_single_response
+from utils.serde import record_dict
 
 
 def get_policy(site_id: str | None, group_id: str | None) -> dict | None:
@@ -20,4 +20,4 @@ def get_policy(site_id: str | None, group_id: str | None) -> dict | None:
         policy = policy_repo.get_for_group(group_id)
     else:
         return None
-    return build_single_response(asdict(policy)) if policy else None
+    return build_single_response(record_dict(policy)) if policy else None

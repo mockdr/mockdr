@@ -1,13 +1,12 @@
 """Microsoft Defender for Endpoint Vulnerability (TVM) query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
+from utils.serde import record_dict
 
 
 def _machine_refs_for(vuln_id: str) -> list[dict]:
@@ -62,7 +61,7 @@ def list_vulnerabilities(
     Returns:
         OData list response with paginated vulnerability records.
     """
-    records = [_with_exposed_count(asdict(v)) for v in mde_vulnerability_repo.list_all()]
+    records = [_with_exposed_count(record_dict(v)) for v in mde_vulnerability_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -90,7 +89,7 @@ def get_vulnerability(vuln_id: str) -> dict | None:
     vuln = mde_vulnerability_repo.get(vuln_id)
     if not vuln:
         return None
-    return _with_exposed_count(asdict(vuln))
+    return _with_exposed_count(record_dict(vuln))
 
 
 def get_vulnerability_machine_references(vuln_id: str) -> dict | None:

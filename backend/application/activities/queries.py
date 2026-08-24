@@ -1,8 +1,8 @@
-from dataclasses import asdict
 
 from repository.activity_repo import activity_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import ACTIVITY_CURSOR, build_list_response, paginate
+from utils.serde import record_dict
 
 
 def list_activity_types() -> dict:
@@ -33,7 +33,10 @@ def list_activities(params: dict, cursor: str | None, limit: int) -> dict:
     # agentId must be a string (not None) per the S1 API schema;
     # other nullable fields (osFamily, description, etc.) may remain None.
     string_fields = {"agentId", "agentUpdatedVersion", "threatId", "hash"}
-    raw = [{**asdict(a), "activityType": int(a.activityType)} for a in activity_repo.list_all()]
+    raw = [
+        {**record_dict(a), "activityType": int(a.activityType)}
+        for a in activity_repo.list_all()
+    ]
     records = [
         {k: ("" if v is None and k in string_fields else v) for k, v in r.items()} for r in raw
     ]

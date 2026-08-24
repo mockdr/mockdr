@@ -40,9 +40,13 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
     # a record without the list gets [] — never a one-item list of blanks.
     # Scalars are immutable and shared; a nested object is rebuilt from its
     # template so the caller can mutate the result freely.
-    out = {k: _blank(v) for k, v in defaults.items()}
-    for key, value in actual.items():
-        template = defaults.get(key)
+    out: dict = {}
+    for key, template in defaults.items():
+        if key not in actual:
+            # Only a key the record lacks needs a default built for it.
+            out[key] = _blank(template)
+            continue
+        value = actual[key]
         if isinstance(value, dict) and isinstance(template, dict):
             out[key] = deep_complete(template, value)
         elif (
@@ -53,6 +57,9 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
         ):
             out[key] = [deep_complete(template[0], i) if isinstance(i, dict) else i for i in value]
         else:
+            out[key] = value
+    for key, value in actual.items():
+        if key not in defaults:
             out[key] = value
     return out
 

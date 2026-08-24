@@ -35,6 +35,8 @@ DEFAULT_TOKEN = "admin-token-0000-0000-000000000001"
 
 @dataclass
 class RequestResult:
+    """One request's outcome: its status, its latency, its error if it had one."""
+
     status_code: int
     latency_ms: float
     error: str | None = None
@@ -42,6 +44,8 @@ class RequestResult:
 
 @dataclass
 class ScenarioReport:
+    """Every result of one scenario, and the statistics derived from them."""
+
     name: str
     total_requests: int
     workers: int
@@ -49,26 +53,31 @@ class ScenarioReport:
 
     @property
     def latencies(self) -> list[float]:
+        """Latencies of the successful requests, in milliseconds."""
         return [r.latency_ms for r in self.results if r.error is None]
 
     @property
     def error_count(self) -> int:
+        """How many requests failed outright or answered 4xx/5xx."""
         return sum(1 for r in self.results if r.error is not None or r.status_code >= 400)
 
     @property
     def error_rate(self) -> float:
+        """Share of requests that failed, in percent."""
         if not self.results:
             return 0.0
         return self.error_count / len(self.results) * 100
 
     @property
     def status_distribution(self) -> dict[int, int]:
+        """How many requests each status code accounted for."""
         dist: dict[int, int] = {}
         for r in self.results:
             dist[r.status_code] = dist.get(r.status_code, 0) + 1
         return dict(sorted(dist.items()))
 
     def percentile(self, p: float) -> float:
+        """The p-th percentile of the successful latencies, in milliseconds."""
         if not self.latencies:
             return 0.0
         sorted_lat = sorted(self.latencies)
@@ -81,23 +90,26 @@ class ScenarioReport:
 
     @property
     def p50(self) -> float:
+        """Median latency in milliseconds."""
         return self.percentile(50)
 
     @property
     def p95(self) -> float:
+        """95th-percentile latency in milliseconds."""
         return self.percentile(95)
 
     @property
     def p99(self) -> float:
+        """99th-percentile latency in milliseconds."""
         return self.percentile(99)
 
     @property
     def rps(self) -> float:
+        """Requests per second, derived from the mean latency and the worker count."""
         if not self.latencies:
             return 0.0
-        total_time = sum(self.latencies) / 1000  # seconds
-        # Effective RPS = total successful requests / wall-clock approximation
-        # Use actual wall time tracked externally; fallback to avg * count / workers
+        # Effective RPS from the average latency and the worker count; the
+        # wall-clock figure is printed separately by the runner.
         avg_s = (sum(self.latencies) / len(self.latencies)) / 1000
         if avg_s == 0:
             return 0.0
@@ -114,7 +126,7 @@ def make_get(client: httpx.Client, url: str) -> RequestResult:
         resp = client.get(url)
         elapsed = (time.perf_counter() - start) * 1000
         return RequestResult(status_code=resp.status_code, latency_ms=elapsed)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure is a data point, not a crash
         return RequestResult(status_code=0, latency_ms=0.0, error=str(exc))
 
 
@@ -125,7 +137,7 @@ def make_post(client: httpx.Client, url: str, json_body: dict[str, Any]) -> Requ
         resp = client.post(url, json=json_body)
         elapsed = (time.perf_counter() - start) * 1000
         return RequestResult(status_code=resp.status_code, latency_ms=elapsed)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure is a data point, not a crash
         return RequestResult(status_code=0, latency_ms=0.0, error=str(exc))
 
 
@@ -165,7 +177,7 @@ def scenario_read_throughput(base_url: str, token: str) -> ScenarioReport:
             url = endpoints[i % len(endpoints)]
             return make_get(client, url)
 
-    return run_scenario("Read Throughput", task, workers=50, total_requests=500)
+    return run_scenario("Read Throughput", task, workers=_workers(50), total_requests=500)
 
 
 def scenario_write_contention(base_url: str, token: str) -> ScenarioReport:
@@ -215,7 +227,7 @@ def scenario_write_contention(base_url: str, token: str) -> ScenarioReport:
             url, body = write_endpoints[i % len(write_endpoints)]
             return make_post(client, url, body)
 
-    return run_scenario("Write Contention", task, workers=20, total_requests=200)
+    return run_scenario("Write Contention", task, workers=_workers(20), total_requests=200)
 
 
 def scenario_mixed_workload(base_url: str, token: str) -> ScenarioReport:
@@ -275,7 +287,7 @@ def scenario_mixed_workload(base_url: str, token: str) -> ScenarioReport:
                         },
                     )
 
-    return run_scenario("Mixed Workload (80/20)", task, workers=30, total_requests=300)
+    return run_scenario("Mixed Workload (80/20)", task, workers=_workers(30), total_requests=300)
 
 
 # ── Output formatting ────────────────────────────────────────────────────────
@@ -305,6 +317,17 @@ def print_report(report: ScenarioReport) -> None:
     for code, count in report.status_distribution.items():
         label = f"    HTTP {code}" if code > 0 else "    Connection error"
         print(f"  {label:<30} {count:>15d}")
+
+
+#: Multiplies every scenario's worker count. The defaults assume a developer
+#: machine; on a 2-vCPU CI runner a 50-deep queue measures the runner's cores,
+#: not the mock's work, so CI passes ``--concurrency 0.25``.
+CONCURRENCY = 1.0
+
+
+def _workers(nominal: int) -> int:
+    """The scenario's worker count for this run, never below four."""
+    return max(4, round(nominal * CONCURRENCY))
 
 
 def evaluate_pass_fail(reports: list[ScenarioReport]) -> bool:
@@ -339,6 +362,7 @@ def evaluate_pass_fail(reports: list[ScenarioReport]) -> bool:
 
 
 def main() -> None:
+    """Run every scenario against the server and report pass or fail."""
     parser = argparse.ArgumentParser(description="Load test the mockdr API server")
     parser.add_argument(
         "--base-url",
@@ -350,13 +374,23 @@ def main() -> None:
         default=DEFAULT_TOKEN,
         help="API token for authentication (default: admin token)",
     )
+    parser.add_argument(
+        "--concurrency",
+        type=float,
+        default=1.0,
+        help="Scale every scenario's worker count (CI on 2 vCPUs uses 0.25)",
+    )
     args = parser.parse_args()
+
+    global CONCURRENCY  # one knob, read by the scenarios
+    CONCURRENCY = args.concurrency
 
     base_url = args.base_url.rstrip("/")
     token: str = args.token
 
     print(f"Load testing: {base_url}")
     print(f"Token: {token[:20]}...")
+    print(f"Concurrency scale: {CONCURRENCY}")
 
     # Verify server is reachable
     try:

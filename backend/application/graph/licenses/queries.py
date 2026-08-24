@@ -1,11 +1,10 @@
 """Read-side handlers for Microsoft Graph Subscribed SKUs (Licenses)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.subscribed_sku_repo import graph_subscribed_sku_repo
 from repository.graph.user_repo import graph_user_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_subscribed_skus() -> dict:
@@ -19,7 +18,7 @@ def list_subscribed_skus() -> dict:
     holders = _licence_holders()
     records = []
     for sku in graph_subscribed_sku_repo.list_all():
-        record = asdict(sku)
+        record = record_dict(sku)
         # consumedUnits was a hardcoded number the seeder chose independently
         # of who actually holds a licence, so every SKU contradicted the user
         # list — two of them reporting more seats consumed than exist. Deriving

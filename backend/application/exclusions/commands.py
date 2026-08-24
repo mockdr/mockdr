@@ -1,10 +1,10 @@
-from dataclasses import asdict
 
 from domain.exclusion import Exclusion
 from repository.activity_repo import activity_repo
 from repository.exclusion_repo import exclusion_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 class InvalidExclusionError(ValueError):
@@ -48,7 +48,7 @@ def create_exclusion(body: dict, user_id: str | None) -> dict:
     )
     exclusion_repo.save(exclusion)
     activity_repo.create(128, "Exclusion added", user_id=user_id, site_id=exclusion.siteId)
-    return {"data": [asdict(exclusion)]}
+    return {"data": [record_dict(exclusion)]}
 
 
 def update_exclusion(exclusion_id: str, body: dict, user_id: str | None) -> dict | None:
@@ -83,7 +83,7 @@ def update_exclusion(exclusion_id: str, body: dict, user_id: str | None) -> dict
     existing.updatedAt = utc_now()
     exclusion_repo.save(existing)
     activity_repo.create(129, "Exclusion updated", user_id=user_id, site_id=existing.siteId)
-    return {"data": asdict(existing)}
+    return {"data": record_dict(existing)}
 
 
 def delete_exclusion(exclusion_id: str, user_id: str | None = None) -> dict:

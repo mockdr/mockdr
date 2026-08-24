@@ -1,12 +1,11 @@
 """Read-side handlers for Microsoft Graph Files (OneDrive / SharePoint)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.drive_item_repo import graph_drive_item_repo
 from repository.graph.drive_repo import graph_drive_repo
 from repository.graph.sharepoint_site_repo import graph_sharepoint_site_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def _strip_internal(record: dict) -> dict:
@@ -24,7 +23,7 @@ def get_user_drive(user_id: str) -> dict | None:
         Drive dict or ``None`` if not found.
     """
     for drive in graph_drive_repo.list_all():
-        d = asdict(drive) if not isinstance(drive, dict) else dict(drive)
+        d = record_dict(drive) if not isinstance(drive, dict) else dict(drive)
         if d.get("_user_id") == user_id:
             return _strip_internal(d)
     return None
@@ -43,7 +42,7 @@ def list_drive_children(drive_id: str, item_id: str = "root") -> dict:
     all_items = graph_drive_item_repo.list_all()
     records: list[dict] = []
     for item in all_items:
-        d = asdict(item) if not isinstance(item, dict) else dict(item)
+        d = record_dict(item) if not isinstance(item, dict) else dict(item)
         if d.get("_drive_id") != drive_id:
             continue
         parent_ref = d.get("parentReference", {})
@@ -62,7 +61,7 @@ def list_sites() -> dict:
     Returns:
         OData list response dict.
     """
-    records = [asdict(s) for s in graph_sharepoint_site_repo.list_all()]
+    records = [record_dict(s) for s in graph_sharepoint_site_repo.list_all()]
     return build_graph_list_response(
         value=records,
         context="https://graph.microsoft.com/v1.0/$metadata#sites",

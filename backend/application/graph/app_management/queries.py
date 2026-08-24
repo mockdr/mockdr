@@ -1,12 +1,11 @@
 """Read-side handlers for Microsoft Graph Intune App Management."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.app_protection_policy_repo import graph_app_protection_policy_repo
 from repository.graph.mobile_app_repo import graph_mobile_app_repo
 from utils.graph_odata import apply_graph_filter, apply_odata_select
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_app_protection_policies(
@@ -26,7 +25,7 @@ def list_app_protection_policies(
     """
     records = []
     for policy in graph_app_protection_policy_repo.list_all():
-        rec = asdict(policy)
+        rec = record_dict(policy)
         rec["@odata.type"] = rec.pop("odata_type", "")
         records.append(rec)
 
@@ -66,7 +65,7 @@ def list_mobile_apps(
     """
     records = []
     for app in graph_mobile_app_repo.list_all():
-        rec = asdict(app)
+        rec = record_dict(app)
         rec["@odata.type"] = rec.pop("odata_type", "")
         records.append(rec)
 

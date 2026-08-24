@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Groups."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.group_repo import graph_group_repo
 from repository.graph.user_repo import graph_user_repo
 from repository.store import store
@@ -13,6 +11,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_groups(
@@ -36,7 +35,7 @@ def list_groups(
     Returns:
         OData list response dict.
     """
-    records = [asdict(g) for g in graph_group_repo.list_all()]
+    records = [record_dict(g) for g in graph_group_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
@@ -74,7 +73,7 @@ def get_group(group_id: str) -> dict | None:
     group = graph_group_repo.get(group_id)
     if group is None:
         return None
-    return asdict(group)
+    return record_dict(group)
 
 
 def get_group_members(group_id: str) -> dict:
@@ -98,7 +97,7 @@ def get_group_members(group_id: str) -> dict:
             continue
         user = graph_user_repo.get(str(member.get("id", "")))
         if user is not None:
-            members.append({"@odata.type": "#microsoft.graph.user", **asdict(user)})
+            members.append({"@odata.type": "#microsoft.graph.user", **record_dict(user)})
         else:
             members.append({"@odata.type": "#microsoft.graph.directoryObject", **member})
 

@@ -9,7 +9,6 @@ import queue
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import asdict
 from typing import Any
 
 import httpx
@@ -21,6 +20,7 @@ from repository.webhook_repo import webhook_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
+from utils.serde import record_dict
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def create_webhook(body: dict, user_id: str | None = None) -> dict:
         updatedAt=now,
     )
     webhook_repo.save(sub)
-    result = asdict(sub)
+    result = record_dict(sub)
     if result.get("secret"):
         result["secret"] = "****" + result["secret"][-4:] if len(result["secret"]) >= 4 else "****"
     return {"data": result}

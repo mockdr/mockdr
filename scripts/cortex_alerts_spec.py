@@ -36,6 +36,7 @@ _RULE = re.compile(r"- path: (\S+).*?minify_json `\s*(\{.*?\})\s*`", re.DOTALL)
 
 
 def observed(value: object, prefix: str = "", depth: int = 0) -> set[str]:
+    """Every dotted key path a JSON value carries."""
     out: set[str] = set()
     if depth > 8:
         return out
@@ -50,6 +51,7 @@ def observed(value: object, prefix: str = "", depth: int = 0) -> set[str]:
 
 
 def main() -> int:
+    """Write the reduced reference and report what it holds."""
     with urllib.request.urlopen(SOURCE, timeout=60) as resp:
         text = resp.read().decode()
     reduced: dict[str, dict] = {}

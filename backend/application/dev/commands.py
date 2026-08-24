@@ -7,7 +7,6 @@ import logging
 import random
 import time
 from collections.abc import Callable
-from dataclasses import asdict
 from typing import Any
 
 from domain.account import Account
@@ -127,6 +126,7 @@ from repository.activity_repo import activity_repo
 from repository.agent_repo import agent_repo
 from repository.store import store
 from repository.threat_repo import threat_repo
+from utils.serde import record_dict
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +325,7 @@ def export_state() -> dict:
     snapshot: dict[str, Any] = {}
     for collection, _cls in _TYPED_COLLECTIONS.items():
         records = store.get_all(collection)
-        snapshot[collection] = [asdict(r) for r in records]
+        snapshot[collection] = [record_dict(r) for r in records]
     for collection in _RAW_COLLECTIONS:
         # Exported as a key->value map: several of these are keyed by a token
         # or session id rather than an "id" field, which a bare list loses.
@@ -348,7 +348,7 @@ def export_state() -> dict:
     # Persist proxy config (vendor connections survive restarts).
     from application.proxy import queries as proxy_queries
     cfg = proxy_queries.get_config_raw()
-    snapshot["_proxy_config"] = asdict(cfg)
+    snapshot["_proxy_config"] = record_dict(cfg)
 
     return snapshot
 
@@ -494,7 +494,7 @@ def _save_agent(agent: Agent) -> None:
     """Persist an agent and bridge the change to the SIEMs (ADR-009)."""
     agent_repo.save(agent)
     event_bus.publish(AgentUpdated(
-        entity_id=agent.id, payload=asdict(agent), timestamp=time.time(),
+        entity_id=agent.id, payload=record_dict(agent), timestamp=time.time(),
     ))
 
 
@@ -502,7 +502,7 @@ def _save_threat(threat: Threat) -> None:
     """Persist a threat and bridge it to the SIEMs (ADR-009)."""
     threat_repo.save(threat)
     event_bus.publish(ThreatCreated(
-        entity_id=threat.id, payload=asdict(threat), timestamp=time.time(),
+        entity_id=threat.id, payload=record_dict(threat), timestamp=time.time(),
     ))
 
 

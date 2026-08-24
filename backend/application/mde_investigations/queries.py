@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.mde_investigation_repo import mde_investigation_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.serde import record_dict
 
 
 def _resource(record: dict) -> dict:
@@ -33,7 +32,7 @@ def list_investigations(
     Returns:
         OData list response with paginated investigation records.
     """
-    records = [_resource(asdict(inv)) for inv in mde_investigation_repo.list_all()]
+    records = [_resource(record_dict(inv)) for inv in mde_investigation_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -60,4 +59,4 @@ def get_investigation(investigation_id: str) -> dict | None:
     investigation = mde_investigation_repo.get(investigation_id)
     if not investigation:
         return None
-    return _resource(asdict(investigation))
+    return _resource(record_dict(investigation))

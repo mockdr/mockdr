@@ -1,10 +1,10 @@
-from dataclasses import asdict
 
 from repository.site_repo import site_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import SITE_INTERNAL_FIELDS
 from utils.pagination import SITE_CURSOR, build_single_response, paginate
 from utils.s1_fixtures import complete_s1
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 FILTER_SPECS = [
@@ -20,7 +20,7 @@ def list_sites(params: dict, cursor: str | None, limit: int) -> dict:
 
     Real S1 API wraps sites list as ``{"data": {"allSites": {...}, "sites": [...]}}``.
     """
-    records = [asdict(s) for s in site_repo.list_all()]
+    records = [record_dict(s) for s in site_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered = apply_query_options(filtered, params)
 
@@ -53,4 +53,6 @@ def list_sites(params: dict, cursor: str | None, limit: int) -> dict:
 def get_site(site_id: str) -> dict | None:
     """Return a single site by ID with internal fields stripped, or None."""
     site = site_repo.get(site_id)
-    return build_single_response(strip_fields(asdict(site), SITE_INTERNAL_FIELDS)) if site else None
+    if not site:
+        return None
+    return build_single_response(strip_fields(record_dict(site), SITE_INTERNAL_FIELDS))

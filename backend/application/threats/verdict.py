@@ -1,11 +1,11 @@
 """Threat verdict and incident status commands."""
-from dataclasses import asdict
 
 from application.webhooks import commands as webhook_commands
 from domain.webhook import THREAT_UPDATED
 from repository.activity_repo import activity_repo
 from repository.threat_repo import threat_repo
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None = None) -> dict:
@@ -37,7 +37,7 @@ def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None 
             user_id=actor_user_id,
             site_id=site_id,
         )
-        webhook_commands.fire_event(THREAT_UPDATED, asdict(threat))
+        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
         affected += 1
     return {"data": {"affected": affected}}
 
@@ -72,7 +72,7 @@ def set_incident_status(status: str, ids: list[str], actor_user_id: str | None =
             user_id=actor_user_id,
             site_id=site_id,
         )
-        webhook_commands.fire_event(THREAT_UPDATED, asdict(threat))
+        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
         affected += 1
     return {"data": {"affected": affected}}
 
@@ -97,7 +97,7 @@ def mark_as_threat(ids: list[str], actor_user_id: str | None = None) -> dict:
             3784, "Threat marked as malicious",
             threat_id=threat_id, user_id=actor_user_id, site_id=site_id,
         )
-        webhook_commands.fire_event(THREAT_UPDATED, asdict(threat))
+        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
         affected += 1
     return {"data": {"affected": affected}}
 
@@ -122,6 +122,6 @@ def mark_as_resolved(ids: list[str], actor_user_id: str | None = None) -> dict:
             27, "Threat marked as resolved",
             threat_id=threat_id, user_id=actor_user_id, site_id=site_id,
         )
-        webhook_commands.fire_event(THREAT_UPDATED, asdict(threat))
+        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
         affected += 1
     return {"data": {"affected": affected}}

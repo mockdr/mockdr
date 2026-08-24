@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import threading
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
+
+from utils.serde import record_dict
 
 
 @dataclass
@@ -42,7 +44,7 @@ def record(entry: DeliveryEntry) -> None:
 def list_entries() -> list[dict[str, Any]]:
     """Return all entries as dicts, newest first."""
     with _lock:
-        return [asdict(e) for e in reversed(_entries)]
+        return [record_dict(e) for e in reversed(_entries)]
 
 
 def clear() -> int:

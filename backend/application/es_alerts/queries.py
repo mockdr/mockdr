@@ -1,12 +1,11 @@
 """Elastic Security alert query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.es_alert_repo import es_alert_repo
 from utils.es_ecs import to_ecs_document
 from utils.es_query import apply_es_query, apply_source_filter, wrap_as_hits
 from utils.es_response import build_es_search_response
+from utils.serde import record_dict
 
 
 def search_alerts(body: dict) -> dict:
@@ -21,7 +20,7 @@ def search_alerts(body: dict) -> dict:
     """
     index = ".siem-signals-default"
     all_records = [
-        to_ecs_document(asdict(a), index) for a in es_alert_repo.list_all()
+        to_ecs_document(record_dict(a), index) for a in es_alert_repo.list_all()
     ]
     total = len(all_records)
 
@@ -45,4 +44,4 @@ def get_alert(alert_id: str) -> dict | None:
     alert = es_alert_repo.get(alert_id)
     if not alert:
         return None
-    return asdict(alert)
+    return record_dict(alert)

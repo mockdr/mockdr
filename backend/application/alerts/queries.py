@@ -1,8 +1,8 @@
-from dataclasses import asdict
 
 from repository.alert_repo import alert_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import ALERT_CURSOR, build_list_response, build_single_response, paginate
+from utils.serde import record_dict
 
 FILTER_SPECS = [
     FilterSpec("ids", "alertInfo.alertId", "in"),
@@ -22,7 +22,7 @@ FILTER_SPECS = [
 
 def list_alerts(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of alerts sorted by creation date."""
-    records = [asdict(a) for a in alert_repo.list_all()]
+    records = [record_dict(a) for a in alert_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: (r.get("alertInfo") or {}).get("createdAt", ""), reverse=True)
     filtered = apply_query_options(filtered, params)
@@ -41,4 +41,4 @@ def get_alert(alert_id: str) -> dict | None:
     alert = alert_repo.get(alert_id)
     if not alert:
         return None
-    return build_single_response(asdict(alert))
+    return build_single_response(record_dict(alert))

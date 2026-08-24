@@ -1,12 +1,11 @@
 """Elastic Security Exception Lists query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.es_exception_item_repo import es_exception_item_repo
 from repository.es_exception_list_repo import es_exception_list_repo
 from utils.es_pagination import paginate_kibana
 from utils.es_response import build_kibana_list_response
+from utils.serde import record_dict
 
 
 def find_lists(
@@ -26,7 +25,7 @@ def find_lists(
     Returns:
         Kibana paginated list response.
     """
-    records = [asdict(el) for el in es_exception_list_repo.list_all()]
+    records = [record_dict(el) for el in es_exception_list_repo.list_all()]
 
     if list_id:
         records = [r for r in records if r["list_id"] == list_id]
@@ -49,12 +48,12 @@ def get_list(list_id_or_id: str) -> dict | None:
     # Try by internal id first.
     el = es_exception_list_repo.get(list_id_or_id)
     if el:
-        return asdict(el)
+        return record_dict(el)
 
     # Fall back to list_id.
     el = es_exception_list_repo.get_by_list_id(list_id_or_id)
     if el:
-        return asdict(el)
+        return record_dict(el)
 
     return None
 
@@ -78,7 +77,7 @@ def find_items(
     Returns:
         Kibana paginated list response.
     """
-    records = [asdict(i) for i in es_exception_item_repo.list_all()]
+    records = [record_dict(i) for i in es_exception_item_repo.list_all()]
 
     if list_id:
         records = [r for r in records if r["list_id"] == list_id]
@@ -104,11 +103,11 @@ def get_item(item_id_or_id: str) -> dict | None:
     # Try by internal id first.
     item = es_exception_item_repo.get(item_id_or_id)
     if item:
-        return asdict(item)
+        return record_dict(item)
 
     # Fall back to item_id.
     for i in es_exception_item_repo.list_all():
         if i.item_id == item_id_or_id:
-            return asdict(i)
+            return record_dict(i)
 
     return None

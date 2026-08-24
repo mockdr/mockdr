@@ -1,13 +1,13 @@
-from dataclasses import asdict
 
 from repository.account_repo import account_repo
 from utils.pagination import ACCOUNT_CURSOR, build_list_response, build_single_response, paginate
 from utils.s1_fixtures import restrict_s1
+from utils.serde import record_dict
 
 
 def list_accounts(cursor: str | None, limit: int) -> dict:
     """Return a paginated list of all accounts."""
-    records = [asdict(a) for a in account_repo.list_all()]
+    records = [record_dict(a) for a in account_repo.list_all()]
     page, next_cursor, total = paginate(records, cursor, limit, ACCOUNT_CURSOR)
     return build_list_response(
         page,
@@ -23,7 +23,7 @@ def get_account(account_id: str) -> dict | None:
     account = account_repo.get(account_id)
     return (
         restrict_s1(
-            build_single_response(asdict(account)), "accounts.schemas_AccountViewSchema_200"
+            build_single_response(record_dict(account)), "accounts.schemas_AccountViewSchema_200"
         )
         if account
         else None

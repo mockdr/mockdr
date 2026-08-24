@@ -2,7 +2,6 @@ import io
 import json
 import uuid as _uuid
 import zipfile
-from dataclasses import asdict
 from typing import cast
 
 from application.agents.queries import FILTER_SPECS as AGENT_FILTER_SPECS
@@ -16,6 +15,7 @@ from repository.store import store
 from repository.tag_repo import tag_repo
 from utils.dt import utc_now
 from utils.filtering import apply_filters
+from utils.serde import record_dict
 
 
 class UnscopedActionError(ValueError):
@@ -61,7 +61,7 @@ def _resolve_ids(body: dict) -> list[str]:
     # Everything else goes through the same filter engine the list endpoint
     # uses, so an action selects exactly what a GET with those params returns.
     params = {k: v for k, v in raw_filter.items() if v is not None}
-    records = [asdict(a) for a in agent_repo.list_all()]
+    records = [record_dict(a) for a in agent_repo.list_all()]
     matched = apply_filters(records, params, AGENT_FILTER_SPECS)
     return [str(r["id"]) for r in matched]
 
@@ -225,7 +225,7 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
             site_id=agent.siteId,
         )
         if action == "disconnect":
-            webhook_commands.fire_event(AGENT_OFFLINE, asdict(agent))
+            webhook_commands.fire_event(AGENT_OFFLINE, record_dict(agent))
         affected += 1
 
     return {"data": {"affected": affected}}

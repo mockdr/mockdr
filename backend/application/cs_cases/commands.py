@@ -12,6 +12,7 @@ from utils.cs_response import (
     build_cs_error_response,
 )
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def create_case(body: dict) -> dict:
@@ -37,8 +38,7 @@ def create_case(body: dict) -> dict:
         last_modified_time=now,
     )
     cs_case_repo.save(case)
-    from dataclasses import asdict
-    return build_cs_entity_response([asdict(case)])
+    return build_cs_entity_response([record_dict(case)])
 
 
 def update_case(case_id: str, body: dict) -> dict:
@@ -60,8 +60,7 @@ def update_case(case_id: str, body: dict) -> dict:
             setattr(case, field, body[field])
     case.last_modified_time = utc_now()
     cs_case_repo.save(case)
-    from dataclasses import asdict
-    return build_cs_entity_response([asdict(case)])
+    return build_cs_entity_response([record_dict(case)])
 
 
 def add_case_tags(case_id: str, tags: list[str]) -> dict:

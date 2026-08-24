@@ -1,12 +1,11 @@
 """CrowdStrike Falcon Cases (Messaging Center) query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_case_repo import cs_case_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.serde import record_dict
 
 
 def query_case_ids(
@@ -26,7 +25,7 @@ def query_case_ids(
     Returns:
         CS ID response envelope with case IDs.
     """
-    records = [asdict(c) for c in cs_case_repo.list_all()]
+    records = [record_dict(c) for c in cs_case_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     if sort:
@@ -54,5 +53,5 @@ def get_case_entities(ids: list[str]) -> dict:
     for case_id in ids:
         case = cs_case_repo.get(case_id)
         if case:
-            entities.append(asdict(case))
+            entities.append(record_dict(case))
     return build_cs_entity_response(entities)

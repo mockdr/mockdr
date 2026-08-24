@@ -1,9 +1,8 @@
 """Cortex XDR Distribution query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_distribution_repo import xdr_distribution_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 
@@ -64,4 +63,4 @@ def get_distribution_status(distribution_id: str) -> dict | None:
     if not dist:
         return None
 
-    return build_xdr_reply(asdict(dist))
+    return build_xdr_reply(record_dict(dist))

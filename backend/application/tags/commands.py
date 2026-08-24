@@ -1,5 +1,4 @@
 """Write commands for scoped tag definitions (tag-manager CRUD)."""
-from dataclasses import asdict
 
 from repository.account_repo import account_repo
 from repository.agent_repo import agent_repo
@@ -8,6 +7,7 @@ from repository.site_repo import site_repo
 from repository.tag_repo import tag_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 def _resolve_scope(filter_obj: dict) -> tuple[str, str, str]:
@@ -86,7 +86,7 @@ def create_tag(body: dict, user_name: str = "", user_id: str = "") -> dict:
         updatedById=user_id,
     )
     tag_repo.save(tag)
-    return {"data": asdict(tag)}
+    return {"data": record_dict(tag)}
 
 
 def update_tag(tag_id: str, body: dict, user_name: str = "", user_id: str = "") -> dict | None:
@@ -127,7 +127,7 @@ def update_tag(tag_id: str, body: dict, user_name: str = "", user_id: str = "") 
             agent.tags = updated
             agent_repo.save(agent)
 
-    return {"data": asdict(tag)}
+    return {"data": record_dict(tag)}
 
 
 def delete_tag(tag_id: str) -> dict:

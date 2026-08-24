@@ -1,8 +1,6 @@
 """Read-side handlers for Microsoft Graph Service Principals."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.service_principal_repo import graph_service_principal_repo
 from utils.graph_odata import (
     apply_graph_filter,
@@ -10,6 +8,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_service_principals(
@@ -31,7 +30,7 @@ def list_service_principals(
     Returns:
         OData list response dict.
     """
-    records = [asdict(sp) for sp in graph_service_principal_repo.list_all()]
+    records = [record_dict(sp) for sp in graph_service_principal_repo.list_all()]
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)

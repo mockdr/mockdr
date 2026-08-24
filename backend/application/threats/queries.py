@@ -1,8 +1,8 @@
-from dataclasses import asdict
 
 from repository.threat_repo import threat_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import THREAT_CURSOR, build_list_response, build_single_response, paginate
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 # Internal fields stored on Threat but never returned in list/get responses
@@ -50,7 +50,7 @@ def public_threat(record: dict) -> dict:
 
 def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of threats sorted by creation date."""
-    records = [asdict(t) for t in threat_repo.list_all()]
+    records = [record_dict(t) for t in threat_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: (r.get("threatInfo") or {}).get("createdAt", ""), reverse=True)
     filtered = apply_query_options(filtered, params)
@@ -68,7 +68,7 @@ def get_threat(threat_id: str) -> dict | None:
     threat = threat_repo.get(threat_id)
     if not threat:
         return None
-    return build_single_response(public_threat(asdict(threat)))
+    return build_single_response(public_threat(record_dict(threat)))
 
 
 def get_threat_timeline(threat_id: str) -> dict | None:

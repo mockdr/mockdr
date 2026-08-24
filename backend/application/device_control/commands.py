@@ -1,4 +1,3 @@
-from dataclasses import asdict
 
 from domain.device_control_rule import DeviceControlRule
 from repository.activity_repo import activity_repo
@@ -6,6 +5,7 @@ from repository.device_control_repo import device_control_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.internal_fields import DEVICE_CONTROL_INTERNAL_FIELDS
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 
@@ -49,7 +49,7 @@ def create_rule(data: dict) -> dict:
         description=f"Device control rule created: {rule.ruleName}",
         site_id=rule.siteId,
     )
-    return {"data": strip_fields(asdict(rule), DEVICE_CONTROL_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(rule), DEVICE_CONTROL_INTERNAL_FIELDS)}
 
 
 def update_rule(rule_id: str, data: dict) -> dict | None:
@@ -57,7 +57,7 @@ def update_rule(rule_id: str, data: dict) -> dict | None:
     rule = device_control_repo.get(rule_id)
     if rule is None:
         return None
-    record = asdict(rule)
+    record = record_dict(rule)
     updatable = {
         "ruleName", "action", "status", "deviceClass", "interface", "ruleType",
         "scope", "scopeName", "scopeId", "vendorId", "productId", "deviceId", "uid",
@@ -78,7 +78,7 @@ def update_rule(rule_id: str, data: dict) -> dict | None:
         description=f"Device control rule updated: {updated.ruleName}",
         site_id=updated.siteId,
     )
-    return {"data": strip_fields(asdict(updated), DEVICE_CONTROL_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(updated), DEVICE_CONTROL_INTERNAL_FIELDS)}
 
 
 def delete_rules(ids: list[str]) -> int:

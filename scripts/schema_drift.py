@@ -712,7 +712,8 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
             extra = []
         if cfg.get("extras_only"):
             print(
-                f"  ·  {method} {route}: {len(declared & seen)}/{len(declared)} declared paths present"
+                f"  ·  {method} {route}: "
+                f"{len(declared & seen)}/{len(declared)} declared paths present"
             )
             missing = []
         if missing or extra or undocumented:

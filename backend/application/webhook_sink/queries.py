@@ -1,9 +1,8 @@
 """Read-only application queries for the webhook sink."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.webhook_sink_repo import webhook_sink_repo
+from utils.serde import record_dict
 
 
 def list_captured(limit: int = 100) -> dict:
@@ -18,6 +17,6 @@ def list_captured(limit: int = 100) -> dict:
     all_entries = webhook_sink_repo.list_recent()
     limited = all_entries[:limit]
     return {
-        "data": [asdict(e) for e in limited],
+        "data": [record_dict(e) for e in limited],
         "pagination": {"totalItems": len(all_entries)},
     }

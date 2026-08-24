@@ -1,4 +1,3 @@
-from dataclasses import asdict
 
 from domain.firewall_rule import FirewallRule
 from repository.activity_repo import activity_repo
@@ -6,6 +5,7 @@ from repository.firewall_repo import firewall_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.internal_fields import FIREWALL_INTERNAL_FIELDS
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 
@@ -47,7 +47,7 @@ def create_rule(data: dict) -> dict:
         description=f"Firewall rule created: {rule.name}",
         site_id=rule.siteId,
     )
-    return {"data": strip_fields(asdict(rule), FIREWALL_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(rule), FIREWALL_INTERNAL_FIELDS)}
 
 
 def update_rule(rule_id: str, data: dict) -> dict | None:
@@ -55,7 +55,7 @@ def update_rule(rule_id: str, data: dict) -> dict | None:
     rule = firewall_repo.get(rule_id)
     if rule is None:
         return None
-    record = asdict(rule)
+    record = record_dict(rule)
     updatable = {
         "name", "description", "status", "action", "direction", "order",
         "osType", "osTypes", "protocol", "scope", "scopeId", "tag",
@@ -73,7 +73,7 @@ def update_rule(rule_id: str, data: dict) -> dict | None:
         description=f"Firewall rule updated: {updated.name}",
         site_id=updated.siteId,
     )
-    return {"data": strip_fields(asdict(updated), FIREWALL_INTERNAL_FIELDS)}
+    return {"data": strip_fields(record_dict(updated), FIREWALL_INTERNAL_FIELDS)}
 
 
 def delete_rule(rule_id: str) -> dict | None:

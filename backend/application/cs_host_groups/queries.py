@@ -1,8 +1,6 @@
 """CrowdStrike Falcon Host Group query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.cs_host_group_repo import cs_host_group_repo
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_fql import apply_fql
@@ -12,6 +10,7 @@ from utils.cs_response import (
     build_cs_id_response,
     build_cs_list_response,
 )
+from utils.serde import record_dict
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
@@ -48,7 +47,7 @@ def query_host_group_ids(
     Returns:
         CS ID response envelope.
     """
-    records = [asdict(g) for g in cs_host_group_repo.list_all()]
+    records = [record_dict(g) for g in cs_host_group_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -71,7 +70,7 @@ def get_host_group_entities(ids: list[str]) -> dict:
     for group_id in ids:
         group = cs_host_group_repo.get(group_id)
         if group:
-            entities.append(asdict(group))
+            entities.append(record_dict(group))
     return build_cs_entity_response(entities)
 
 
@@ -94,7 +93,7 @@ def list_host_groups(
     Returns:
         CS list response envelope with full entities and pagination.
     """
-    records = [asdict(g) for g in cs_host_group_repo.list_all()]
+    records = [record_dict(g) for g in cs_host_group_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
@@ -123,7 +122,7 @@ def list_group_members(
     Returns:
         CS list response envelope with host entities and pagination.
     """
-    all_hosts = [asdict(h) for h in cs_host_repo.list_all()]
+    all_hosts = [record_dict(h) for h in cs_host_repo.list_all()]
     members = [h for h in all_hosts if group_id in h.get("groups", [])]
     if filter_fql:
         members = apply_fql(members, filter_fql)

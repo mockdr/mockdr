@@ -64,7 +64,9 @@ CORE = {
     "delete_exclusion_response.json": "POST /public_api/v1/alerts_exclusion/delete/",
     "add_blocklist_files_detailed_response.json": "POST /public_api/v1/hash_exceptions/blocklist/",
     # the test file holds the already-extracted endpoints array: wrap it back
-    "get_endpoints_windows_response.json": "POST /public_api/v1/endpoints/get_endpoint/ | reply.endpoints",
+    "get_endpoints_windows_response.json": (
+        "POST /public_api/v1/endpoints/get_endpoint/ | reply.endpoints"
+    ),
     "action_status_get.json": "POST /public_api/v1/actions/get_action_status/",
 }
 
@@ -139,7 +141,8 @@ def reduce(pack: str, mapping: dict[str, str], out_name: str) -> None:
         + "\n"
     )
     print(
-        f"{pack}: {len(reduced)} routes from {sum(len(v['samples']) for v in reduced.values())} samples → {out.relative_to(ROOT)}"
+        f"{pack}: {len(reduced)} routes from "
+        f"{sum(len(v['samples']) for v in reduced.values())} samples → {out.relative_to(ROOT)}"
     )
 
 

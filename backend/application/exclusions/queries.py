@@ -1,9 +1,9 @@
-from dataclasses import asdict
 
 from repository.exclusion_repo import exclusion_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import EXCLUSION_INTERNAL_FIELDS
 from utils.pagination import EXCLUSION_CURSOR, build_list_response, paginate
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 FILTER_SPECS = [
@@ -36,7 +36,7 @@ def _api_scope(record: dict) -> dict:
 
 def list_exclusions(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of exclusions with internal fields stripped."""
-    records = [asdict(e) for e in exclusion_repo.list_all()]
+    records = [record_dict(e) for e in exclusion_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)  # filter before strip
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, EXCLUSION_CURSOR)

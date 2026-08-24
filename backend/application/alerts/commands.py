@@ -1,4 +1,3 @@
-from dataclasses import asdict
 
 from application.webhooks import commands as webhook_commands
 from domain.webhook import ALERT_UPDATED
@@ -6,6 +5,7 @@ from repository.alert_repo import alert_repo
 from repository.store import store
 from utils.dt import utc_now
 from utils.id_gen import new_id
+from utils.serde import record_dict
 
 
 def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None = None) -> dict:
@@ -29,7 +29,7 @@ def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None 
         alert.alertInfo["analystVerdict"] = verdict
         alert.alertInfo["updatedAt"] = utc_now()
         alert_repo.save(alert)
-        webhook_commands.fire_event(ALERT_UPDATED, asdict(alert))
+        webhook_commands.fire_event(ALERT_UPDATED, record_dict(alert))
         affected += 1
     return {"data": {"affected": affected}}
 
@@ -108,6 +108,6 @@ def set_incident_status(status: str, ids: list[str], actor_user_id: str | None =
         alert.alertInfo["incidentStatus"] = status
         alert.alertInfo["updatedAt"] = utc_now()
         alert_repo.save(alert)
-        webhook_commands.fire_event(ALERT_UPDATED, asdict(alert))
+        webhook_commands.fire_event(ALERT_UPDATED, record_dict(alert))
         affected += 1
     return {"data": {"affected": affected}}

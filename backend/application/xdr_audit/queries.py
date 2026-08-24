@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import random
 import time
-from dataclasses import asdict
 
 from repository.xdr_audit_log_repo import xdr_audit_log_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply
 
 
@@ -18,7 +18,7 @@ def get_management_logs(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching audit log entries.
     """
-    all_logs = [asdict(log) for log in xdr_audit_log_repo.list_all()]
+    all_logs = [record_dict(log) for log in xdr_audit_log_repo.list_all()]
 
     filters = request_data.get("filters", [])
     for f in filters:

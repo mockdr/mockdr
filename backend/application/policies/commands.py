@@ -1,10 +1,10 @@
 from collections.abc import Callable
-from dataclasses import asdict
 
 from domain.policy import Policy
 from repository.activity_repo import activity_repo
 from repository.policy_repo import policy_repo
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def update_policy(
@@ -49,4 +49,4 @@ def update_policy(
     policy.updatedAt = utc_now()
     save_fn(policy)
     activity_repo.create(120, "Policy updated", user_id=user_id)
-    return {"data": asdict(policy)}
+    return {"data": record_dict(policy)}

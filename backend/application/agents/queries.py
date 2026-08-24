@@ -1,5 +1,4 @@
 import json
-from dataclasses import asdict
 
 from infrastructure.process_gen import generate_processes_for_agent
 from repository.agent_repo import agent_repo
@@ -8,6 +7,7 @@ from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.pagination import AGENT_CURSOR, build_list_response, build_single_response, paginate
 from utils.s1_fixtures import restrict_item
+from utils.serde import record_dict
 from utils.strip import strip_fields
 
 FILTER_SPECS = [
@@ -70,7 +70,7 @@ def _apply_tag_filters(records: list[dict], params: dict) -> list[dict]:
 
 def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of agents sorted by last active date."""
-    records = [asdict(a) for a in agent_repo.list_all()]
+    records = [record_dict(a) for a in agent_repo.list_all()]
     records = _apply_tag_filters(records, params)
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: r.get("lastActiveDate", ""), reverse=True)
@@ -84,7 +84,7 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
 
 def count_agents(params: dict) -> dict:
     """Return the count of agents matching the given filter parameters."""
-    records = [asdict(a) for a in agent_repo.list_all()]
+    records = [record_dict(a) for a in agent_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered = apply_query_options(filtered, params)
     # S1's own AgentsCountSchema_200 declares `total`, not `count`.
@@ -93,7 +93,7 @@ def count_agents(params: dict) -> dict:
 
 def list_passphrases(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a paginated list of agent passphrases matching the given filters."""
-    records = [asdict(a) for a in agent_repo.list_all()]
+    records = [record_dict(a) for a in agent_repo.list_all()]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered = apply_query_options(filtered, params)
     passphrases = [
@@ -115,7 +115,7 @@ def get_agent(agent_id: str) -> dict | None:
     agent = agent_repo.get(agent_id)
     if not agent:
         return None
-    return build_single_response(strip_fields(asdict(agent), AGENT_INTERNAL_FIELDS))
+    return build_single_response(strip_fields(record_dict(agent), AGENT_INTERNAL_FIELDS))
 
 
 def get_agent_passphrase(agent_id: str) -> dict | None:

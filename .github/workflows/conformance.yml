@@ -103,5 +103,10 @@ jobs:
 
       # The read scenario (50 workers) is the sensitive one: it caught the
       # per-item deepcopy in the completion helpers (p99 1 s) before 2.2.0.
+      # --concurrency 0.25: a 2-vCPU runner with a 50-deep queue measures the
+      # runner's cores, not the mock's work. The scenarios' full worker counts
+      # run on a developer machine before a release.
       - name: Run the load test
-        run: python ../scripts/load_test.py --base-url http://127.0.0.1:8001/web/api/v2.1
+        run: |
+          python ../scripts/load_test.py \
+            --base-url http://127.0.0.1:8001/web/api/v2.1 --concurrency 0.25

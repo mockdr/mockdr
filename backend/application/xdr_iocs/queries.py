@@ -1,9 +1,8 @@
 """Cortex XDR IOC query handlers (read-only)."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.xdr_ioc_repo import xdr_ioc_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply
 
 
@@ -16,7 +15,7 @@ def get_iocs(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching IOCs.
     """
-    all_iocs = [asdict(i) for i in xdr_ioc_repo.list_all()]
+    all_iocs = [record_dict(i) for i in xdr_ioc_repo.list_all()]
 
     ioc_type = request_data.get("type")
     if ioc_type:

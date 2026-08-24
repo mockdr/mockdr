@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict
 
 from domain.event_bus import XdrAlertCreated, event_bus
 from domain.xdr_alert import XdrAlert
 from repository.xdr_alert_repo import xdr_alert_repo
+from utils.serde import record_dict
 from utils.xdr_response import build_xdr_reply
 
 
@@ -42,7 +42,7 @@ def insert_parsed_alerts(alerts: list[dict]) -> dict:
         event_bus.publish(
             XdrAlertCreated(
                 entity_id=alert.alert_id,
-                payload=asdict(alert),
+                payload=record_dict(alert),
                 timestamp=time.time(),
             )
         )
@@ -110,7 +110,7 @@ def insert_cef_alerts(alerts: list[dict]) -> dict:
         event_bus.publish(
             XdrAlertCreated(
                 entity_id=alert.alert_id,
-                payload=asdict(alert),
+                payload=record_dict(alert),
                 timestamp=time.time(),
             )
         )

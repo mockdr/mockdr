@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import uuid as _uuid
-from dataclasses import asdict
 
 from domain.cs_ioc import CsIoc
 from repository.cs_ioc_repo import cs_ioc_repo
 from utils.cs_response import build_cs_action_response, build_cs_entity_response
 from utils.dt import utc_now
+from utils.serde import record_dict
 
 
 def create_iocs(indicators: list[dict]) -> dict:
@@ -45,7 +45,7 @@ def create_iocs(indicators: list[dict]) -> dict:
             modified_by=raw.get("modified_by", "api-client"),
         )
         cs_ioc_repo.save(ioc)
-        created.append(asdict(ioc))
+        created.append(record_dict(ioc))
     return build_cs_entity_response(created)
 
 
@@ -77,7 +77,7 @@ def update_ioc(ioc_id: str, body: dict) -> dict:
     ioc.modified_on = utc_now()
     ioc.modified_by = body.get("modified_by", "api-client")
     cs_ioc_repo.save(ioc)
-    return build_cs_entity_response([asdict(ioc)])
+    return build_cs_entity_response([record_dict(ioc)])
 
 
 def delete_iocs(ids: list[str]) -> dict:

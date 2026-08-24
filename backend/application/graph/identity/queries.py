@@ -1,10 +1,9 @@
 """Read-side handlers for Microsoft Graph Identity / Conditional Access."""
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from repository.graph.conditional_access_policy_repo import graph_ca_policy_repo
 from utils.graph_response import build_graph_list_response
+from utils.serde import record_dict
 
 
 def list_ca_policies() -> dict:
@@ -13,7 +12,7 @@ def list_ca_policies() -> dict:
     Returns:
         OData list response containing conditional access policy records.
     """
-    records = [asdict(p) for p in graph_ca_policy_repo.list_all()]
+    records = [record_dict(p) for p in graph_ca_policy_repo.list_all()]
     return build_graph_list_response(
         value=records,
         context="https://graph.microsoft.com/v1.0/$metadata#identity/conditionalAccess/policies",
@@ -32,4 +31,4 @@ def get_ca_policy(policy_id: str) -> dict | None:
     policy = graph_ca_policy_repo.get(policy_id)
     if policy is None:
         return None
-    return asdict(policy)
+    return record_dict(policy)
