@@ -36,11 +36,10 @@ def _api_scope(record: dict) -> dict:
 
 def list_exclusions(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of exclusions with internal fields stripped."""
-    records = [record_dict(e) for e in exclusion_repo.list_all()]
-    filtered = apply_filters(records, params, FILTER_SPECS)  # filter before strip
+    filtered = apply_filters(exclusion_repo.list_all(), params, FILTER_SPECS)  # before strip
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, EXCLUSION_CURSOR)
-    stripped = [_api_scope(strip_fields(r, EXCLUSION_INTERNAL_FIELDS)) for r in page]
+    stripped = [_api_scope(strip_fields(record_dict(e), EXCLUSION_INTERNAL_FIELDS)) for e in page]
     return build_list_response(
         stripped,
         next_cursor,

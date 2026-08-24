@@ -123,9 +123,12 @@ def apply_graph_filter(records: list[dict], filter_str: str) -> list[dict]:
     # Inject lambda field values into records temporarily
     has_lambda = "_lambda_" in processed
     if has_lambda:
+        # The synthetic field names come from the filter, not from the data:
+        # scanning the filter string again for every record re-ran the same
+        # regex once per document.
+        lambda_fields = sorted({m.group(0) for m in re.finditer(r"_lambda_\w+", processed)})
         for record in records:
-            for m in re.finditer(r"_lambda_\w+", processed):
-                lf = m.group(0)
+            for lf in lambda_fields:
                 record[lf] = _match_lambda_field(record, lf)
 
     # try/finally: a malformed filter now raises, and leaking the synthetic

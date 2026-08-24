@@ -178,9 +178,12 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     # Aggregations run over everything the query matched, not the page.
     aggs = body.get("aggs") or body.get("aggregations")
     if aggs:
-        matched = [r for r in records if build_predicate(query_clause)(r)] if (
-            query_clause
-        ) else records
+        if query_clause:
+            # Compiled once, not once per document.
+            matches = build_predicate(query_clause)
+            matched = [r for r in records if matches(r)]
+        else:
+            matched = records
         response["aggregations"] = apply_aggregations(
             matched, aggs, index=canonical_index,
         )

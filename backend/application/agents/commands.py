@@ -6,6 +6,7 @@ from typing import cast
 
 from application.agents.queries import FILTER_SPECS as AGENT_FILTER_SPECS
 from application.webhooks import commands as webhook_commands
+from domain.tag import Tag
 from domain.webhook import AGENT_OFFLINE
 from repository.activity_repo import activity_repo
 from repository.agent_repo import agent_repo
@@ -25,6 +26,16 @@ class UnscopedActionError(ValueError):
     ``/agents/actions/*`` body. Treating an absent filter as "everything" turned
     a scoped request into a fleet-wide one, so an unscoped call is refused.
     """
+
+
+def _tag_by_key() -> dict[str, Tag]:
+    """The tag definitions keyed by their ``key``, built once per call site.
+
+    Looking a definition up by key used to scan the whole tag collection,
+    inside the loop over an agent's tags, inside the loop over the agents a
+    bulk action names: a thousand agents scanned it a thousand times.
+    """
+    return {t.key: t for t in tag_repo.list_all()}
 
 
 def _resolve_ids(body: dict) -> list[str]:
@@ -192,11 +203,11 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
                 existing_keys = {t.get("key") for t in current}
                 for key in tags_to_add:
                     if key not in existing_keys:
-                        # Look up tag definition by key for a real ID
-                        matched = next(
-                            (td for td in tag_repo.list_all() if td.key == key),
-                            None,
-                        )
+                        # By key, from an index built once: the definition was
+                        # looked up with a full scan of the tag collection, per
+                        # tag, per agent — a bulk action over a thousand agents
+                        # scanned it a thousand times over.
+                        matched = _tag_by_key().get(key)
                         current.append({
                             "id": matched.id if matched else str(_uuid.uuid4()),
                             "key": key,

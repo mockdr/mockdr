@@ -128,7 +128,8 @@ def _bucket(
     if agg_type == "range":
         return _range(body, sub, records, index, depth)
     if agg_type == "filter":
-        matched = [r for r in records if build_predicate(body)(r)]
+        matches = build_predicate(body)  # compiled once, not once per document
+        matched = [r for r in records if matches(r)]
         return _with_sub({"doc_count": len(matched)}, sub, matched, index, depth)
     # filters
     return _filters(body, sub, records, index, depth)
@@ -237,10 +238,14 @@ def _range(body: dict, sub: dict, records: list[dict], index: str, depth: int) -
 
 def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int) -> dict:
     named = body.get("filters", {})
+    # The predicate is compiled once per clause, not once per document: it sat
+    # inside the comprehension's condition, so a bucket over ten thousand
+    # documents rebuilt the same matcher ten thousand times.
     if isinstance(named, dict):
         buckets: dict[str, Any] = {}
         for key, clause in named.items():
-            members = [r for r in records if build_predicate(clause)(r)]
+            matches = build_predicate(clause)
+            members = [r for r in records if matches(r)]
             buckets[key] = _with_sub(
                 {"doc_count": len(members)}, sub, members, index, depth,
             )
@@ -248,7 +253,8 @@ def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int)
 
     anonymous = []
     for clause in named:
-        members = [r for r in records if build_predicate(clause)(r)]
+        matches = build_predicate(clause)
+        members = [r for r in records if matches(r)]
         anonymous.append(
             _with_sub({"doc_count": len(members)}, sub, members, index, depth),
         )
