@@ -16,6 +16,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from utils.nested import get_nested
 from utils.s1_fixtures import complete_item, restrict_item
 
 # ---------------------------------------------------------------------------
@@ -92,10 +93,10 @@ FIREWALL_CURSOR = CursorSpec(
 # ---------------------------------------------------------------------------
 
 
-def _encode_keyset(item: dict, spec: CursorSpec) -> str:
+def _encode_keyset(item: object, spec: CursorSpec) -> str:
     """Build a URL-safe S1 keyset cursor string from the given item."""
-    id_val = item.get(spec.id_field)
-    sort_val = item.get(spec._sort_by_field)
+    id_val = get_nested(item, spec.id_field)
+    sort_val = get_nested(item, spec._sort_by_field)
     payload = {
         "id_column": spec.id_column,
         "id_value": id_val,
@@ -107,7 +108,7 @@ def _encode_keyset(item: dict, spec: CursorSpec) -> str:
         # createdAt — and resuming by value alone always re-found the *first*
         # tied row, so the page never advanced and the client looped forever.
         # The record's own id disambiguates.
-        "_tiebreak": item.get("id"),
+        "_tiebreak": get_nested(item, "id"),
     }
     b64 = base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
     # S1 URL-encodes the base64 padding character
@@ -166,11 +167,11 @@ def _resume_index(
     if tiebreak is not None:
         tiebreak_str = str(tiebreak)
         for i, item in enumerate(items):
-            if str(item.get("id", "")) == tiebreak_str:
+            if str(get_nested(item, "id") or "") == tiebreak_str:
                 return i + 1
 
     for i, item in enumerate(items):
-        if str(item.get(spec.id_field, "")) == id_str:
+        if str(get_nested(item, spec.id_field) or "") == id_str:
             return i + 1
     return None
 

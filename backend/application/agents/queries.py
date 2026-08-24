@@ -5,6 +5,7 @@ from repository.agent_repo import agent_repo
 from repository.store import store
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
+from utils.nested import get_nested
 from utils.pagination import AGENT_CURSOR, build_list_response, build_single_response, paginate
 from utils.s1_fixtures import restrict_item
 from utils.serde import record_dict
@@ -31,14 +32,17 @@ FILTER_SPECS = [
 ]
 
 
-def _apply_tag_filters(records: list[dict], params: dict) -> list[dict]:
-    """Apply hasTags and tagsData post-filters to agent records."""
+def _apply_tag_filters(records: list, params: dict) -> list:
+    """Apply hasTags and tagsData post-filters to agent records (dicts or records)."""
     has_tags = params.pop("hasTags", None)
     tags_data_raw = params.pop("tagsData", None)
 
     if has_tags is not None:
         want = str(has_tags).lower() in ("true", "1", "yes")
-        records = [r for r in records if bool((r.get("tags") or {}).get("sentinelone", [])) == want]
+        records = [
+            r for r in records
+            if bool((get_nested(r, "tags") or {}).get("sentinelone", [])) == want
+        ]
 
     if tags_data_raw:
         try:
@@ -54,7 +58,7 @@ def _apply_tag_filters(records: list[dict], params: dict) -> list[dict]:
             tag_key = key_expr.removesuffix("__nin")
             filtered = []
             for r in records:
-                s1_tags = (r.get("tags") or {}).get("sentinelone", [])
+                s1_tags = (get_nested(r, "tags") or {}).get("sentinelone", [])
                 agent_vals = {t["value"] for t in s1_tags if t.get("key") == tag_key}
                 has_match = bool(agent_vals & set(values))
                 if negate:
@@ -69,14 +73,18 @@ def _apply_tag_filters(records: list[dict], params: dict) -> list[dict]:
 
 
 def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
-    """Return a filtered, paginated list of agents sorted by last active date."""
-    records = [record_dict(a) for a in agent_repo.list_all()]
-    records = _apply_tag_filters(records, params)
+    """Return a filtered, paginated list of agents sorted by last active date.
+
+    Filtering and sorting run on the stored records; only the page is turned
+    into dicts. Converting the whole collection first cost 2 400 conversions
+    to serve 100 rows at forty times the default seed.
+    """
+    records = _apply_tag_filters(agent_repo.list_all(), params)
     filtered = apply_filters(records, params, FILTER_SPECS)
-    filtered.sort(key=lambda r: r.get("lastActiveDate", ""), reverse=True)
+    filtered.sort(key=lambda a: get_nested(a, "lastActiveDate") or "", reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, AGENT_CURSOR)
-    stripped = [strip_fields(r, AGENT_INTERNAL_FIELDS) for r in page]
+    stripped = [strip_fields(record_dict(a), AGENT_INTERNAL_FIELDS) for a in page]
     return build_list_response(
         stripped, next_cursor, total, definition="agents.schemas_AgentViewSchema_many_200"
     )
@@ -84,7 +92,7 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
 
 def count_agents(params: dict) -> dict:
     """Return the count of agents matching the given filter parameters."""
-    records = [record_dict(a) for a in agent_repo.list_all()]
+    records = _apply_tag_filters(agent_repo.list_all(), params)
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered = apply_query_options(filtered, params)
     # S1's own AgentsCountSchema_200 declares `total`, not `count`.

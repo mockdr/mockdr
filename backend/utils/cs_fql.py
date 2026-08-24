@@ -231,11 +231,11 @@ def parse_fql(fql: str) -> list[FqlClause]:
 # Public API — filtering
 # ---------------------------------------------------------------------------
 
-def _match_clause(record: dict, clause: FqlClause) -> bool:
+def _match_clause(record: object, clause: FqlClause) -> bool:
     """Test whether a single record satisfies one FQL clause.
 
     Args:
-        record: Dict record to test.
+        record: The record to test — a dict or a stored dataclass.
         clause: Parsed FQL clause.
 
     Returns:
@@ -324,7 +324,7 @@ def _compare_range(field_val: Any, target: str, op: str) -> bool:
     return fs < target
 
 
-def apply_fql(records: list[dict], fql: str) -> list[dict]:
+def apply_fql(records: list, fql: str) -> list:
     """Apply a CrowdStrike FQL filter string to a list of records.
 
     Args:

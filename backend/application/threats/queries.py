@@ -1,6 +1,7 @@
 
 from repository.threat_repo import threat_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
+from utils.nested import get_nested
 from utils.pagination import THREAT_CURSOR, build_list_response, build_single_response, paginate
 from utils.serde import record_dict
 from utils.strip import strip_fields
@@ -50,13 +51,13 @@ def public_threat(record: dict) -> dict:
 
 def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of threats sorted by creation date."""
-    records = [record_dict(t) for t in threat_repo.list_all()]
-    filtered = apply_filters(records, params, FILTER_SPECS)
-    filtered.sort(key=lambda r: (r.get("threatInfo") or {}).get("createdAt", ""), reverse=True)
+    # Filtered and sorted on the stored records; only the page becomes dicts.
+    filtered = apply_filters(threat_repo.list_all(), params, FILTER_SPECS)
+    filtered.sort(key=lambda t: get_nested(t, "threatInfo.createdAt") or "", reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, THREAT_CURSOR)
     return build_list_response(
-        [public_threat(r) for r in page],
+        [public_threat(record_dict(t)) for t in page],
         next_cursor,
         total,
         definition="threats.schemas_ThreatSchema_many_200",

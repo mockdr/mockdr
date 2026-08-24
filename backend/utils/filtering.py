@@ -57,7 +57,7 @@ def _parse_dt(value: str) -> datetime | None:
     return None
 
 
-def apply_filters(records: list[dict], params: dict, specs: list[FilterSpec]) -> list[dict]:
+def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
     """Apply a sequence of filter specs to a list of records.
 
     Each spec is only applied when its corresponding ``params`` key is present
@@ -146,7 +146,7 @@ def _compare_dt(field_val: Any, target: datetime, op: str) -> bool:
     return parsed <= target
 
 
-def apply_query_options(records: list[dict], params: dict) -> list[dict]:
+def apply_query_options(records: list, params: dict) -> list:
     """Apply the sorting and offset options every S1 list endpoint accepts.
 
     ``sortBy``, ``sortOrder`` and ``skip`` are documented on every list
@@ -179,9 +179,9 @@ def _as_int(value: Any) -> int:
         return 0
 
 
-def _sort_key(field: str) -> Callable[[dict], tuple[int, float, str]]:
+def _sort_key(field: str) -> Callable[[Any], tuple[int, float, str]]:
     """Build a sort key that orders numbers numerically and Nones last."""
-    def key(record: dict) -> tuple[int, float, str]:
+    def key(record: Any) -> tuple[int, float, str]:  # noqa: ANN401 - dict or record
         value = _get_field(record, field)
         if value is None:
             return (2, 0.0, "")

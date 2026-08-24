@@ -17,11 +17,10 @@ FILTER_SPECS = [
 
 def list_users(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of users with internal fields stripped."""
-    records = [record_dict(u) for u in user_repo.list_all()]
-    filtered = apply_filters(records, params, FILTER_SPECS)  # filter before strip
+    filtered = apply_filters(user_repo.list_all(), params, FILTER_SPECS)  # filter before strip
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, USER_CURSOR)
-    stripped = [strip_fields(r, USER_INTERNAL_FIELDS) for r in page]
+    stripped = [strip_fields(record_dict(u), USER_INTERNAL_FIELDS) for u in page]
     response = build_list_response(
         stripped, next_cursor, total, definition="users.schemas_GetUserListSchema_many_200"
     )

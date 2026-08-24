@@ -12,6 +12,17 @@ from utils.mde_serde import to_mde_resource
 from utils.serde import record_dict
 
 
+def _renamed(record: dict) -> dict:
+    """The stored machine under its API key, without the fixture completion.
+
+    Completion is what a page costs; running it over the whole collection to
+    return `$top` rows is work thrown away.
+    """
+    for key in ("groupName", "loggedOnUsers", "agentVersion"):
+        record.pop(key, None)
+    return to_mde_resource(record, "machineId")
+
+
 def resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
     # The docs' machine has none of these; loggedOnUsers has its own route.
@@ -41,12 +52,12 @@ def list_machines(
     Returns:
         OData list response with paginated machine records.
     """
-    records = [resource(record_dict(m)) for m in mde_machine_repo.list_all()]
+    records = [_renamed(record_dict(m)) for m in mde_machine_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
     total = len(records)
-    page = records[skip : skip + top]
+    page = [complete_mde(r, "machine") for r in records[skip : skip + top]]
     page = apply_odata_select(page, select)
     next_link = None
     if skip + top < total:

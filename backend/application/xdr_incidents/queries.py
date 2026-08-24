@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from repository.xdr_alert_repo import xdr_alert_repo
 from repository.xdr_incident_repo import xdr_incident_repo
+from utils.nested import get_nested
 from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
@@ -20,7 +21,7 @@ def get_incidents(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching incidents.
     """
-    all_incidents = [record_dict(i) for i in xdr_incident_repo.list_all()]
+    all_incidents = xdr_incident_repo.list_all()
 
     filters = request_data.get("filters", [])
     for f in filters:
@@ -28,22 +29,26 @@ def get_incidents(request_data: dict) -> dict:
         value = f.get("value")
         if field == "severity" and value:
             values = value if isinstance(value, list) else [value]
-            all_incidents = [i for i in all_incidents if i["severity"] in values]
+            all_incidents = [x for x in all_incidents if get_nested(x, "severity") in values]
         elif field == "status" and value:
             values = value if isinstance(value, list) else [value]
-            all_incidents = [i for i in all_incidents if i["status"] in values]
+            all_incidents = [x for x in all_incidents if get_nested(x, "status") in values]
         elif field == "creation_time":
             gte = f.get("gte")
             lte = f.get("lte")
             if gte is not None:
-                all_incidents = [i for i in all_incidents if i["creation_time"] >= gte]
+                all_incidents = [
+                    x for x in all_incidents if (get_nested(x, "creation_time") or 0) >= gte
+                ]
             if lte is not None:
-                all_incidents = [i for i in all_incidents if i["creation_time"] <= lte]
+                all_incidents = [
+                    x for x in all_incidents if (get_nested(x, "creation_time") or 0) <= lte
+                ]
 
     total = len(all_incidents)
     search_from = request_data.get("search_from", 0)
     search_to = request_data.get("search_to", search_from + 100)
-    page = all_incidents[search_from:search_to]
+    page = [record_dict(r) for r in all_incidents[search_from:search_to]]
 
     return build_xdr_list_reply(page, total_count=total, key="incidents")
 

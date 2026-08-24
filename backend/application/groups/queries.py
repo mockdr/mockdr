@@ -23,11 +23,10 @@ FILTER_SPECS = [
 
 def list_groups(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of groups with internal fields stripped."""
-    records = [record_dict(g) for g in group_repo.list_all()]
-    filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_filters(group_repo.list_all(), params, FILTER_SPECS)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, GROUP_CURSOR)
-    stripped = [strip_fields(r, GROUP_INTERNAL_FIELDS) for r in page]
+    stripped = [strip_fields(record_dict(g), GROUP_INTERNAL_FIELDS) for g in page]
     return build_list_response(
         stripped, next_cursor, total, definition="groups_SummarizedGroupSchema_many_200"
     )

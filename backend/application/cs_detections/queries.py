@@ -5,6 +5,7 @@ from repository.cs_detection_repo import cs_detection_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.nested import get_nested
 from utils.serde import record_dict
 
 
@@ -42,13 +43,13 @@ def query_detection_ids(
     Returns:
         CS ID response envelope.
     """
-    records = [record_dict(d) for d in cs_detection_repo.list_all()]
+    records = cs_detection_repo.list_all()
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
     page, total = paginate_cs(records, offset, limit)
-    ids = [r["composite_id"] for r in page]
+    ids = [get_nested(r, "composite_id") for r in page]
     return build_cs_id_response(ids, total, offset, limit)
 
 

@@ -43,16 +43,14 @@ def get_alerts(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching alerts.
     """
-    all_alerts = [record_dict(a) for a in xdr_alert_repo.list_all()]
-
-    all_alerts = apply_xdr_filters(
-        all_alerts, request_data.get("filters"), _ALERT_FILTER_FIELDS,
+    matched = apply_xdr_filters(
+        xdr_alert_repo.list_all(), request_data.get("filters"), _ALERT_FILTER_FIELDS,
     )
 
-    total = len(all_alerts)
+    total = len(matched)
     search_from = request_data.get("search_from", 0)
     search_to = request_data.get("search_to", search_from + 100)
-    page = all_alerts[search_from:search_to]
+    page = [record_dict(r) for r in matched[search_from:search_to]]
 
     return build_xdr_list_reply(page, total_count=total, key="alerts")
 
@@ -110,12 +108,11 @@ def get_alerts_multi_events(request_data: dict) -> dict:
 
     Same filters and pagination as ``get_alerts_by_filter_data``.
     """
-    all_alerts = [record_dict(a) for a in xdr_alert_repo.list_all()]
-    all_alerts = apply_xdr_filters(
-        all_alerts, request_data.get("filters"), _ALERT_FILTER_FIELDS,
+    matched = apply_xdr_filters(
+        xdr_alert_repo.list_all(), request_data.get("filters"), _ALERT_FILTER_FIELDS,
     )
-    total = len(all_alerts)
+    total = len(matched)
     search_from = request_data.get("search_from", 0)
     search_to = request_data.get("search_to", search_from + 100)
-    page = [multi_events_alert(a) for a in all_alerts[search_from:search_to]]
+    page = [multi_events_alert(record_dict(a)) for a in matched[search_from:search_to]]
     return build_xdr_list_reply(page, total_count=total, key="alerts")

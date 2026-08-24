@@ -15,6 +15,16 @@ def resource(record: dict) -> dict:
     return complete_mde(to_mde_resource(record, "alertId"), "alert")
 
 
+def _renamed(record: dict) -> dict:
+    """The stored record under its API key, without the fixture completion.
+
+    Completion is what a page costs; running it over the whole collection to
+    return `$top` rows is work thrown away. Filtering and ordering read the
+    record's own fields, which the completion only ever adds defaults to.
+    """
+    return to_mde_resource(record, "alertId")
+
+
 def list_alerts(
     filter_str: str | None,
     top: int,
@@ -36,12 +46,12 @@ def list_alerts(
     Returns:
         OData list response with paginated alert records.
     """
-    records = [resource(record_dict(a)) for a in mde_alert_repo.list_all()]
+    records = [_renamed(record_dict(a)) for a in mde_alert_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
     total = len(records)
-    page = records[skip : skip + top]
+    page = [complete_mde(r, "alert") for r in records[skip : skip + top]]
     page = apply_odata_select(page, select)
     next_link = None
     if skip + top < total:

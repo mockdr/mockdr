@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
+from utils.nested import get_nested
 from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
@@ -18,7 +19,7 @@ def get_endpoints(request_data: dict) -> dict:
     Returns:
         XDR list reply with matching endpoints.
     """
-    all_endpoints = [record_dict(e) for e in xdr_endpoint_repo.list_all()]
+    all_endpoints = xdr_endpoint_repo.list_all()
 
     filters = request_data.get("filters", [])
     for f in filters:
@@ -26,32 +27,32 @@ def get_endpoints(request_data: dict) -> dict:
         value = f.get("value")
         if field == "endpoint_status" and value:
             values = value if isinstance(value, list) else [value]
-            all_endpoints = [e for e in all_endpoints if e["endpoint_status"] in values]
+            all_endpoints = [x for x in all_endpoints if get_nested(x, "endpoint_status") in values]
         elif field == "os_type" and value:
             values = value if isinstance(value, list) else [value]
-            all_endpoints = [e for e in all_endpoints if e["os_type"] in values]
+            all_endpoints = [x for x in all_endpoints if get_nested(x, "os_type") in values]
         elif field == "hostname" and value:
             values = value if isinstance(value, list) else [value]
             all_endpoints = [
                 e for e in all_endpoints
-                if any(v.lower() in e["endpoint_name"].lower() for v in values)
+                if any(v.lower() in (get_nested(e, "endpoint_name") or "").lower() for v in values)
             ]
         elif field == "ip_list" and value:
             values = value if isinstance(value, list) else [value]
             all_endpoints = [
                 e for e in all_endpoints
-                if any(ip in values for ip in e.get("ip", []))
+                if any(ip in values for ip in (get_nested(e, "ip") or []))
             ]
 
     # Also support top-level endpoint_id_list filter
     id_list = request_data.get("endpoint_id_list")
     if id_list:
-        all_endpoints = [e for e in all_endpoints if e["endpoint_id"] in id_list]
+        all_endpoints = [x for x in all_endpoints if get_nested(x, "endpoint_id") in id_list]
 
     total = len(all_endpoints)
     search_from = request_data.get("search_from", 0)
     search_to = request_data.get("search_to", search_from + 100)
-    page = all_endpoints[search_from:search_to]
+    page = [record_dict(r) for r in all_endpoints[search_from:search_to]]
 
     return build_xdr_list_reply(page, total_count=total, key="endpoints")
 

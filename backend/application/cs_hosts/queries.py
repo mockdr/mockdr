@@ -5,6 +5,7 @@ from repository.cs_host_repo import cs_host_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.nested import get_nested
 from utils.serde import record_dict
 
 
@@ -44,13 +45,13 @@ def query_host_ids(
     Returns:
         CS ID response envelope.
     """
-    records = [record_dict(h) for h in cs_host_repo.list_all()]
+    records = cs_host_repo.list_all()
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
     page, total = paginate_cs(records, offset, limit)
-    ids = [r["device_id"] for r in page]
+    ids = [get_nested(r, "device_id") for r in page]
     return build_cs_id_response(ids, total, offset, limit)
 
 
@@ -91,16 +92,16 @@ def query_host_ids_scroll(
     Returns:
         CS ID response with scroll-style pagination metadata.
     """
-    records = [record_dict(h) for h in cs_host_repo.list_all()]
+    records = cs_host_repo.list_all()
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
     total = len(records)
 
     start = int(offset) if offset else 0
     page = records[start : start + limit]
-    ids = [r["device_id"] for r in page]
+    ids = [get_nested(r, "device_id") for r in page]
 
     next_offset = "" if start + limit >= total else str(start + limit)
 
@@ -129,7 +130,7 @@ def get_host_count(filter_fql: str | None) -> dict:
     Returns:
         CS entity response with a single resource containing the count.
     """
-    records = [record_dict(h) for h in cs_host_repo.list_all()]
+    records = cs_host_repo.list_all()
     if filter_fql:
         records = apply_fql(records, filter_fql)
     return build_cs_entity_response([{"count": len(records)}])

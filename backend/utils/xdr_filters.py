@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from utils.nested import get_nested
+
 __all__ = ["XdrFilterError", "apply_xdr_filters"]
 
 
@@ -73,7 +75,7 @@ def _compare(record_value: Any, operand: Any, operator: str) -> bool:  # noqa: P
 
 
 def apply_xdr_filters(
-    records: list[dict],
+    records: list,
     filters: list[dict] | None,
     field_map: dict[str, str],
 ) -> list[dict]:
@@ -112,10 +114,10 @@ def apply_xdr_filters(
             bounds = [(op, entry[op]) for op in ("gte", "lte") if entry.get(op) is not None]
             if bounds:
                 for op, operand in bounds:
-                    result = [r for r in result if _compare(r.get(key), operand, op)]
+                    result = [r for r in result if _compare(get_nested(r, key), operand, op)]
                 continue
             operator = "in"
 
         operand = entry.get("value")
-        result = [r for r in result if _compare(r.get(key), operand, operator)]
+        result = [r for r in result if _compare(get_nested(r, key), operand, operator)]
     return result
