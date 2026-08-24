@@ -611,22 +611,22 @@ async def es_query_exception_handler(
     ``ValueError``, which reached the client as a plain-text ``500`` — an
     Elasticsearch client cannot tell that apart from the cluster falling over.
     """
-    if exc.es_type == "search_phase_execution_exception":
-        # The result-window limit is enforced per shard, so Elasticsearch
-        # reports it as a search-phase failure wrapping the argument error,
-        # with one root cause and one failed shard per shard (measured on
-        # 8.15; mockdr has one shard). Nested caused_by is as measured.
-        cause = {"type": "illegal_argument_exception", "reason": str(exc)}
-        return JSONResponse(status_code=400, content={
-            "error": {
-                "root_cause": [dict(cause)], "type": "search_phase_execution_exception",
-                "reason": "all shards failed", "phase": "query", "grouped": True,
-                "failed_shards": [{"shard": 0, "index": "mockdr", "node": "mockdr-node-1",
-                                   "reason": dict(cause)}],
-                "caused_by": {**cause, "caused_by": dict(cause)},
-            },
-            "status": 400,
-        })
+    if exc.shard_failure:
+        # What a shard raises comes back wrapped: one root cause and one
+        # failed shard per shard (mockdr has one), with `phase` and `grouped`
+        # naming where it happened. An argument error also repeats itself down
+        # a two-level caused_by; a date-math parse error does not — both
+        # measured against 8.15.
+        cause = {"type": exc.es_type, "reason": str(exc)}
+        error: dict = {
+            "root_cause": [dict(cause)], "type": "search_phase_execution_exception",
+            "reason": "all shards failed", "phase": "query", "grouped": True,
+            "failed_shards": [{"shard": 0, "index": "mockdr", "node": "mockdr-node-1",
+                               "reason": dict(cause)}],
+        }
+        if exc.es_type == "illegal_argument_exception":
+            error["caused_by"] = {**cause, "caused_by": dict(cause)}
+        return JSONResponse(status_code=400, content={"error": error, "status": 400})
     content = build_es_error_response(400, exc.es_type, str(exc))
     if exc.clause is not None:
         # Elasticsearch reports where in the body the unknown clause sits and

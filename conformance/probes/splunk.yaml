@@ -786,3 +786,79 @@ probes:
       query: {index: no_such_index_conformance}
       headers: {Authorization: "Splunk ${hec_token}"}
       content: "raw probe"
+
+  # ── Time modifiers (2.3.0) ──────────────────────────────────────────────
+  - id: search-invalid-time-term
+    endpoint: management
+    why: >
+      A time modifier the grammar has no unit for. splunkd dispatches the
+      job, returns nothing and says so with a FATAL message; mockdr used to
+      drop the bound it could not read and answer with every event in the
+      index — a full result set here and an empty one in production.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main earliest=-30x&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-invalid-latest-term
+    endpoint: management
+    why: The same refusal, naming `latest` instead.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main latest=nope&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-invalid-earliest-parameter
+    endpoint: management
+    why: >
+      The same value as a request parameter rather than in the search string,
+      which splunkd refuses with 400 rather than a message inside a 200.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main&earliest_time=-30x&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-latest-not-after-earliest
+    endpoint: management
+    why: >
+      Equal bounds as parameters. splunkd insists latest be strictly after
+      earliest, though it accepts the same pair inside the search string.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main&earliest_time=-5m&latest_time=-5m&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-timerange-substituted
+    endpoint: management
+    why: >
+      A readable modifier written into the search draws an INFO line naming
+      the substitution; the same value as a parameter draws nothing. Scoped
+      to an index neither target has, because the envelope itself differs
+      between a page with rows and one without — which is the next probe.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=conformance_absent_xyz earliest=-1mon@mon&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: search-empty-result-envelope
+    endpoint: management
+    why: >
+      A search that matched nothing. splunkd drops `fields` and `highlighted`
+      and adds `post_process_count`; mockdr sent empty ones of the first two
+      and neither `preview` nor `post_process_count` at all.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=conformance_absent_xyz&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic

@@ -145,6 +145,12 @@ def get_job(sid: str) -> dict | None:
         "isPaused": job.is_paused,
         "isSaved": job.is_saved,
         "ttl": job.ttl,
+        # A failed job reports the reason twice: the FATAL the search raised
+        # and an ERROR copy of it. Only the job entry carries the copy.
+        "messages": job.messages + [
+            {"type": "ERROR", "text": m["text"]}
+            for m in job.messages if m["type"] == "FATAL"
+        ],
     }
     # Every key a real job carries, and the eight sub-resource links a job
     # has instead of edit/remove (measured on 10.4.2).
@@ -205,6 +211,26 @@ def _page(rows: list[dict[str, object]], count: int, offset: int) -> list[dict[s
     return windowed if count <= 0 else windowed[:count]
 
 
+class SearchJobFailedError(LookupError):
+    """Raised when a job's results are asked for but the search never ran.
+
+    splunkd answers ``/results`` and ``/events`` for a failed job with 400 and
+    the messages that explain why, not with an empty page — which is what the
+    mock used to return, and reads as "the search ran and found nothing".
+    """
+
+    def __init__(self, messages: list[dict[str, str]]) -> None:
+        """Carry the job's messages so the route can render them."""
+        self.messages = messages
+        super().__init__("search job failed")
+
+
+def _refuse_if_failed(job: object) -> None:
+    """Raise if *job* failed, so the caller answers 400 rather than a page."""
+    if getattr(job, "is_failed", False):
+        raise SearchJobFailedError(getattr(job, "messages", []))
+
+
 def get_results(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     """Return search results for a job.
 
@@ -219,6 +245,7 @@ def get_results(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     job = search_job_repo.get(sid)
     if not job:
         return None
+    _refuse_if_failed(job)
 
     return build_search_results(
         _page(job.results, count, offset),
@@ -238,6 +265,7 @@ def get_events(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     job = search_job_repo.get(sid)
     if not job:
         return None
+    _refuse_if_failed(job)
 
     events = job.events or job.results
     fields = list(events[0].keys()) if events else []

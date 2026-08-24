@@ -78,6 +78,7 @@ def validate_search_body(body: dict) -> None:
             raise ESQueryError(
                 "Sort must contain at least one field.",
                 es_type="illegal_argument_exception",
+                shard_failure=True,
             )
         if len(search_after) != len(sort_keys):
             # The real message, because a client that pages wrongly needs to
@@ -86,6 +87,7 @@ def validate_search_body(body: dict) -> None:
                 f"search_after has {len(search_after)} value(s) but sort has "
                 f"{len(sort_keys)}.",
                 es_type="illegal_argument_exception",
+                shard_failure=True,
             )
     start = _as_bound(body.get("from"), "from") or 0
     size = _as_bound(body.get("size"), "size")
@@ -96,7 +98,8 @@ def validate_search_body(body: dict) -> None:
             f"[{MAX_RESULT_WINDOW}] but was [{start + size}]. See the scroll api for a more "
             f"efficient way to request large data sets. This limit can be set by changing "
             f"the [index.max_result_window] index level setting.",
-            es_type="search_phase_execution_exception",
+            es_type="illegal_argument_exception",
+            shard_failure=True,
         )
 
 
@@ -115,17 +118,26 @@ class ESQueryError(ValueError):
     def __init__(
         self, message: str, *, clause: str | None = None,
         es_type: str = "parsing_exception", named_object: bool = False,
+        shard_failure: bool = False,
     ) -> None:
         """Record the message, the clause if any, and Elasticsearch's exception type.
 
         ``named_object`` marks the one case that carries a ``caused_by``:
         an unknown query or aggregation *type*. An unknown top-level key is
         a parsing_exception too, but without the cause (measured on 8.15).
+
+        ``shard_failure`` marks the errors Elasticsearch only discovers once
+        the query reaches a shard — an unreadable date-math bound, a
+        search_after that does not match the sort, a result window past the
+        limit. Those come back wrapped in a ``search_phase_execution_exception``
+        naming the failed shards; everything the coordinating node catches
+        while parsing comes back flat.
         """
         super().__init__(message)
         self.clause = clause
         self.es_type = es_type
         self.named_object = named_object
+        self.shard_failure = shard_failure
 
 # ---------------------------------------------------------------------------
 # Range comparison helper
@@ -145,7 +157,9 @@ def _compare_range(field_val: Any, target: Any, op: str) -> bool:
     Returns:
         ``True`` if the comparison holds.
     """
-    if field_val is None:
+    # A null bound matches nothing, rather than comparing as the string
+    # "None" and matching about half the index.
+    if field_val is None or target is None:
         return False
 
     # Try numeric comparison.
@@ -350,8 +364,27 @@ def _build_range(body: dict) -> Callable[[dict], bool]:
     what makes ``gte: "now/d"`` mean *since midnight* and ``lte: "now/d"``
     *through the end of today*.
     """
+    # Elasticsearch refuses each of these shapes by name rather than reading
+    # past them; the fuzzer reached `{"range": {"a": null}}` and this raised
+    # AttributeError out of the handler as a 500.
+    if not body:
+        raise ESQueryError(
+            "field name is null or empty", es_type="illegal_argument_exception",
+        )
+    if len(body) > 1:
+        first, second = list(body)[:2]
+        raise ESQueryError(
+            f"[range] query doesn't support multiple fields, found [{first}] and [{second}]",
+            clause="range",
+        )
     field, bounds = next(iter(body.items()))
-    time_zone = bounds.get("time_zone") if isinstance(bounds, dict) else None
+    if bounds is None or not field:
+        raise ESQueryError(
+            "field name is null or empty", es_type="illegal_argument_exception",
+        )
+    if not isinstance(bounds, dict):
+        raise ESQueryError(f"[range] query does not support [{field}]", clause="range")
+    time_zone = bounds.get("time_zone")
 
     resolved: list[tuple[str, Any, datetime | None]] = []
     for op, target in bounds.items():
@@ -365,7 +398,9 @@ def _build_range(body: dict) -> Callable[[dict], bool]:
                     target, round_up=ROUNDS_UP[op], time_zone=time_zone,
                 )
             except DateMathError as exc:
-                raise ESQueryError(str(exc), es_type="parse_exception") from exc
+                raise ESQueryError(
+                    str(exc), es_type="parse_exception", shard_failure=True,
+                ) from exc
         resolved.append((op, target, moment))
 
     def predicate(rec: dict) -> bool:

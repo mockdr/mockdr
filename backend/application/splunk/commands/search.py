@@ -10,7 +10,52 @@ from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.search_job_repo import search_job_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
 from utils.splunk.spl_exec import execute_pipeline
-from utils.splunk.spl_parser import SPLQuery, parse_spl, resolve_relative_time
+from utils.splunk.spl_parser import (
+    SPLQuery,
+    current_time,
+    parse_spl,
+    resolve_relative_time,
+)
+
+#: What splunkd says about a `latest_time` it will not take — the same line
+#: whether the value is unreadable or merely not after `earliest_time`.
+_LATEST_PARAM_MESSAGE = "Invalid latest_time: latest_time must be after earliest_time."
+
+
+class InvalidTimeParameterError(ValueError):
+    """Raised when ``earliest_time``/``latest_time`` is not a time splunkd takes.
+
+    It answers the request with 400 rather than dispatching a job; the mock
+    used to drop the bound it could not read and search everything instead.
+    """
+
+    def __init__(self, message: str) -> None:
+        """Record splunkd's own wording for the refusal."""
+        super().__init__(message)
+
+
+def _validate_time_parameters(earliest_time: str, latest_time: str) -> None:
+    """Refuse the request the way splunkd refuses it.
+
+    Raises:
+        InvalidTimeParameterError: If either parameter cannot be read, or if
+            both are given and ``latest_time`` is not strictly after
+            ``earliest_time`` — splunkd rejects equal bounds here, though it
+            accepts them when the same values are written into the search
+            string (both measured against Splunk 9).
+    """
+    # One clock reading for both bounds, so `earliest_time=-5m
+    # latest_time=-5m` is the equal pair splunkd refuses rather than a window
+    # a few microseconds wide.
+    now = current_time()
+    earliest = resolve_relative_time(earliest_time, now) if earliest_time else None
+    if earliest_time and not earliest:
+        raise InvalidTimeParameterError("Invalid earliest_time.")
+    latest = resolve_relative_time(latest_time, now) if latest_time else None
+    if latest_time and not latest:
+        raise InvalidTimeParameterError(_LATEST_PARAM_MESSAGE)
+    if earliest and latest and latest <= earliest:
+        raise InvalidTimeParameterError(_LATEST_PARAM_MESSAGE)
 
 
 def create_search_job(
@@ -31,19 +76,34 @@ def create_search_job(
 
     Returns:
         The search job SID.
+
+    Raises:
+        InvalidTimeParameterError: If ``earliest_time`` or ``latest_time`` is
+            not a time splunkd can read. It refuses the request outright
+            rather than dispatching a job with a bound it had to guess at.
     """
     sid = str(uuid.uuid4()).replace("-", "")[:24]
     sid = f"1{int(time.time())}.{sid}"
 
     now = time.time()
     parsed = parse_spl(search)
-    # Override time from explicit params if provided
+    # An explicit parameter overrides what the search string said, and is
+    # validated here: splunkd answers 400 for the parameter and a FATAL
+    # message inside a 200 for the same value written into the search.
+    _validate_time_parameters(earliest_time, latest_time)
     if earliest_time:
         parsed.earliest_time = earliest_time
+        parsed.from_search_string = False
     if latest_time:
         parsed.latest_time = latest_time
+        parsed.from_search_string = False
 
     events, results, messages = _execute_query(parsed)
+    # splunkd marks a search that could not run FAILED; a client polling
+    # dispatchState saw DONE here and concluded the empty result set was the
+    # answer. The job entry repeats the FATAL line as an ERROR — the results
+    # body does not, so that duplication lives in the job renderer.
+    failed = any(m["type"] == "FATAL" for m in messages)
 
     job = SearchJob(
         sid=sid,
@@ -52,7 +112,8 @@ def create_search_job(
         latest_time=latest_time,
         exec_mode=exec_mode,
         status_buckets=status_buckets,
-        dispatch_state="DONE",
+        dispatch_state="FAILED" if failed else "DONE",
+        is_failed=failed,
         done_progress=1.0,
         # eventCount counts what the search matched; resultCount counts what
         # the pipeline produced. A transforming search makes them differ.
@@ -172,14 +233,65 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
         ``(events, results, messages)`` — the matched events before the
         pipeline ran, the rows the pipeline produced, and any diagnostics.
     """
+    time_messages, usable = _time_term_messages(parsed)
+    if not usable:
+        # splunkd refuses the whole search rather than dropping the bound it
+        # could not read: a typo in `earliest` returned every event here and
+        # none in production, which is the worst way for the two to differ.
+        return [], [], time_messages
+
     if parsed.is_notable or parsed.index == "notable":
         events = _query_notables(parsed)
     else:
         events = _query_events(parsed)
 
     results, texts = execute_pipeline(events, parsed)
-    messages = [{"type": "WARN", "text": text} for text in texts]
+    messages = time_messages + [{"type": "WARN", "text": text} for text in texts]
     return events, results, messages
+
+
+def _time_term_messages(parsed: SPLQuery) -> tuple[list[dict], bool]:
+    """Diagnose the search's time terms the way splunkd reports them.
+
+    Returns:
+        The messages to attach, and whether the search can run at all. An
+        unreadable ``earliest`` or ``latest`` is FATAL and yields no results;
+        a readable one that came from the search string is announced with the
+        INFO line splunkd emits (both measured against Splunk 9).
+    """
+    bounds: dict[str, float] = {}
+    now = current_time()
+    for term in ("earliest", "latest"):
+        value = getattr(parsed, f"{term}_time")
+        if not value:
+            continue
+        resolved = resolve_relative_time(value, now)
+        if not resolved:
+            # Only the first bad term is reported, as splunkd does.
+            return (
+                [{"type": "FATAL", "text": f'Invalid value "{value}" for time term \'{term}\''}],
+                False,
+            )
+        bounds[term] = resolved
+
+    start, end = bounds.get("earliest"), bounds.get("latest")
+    if start and end and start > end:
+        # An inverted window is a parse failure in the search itself, and
+        # splunkd quotes the two epochs it resolved them to.
+        return ([{
+            "type": "FATAL",
+            "text": (
+                "Error in 'search' command: Unable to parse the search: "
+                f"Invalid time bounds in search: start={int(start)} > end={int(end)}."
+            ),
+        }], False)
+
+    if parsed.from_search_string and (parsed.earliest_time or parsed.latest_time):
+        return ([{
+            "type": "INFO",
+            "text": "Your timerange was substituted based on your search string",
+        }], True)
+    return ([], True)
 
 
 def _query_events(parsed: SPLQuery) -> list[dict]:
@@ -187,8 +299,9 @@ def _query_events(parsed: SPLQuery) -> list[dict]:
     all_events = splunk_event_repo.list_all()
 
     # Time filtering
-    earliest = resolve_relative_time(parsed.earliest_time) if parsed.earliest_time else 0.0
-    latest = resolve_relative_time(parsed.latest_time) if parsed.latest_time else 0.0
+    now = current_time()
+    earliest = resolve_relative_time(parsed.earliest_time, now) if parsed.earliest_time else 0.0
+    latest = resolve_relative_time(parsed.latest_time, now) if parsed.latest_time else 0.0
 
     filtered = []
     for event in all_events:

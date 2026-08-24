@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import re
 import time
+from calendar import monthrange
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 from utils.splunk.spl_expr import Node, SPLExprError, parse_search, parse_where
 
 __all__ = [
     "KNOWN_COMMANDS",
+    "current_time",
     "parse_sort_keys",
     "SPLCommand",
     "SPLQuery",
@@ -70,6 +73,10 @@ class SPLQuery:
     errors: list[str] = field(default_factory=list)
     raw_search: str = ""
     is_notable: bool = False
+    #: Whether the time bounds came from the search string rather than from
+    #: the request's own earliest_time/latest_time parameters. splunkd
+    #: announces the first case with an INFO message and the second silently.
+    from_search_string: bool = False
 
     # -- compatibility accessors ----------------------------------------
     # The pipeline is authoritative; these read it back for callers and tests
@@ -341,8 +348,10 @@ def _assign_builtin(key: str, value: str, result: SPLQuery) -> None:
         result.host = value
     elif key == "earliest":
         result.earliest_time = value
+        result.from_search_string = True
     elif key == "latest":
         result.latest_time = value
+        result.from_search_string = True
 
 
 def _split_top_level_terms(clause: str) -> list[str]:
@@ -374,66 +383,164 @@ def parse_where_expr(arg: str) -> Node | None:
     return parse_where(arg)
 
 
-def resolve_relative_time(time_str: str) -> float:
+def current_time() -> float:
+    """The instant ``now`` stands for; one place, so a test can pin it."""
+    return time.time()
+
+
+def resolve_relative_time(time_str: str, now: float | None = None) -> float:
     """Convert a Splunk relative time string to epoch seconds.
 
-    Supports ``-1h``, ``-7d``, ``-1mon``, ``@h`` snapping, ``now`` and epoch
-    literals. Units beyond ``[smhdw]`` previously returned 0.0, which read as
-    "no time filter" rather than as an error.
+    Handles the whole time-modifier grammar a dashboard uses: an offset
+    (``-1h``, ``-7d``, ``-1mon``, and the bare ``-h`` that means ``-1h``), a
+    snap to the start of a unit (``@d``, ``@mon``, ``@w1``), and further
+    offsets applied after the snap (``-1d@d+3h``). ``now`` and an epoch
+    literal are accepted as they are.
 
     Args:
         time_str: Splunk time modifier string.
+        now:      The instant to resolve against. A search resolves both of
+                  its bounds against one reading of the clock, so
+                  ``earliest=-5m latest=-5m`` names a single instant rather
+                  than a window a few microseconds wide.
 
     Returns:
         Epoch seconds as float, or 0.0 when the string cannot be understood.
     """
+    if now is None:
+        now = current_time()
     if not time_str:
         return 0.0
 
     text = time_str.strip()
     if text.lower() == "now":
-        return time.time()
+        return now
 
     try:
         return float(text)
     except ValueError:
         pass
 
-    base, _, snap = text.partition("@")
-    seconds = _relative_offset(base.strip())
-    if seconds is None:
+    head, snapped, tail = text.partition("@")
+    moment = _apply_offsets(now, head.strip())
+    if moment is None:
         return 0.0
-    return _snap(seconds, snap.strip()) if snap else seconds
+    if not snapped:
+        return moment
+
+    match = _SNAP_UNIT_RE.match(tail.strip())
+    if not match:
+        return 0.0
+    moment = _snap(moment, match.group(1))
+    if moment is None:
+        return 0.0
+    # `-1d@d+3h`: whatever follows the snap unit shifts the snapped instant.
+    return _apply_offsets(moment, tail.strip()[match.end():]) or 0.0
 
 
-_UNIT_SECONDS = {
+#: The unit right after ``@``, optionally a weekday number for ``w``.
+_SNAP_UNIT_RE = re.compile(r"([A-Za-z]+\d?)")
+
+#: One ``+1h`` / ``-30m`` term; the count defaults to 1, as ``-h`` does.
+_OFFSET_RE = re.compile(r"([+-])(\d*)([A-Za-z]+)")
+
+
+def _apply_offsets(moment: float, text: str) -> float | None:
+    """Apply every offset term in *text* to *moment*, left to right.
+
+    Returns:
+        The shifted instant, or ``None`` if *text* is not offsets.
+    """
+    if not text:
+        return moment
+    position = 0
+    while position < len(text):
+        match = _OFFSET_RE.match(text, position)
+        if not match:
+            return None
+        sign, count, unit = match.groups()
+        shifted = _shift(moment, (1 if sign == "+" else -1) * int(count or 1), unit.lower())
+        if shifted is None:
+            return None
+        moment = shifted
+        position = match.end()
+    return moment
+
+
+#: Units whose length is fixed, so a duration in seconds is exact.
+_FIXED_UNITS: dict[str, int] = {
     "s": 1, "sec": 1, "secs": 1, "second": 1, "seconds": 1,
     "m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60,
     "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600,
     "d": 86400, "day": 86400, "days": 86400,
     "w": 604800, "week": 604800, "weeks": 604800,
-    "mon": 2592000, "month": 2592000, "months": 2592000,
-    "q": 7776000, "qtr": 7776000, "quarter": 7776000,
-    "y": 31536000, "yr": 31536000, "year": 31536000, "years": 31536000,
+}
+
+#: Units that are calendar arithmetic — a month is not 30 days, and treating
+#: it as one put ``-1mon`` on a different day every month.
+_CALENDAR_MONTHS: dict[str, int] = {
+    "mon": 1, "month": 1, "months": 1,
+    "q": 3, "qtr": 3, "quarter": 3, "quarters": 3,
+    "y": 12, "yr": 12, "year": 12, "years": 12,
 }
 
 
-def _relative_offset(base: str) -> float | None:
-    if not base:
-        return time.time()
-    match = re.fullmatch(r"([+-])(\d+)([A-Za-z]+)", base)
-    if not match:
+def _shift(moment: float, amount: int, unit: str) -> float | None:
+    """Move *moment* by *amount* of *unit*, or ``None`` for an unknown unit."""
+    fixed = _FIXED_UNITS.get(unit)
+    if fixed is not None:
+        return moment + amount * fixed
+    months = _CALENDAR_MONTHS.get(unit)
+    if months is None:
         return None
-    sign, amount, unit = match.groups()
-    unit_seconds = _UNIT_SECONDS.get(unit.lower())
-    if unit_seconds is None:
-        return None
-    delta = int(amount) * unit_seconds
-    return time.time() + (delta if sign == "+" else -delta)
+    return _add_months(moment, amount * months)
 
 
-def _snap(epoch: float, unit: str) -> float:
-    unit_seconds = _UNIT_SECONDS.get(unit.lower())
-    if not unit_seconds:
-        return epoch
-    return epoch - (epoch % unit_seconds)
+def _add_months(moment: float, months: int) -> float:
+    """Add calendar months, clamping the day to the target month's length."""
+    stamp = datetime.fromtimestamp(moment, tz=UTC)
+    total = stamp.month - 1 + months
+    year = stamp.year + total // 12
+    month = total % 12 + 1
+    day = min(stamp.day, monthrange(year, month)[1])
+    return stamp.replace(year=year, month=month, day=day).timestamp()
+
+
+def _snap(moment: float, unit: str) -> float | None:
+    """Snap *moment* down to the start of *unit*, the way ``@`` does.
+
+    Splunk snaps on the calendar, not on a multiple of seconds. Modulo
+    arithmetic gets the sub-day units right by accident and everything above
+    them wrong: the epoch fell on a Thursday, so ``@w`` landed on a Thursday
+    rather than the preceding Sunday, and ``@mon`` snapped to a multiple of
+    30 days rather than to the first of the month.
+    """
+    unit = unit.lower()
+    fixed = _FIXED_UNITS.get(unit)
+    if fixed is not None and unit not in ("w", "week", "weeks"):
+        return moment - (moment % fixed)
+
+    stamp = datetime.fromtimestamp(moment, tz=UTC)
+    midnight = stamp.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    if unit in ("w", "week", "weeks") or _WEEKDAY_RE.fullmatch(unit):
+        # `@w0` is Sunday and `@w` means `@w0`; Python counts Monday as 0.
+        wanted = int(unit[1:]) if len(unit) > 1 and unit[1:].isdigit() else 0
+        current = (midnight.weekday() + 1) % 7
+        return (midnight - timedelta(days=(current - wanted) % 7)).timestamp()
+
+    months = _CALENDAR_MONTHS.get(unit)
+    if months is None:
+        # Ignoring an unreadable snap would hand back the unsnapped instant,
+        # which is a different window from the one that was asked for.
+        return None
+    if months == 12:
+        return midnight.replace(month=1, day=1).timestamp()
+    if months == 3:
+        return midnight.replace(month=(stamp.month - 1) // 3 * 3 + 1, day=1).timestamp()
+    return midnight.replace(day=1).timestamp()
+
+
+#: ``@w0`` … ``@w6`` — the weekday to snap back to.
+_WEEKDAY_RE = re.compile(r"w[0-6]")
+

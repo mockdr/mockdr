@@ -603,28 +603,32 @@ probes:
       auth: basic
 
   # ── Elasticsearch: time filters and deep paging (2.3.0) ─────────────────
-  - id: es-range-bad-date-math
-    endpoint: search
-    why: >
-      A range bound in a unit the date-math grammar has no letter for.
-      Elasticsearch names the unit in a parse_exception; accepting it would
-      apply a window the client never asked for and answer 200.
-    request:
-      method: POST
-      path: /_search
-      json: {size: 0, query: {range: {"@timestamp": {gte: now-30q}}}}
-      auth: basic
+  #
+  # A bad date-math bound is deliberately not probed here. The real target's
+  # index carries no mapping for the field, so its shard never parses the
+  # bound and answers 200; the refusal only appears on a mapped date field,
+  # which a mock without mappings cannot arrange. That behaviour is pinned by
+  # unit tests taken from 8.15 directly.
+  #
+  # The sorts below use `_doc` for the same reason: sorting on `@timestamp`
+  # against an unmapped index fails with query_shard_exception before
+  # anything under test is reached.
 
   - id: es-search-after-without-sort
     endpoint: search
     why: >
       search_after is meaningless without a sort, and Elasticsearch says so
-      rather than paging from an arbitrary point.
+      rather than paging from an arbitrary point. Shard-level, so the refusal
+      arrives wrapped in a search_phase_execution_exception.
     request:
       method: POST
-      path: /_search
+      path: /${index}/_search
       json: {size: 2, search_after: [1]}
       auth: basic
+    ignore_paths:
+      # Which shard of which index failed is the cluster's own topology.
+      - $.error.failed_shards[*].index
+      - $.error.failed_shards[*].node
 
   - id: es-search-after-length-mismatch
     endpoint: search
@@ -633,9 +637,12 @@ probes:
       client that changed its sort mid-page.
     request:
       method: POST
-      path: /_search
-      json: {size: 2, sort: [{"@timestamp": desc}], search_after: [1, 2]}
+      path: /${index}/_search
+      json: {size: 2, sort: ["_doc"], search_after: [1, 2]}
       auth: basic
+    ignore_paths:
+      - $.error.failed_shards[*].index
+      - $.error.failed_shards[*].node
 
   - id: es-sorted-search-envelope
     endpoint: search
@@ -645,11 +652,11 @@ probes:
       those values no client can page with search_after at all.
     request:
       method: POST
-      path: /_search
-      json: {size: 1, sort: [{"@timestamp": desc}]}
+      path: /${index}/_search
+      json: {size: 1, sort: ["_doc"]}
       auth: basic
     ignore_paths:
-      # Hit contents are fixture: the real cluster here is empty, mockdr is
+      # Hit contents are fixture: the real index here is empty, mockdr is
       # seeded. The envelope around them is what this probe compares.
       - $.hits.hits
       - $._shards

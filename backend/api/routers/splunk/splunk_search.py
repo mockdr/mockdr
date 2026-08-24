@@ -12,11 +12,13 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.search import (
+    InvalidTimeParameterError,
     apply_control_action,
     create_search_job,
     delete_search_job,
 )
 from application.splunk.queries.search import (
+    SearchJobFailedError,
     get_events,
     get_job,
     get_results,
@@ -77,18 +79,29 @@ async def create_job(
             {"type": "FATAL", "text": _SEARCH_REQUIRED},
         ]})
 
-    sid = create_search_job(
-        search=search,
-        earliest_time=earliest_time,
-        latest_time=latest_time,
-        exec_mode=exec_mode,
-    )
+    try:
+        sid = create_search_job(
+            search=search,
+            earliest_time=earliest_time,
+            latest_time=latest_time,
+            exec_mode=exec_mode,
+        )
+    except InvalidTimeParameterError as exc:
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "FATAL", "text": str(exc)},
+        ]}) from exc
 
     if exec_mode == "oneshot":
         # A oneshot search returns the results directly; splunklib enforces
         # this by refusing exec_mode="oneshot" in Jobs.create(). Returning a
         # sid here left the caller polling a job it was never given.
-        results = get_results(sid, count=0)
+        try:
+            results = get_results(sid, count=0)
+        except SearchJobFailedError as exc:
+            # A search that could not run answers 200 with the messages alone
+            # — no `results`, no `fields`, nothing that reads as an answer.
+            delete_search_job(sid)
+            return JSONResponse(status_code=200, content={"messages": exc.messages})
         delete_search_job(sid)
         return JSONResponse(
             status_code=200,
@@ -148,13 +161,24 @@ async def export_search(
             {"type": "FATAL", "text": _SEARCH_REQUIRED},
         ]})
 
-    sid = create_search_job(
-        search=search,
-        earliest_time=earliest_time,
-        latest_time=latest_time,
-        exec_mode="oneshot",
-    )
-    result = get_results(sid, count=0) or _EMPTY_RESULTS
+    try:
+        sid = create_search_job(
+            search=search,
+            earliest_time=earliest_time,
+            latest_time=latest_time,
+            exec_mode="oneshot",
+        )
+    except InvalidTimeParameterError as exc:
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "FATAL", "text": str(exc)},
+        ]}) from exc
+    try:
+        result = get_results(sid, count=0) or _EMPTY_RESULTS
+    except SearchJobFailedError as exc:
+        delete_search_job(sid)
+        raise HTTPException(
+            status_code=400, detail={"messages": exc.messages},
+        ) from exc
     delete_search_job(sid)
 
     if output_mode.lower() == "json":
@@ -169,7 +193,16 @@ async def export_search(
     return JSONResponse(status_code=200, content=result)
 
 
-_EMPTY_RESULTS: dict = {"results": [], "fields": [], "init_offset": 0, "messages": []}
+#: The envelope splunkd sends when a search produced no rows: no `fields`
+#: and no `highlighted`, a `post_process_count` instead, and `preview` always
+#: present (measured against Splunk 10).
+_EMPTY_RESULTS: dict = {
+    "preview": False,
+    "init_offset": 0,
+    "messages": [],
+    "results": [],
+    "post_process_count": 0,
+}
 
 
 def _export_lines(result: dict) -> Iterator[str]:
@@ -256,7 +289,12 @@ def get_job_results(
 ) -> dict:
     """Get transformed search results."""
     count = min(count, 10_000) if count > 0 else 0
-    result = get_results(sid, count, offset)
+    try:
+        result = get_results(sid, count, offset)
+    except SearchJobFailedError as exc:
+        raise HTTPException(
+            status_code=400, detail={"messages": exc.messages},
+        ) from exc
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
             {"type": "FATAL", "text": "Unknown sid."},
@@ -277,7 +315,12 @@ def get_job_events(
 ) -> dict:
     """Get raw events from search job."""
     count = min(count, 10_000) if count > 0 else 0
-    result = get_events(sid, count, offset)
+    try:
+        result = get_events(sid, count, offset)
+    except SearchJobFailedError as exc:
+        raise HTTPException(
+            status_code=400, detail={"messages": exc.messages},
+        ) from exc
     if result is None:
         raise HTTPException(status_code=404, detail={"messages": [
             {"type": "FATAL", "text": "Unknown sid."},

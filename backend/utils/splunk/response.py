@@ -233,15 +233,28 @@ def build_search_results(
 
     Returns:
         Search results envelope dict.
+
+    The envelope splunkd sends depends on whether there are rows: a page with
+    results carries ``fields`` and ``highlighted``, an empty one carries
+    ``post_process_count`` instead and neither of those. ``preview`` is always
+    there and always false for a finished search — splunklib's
+    ``JSONResultsReader`` asserts on it, and it was absent here entirely.
     """
-    if fields is None:
-        fields = list(results[0].keys()) if results else []
-    return {
-        "results": [_render_row(row) for row in results],
-        "fields": [{"name": f} for f in fields],
+    rendered = [_render_row(row) for row in results]
+    envelope: dict = {
+        "preview": False,
         "init_offset": init_offset,
         "messages": messages or [],
+        "results": rendered,
     }
+    if rendered:
+        if fields is None:
+            fields = list(results[0].keys())
+        envelope["fields"] = [{"name": f} for f in fields]
+        envelope["highlighted"] = {}
+    else:
+        envelope["post_process_count"] = 0
+    return envelope
 
 
 def _render_row(row: dict) -> dict:

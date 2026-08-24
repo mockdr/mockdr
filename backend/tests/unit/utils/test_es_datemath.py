@@ -308,3 +308,53 @@ class TestMissingValueOrdering:
     def test_missing_first_ascending(self) -> None:
         spec = [{"@timestamp": {"order": "asc", "missing": "_first"}}]
         assert self._ordered(spec) == ["none", "old", "new"]
+
+
+class TestMalformedRanges:
+    """What Elasticsearch refuses, and by which name.
+
+    ``{"range": {"a": null}}`` reached the fuzzer and raised AttributeError
+    out of the handler as a 500 — which an Elasticsearch client cannot tell
+    apart from the cluster falling over.
+    """
+
+    @pytest.mark.parametrize(("clause", "es_type", "reason"), [
+        ({"range": {"a": None}}, "illegal_argument_exception",
+         "field name is null or empty"),
+        ({"range": {}}, "illegal_argument_exception",
+         "field name is null or empty"),
+        ({"range": {"a": "x"}}, "parsing_exception",
+         "[range] query does not support [a]"),
+        ({"range": {"a": [1, 2]}}, "parsing_exception",
+         "[range] query does not support [a]"),
+        ({"range": {"a": {}, "b": {}}}, "parsing_exception",
+         "[range] query doesn't support multiple fields, found [a] and [b]"),
+    ])
+    def test_a_malformed_range_is_refused_by_name(
+        self, clause: dict, es_type: str, reason: str,
+    ) -> None:
+        with pytest.raises(ESQueryError) as caught:
+            build_predicate(clause)
+        assert str(caught.value) == reason
+        assert caught.value.es_type == es_type
+        # Parsing happens on the coordinating node, so these come back flat
+        # rather than wrapped in a search_phase_execution_exception.
+        assert not caught.value.shard_failure
+
+    def test_a_null_bound_matches_nothing(self) -> None:
+        # It used to compare as the string "None" and match about half the
+        # index; Elasticsearch answers 200 with no hits.
+        assert names({"range": {"@timestamp": {"gte": None}}}) == []
+
+    @pytest.mark.parametrize("clause", [
+        {"range": {"@timestamp": {"gte": "now-30q"}}},
+    ])
+    def test_a_shard_level_failure_is_marked_as_one(self, clause: dict) -> None:
+        with pytest.raises(ESQueryError) as caught:
+            build_predicate(clause)
+        assert caught.value.shard_failure
+
+    def test_search_after_failures_are_shard_level_too(self) -> None:
+        with pytest.raises(ESQueryError) as caught:
+            validate_search_body({"search_after": [1]})
+        assert caught.value.shard_failure
