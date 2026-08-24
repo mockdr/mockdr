@@ -146,3 +146,85 @@ def _as_number(value: str | None, default: float | None) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+#: The Detection Rules API validates with zod rather than io-ts, so it words
+#: everything differently and reports its fields in this order.
+_RULE_FIELD_ORDER: tuple[str, ...] = ("sort_field", "sort_order", "page", "per_page")
+
+#: What that endpoint will sort by. Both spellings of several fields are
+#: allowed, which is a hint at how long it has been carrying them.
+RULE_SORT_FIELDS: tuple[str, ...] = (
+    "created_at", "createdAt", "enabled",
+    "execution_summary.last_execution.date",
+    "execution_summary.last_execution.metrics.execution_gap_duration_s",
+    "execution_summary.last_execution.metrics.total_indexing_duration_ms",
+    "execution_summary.last_execution.metrics.total_search_duration_ms",
+    "execution_summary.last_execution.status",
+    "name", "risk_score", "riskScore", "severity", "updated_at", "updatedAt",
+)
+
+RULE_SORT_ORDERS: tuple[str, ...] = ("asc", "desc")
+
+#: The lower bound each numeric parameter has there.
+_RULE_MINIMUMS: dict[str, int] = {"page": 1, "per_page": 0}
+
+#: The message the route raises after the schema has passed, when only one of
+#: the sort pair was given. It travels in an envelope of its own.
+SORT_PAIR_MESSAGE = 'when "sort_order" and "sort_field" must exist together or not at all'
+
+
+class RulesQueryError(ValueError):
+    """Raised when a rules ``_find`` query is not one Kibana would run.
+
+    ``sort_pair`` marks the one failure that arrives in a different envelope:
+    the schema's errors come back as Kibana's usual ``statusCode``/``error``
+    object, while this one is ``{"message": [...], "status_code": 400}``.
+    """
+
+    def __init__(self, message: str, *, sort_pair: bool = False) -> None:
+        """Record the message and which envelope carries it."""
+        super().__init__(message)
+        self.sort_pair = sort_pair
+
+
+def _enum_problem(field: str, value: str, allowed: tuple[str, ...]) -> str:
+    """Zod's wording for a value outside an enum, listing what it takes."""
+    expected = " | ".join(f"'{option}'" for option in allowed)
+    return f"{field}: Invalid enum value. Expected {expected}, received '{value}'"
+
+
+def validate_rules_find_query(params: Mapping[str, str]) -> None:
+    """Refuse a rules ``_find`` query the way the Detection Rules API does.
+
+    ``sort_order=sideways`` and a lone ``sort_field`` both came back as 200
+    here: the first sorted the other way round without saying so, the second
+    is a pairing Kibana refuses outright.
+
+    Raises:
+        RulesQueryError: Carrying Kibana's own message.
+    """
+    problems: list[str] = []
+    for field in _RULE_FIELD_ORDER:
+        value = params.get(field)
+        if value is None:
+            continue
+        if field == "sort_field" and value not in RULE_SORT_FIELDS:
+            problems.append(_enum_problem(field, value, RULE_SORT_FIELDS))
+        elif field == "sort_order" and value not in RULE_SORT_ORDERS:
+            problems.append(_enum_problem(field, value, RULE_SORT_ORDERS))
+        elif field in _RULE_MINIMUMS:
+            number = _as_number(value, None)
+            if number is None:
+                problems.append(f"{field}: Expected number, received nan")
+            elif number < _RULE_MINIMUMS[field]:
+                problems.append(
+                    f"{field}: Number must be greater than or equal to "
+                    f"{_RULE_MINIMUMS[field]}",
+                )
+    if problems:
+        raise RulesQueryError("[request query]: " + ", ".join(problems))
+
+    # Checked by the route itself, once the schema is satisfied.
+    if bool(params.get("sort_field")) != bool(params.get("sort_order")):
+        raise RulesQueryError(SORT_PAIR_MESSAGE, sort_pair=True)

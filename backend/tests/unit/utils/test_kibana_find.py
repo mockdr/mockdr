@@ -8,7 +8,12 @@ something else entirely.
 """
 import pytest
 
-from utils.kibana_find import FindQueryError, validate_find_query
+from utils.kibana_find import (
+    FindQueryError,
+    RulesQueryError,
+    validate_find_query,
+    validate_rules_find_query,
+)
 
 
 def refuse(**params: str) -> str:
@@ -135,3 +140,71 @@ class TestAcceptedQueries:
     ])
     def test_a_usable_query_passes(self, params: dict) -> None:
         validate_find_query(params)
+
+
+class TestRulesFindQuery:
+    """The Detection Rules API validates with zod, and words it differently.
+
+    Measured against Kibana 8.15. `sort_order=sideways` came back 200 here,
+    sorted the other way round without saying so, and a `sort_field` without
+    its `sort_order` — a pairing Kibana refuses outright — came back 200 too.
+    """
+
+    def refuse(self, **params: str) -> RulesQueryError:
+        with pytest.raises(RulesQueryError) as caught:
+            validate_rules_find_query(params)
+        return caught.value
+
+    def test_a_number_below_its_minimum(self) -> None:
+        assert str(self.refuse(page="0")) == (
+            "[request query]: page: Number must be greater than or equal to 1"
+        )
+        assert str(self.refuse(per_page="-1")) == (
+            "[request query]: per_page: Number must be greater than or equal to 0"
+        )
+
+    def test_a_number_that_is_not_one(self) -> None:
+        assert str(self.refuse(page="bad")) == (
+            "[request query]: page: Expected number, received nan"
+        )
+
+    def test_an_enum_lists_what_it_takes(self) -> None:
+        message = str(self.refuse(sort_order="sideways"))
+        assert message == (
+            "[request query]: sort_order: Invalid enum value. "
+            "Expected 'asc' | 'desc', received 'sideways'"
+        )
+
+    def test_the_sort_field_enum_carries_every_spelling(self) -> None:
+        message = str(self.refuse(sort_field="nope"))
+        assert "'created_at' | 'createdAt' | 'enabled'" in message
+        assert "'risk_score' | 'riskScore'" in message
+        assert message.endswith("received 'nope'")
+
+    def test_several_problems_are_joined_in_the_schemas_order(self) -> None:
+        message = str(self.refuse(page="0", per_page="-1"))
+        assert message == (
+            "[request query]: page: Number must be greater than or equal to 1, "
+            "per_page: Number must be greater than or equal to 0"
+        )
+        joined = str(self.refuse(sort_order="bad", per_page="-1"))
+        assert joined.index("sort_order") < joined.index("per_page")
+
+    def test_the_sort_pair_must_be_whole(self) -> None:
+        for params in ({"sort_field": "name"}, {"sort_order": "asc"}):
+            error = self.refuse(**params)
+            assert str(error) == (
+                'when "sort_order" and "sort_field" must exist together or not at all'
+            )
+            # It travels in an envelope of its own, not the schema's.
+            assert error.sort_pair
+
+    def test_a_whole_pair_passes(self) -> None:
+        validate_rules_find_query({"sort_field": "name", "sort_order": "asc"})
+
+    @pytest.mark.parametrize("params", [
+        {}, {"page": "2", "per_page": "50"}, {"nosuchparam": "1"}, {"per_page": "101"},
+    ])
+    def test_what_this_endpoint_does_accept(self, params: dict) -> None:
+        # Unlike the Cases API, it takes an unknown key and has no page cap.
+        validate_rules_find_query(params)

@@ -6,12 +6,13 @@ CRUD, find, bulk actions, tags, and prepackaged status.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_rules import commands as rule_commands
 from application.es_rules import queries as rule_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_find import RulesQueryError, validate_rules_find_query
 
 _RULE_TYPES = frozenset({
     "eql", "query", "saved_query", "threshold", "threat_match", "machine_learning",
@@ -176,34 +177,38 @@ _ALLOWED_SORT_FIELDS = {
 
 @router.get("/api/detection_engine/rules/_find")
 def find_rules(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=0, le=1000),
+    request: Request,
+    # Untyped on purpose: FastAPI's own 422 would pre-empt the zod wording
+    # this endpoint answers with, which is what a client parses.
+    page: str = Query("1"),
+    per_page: str = Query("20"),
     sort_field: str = Query(None),
-    sort_order: str = Query("asc"),
+    sort_order: str = Query(None),
     filter: str = Query(None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Find detection rules with optional filtering and pagination."""
-    if sort_field is not None and sort_field not in _SORTABLE:
-        # zod's enum message, verbatim (measured on 8.15).
+    """Find detection rules with optional filtering and pagination.
+
+    This endpoint validates with zod, not the io-ts the Cases API uses, so it
+    words everything differently — and it refuses a `sort_field` without a
+    `sort_order` in an envelope of its own. Both used to come back 200: the
+    first sorted the other way round without saying so.
+    """
+    try:
+        validate_rules_find_query(request.query_params)
+    except RulesQueryError as exc:
+        if exc.sort_pair:
+            raise HTTPException(status_code=400, detail={
+                "message": [str(exc)], "status_code": 400,
+            }) from exc
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
-            400, "[request query]: sort_field: Invalid enum value. Expected "
-            + " | ".join(f"'{f}'" for f in _SORTABLE) + f", received '{sort_field}'",
-        ))
-    if sort_field and sort_field not in _ALLOWED_SORT_FIELDS:
-        raise HTTPException(
-            status_code=400,
-            detail=build_security_solution_error(
-                400,
-                f"Invalid sort_field '{sort_field}'. "
-                f"Allowed: {', '.join(sorted(_ALLOWED_SORT_FIELDS))}",
-            ),
-        )
+            400, str(exc),
+        )) from exc
     return rule_queries.find_rules(
-        page=page,
-        per_page=per_page,
+        page=int(float(page)),
+        per_page=int(float(per_page)),
         sort_field=sort_field,
-        sort_order=sort_order,
+        sort_order=sort_order or "asc",
         filter_str=filter,
     )
 
