@@ -44,15 +44,20 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
             out[key] = _blank(template)
             continue
         value = actual[key]
-        if isinstance(value, dict) and isinstance(template, dict):
+        # `type() is` rather than isinstance: a completed list page runs this
+        # for every field of every item, and the values are plain JSON types.
+        if type(value) is dict and type(template) is dict:
             out[key] = deep_complete(template, value)
         elif (
-            isinstance(value, list)
-            and isinstance(template, list)
+            type(value) is list
+            and type(template) is list
             and template
-            and isinstance(template[0], dict)
+            and type(template[0]) is dict
         ):
-            out[key] = [deep_complete(template[0], i) if isinstance(i, dict) else i for i in value]
+            item_template = template[0]
+            out[key] = [
+                deep_complete(item_template, i) if type(i) is dict else i for i in value
+            ]
         elif value is None and isinstance(template, (dict, list)):
             # The product answers an object of nulls, not a null object
             # (``containerInfo: {"id": null, …}``), so keep the declared shape.
