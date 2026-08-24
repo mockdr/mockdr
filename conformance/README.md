@@ -55,6 +55,10 @@ than their skeletons. The fields that belong to the instance rather than to
 the API — bucket ids, index times, the server's own name — are listed under
 `volatile_fields` in the probe file and dropped before the comparison.
 
+A `compare: values` probe against a body that is *not* JSON — Splunk's CSV —
+compares the text as it arrived. `ignore_leading_lines` drops a preamble that
+is not an answer; one case needs it, and says so on the probe.
+
 A seeded probe has to establish its own row order: the order splunkd returns
 raw events in is a property of how they landed in buckets, not something it
 documents. `| sort <field>` before the command under test is enough.

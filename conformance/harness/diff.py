@@ -63,6 +63,10 @@ class Response:
     #: Set when the body was not JSON, so the harness can say so rather than
     #: silently comparing two empty skeletons and reporting agreement.
     body_error: str = ""
+    #: The body as it arrived. A `compare: values` probe against a response
+    #: that is not JSON — Splunk's CSV — has nothing else to compare, and
+    #: comparing the parsed body would agree that two `None`s are equal.
+    text: str = ""
 
 
 def _ignored(path: str, ignore_paths: tuple[str, ...]) -> bool:
@@ -121,6 +125,7 @@ def compare_values(
     real: Response,
     volatile: frozenset[str],
     why: str = "",
+    ignore_leading_lines: int = 0,
 ) -> list[Finding]:
     """Compare two seeded responses member for member.
 
@@ -134,6 +139,22 @@ def compare_values(
         findings.append(Finding(
             probe_id, "status", "$", str(mock.status), str(real.status), why,
         ))
+    if mock.body_error or real.body_error:
+        # Not JSON on one side or both: compare what actually arrived, or the
+        # probe would agree that two unparsed bodies are equal.
+        if mock.body_error != real.body_error:
+            findings.append(Finding(
+                probe_id, "type", "$",
+                mock.body_error or "json", real.body_error or "json", why,
+            ))
+        else:
+            mock_text = _drop_lines(mock.text, ignore_leading_lines)
+            real_text = _drop_lines(real.text, ignore_leading_lines)
+            if mock_text != real_text:
+                findings.append(Finding(
+                    probe_id, "value", "$", mock_text[:600], real_text[:600], why,
+                ))
+        return findings
     mock_body = json.dumps(strip_volatile(mock.body, volatile), sort_keys=True)
     real_body = json.dumps(strip_volatile(real.body, volatile), sort_keys=True)
     if mock_body != real_body:
@@ -141,6 +162,11 @@ def compare_values(
             probe_id, "value", "$", mock_body[:600], real_body[:600], why,
         ))
     return findings
+
+
+def _drop_lines(text: str, count: int) -> str:
+    """Drop *count* lines from the top, for a preamble that is not an answer."""
+    return text.split("\n", count)[-1] if count else text
 
 
 def compare(

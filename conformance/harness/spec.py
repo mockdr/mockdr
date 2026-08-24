@@ -94,6 +94,11 @@ class Probe:
     #: alongside ``needs_seed``: with both targets holding the same events,
     #: the rows themselves are the behaviour under test.
     compare_values: bool = False
+    #: Drop this many lines from the top of a text body before comparing it.
+    #: One case needs it: splunkd puts a line before a oneshot's CSV that is
+    #: empty on one run and a single space on the next — its own streaming,
+    #: not an answer. Everything below it is compared.
+    ignore_leading_lines: int = 0
 
 
 @dataclass(frozen=True)
@@ -220,6 +225,7 @@ def load_spec(path: Path) -> PlatformSpec:
             ignore_paths=tuple(entry.get("ignore_paths") or ()),
             needs_seed=bool(entry.get("needs_seed", False)),
             compare_values=str(entry.get("compare", "shape")) == "values",
+            ignore_leading_lines=int(entry.get("ignore_leading_lines", 0)),
         ))
 
     ids = [p.id for p in probes]

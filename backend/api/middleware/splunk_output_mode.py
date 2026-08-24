@@ -21,6 +21,7 @@ from xml.sax.saxutils import escape
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from api.middleware.json_rewrite import rewrite_json_body
+from utils.splunk.csv_output import render_splunk_csv
 from utils.splunk.xml_output import render_splunk_xml
 
 _SPLUNK_PREFIX = "/splunk"
@@ -39,11 +40,24 @@ _FORM_TYPE = b"application/x-www-form-urlencoded"
 #: 10.4.2).
 _KNOWN_OUTPUT_MODES = frozenset({"json", "xml", "csv", "atom", "raw"})
 
-#: What this mock renders. `csv` is the one deliberate gap: splunkd serves it
-#: for the job collection alone, and rendering a collection as CSV — column
-#: order and quoting included — is a format this mock has no other use for.
-#: Every other endpoint refuses it there too, in these same words.
-_OUTPUT_MODES = frozenset({"json", "xml"})
+#: What this mock renders.
+_OUTPUT_MODES = frozenset({"json", "xml", "csv"})
+
+#: Where `output_mode=csv` is answered rather than refused: a job's results
+#: and events, the job itself, and the job collection. Every other endpoint
+#: refuses it, in splunkd's own words for a mode it knows but will not serve
+#: there (all measured on 10.4.2).
+_CSV_COLLECTION = "/splunk/services/search/jobs"
+
+#: The `events` endpoint sorts its columns by name; `results` keeps the order
+#: the search produced, and a job entry keeps splunkd's own key order — which
+#: is neither, and not derivable from outside, so mockdr keeps its own.
+_CSV_SORTED_SUFFIX = "/events"
+
+#: A oneshot search puts a line for its messages before the header: empty
+#: when it produced none, a single space when it did. A job's own `/results`
+#: has no such line (measured on 10.4.2).
+_CSV_MESSAGE_LINE = {True: " \n", False: "\n"}
 
 #: A collection sorts one way or the other. mockdr took any word and sorted
 #: the default way without saying so.
@@ -109,17 +123,28 @@ class SplunkOutputModeMiddleware:
         if refusal is not None:
             await _send_refusal(send, *refusal)
             return
-        wants_json = _values(query, "output_mode").lower() == "json"
+        mode = _values(query, "output_mode").lower()
+        wants_json = mode == "json"
         if not wants_json and _is_form_post(scope):
             # splunklib's post() puts every parameter, output_mode included,
             # into the form body; reading only the query string rendered every
             # SDK form POST as Atom XML. The body is replayed to the route.
             body, receive = await _buffered_body(receive)
             form = parse_qs(body.decode("latin-1"))
-            wants_json = _values(form, "output_mode").lower() == "json"
+            mode = _values(form, "output_mode").lower() or mode
+            wants_json = mode == "json"
 
         if wants_json:
             await self.app(scope, receive, send)
+            return
+
+        if mode == "csv":
+            oneshot = scope.get("method") == "POST" and path.rstrip("/") == _CSV_COLLECTION
+            await rewrite_json_body(
+                self.app, scope, receive, send,
+                claims=lambda status, _headers: status < 400,
+                rewrite=lambda payload: _csv_body(payload, path, oneshot=oneshot),
+            )
             return
 
         def claims(status: int, _headers: dict[bytes, bytes]) -> bool:
@@ -149,7 +174,10 @@ def _refusal(
     collection raises and ERROR for the rest.
     """
     modes = query.get("output_mode")
-    if modes is not None and modes[0].lower() not in _OUTPUT_MODES:
+    if modes is not None and (
+        modes[0].lower() not in _OUTPUT_MODES
+        or (modes[0].lower() == "csv" and not _serves_csv(path))
+    ):
         if modes[0].lower() in _KNOWN_OUTPUT_MODES:
             return (
                 f"Output mode '{modes[0]}' is not supported for this endpoint.",
@@ -199,6 +227,29 @@ async def _send_refusal(
                     (b"content-length", str(len(body)).encode())],
     })
     await send({"type": "http.response.body", "body": body})
+
+
+def _csv_body(payload: object, path: str, *, oneshot: bool) -> tuple[bytes, str]:
+    """The CSV document for this response, and the type splunkd sends with it.
+
+    A oneshot search always answers as CSV, behind a line for its messages,
+    even when it matched nothing. A job's own ``/results`` has no such line,
+    and comes back empty as ``text/plain`` when there is nothing to render.
+    """
+    document = render_splunk_csv(
+        payload, sort_columns=path.rstrip("/").endswith(_CSV_SORTED_SUFFIX),
+    )
+    if oneshot:
+        messages = bool((payload or {}).get("messages")) if isinstance(payload, dict) else False
+        return (_CSV_MESSAGE_LINE[messages] + document).encode(), "text/csv; charset=UTF-8"
+    if not document:
+        return b"", "text/plain; charset=UTF-8"
+    return document.encode(), "text/csv; charset=UTF-8"
+
+
+def _serves_csv(path: str) -> bool:
+    """Whether this endpoint answers `output_mode=csv` at all."""
+    return path.rstrip("/").startswith(_CSV_COLLECTION)
 
 
 def _values(query: dict[str, list[str]], name: str) -> str:

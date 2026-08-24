@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+**`output_mode=csv`, where splunkd serves it.** 2.3.0 refused it everywhere,
+in splunkd's own words for a mode a handler will not serve — right for most
+endpoints and wrong for the four that do serve it: a job's `results` and
+`events`, the job itself, and the job collection. The quoting is splunkd's,
+not RFC 4180's: a token is written bare only when it is purely alphanumeric,
+so `ok` and `42` are bare while `1.5`, `a-b`, `a b` and `a:b` are quoted, and
+a multivalue field becomes one quoted cell whose members are separated by
+newlines. A field a row has no value for is empty rather than `""`. Measured
+against Splunk 10.4.2, and four seeded probes compare the bytes.
+
+### Fixed
+
+**A probe that could not fail.** `compare: values` parsed both bodies as
+JSON, so two CSV documents both became `None` and every csv probe agreed with
+itself — coverage that measured nothing. It compares the text when the body
+is not JSON, and `ignore_leading_lines` accounts for the one preamble splunkd
+writes non-deterministically (empty on one run, a single space on the next).
+Verified by breaking the quoting rule on purpose and watching the probes
+catch it.
+
 ## [2.3.0] - 2026-08-24
 
 ### Fixed

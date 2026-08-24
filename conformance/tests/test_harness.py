@@ -411,3 +411,55 @@ class TestSeededProbesLoad:
         spec = load_spec(ROOT / "probes" / "splunk.yaml")
         assert "_bkt" in spec.volatile_fields
         assert "splunk_server" in spec.volatile_fields
+
+
+class TestSeededTextComparison:
+    """A seeded probe against a body that is not JSON — Splunk's CSV.
+
+    The first version of `compare_values` parsed both bodies as JSON, so two
+    unparsed CSV documents both became `None` and every csv probe agreed with
+    itself. A probe that cannot fail is worse than no probe: it reads as
+    coverage.
+    """
+
+    VOLATILE = frozenset({"_bkt"})
+
+    def _csv(self, text: str) -> Response:
+        return Response(200, {"content-type": "text/csv"}, None, "non-json (text/csv)", text)
+
+    def test_two_different_csv_bodies_are_a_finding(self) -> None:
+        findings = compare_values(
+            "p", self._csv("a\n1\n"), self._csv("a\n2\n"), self.VOLATILE,
+        )
+        assert [f.kind for f in findings] == ["value"]
+
+    def test_two_identical_csv_bodies_are_not(self) -> None:
+        assert compare_values(
+            "p", self._csv("a\n1\n"), self._csv("a\n1\n"), self.VOLATILE,
+        ) == []
+
+    def test_one_side_answering_json_is_a_type_finding(self) -> None:
+        json_side = Response(200, {}, {"a": 1}, "", '{"a": 1}')
+        findings = compare_values("p", self._csv("a\n1\n"), json_side, self.VOLATILE)
+        assert [f.kind for f in findings] == ["type"]
+
+    def test_a_leading_line_can_be_left_out(self) -> None:
+        # splunkd puts a line before a oneshot's CSV that is empty on one run
+        # and a single space on the next.
+        assert compare_values(
+            "p", self._csv("\na\n1\n"), self._csv(" \na\n1\n"), self.VOLATILE,
+            ignore_leading_lines=1,
+        ) == []
+
+    def test_leaving_it_out_does_not_hide_the_rest(self) -> None:
+        findings = compare_values(
+            "p", self._csv("\na\n1\n"), self._csv(" \na\n2\n"), self.VOLATILE,
+            ignore_leading_lines=1,
+        )
+        assert [f.kind for f in findings] == ["value"]
+
+    def test_the_probe_file_declares_why_it_skips_one(self) -> None:
+        spec = load_spec(ROOT / "probes" / "splunk.yaml")
+        skipping = [p for p in spec.probes if p.ignore_leading_lines]
+        assert skipping, "the csv probes should skip splunkd's preamble"
+        assert all(p.compare_values for p in skipping)

@@ -1421,3 +1421,136 @@ probes:
     ignore_paths:
       - $.entry
       - $.paging
+
+  # ── output_mode=csv, where splunkd serves it (2.3.1) ───────────────────
+  #
+  # It is real, but only on four paths: a job's results and events, the
+  # job itself, and the job collection. mockdr refused it everywhere.
+  # The rows and the quoting are compared with the seeded probes below;
+  # these check who answers at all.
+
+  - id: splunk-csv-job-collection
+    endpoint: management
+    why: >
+      The job collection is one of the four that answer as CSV.
+      Compared for status and type: the column order is splunkd's own
+      key order, which is not derivable from outside.
+    ignore_paths:
+      - $
+    request:
+      method: GET
+      path: /services/search/jobs
+      query: {output_mode: csv, count: "1"}
+      auth: basic
+
+  - id: splunk-csv-refused-saved-searches
+    endpoint: management
+    why: >
+      Everywhere but those four, csv is a mode splunkd knows and will
+      not serve here — a different message and severity from a mode it
+      does not know at all.
+    request:
+      method: GET
+      path: /services/saved/searches
+      query: {output_mode: csv}
+      auth: basic
+
+  - id: splunk-csv-refused-indexes
+    endpoint: management
+    why: >
+      Everywhere but those four, csv is a mode splunkd knows and will
+      not serve here — a different message and severity from a mode it
+      does not know at all.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: csv}
+      auth: basic
+
+  - id: splunk-csv-refused-users
+    endpoint: management
+    why: >
+      Everywhere but those four, csv is a mode splunkd knows and will
+      not serve here — a different message and severity from a mode it
+      does not know at all.
+    request:
+      method: GET
+      path: /services/authentication/users
+      query: {output_mode: csv}
+      auth: basic
+
+  - id: splunk-csv-refused-hec-inputs
+    endpoint: management
+    why: >
+      Everywhere but those four, csv is a mode splunkd knows and will
+      not serve here — a different message and severity from a mode it
+      does not know at all.
+    request:
+      method: GET
+      path: /services/data/inputs/http
+      query: {output_mode: csv}
+      auth: basic
+
+  - id: splunk-csv-seeded-table
+    endpoint: management
+    needs_seed: true
+    compare: values
+    # splunkd puts a line before a oneshot's CSV that is empty on one run and
+    # a single space on the next — its own streaming, not an answer.
+    ignore_leading_lines: 1
+    why: >
+      The rows and the quoting: a value is written bare only when it is purely alphanumeric.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | sort sev | table sev, user&output_mode=csv&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-csv-seeded-stats
+    endpoint: management
+    needs_seed: true
+    compare: values
+    # splunkd puts a line before a oneshot's CSV that is empty on one run and
+    # a single space on the next — its own streaming, not an answer.
+    ignore_leading_lines: 1
+    why: >
+      A group-by rendered as CSV.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | stats count by host&output_mode=csv&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-csv-seeded-quoting
+    endpoint: management
+    needs_seed: true
+    compare: values
+    # splunkd puts a line before a oneshot's CSV that is empty on one run and
+    # a single space on the next — its own streaming, not an answer.
+    ignore_leading_lines: 1
+    why: >
+      A comma, a dot and a plain word in one row — three different quoting decisions.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | head 1 | eval c="a,b", q="x", d="1.5", plain="ok" | table c, q, d, plain&output_mode=csv&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-csv-seeded-top
+    endpoint: management
+    needs_seed: true
+    compare: values
+    # splunkd puts a line before a oneshot's CSV that is empty on one run and
+    # a single space on the next — its own streaming, not an answer.
+    ignore_leading_lines: 1
+    why: >
+      top's generated columns, including the quoted _tc.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | top action&output_mode=csv&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic

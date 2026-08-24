@@ -96,7 +96,7 @@ def _send(
         # answers JSON is itself a finding, and the most interesting one.
         body_error = f"non-json ({headers.get('content-type', 'unknown')})"
 
-    return Response(response.status_code, headers, body, body_error)
+    return Response(response.status_code, headers, body, body_error, response.text)
 
 
 def _needs_context(probe: Probe) -> bool:
@@ -182,6 +182,7 @@ def run_platform(
                     findings.extend(compare_values(
                         probe.id, responses["mock"], responses["real"],
                         spec.volatile_fields, probe.why,
+                        probe.ignore_leading_lines,
                     ))
                 else:
                     findings.extend(compare(
