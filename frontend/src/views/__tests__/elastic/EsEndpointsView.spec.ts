@@ -74,7 +74,7 @@ describe('EsEndpointsView', () => {
       global: { plugins: [router], stubs: STUBS },
     })
     await flushPromises()
-    expect(esEndpointsApi.list).toHaveBeenCalledWith({ page: 1, per_page: 25 })
+    expect(esEndpointsApi.list).toHaveBeenCalledWith({ page: 0, pageSize: 25 })
   })
 
   it('displays loaded endpoint hostnames after mount', async () => {
@@ -151,7 +151,7 @@ describe('EsEndpointsView', () => {
     vi.mocked(esEndpointsApi.list).mockClear()
     await (wrapper.vm as any).fetchEndpoints(2)
     await flushPromises()
-    expect(esEndpointsApi.list).toHaveBeenCalledWith({ page: 2, per_page: 25 })
+    expect(esEndpointsApi.list).toHaveBeenCalledWith({ page: 1, pageSize: 25 })
   })
 
   it('fetchEndpoints sets loading to false after success', async () => {

@@ -96,7 +96,7 @@ async function fetchAll(): Promise<void> {
   error.value = ''
   try {
     const [epRes, rulesRes, alertsRes, casesRes] = await Promise.all([
-      esEndpointsApi.list({ per_page: 50 }),
+      esEndpointsApi.list({ pageSize: 50 }),
       esRulesApi.find({ per_page: 50 }),
       esAlertsApi.search({ query: { match_all: {} }, size: 50 }),
       esCasesApi.find({ per_page: 1 }),

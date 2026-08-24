@@ -20,7 +20,12 @@ from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
 from application.es_exception_lists import queries as exception_queries
 from application.es_rules import queries as rule_queries
-from utils.es_response import build_security_solution_error
+from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_validation import (
+    ENDPOINT_ACTION_STATUS_QUERY,
+    ConfigSchemaError,
+    validate_config_schema,
+)
 
 router = APIRouter(tags=["Kibana Security Extras"])
 
@@ -452,10 +457,24 @@ def exception_list_summary(
 
 @router.get("/api/endpoint/action_status")
 def endpoint_action_status(
+    request: Request,
     agent_ids: str = Query(default="", alias="agent_ids"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Report how many actions are still pending per agent."""
+    """Report how many actions are still pending per agent.
+
+    `agent_ids` is required: without it Kibana refuses the request, where
+    mockdr answered with an empty list — which reads as "nothing pending".
+    """
+    try:
+        validate_config_schema(
+            {k: request.query_params.getlist(k) for k in request.query_params},
+            ENDPOINT_ACTION_STATUS_QUERY, where="request query", from_query=True,
+        )
+    except ConfigSchemaError as exc:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, str(exc),
+        )) from exc
     wanted = [a.strip() for a in agent_ids.split(",") if a.strip()]
 
     data = []

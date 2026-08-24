@@ -6,12 +6,18 @@ detail, and response actions (isolate, unisolate, kill process, scan).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_validation import (
+    ENDPOINT_ACTION_BODY,
+    ENDPOINT_METADATA_QUERY,
+    ConfigSchemaError,
+    validate_config_schema,
+)
 
 #: Kibana's config-schema wording for a missing array (measured on 8.15).
 _NO_ENDPOINT_IDS = "[request body.endpoint_ids]: expected value of type [array] but got [undefined]"
@@ -24,28 +30,37 @@ router = APIRouter(tags=["Elastic Endpoints"])
 
 @router.get("/api/endpoint/metadata")
 def list_endpoints(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(None, ge=1, le=1000, alias="pageSize"),
-    per_page: int = Query(20, ge=1, le=1000),
-    hostname: str = Query(None),
-    host_os_name: str = Query(None),
-    agent_status: str = Query(None),
-    policy_id: str = Query(None),
+    request: Request,
+    # Untyped on purpose: FastAPI's own 422 would pre-empt the wording this
+    # schema answers with.
+    page: str = Query("0"),
+    page_size: str = Query("10", alias="pageSize"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """List all managed endpoints with optional filtering.
+    """List all managed endpoints.
 
-    Kibana spells the page size ``pageSize`` on this endpoint; ``per_page`` is
-    accepted too so callers written against mockdr's earlier spelling keep
-    working.
+    The query is validated against Kibana's own schema, which is a fourth
+    dialect again (@kbn/config-schema): it names the member in the bracket,
+    stops at the first failure, and refuses a key it has no definition for.
+    mockdr took four filters Kibana does not declare and a `per_page` it
+    spells `pageSize`, so a client written here sent a query the real one
+    refuses.
+
+    `page` counts from 0, which is what its schema minimum says; whether the
+    first page is 0 or 1 cannot be checked against a Basic licence, because
+    the endpoint list needs Enterprise before it returns any data.
     """
+    try:
+        validate_config_schema(
+            request.query_params, ENDPOINT_METADATA_QUERY,
+            where="request query", from_query=True,
+        )
+    except ConfigSchemaError as exc:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, str(exc),
+        )) from exc
     return endpoint_queries.list_endpoints(
-        page=page,
-        per_page=page_size if page_size is not None else per_page,
-        hostname=hostname,
-        host_os_name=host_os_name,
-        agent_status=agent_status,
-        policy_id=policy_id,
+        page=int(float(page)) + 1, per_page=int(float(page_size)),
     )
 
 
@@ -75,6 +90,7 @@ def isolate_endpoint(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Isolate an endpoint from the network."""
+    _validate_action_body(body)
     ids = body.get("endpoint_ids") or []
     agent_id = ids[0] if ids else body.get("agent_id")
     if not agent_id:
@@ -99,6 +115,7 @@ def unisolate_endpoint(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Release an endpoint from network isolation."""
+    _validate_action_body(body)
     ids = body.get("endpoint_ids") or []
     agent_id = ids[0] if ids else body.get("agent_id")
     if not agent_id:
@@ -190,3 +207,18 @@ def get_action(
             detail=build_kbn_error_response(404, f"Action with id '{action_id}' not found."),
         )
     return result
+
+
+def _validate_action_body(body: dict) -> None:
+    """Refuse a response-action body the way Kibana's schema refuses it.
+
+    mockdr looked for an id and reported "Endpoint x not found" for anything
+    else, so a body with a member Kibana has no definition for came back as a
+    404 about an endpoint rather than a 400 about the request.
+    """
+    try:
+        validate_config_schema(body, ENDPOINT_ACTION_BODY, where="request body")
+    except ConfigSchemaError as exc:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, str(exc),
+        )) from exc

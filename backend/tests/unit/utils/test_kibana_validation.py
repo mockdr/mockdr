@@ -9,11 +9,16 @@ something else entirely.
 import pytest
 
 from utils.kibana_validation import (
+    ENDPOINT_ACTION_BODY,
+    ENDPOINT_ACTION_STATUS_QUERY,
+    ENDPOINT_METADATA_QUERY,
     CaseBodyError,
+    ConfigSchemaError,
     ExceptionListError,
     FindQueryError,
     RulesQueryError,
     validate_case_body,
+    validate_config_schema,
     validate_exception_find_query,
     validate_exception_list_body,
     validate_find_query,
@@ -391,4 +396,115 @@ class TestExceptionLists:
     def test_a_member_of_the_wrong_type(self) -> None:
         assert self.refuse_body(name=5, description="d", type="detection") == (
             '[request body]: Invalid value "5" supplied to "name"'
+        )
+
+
+class TestEndpointSchemas:
+    """A fourth dialect: @kbn/config-schema, on the Endpoint routes.
+
+    It names the member in the bracket, stops at the *first* failure, and
+    refuses a key it has no definition for. mockdr took four filters Kibana
+    does not declare, spelled the page size its own way, and reported a body
+    it could not read as a 404 about an endpoint rather than a 400 about the
+    request. Measured against Kibana 8.15.
+    """
+
+    def refuse_query(self, **params: str) -> str:
+        with pytest.raises(ConfigSchemaError) as caught:
+            validate_config_schema(
+                params, ENDPOINT_METADATA_QUERY, where="request query", from_query=True,
+            )
+        return str(caught.value)
+
+    def refuse_body(self, **body: object) -> str:
+        with pytest.raises(ConfigSchemaError) as caught:
+            validate_config_schema(body, ENDPOINT_ACTION_BODY, where="request body")
+        return str(caught.value)
+
+    def test_the_page_counts_from_zero_here(self) -> None:
+        validate_config_schema(
+            {"page": "0"}, ENDPOINT_METADATA_QUERY,
+            where="request query", from_query=True,
+        )
+        assert self.refuse_query(page="-1") == (
+            "[request query.page]: Value must be equal to or greater than [0]."
+        )
+
+    def test_the_page_size_has_both_bounds(self) -> None:
+        assert self.refuse_query(pageSize="0") == (
+            "[request query.pageSize]: Value must be equal to or greater than [1]."
+        )
+        assert self.refuse_query(pageSize="10001") == (
+            "[request query.pageSize]: Value must be equal to or lower than [10000]."
+        )
+
+    def test_a_number_that_is_not_one_names_the_type_it_got(self) -> None:
+        assert self.refuse_query(pageSize="abc") == (
+            "[request query.pageSize]: expected value of type [number] but got [string]"
+        )
+
+    def test_a_key_the_schema_has_no_definition_for(self) -> None:
+        assert self.refuse_query(nosuch="1") == (
+            "[request query.nosuch]: definition for this key is missing"
+        )
+
+    def test_it_stops_at_the_first_failure(self) -> None:
+        # Not a joined list, as the io-ts endpoints send.
+        assert self.refuse_query(page="-1", pageSize="0") == (
+            "[request query.page]: Value must be equal to or greater than [0]."
+        )
+
+    def test_a_union_lists_each_value_it_would_equal(self) -> None:
+        message = self.refuse_query(sortDirection="x")
+        assert message == (
+            "[request query.sortDirection]: types that failed validation:\n"
+            "- [request query.sortDirection.0]: expected value to equal [asc]\n"
+            "- [request query.sortDirection.1]: expected value to equal [desc]"
+        )
+
+    def test_the_sort_fields_the_endpoint_list_knows(self) -> None:
+        message = self.refuse_query(sortField="x")
+        assert "expected value to equal [enrolled_at]" in message
+        assert "expected value to equal [last_checkin]" in message
+
+    def test_an_action_needs_at_least_one_endpoint(self) -> None:
+        assert self.refuse_body() == (
+            "[request body.endpoint_ids]: expected value of type [array] but got "
+            "[undefined]"
+        )
+        assert self.refuse_body(endpoint_ids=[]) == (
+            "[request body.endpoint_ids]: array size is [0], but cannot be smaller "
+            "than [1]"
+        )
+
+    def test_ids_that_are_not_an_array(self) -> None:
+        assert self.refuse_body(endpoint_ids="x") == (
+            "[request body.endpoint_ids]: could not parse array value from json input"
+        )
+
+    def test_a_comment_is_a_string(self) -> None:
+        assert self.refuse_body(endpoint_ids=["a"], comment=5) == (
+            "[request body.comment]: expected value of type [string] but got [number]"
+        )
+
+    def test_the_agent_types_an_action_can_target(self) -> None:
+        for agent_type in ("endpoint", "sentinel_one", "crowdstrike"):
+            validate_config_schema(
+                {"endpoint_ids": ["a"], "agent_type": agent_type},
+                ENDPOINT_ACTION_BODY, where="request body",
+            )
+
+    def test_a_body_key_the_schema_has_no_definition_for(self) -> None:
+        assert self.refuse_body(endpoint_ids=["a"], nosuch=1) == (
+            "[request body.nosuch]: definition for this key is missing"
+        )
+
+    def test_action_status_needs_its_agent_ids(self) -> None:
+        with pytest.raises(ConfigSchemaError) as caught:
+            validate_config_schema(
+                {}, ENDPOINT_ACTION_STATUS_QUERY, where="request query", from_query=True,
+            )
+        assert str(caught.value) == (
+            "[request query.agent_ids]: expected at least one defined value but got "
+            "[undefined]"
         )

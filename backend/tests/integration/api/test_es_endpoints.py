@@ -23,7 +23,7 @@ def _get_first_endpoint_id(client: TestClient) -> str:
     body = client.get(
         "/kibana/api/endpoint/metadata",
         headers=ES_AUTH,
-        params={"per_page": 1},
+        params={"pageSize": 1},
     ).json()
     return body["data"][0]["metadata"]["agent"]["id"]
 
@@ -51,7 +51,7 @@ class TestListEndpoints:
         body = client.get(
             "/kibana/api/endpoint/metadata",
             headers=ES_AUTH,
-            params={"per_page": 200},
+            params={"pageSize": 200},
         ).json()
         # The seed maps all S1 agents to ES endpoints; there are 100 S1 agents
         assert body["total"] > 0
@@ -61,7 +61,7 @@ class TestListEndpoints:
         body = client.get(
             "/kibana/api/endpoint/metadata",
             headers=ES_AUTH,
-            params={"per_page": 5},
+            params={"pageSize": 5},
         ).json()
         assert len(body["data"]) == 5
 
@@ -70,12 +70,12 @@ class TestListEndpoints:
         p1 = client.get(
             "/kibana/api/endpoint/metadata",
             headers=ES_AUTH,
-            params={"per_page": 5, "page": 1},
+            params={"pageSize": 5, "page": 0},
         ).json()["data"]
         p2 = client.get(
             "/kibana/api/endpoint/metadata",
             headers=ES_AUTH,
-            params={"per_page": 5, "page": 2},
+            params={"pageSize": 5, "page": 1},
         ).json()["data"]
         ids1 = {ep["metadata"]["agent"]["id"] for ep in p1}
         ids2 = {ep["metadata"]["agent"]["id"] for ep in p2}
@@ -86,7 +86,7 @@ class TestListEndpoints:
         body = client.get(
             "/kibana/api/endpoint/metadata",
             headers=ES_AUTH,
-            params={"per_page": 1},
+            params={"pageSize": 1},
         ).json()
         entry = body["data"][0]
         # Real entries wrap the document in metadata/host_status/policy_info

@@ -103,7 +103,7 @@ describe('EsDashboardView', () => {
   it('calls all four APIs on mount', async () => {
     mount(EsDashboardView, { global: { plugins: [router], stubs: STUBS } })
     await flushPromises()
-    expect(esEndpointsApi.list).toHaveBeenCalledWith({ per_page: 50 })
+    expect(esEndpointsApi.list).toHaveBeenCalledWith({ pageSize: 50 })
     expect(esRulesApi.find).toHaveBeenCalledWith({ per_page: 50 })
     expect(esAlertsApi.search).toHaveBeenCalledWith(
       expect.objectContaining({ query: { match_all: {} }, size: 50 })

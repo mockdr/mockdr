@@ -172,7 +172,7 @@ class TestKibanaPlatform:
     ) -> None:
         endpoints = client.get(
             "/kibana/api/endpoint/metadata", headers=ES_AUTH,
-            params={"page": 1, "pageSize": 5},
+            params={"page": 0, "pageSize": 5},
         ).json()["data"]
         agents = client.get(
             "/kibana/api/fleet/agents", headers=ES_AUTH, params={"perPage": 5},

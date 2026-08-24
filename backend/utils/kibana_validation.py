@@ -15,6 +15,7 @@ Kibana 8.15.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import NamedTuple
 
 #: Kibana's cap, and the message it refuses a larger page with.
 MAX_PER_PAGE = 100
@@ -435,3 +436,173 @@ def validate_exception_list_body(body: Mapping[str, object]) -> None:
     unknown = [key for key in body if key not in _EXCEPTION_BODY_KEYS]
     if unknown:
         raise ExceptionListError(f'{_BODY_PREFIX}invalid keys "{",".join(unknown)}"')
+
+
+# ---------------------------------------------------------------------------
+# Endpoint routes (@kbn/config-schema)
+# ---------------------------------------------------------------------------
+
+#: A fourth dialect. The Endpoint routes validate with @kbn/config-schema,
+#: which names the member in the bracket — `[request query.pageSize]` — stops
+#: at the *first* failure, and refuses a key it has no definition for.
+_SCHEMA_TYPE_NAMES: dict[type, str] = {
+    str: "string", int: "number", float: "number", bool: "boolean",
+    list: "array", dict: "object", type(None): "null",
+}
+
+
+class SchemaField(NamedTuple):
+    """One member of a config-schema, and what it will take.
+
+    Attributes:
+        name:      The member's name.
+        kind:      ``number``, ``string``, ``array`` or ``boolean``.
+        required:  Whether its absence is a failure.
+        minimum:   Lowest number it takes, if it is one.
+        maximum:   Highest number it takes.
+        min_items: Fewest members an array may have.
+        one_of:    The values it will equal, if it is a union of literals.
+    """
+
+    name: str
+    kind: str = "string"
+    required: bool = False
+    minimum: float | None = None
+    maximum: float | None = None
+    min_items: int | None = None
+    one_of: tuple[str, ...] = ()
+
+
+class ConfigSchemaError(ValueError):
+    """Raised when a request does not satisfy a config-schema."""
+
+
+#: `GET /api/endpoint/metadata`. `page` counts from 0 here, unlike every
+#: other paged endpoint in this file.
+ENDPOINT_METADATA_QUERY: tuple[SchemaField, ...] = (
+    SchemaField("page", "number", minimum=0),
+    SchemaField("pageSize", "number", minimum=1, maximum=10000),
+    SchemaField("kuery"),
+    SchemaField("hostStatuses", "array"),
+    SchemaField("sortField", one_of=(
+        "enrolled_at", "metadata.host.hostname", "host_status",
+        "metadata.Endpoint.policy.applied.name",
+        "metadata.Endpoint.policy.applied.status", "metadata.host.os.name",
+        "metadata.host.ip", "metadata.agent.version", "last_checkin",
+    )),
+    SchemaField("sortDirection", one_of=("asc", "desc")),
+)
+
+#: The body every response action takes.
+ENDPOINT_ACTION_BODY: tuple[SchemaField, ...] = (
+    SchemaField("endpoint_ids", "array", required=True, min_items=1),
+    SchemaField("alert_ids", "array"),
+    SchemaField("case_ids", "array"),
+    SchemaField("comment"),
+    SchemaField("parameters", "object"),
+    SchemaField("agent_type", one_of=("endpoint", "sentinel_one", "crowdstrike")),
+)
+
+#: `GET /api/endpoint/action_status`.
+ENDPOINT_ACTION_STATUS_QUERY: tuple[SchemaField, ...] = (
+    SchemaField("agent_ids", "array", required=True),
+)
+
+
+def _union_failure(where: str, name: str, allowed: tuple[str, ...]) -> str:
+    """config-schema's message for a value outside a union of literals."""
+    lines = "\n".join(
+        f"- [{where}.{name}.{index}]: expected value to equal [{option}]"
+        for index, option in enumerate(allowed)
+    )
+    return f"[{where}.{name}]: types that failed validation:\n{lines}"
+
+
+def validate_config_schema(
+    values: Mapping[str, object], fields: tuple[SchemaField, ...], *, where: str,
+    from_query: bool = False,
+) -> None:
+    """Refuse a request the way ``@kbn/config-schema`` refuses it.
+
+    It stops at the first failure and names the member in the bracket, which
+    is what a client parsing the message keys on.
+
+    Args:
+        values:     The query or body, as sent.
+        fields:     The schema, in declaration order.
+        where:      ``request query`` or ``request body``.
+        from_query: Whether every value arrived as a string, as it does in a
+                    query string — a number is then whatever parses as one.
+
+    Raises:
+        ConfigSchemaError: Carrying Kibana's own message.
+    """
+    for field in fields:
+        if field.name not in values:
+            if field.required:
+                missing = (
+                    "expected at least one defined value but got [undefined]"
+                    if from_query and field.kind == "array"
+                    else f"expected value of type [{field.kind}] but got [undefined]"
+                )
+                raise ConfigSchemaError(f"[{where}.{field.name}]: {missing}")
+            continue
+        _check_field(values[field.name], field, where=where, from_query=from_query)
+
+    declared = {field.name for field in fields}
+    for key in values:
+        if key not in declared:
+            raise ConfigSchemaError(
+                f"[{where}.{key}]: definition for this key is missing",
+            )
+
+
+def _check_field(
+    value: object, field: SchemaField, *, where: str, from_query: bool,
+) -> None:
+    """Check one member, raising the first thing wrong with it."""
+    label = f"[{where}.{field.name}]"
+    if field.one_of:
+        if value not in field.one_of:
+            raise ConfigSchemaError(_union_failure(where, field.name, field.one_of))
+        return
+    if field.kind == "number":
+        number = _as_number(str(value), None) if from_query else _numeric(value)
+        if number is None:
+            raise ConfigSchemaError(
+                f"{label}: expected value of type [number] but got "
+                f"[{_SCHEMA_TYPE_NAMES.get(type(value), 'string')}]",
+            )
+        if field.minimum is not None and number < field.minimum:
+            raise ConfigSchemaError(
+                f"{label}: Value must be equal to or greater than [{int(field.minimum)}].",
+            )
+        if field.maximum is not None and number > field.maximum:
+            raise ConfigSchemaError(
+                f"{label}: Value must be equal to or lower than [{int(field.maximum)}].",
+            )
+        return
+    if field.kind == "array":
+        if not isinstance(value, list):
+            raise ConfigSchemaError(
+                f"{label}: could not parse array value from json input",
+            )
+        if field.min_items is not None and len(value) < field.min_items:
+            raise ConfigSchemaError(
+                f"{label}: array size is [{len(value)}], but cannot be smaller "
+                f"than [{field.min_items}]",
+            )
+        return
+    expected = {"string": str, "boolean": bool, "object": dict}[field.kind]
+    if not isinstance(value, expected) or (field.kind != "boolean" and isinstance(value, bool)):
+        raise ConfigSchemaError(
+            f"{label}: expected value of type [{field.kind}] but got "
+            f"[{_SCHEMA_TYPE_NAMES.get(type(value), 'string')}]",
+        )
+
+
+def _numeric(value: object) -> float | None:
+    """A JSON number, or ``None`` for anything else."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)

@@ -56,7 +56,8 @@ async function fetchEndpoints(p = 1): Promise<void> {
   loading.value = true
   page.value = p
   try {
-    const res = await esEndpointsApi.list({ page: p, per_page: perPage })
+    // Kibana spells the page size `pageSize` here and counts pages from 0.
+    const res = await esEndpointsApi.list({ page: p - 1, pageSize: perPage })
     endpoints.value = res.data ?? []
     total.value = res.total ?? endpoints.value.length
   } finally {

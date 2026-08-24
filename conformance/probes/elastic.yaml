@@ -1600,3 +1600,177 @@ probes:
       path: /api/exception_lists
       query: {id: "no-such-list"}
       auth: basic
+
+  # ── Kibana: the Endpoint routes, in a fourth dialect (2.3.0) ───────────
+  #
+  # @kbn/config-schema: it names the member in the bracket, stops at the
+  # first failure, refuses a key it has no definition for, and counts pages
+  # from 0. Only the validation is compared — the response actions
+  # themselves need an Enterprise licence, and the 403 a Basic install
+  # answers with is its licence, not the API's contract.
+
+  - id: kbn-endpoint-metadata-page-negative
+    endpoint: kibana
+    why: >
+      The page counts from 0 here, and a value below it is refused in a fourth dialect again: @kbn/config-schema, which names the member in the bracket.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"page": "-1"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-page-size-zero
+    endpoint: kibana
+    why: >
+      The page size has both bounds.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"pageSize": "0"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-page-size-too-large
+    endpoint: kibana
+    why: >
+      And the upper one.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"pageSize": "10001"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-page-size-not-a-number
+    endpoint: kibana
+    why: >
+      A number that is not one names the type it got.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"pageSize": "abc"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-host-statuses-scalar
+    endpoint: kibana
+    why: >
+      An array member given a scalar.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"hostStatuses": "healthy"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-sort-field-unknown
+    endpoint: kibana
+    why: >
+      A union lists every value it would equal, one line each.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"sortField": "x"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-sort-direction-unknown
+    endpoint: kibana
+    why: >
+      The same, with two.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"sortDirection": "x"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-unknown-key
+    endpoint: kibana
+    why: >
+      A key the schema has no definition for; mockdr took four filters Kibana does not declare.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"nosuch": "1"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-first-failure-only
+    endpoint: kibana
+    why: >
+      config-schema stops at the first failure rather than joining them, as the io-ts endpoints do.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"page": "-1", "pageSize": "0"}
+      auth: basic
+
+  - id: kbn-endpoint-isolate-no-ids
+    endpoint: kibana
+    why: >
+      A response action needs at least one endpoint; mockdr reported this as a 404 about an endpoint rather than a 400 about the request.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-isolate-empty-ids
+    endpoint: kibana
+    why: >
+      An array that is there but empty.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {"endpoint_ids": []}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-isolate-ids-not-an-array
+    endpoint: kibana
+    why: >
+      And one that is not an array at all.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {"endpoint_ids": "x"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-isolate-unknown-key
+    endpoint: kibana
+    why: >
+      A body key the schema has no definition for.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {"endpoint_ids": ["a"], "nosuch": 1}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-isolate-comment-not-a-string
+    endpoint: kibana
+    why: >
+      A member of the wrong type.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {"endpoint_ids": ["a"], "comment": 5}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-isolate-agent-type-unknown
+    endpoint: kibana
+    why: >
+      A union again, in the body this time.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {"endpoint_ids": ["a"], "agent_type": "x"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-action-status-no-ids
+    endpoint: kibana
+    why: >
+      agent_ids is required; mockdr answered with an empty list, which reads
+      as nothing pending.
+    request:
+      method: GET
+      path: /api/endpoint/action_status
+      auth: basic
