@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.search import (
     InvalidTimeParameterError,
+    UnknownSearchCommandError,
     apply_control_action,
     create_search_job,
     delete_search_job,
@@ -86,7 +87,7 @@ async def create_job(
             latest_time=latest_time,
             exec_mode=exec_mode,
         )
-    except InvalidTimeParameterError as exc:
+    except (InvalidTimeParameterError, UnknownSearchCommandError) as exc:
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "FATAL", "text": str(exc)},
         ]}) from exc
@@ -168,7 +169,7 @@ async def export_search(
             latest_time=latest_time,
             exec_mode="oneshot",
         )
-    except InvalidTimeParameterError as exc:
+    except (InvalidTimeParameterError, UnknownSearchCommandError) as exc:
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "FATAL", "text": str(exc)},
         ]}) from exc

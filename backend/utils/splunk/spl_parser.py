@@ -73,6 +73,9 @@ class SPLQuery:
     errors: list[str] = field(default_factory=list)
     raw_search: str = ""
     is_notable: bool = False
+    #: The first command the parser did not recognise, if any. splunkd
+    #: answers such a dispatch with 400 rather than running what it could.
+    unknown_command: str = ""
     #: Whether the time bounds came from the search string rather than from
     #: the request's own earliest_time/latest_time parameters. splunkd
     #: announces the first case with an INFO message and the second silently.
@@ -274,6 +277,9 @@ def parse_spl(query: str) -> SPLQuery:
         name, _, arg = text.partition(" ")
         name = name.lower().strip()
         if name not in KNOWN_COMMANDS:
+            # splunkd refuses the dispatch outright for this one: it is not a
+            # search that ran badly, it is not a search it can parse.
+            result.unknown_command = name
             result.errors.append(f"Unknown search command '{name}'.")
             continue
         result.commands.append(SPLCommand(name, arg.strip()))

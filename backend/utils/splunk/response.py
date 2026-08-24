@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -269,18 +270,47 @@ def _render_row(row: dict) -> dict:
     # already strings, so that case skips the type ladder entirely.
     out: dict[str, str | list[str]] = {}
     for key, value in row.items():
-        if type(value) is str:
+        if key == "_time":
+            out[key] = _render_time(value)
+        elif type(value) is str:
             out[key] = value
         elif isinstance(value, (list, tuple)):
-            out[key] = [_scalar(v) for v in value]
+            out[key] = _multivalue(value)
         else:
             out[key] = _scalar(value)
     return out
 
 
+def _render_time(value: object) -> str:
+    """Render ``_time`` the way splunkd's JSON writer does.
+
+    ``2026-08-23T15:46:40.000+00:00``, not the epoch the pipeline sorts on.
+    Every SIEM integration parses this field, and an epoch float here against
+    an ISO-8601 string in production is the kind of difference that only
+    shows up once the client is pointed at the real thing.
+    """
+    try:
+        moment = datetime.fromtimestamp(float(str(value)), tz=UTC)
+    except (TypeError, ValueError, OSError, OverflowError):
+        return _scalar(value)
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}+00:00"
+
+
+def _multivalue(value: list | tuple) -> str | list[str]:
+    """Render a multivalue field as splunkd's JSON writer does.
+
+    A field holding one value is a plain string there, not a one-element
+    array — `stats values(user)` over a group with a single user comes back
+    as `"alice"`. A client reading it as a string worked against splunkd and
+    got `["alice"]` here.
+    """
+    rendered = [_scalar(v) for v in value]
+    return rendered[0] if len(rendered) == 1 else rendered
+
+
 def _render_value(value: object) -> str | list[str]:
     if isinstance(value, (list, tuple)):
-        return [_scalar(v) for v in value]
+        return _multivalue(value)
     return _scalar(value)
 
 

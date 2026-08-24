@@ -26,13 +26,54 @@ __all__ = ["execute_pipeline"]
 Rows = list[dict[str, Any]]
 
 
-def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[str]]:
+#: How splunkd names each command in an error. `eval` is the odd one: it
+#: reports as `EvalCommand`, where everything else is `'<name>' command`.
+_COMMAND_LABELS: dict[str, str] = {"eval": "EvalCommand"}
+
+
+def _command_label(name: str) -> str:
+    """The subject of splunkd's "Error in ..." line for this command."""
+    special = _COMMAND_LABELS.get(name)
+    return f"'{special}'" if special else f"'{name}' command"
+
+
+def _failure_text(command: SPLCommand, exc: Exception) -> str:
+    """Word a command failure the way splunkd words it."""
+    subject = _command_label(command.name)
+    if isinstance(exc, SPLExprError):
+        if exc.function:
+            return (
+                f"Error in {subject}: The '{exc.function}' function is "
+                f"unsupported or undefined."
+            )
+        if exc.at:
+            return (
+                f"Error in {subject}: The expression is malformed. "
+                f"An unexpected character is reached at '{exc.at}'."
+            )
+    return f"Error in {subject}: {exc}"
+
+
+def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, str]]]:
     """Run *query*'s commands over *rows*, in order.
 
     Returns:
-        The resulting rows and any diagnostic messages produced along the way.
+        The resulting rows and any messages produced along the way, each with
+        the severity splunkd gives it. A command that cannot run at all is
+        FATAL and takes the whole result set with it — returning the rows the
+        pipeline had reached reads as an answer, and splunkd returns none.
     """
-    messages: list[str] = list(query.errors)
+    if query.unknown_command:
+        # splunkd refuses this dispatch rather than running the stages it did
+        # recognise; the API layer turns it into the 400 it answers with.
+        return [], [{
+            "type": "FATAL",
+            "text": f"Unknown search command '{query.unknown_command}'.",
+        }]
+
+    messages: list[dict[str, str]] = [
+        {"type": "WARN", "text": text} for text in query.errors
+    ]
 
     # The search clause is the first stage of the pipeline. Applying it here
     # keeps selection and the commands in one place, so the two cannot drift.
@@ -42,14 +83,18 @@ def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[str]]:
     for command in query.commands:
         handler = _HANDLERS.get(command.name)
         if handler is None:  # pragma: no cover - parser filters these out
-            messages.append(f"Unknown search command '{command.name}'.")
-            continue
+            messages.append({
+                "type": "FATAL", "text": f"Unknown search command '{command.name}'.",
+            })
+            return [], messages
         try:
+            before = rows
             rows = handler(rows, command)
-        except SPLExprError as exc:
-            messages.append(f"Error in '{command.name}' command: {exc}")
-        except (ValueError, TypeError, KeyError, IndexError) as exc:
-            messages.append(f"Error in '{command.name}' command: {exc}")
+            if command.name == "table" and before and not rows:
+                messages.append({"type": "INFO", "text": "No matching fields exist."})
+        except (SPLExprError, ValueError, TypeError, KeyError, IndexError) as exc:
+            messages.append({"type": "FATAL", "text": _failure_text(command, exc)})
+            return [], messages
     return rows, messages
 
 
@@ -86,7 +131,13 @@ def _cmd_head(rows: Rows, command: SPLCommand) -> Rows:
 
 
 def _cmd_tail(rows: Rows, command: SPLCommand) -> Rows:
-    return rows[-_count(command.arg, default=10) :]
+    """The last N results, in reverse order — which is what `tail` documents.
+
+    Returning them in pipeline order made `| sort sev | tail 2` answer
+    ascending where splunkd answers descending, so a client reading the first
+    row as "the largest" got the smallest.
+    """
+    return rows[-_count(command.arg, default=10):][::-1]
 
 
 def _cmd_dedup(rows: Rows, command: SPLCommand) -> Rows:
@@ -108,8 +159,18 @@ def _cmd_dedup(rows: Rows, command: SPLCommand) -> Rows:
 # ---------------------------------------------------------------------------
 
 def _cmd_table(rows: Rows, command: SPLCommand) -> Rows:
+    """Keep the named fields, and only where a row actually has them.
+
+    splunkd drops a field a row does not carry rather than showing it empty,
+    and when no row carries any of them it emits no rows at all. Inventing an
+    empty column let a client believe the field exists and is blank.
+    """
     fields = _fields(command.arg)
-    return [{f: row.get(f, "") for f in fields} for row in rows]
+    if not fields:
+        return rows
+    if not any(field in row for row in rows for field in fields):
+        return []
+    return [{f: row[f] for f in fields if f in row} for row in rows]
 
 
 def _cmd_fields(rows: Rows, command: SPLCommand) -> Rows:
@@ -229,16 +290,33 @@ def _cmd_stats(rows: Rows, command: SPLCommand) -> Rows:
 
     groups: OrderedDict[tuple, Rows] = OrderedDict()
     for row in rows:
-        key = tuple(str(row.get(f, "")) for f in by_fields)
+        # A row that does not carry every by-field is not part of any group:
+        # `stats count by nope` returns nothing, not one group keyed on "".
+        if any(row.get(f) in (None, "") for f in by_fields):
+            continue
+        key = tuple(str(row[f]) for f in by_fields)
         groups.setdefault(key, []).append(row)
 
     out: Rows = []
-    for key, members in groups.items():
+    # splunkd returns the groups sorted by the by-fields, not in the order the
+    # events happened to arrive: `stats count by host` always reads srv-1,
+    # srv-2, srv-3. A client rendering the first row as "the top group" saw
+    # whichever host the search hit first.
+    for key in sorted(groups, key=lambda k: tuple(_sortable(v) for v in k)):
+        members = groups[key]
         record: dict[str, Any] = dict(zip(by_fields, key, strict=False))
         for func, field, alias in aggs:
             record[alias] = _aggregate(func, field, members)
         out.append(record)
     return out
+
+
+def _sortable(value: str) -> tuple[int, float, str]:
+    """Order a group key numerically when it is a number, lexically otherwise."""
+    try:
+        return (0, float(value), "")
+    except (TypeError, ValueError):
+        return (1, 0.0, str(value))
 
 
 def _cmd_top(rows: Rows, command: SPLCommand) -> Rows:
@@ -249,14 +327,24 @@ def _cmd_rare(rows: Rows, command: SPLCommand) -> Rows:
     return _top_or_rare(rows, command, most_common=False)
 
 
+#: `top`'s and `rare`'s options, which are not field names — reading them as
+#: fields counted a bucket keyed on the literal string "showperc=f".
+_TOP_OPTION_RE = re.compile(
+    r"\b(limit|showcount|showperc|countfield|percentfield|useother|otherstr)"
+    r"\s*=\s*\S+", re.I,
+)
+
+
 def _top_or_rare(rows: Rows, command: SPLCommand, *, most_common: bool) -> Rows:
     arg = command.arg.strip()
     limit = _leading_count(arg) or 10
     limit_match = re.search(r"limit\s*=\s*(\d+)", arg, re.I)
     if limit_match:
         limit = int(limit_match.group(1))
-        arg = re.sub(r"limit\s*=\s*\d+", "", arg, flags=re.I)
-    fields = _fields(re.sub(r"^\s*\d+\s+", "", arg))
+    show_count = not re.search(r"showcount\s*=\s*(?:f|false|0)\b", arg, re.I)
+    show_percent = not re.search(r"showperc\s*=\s*(?:f|false|0)\b", arg, re.I)
+
+    fields = _fields(re.sub(r"^\s*\d+\s+", "", _TOP_OPTION_RE.sub("", arg)))
     if not fields:
         return rows
 
@@ -269,8 +357,14 @@ def _top_or_rare(rows: Rows, command: SPLCommand, *, most_common: bool) -> Rows:
     out: Rows = []
     for key, count in ordered[:limit]:
         record: dict[str, Any] = dict(zip(fields, key, strict=False))
-        record["count"] = count
-        record["percent"] = round(count * 100.0 / total, 6)
+        if show_count:
+            record["count"] = count
+        if show_percent:
+            # splunkd renders the share with six decimals, always: `60.000000`.
+            record["percent"] = f"{count * 100.0 / total:.6f}"
+        # The total the shares are of. Absent here, a client could not tell
+        # 3 of 5 from 3 of 3000.
+        record["_tc"] = total
         out.append(record)
     return out
 
@@ -307,6 +401,44 @@ def _cmd_timechart(rows: Rows, command: SPLCommand) -> Rows:
 # Helpers
 # ---------------------------------------------------------------------------
 
+#: `perc95(x)`, `p95(x)` and `upperperc95(x)` all name the same statistic on
+#: a single search head.
+_PERCENTILE_RE = re.compile(r"(?:upper|lower)?perc(\d+(?:\.\d+)?)|p(?:erc)?(\d+(?:\.\d+)?)")
+
+
+def _percentile(numbers: list[float], percent: float) -> float:
+    """The percentile Splunk reports: linear interpolation between ranks."""
+    ordered = sorted(numbers)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (percent / 100.0) * (len(ordered) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    return ordered[lower] + (position - lower) * (ordered[upper] - ordered[lower])
+
+
+def _variance(numbers: list[float], *, population: bool) -> float:
+    """Variance over the sample (n-1) or the population (n)."""
+    count = len(numbers)
+    divisor = count if population else count - 1
+    if divisor <= 0:
+        return 0.0
+    mean = sum(numbers) / count
+    return sum((n - mean) ** 2 for n in numbers) / divisor
+
+
+#: The spread statistics Splunk documents, which the mock reported as unknown
+#: functions — a dashboard asking for a standard deviation got a FATAL where
+#: splunkd answers with a number.
+_SPREAD_FUNCTIONS: dict[str, Callable[[list[float]], float]] = {
+    "stdev": lambda ns: _variance(ns, population=False) ** 0.5,
+    "stdevp": lambda ns: _variance(ns, population=True) ** 0.5,
+    "var": lambda ns: _variance(ns, population=False),
+    "varp": lambda ns: _variance(ns, population=True),
+    "sumsq": lambda ns: sum(n * n for n in ns),
+}
+
+
 def _aggregate(func: str, field: str, rows: Rows) -> Any:
     name = func.lower()
     if name in ("count", "c"):
@@ -325,7 +457,28 @@ def _aggregate(func: str, field: str, rows: Rows) -> Any:
             return ""
         return pool[0] if name == "first" else pool[-1]
 
+    if name in ("earliest", "latest"):
+        # By event time, not pipeline order — which is what separates these
+        # from `first` and `last`.
+        timed = [r for r in rows if r.get(field) not in (None, "")]
+        if not timed:
+            return ""
+        by_time = sorted(timed, key=lambda r: _as_float(r.get("_time")) or 0.0)
+        return by_time[0 if name == "earliest" else -1].get(field)
+
     numbers = [n for n in (_as_float(r.get(field)) for r in rows) if n is not None]
+    if name == "mode":
+        values = [str(r.get(field)) for r in rows if r.get(field) not in (None, "")]
+        if not values:
+            return ""
+        counts = Counter(values)
+        best = max(counts.values())
+        return sorted(v for v, c in counts.items() if c == best)[0]
+    if numbers and name in _SPREAD_FUNCTIONS:
+        return _SPREAD_FUNCTIONS[name](numbers)
+    percentile = _PERCENTILE_RE.fullmatch(name)
+    if percentile and numbers:
+        return _percentile(numbers, float(percentile.group(1)))
     if not numbers:
         return 0
     if name == "sum":

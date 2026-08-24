@@ -207,7 +207,11 @@ class TestUnknownCommandsAreReported:
 
     def test_unknown_command_produces_a_message(self) -> None:
         _, messages = run("search * | boguscommand foo")
-        assert any("boguscommand" in m for m in messages)
+        # splunkd refuses the dispatch outright, so it is FATAL and the
+        # pipeline stops there rather than running what it recognised.
+        assert messages == [{
+            "type": "FATAL", "text": "Unknown search command 'boguscommand'.",
+        }]
 
     def test_known_commands_produce_no_messages(self) -> None:
         _, messages = run("search * | stats count")

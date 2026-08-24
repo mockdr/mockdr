@@ -72,4 +72,4 @@ class TestRunawayNestingIsReportedNotRaised:
         _, messages = execute_pipeline(
             list(ROWS), parse_spl(f"search * | where {expression}"),
         )
-        assert any("nested too deeply" in m for m in messages)
+        assert any("nested too deeply" in m["text"] for m in messages)

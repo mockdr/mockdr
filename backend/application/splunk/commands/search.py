@@ -22,6 +22,20 @@ from utils.splunk.spl_parser import (
 _LATEST_PARAM_MESSAGE = "Invalid latest_time: latest_time must be after earliest_time."
 
 
+class UnknownSearchCommandError(ValueError):
+    """Raised when the pipeline names a command splunkd does not have.
+
+    It refuses the dispatch with 400 rather than running the stages it did
+    recognise, which would answer with a result set the search never asked
+    for.
+    """
+
+    def __init__(self, command: str) -> None:
+        """Record the command name, for splunkd's own wording."""
+        self.command = command
+        super().__init__(f"Unknown search command '{command}'.")
+
+
 class InvalidTimeParameterError(ValueError):
     """Raised when ``earliest_time``/``latest_time`` is not a time splunkd takes.
 
@@ -90,6 +104,8 @@ def create_search_job(
     # An explicit parameter overrides what the search string said, and is
     # validated here: splunkd answers 400 for the parameter and a FATAL
     # message inside a 200 for the same value written into the search.
+    if parsed.unknown_command:
+        raise UnknownSearchCommandError(parsed.unknown_command)
     _validate_time_parameters(earliest_time, latest_time)
     if earliest_time:
         parsed.earliest_time = earliest_time
@@ -245,8 +261,12 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
     else:
         events = _query_events(parsed)
 
-    results, texts = execute_pipeline(events, parsed)
-    messages = time_messages + [{"type": "WARN", "text": text} for text in texts]
+    results, pipeline_messages = execute_pipeline(events, parsed)
+    messages = time_messages + pipeline_messages
+    if any(m["type"] == "FATAL" for m in pipeline_messages):
+        # A search that could not run reports no events either, the way a
+        # failed dispatch does.
+        return [], [], messages
     return events, results, messages
 
 

@@ -21,6 +21,7 @@ import operator
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from fnmatch import fnmatch
 from typing import Any
 
@@ -34,7 +35,20 @@ __all__ = [
 
 
 class SPLExprError(ValueError):
-    """Raised when an expression cannot be parsed."""
+    """Raised when an expression cannot be parsed or evaluated.
+
+    ``function`` names the function a command asked for and does not have, and
+    ``at`` the text a parse stopped on. splunkd words those two failures
+    differently from each other and from everything else, and the mock has to
+    say the same things: a client that keys on the message sees one wording
+    here and another in production.
+    """
+
+    def __init__(self, message: str, *, function: str = "", at: str = "") -> None:
+        """Record the message and, where there is one, the offending token."""
+        super().__init__(message)
+        self.function = function
+        self.at = at
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +101,9 @@ def _tokenize(source: str, *, mode: str) -> list[_Token]:
     while pos < len(source):
         match = pattern.match(source, pos)
         if match is None:
-            raise SPLExprError(f"unexpected character at offset {pos}")
+            raise SPLExprError(
+                f"unexpected character at offset {pos}", at=source[pos:pos + 2],
+            )
         pos = match.end()
         kind = match.lastgroup or ""
         if kind == "ws":
@@ -209,7 +225,7 @@ class _Parser:
         if not self._accept(text):
             found = self._peek()
             got = found.text if found else "end of expression"
-            raise SPLExprError(f"expected {text!r} but found {got!r}")
+            raise SPLExprError(f"expected {text!r} but found {got!r}", at=str(got))
 
     # -- grammar --------------------------------------------------------
 
@@ -217,7 +233,9 @@ class _Parser:
         node = self._parse_or()
         trailing = self._peek()
         if trailing is not None:
-            raise SPLExprError(f"unexpected trailing input at {trailing.text!r}")
+            raise SPLExprError(
+                f"unexpected trailing input at {trailing.text!r}", at=trailing.text,
+            )
         return node
 
     def _guard(self) -> None:
@@ -328,7 +346,12 @@ class _Parser:
 
         if token.kind == "word":
             nxt = self._peek()
-            if nxt is not None and nxt.text == "(":
+            # Functions exist in `eval` and `where`, not in the search clause:
+            # `index=main (host=a OR host=b)` is a term and a group, and
+            # reading it as a call to `main(...)` raised "unknown function
+            # 'main'" out of the handler as a 500 — on one of the most
+            # ordinary searches there is.
+            if self._mode != "search" and nxt is not None and nxt.text == "(":
                 self._next()
                 args: list[Node] = []
                 if not self._accept(")"):
@@ -354,7 +377,7 @@ class _Parser:
                 return FieldRef(token.text) if is_field else RawTerm(token.text)
             return FieldRef(token.text)
 
-        raise SPLExprError(f"unexpected token {token.text!r}")
+        raise SPLExprError(f"unexpected token {token.text!r}", at=token.text)
 
 
 def _unquote(text: str) -> str:
@@ -488,7 +511,12 @@ def _func(name: str, args: list[Any]) -> Any:  # noqa: PLR0911, PLR0912
         if num is None:
             return None
         digits = int(_numeric(args[1]) or 0) if len(args) > 1 else 0
-        return round(num, digits) if digits else round(num)
+        # Splunk keeps the requested precision — `round(10, 2)` is `10.00`,
+        # not `10` — and rounds a half away from zero, where Python's own
+        # `round` rounds it to even: `round(10.5)` is 11 there and 10 here.
+        quantum = Decimal(1).scaleb(-digits)
+        value = Decimal(str(num)).quantize(quantum, rounding=ROUND_HALF_UP)
+        return str(value) if digits > 0 else int(value)
     if name == "substr":
         text = str(args[0])
         start = int(_numeric(args[1]) or 1)
@@ -506,7 +534,7 @@ def _func(name: str, args: list[Any]) -> Any:  # noqa: PLR0911, PLR0912
         if not nums:
             return None
         return min(nums) if name == "min" else max(nums)
-    raise SPLExprError(f"unknown function {name!r}")
+    raise SPLExprError(f"unknown function {name!r}", function=name)
 
 
 def evaluate(node: Node | None, row: dict, *, mode: str = "where") -> Any:  # noqa: PLR0911
