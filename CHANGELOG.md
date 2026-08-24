@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Sentinel resources completed what they already had.** The ARM completion
+helper built a default for every declared property and then overwrote most of
+them — 14 000 discarded objects per incident page. It builds only what the
+resource lacks, as the other four platforms' helpers already did. Incident
+list 6.0 → 3.9 ms.
+
 **Every icon was its own download.** Rollup gave each `lucide-vue-next` icon
 its own ~200-byte chunk, so opening a view fetched 42–46 JavaScript files for
 about 8 kB of icons. They are one chunk now (20 kB, cached once): a view costs

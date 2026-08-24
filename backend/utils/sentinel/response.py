@@ -106,12 +106,19 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
     and gains the declared siblings; lists and scalars from ``actual`` win
     untouched. ``defaults`` is never mutated.
     """
-    out = {k: _blank(v) for k, v in defaults.items()}
-    for key, value in actual.items():
-        template = defaults.get(key)
-        if isinstance(value, dict) and isinstance(template, dict):
+    out: dict = {}
+    for key, template in defaults.items():
+        if key not in actual:
+            # Only a key the resource lacks needs a default built for it.
+            out[key] = _blank(template)
+            continue
+        value = actual[key]
+        if type(value) is dict and type(template) is dict:
             out[key] = deep_complete(template, value)
         else:
+            out[key] = value
+    for key, value in actual.items():
+        if key not in defaults:
             out[key] = value
     return out
 
