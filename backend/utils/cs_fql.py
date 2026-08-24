@@ -31,7 +31,8 @@ class FqlClause:
     Attributes:
         field:       Field name the clause targets, e.g. ``"hostname"``.
         operator:    One of ``"eq"``, ``"neq"``, ``"gte"``, ``"lte"``,
-                     ``"gt"``, ``"lt"``, ``"in"``, ``"wildcard"``.
+                     ``"gt"``, ``"lt"``, ``"in"``, ``"wildcard"``,
+                     ``"not_wildcard"``.
         values:      List of values for the clause (single-element for
                      scalar operators, multi-element for ``"in"`` / ``"or"``).
         conjunction: How this clause joins with the preceding clause —
@@ -140,8 +141,21 @@ def _parse_term(raw: str) -> FqlClause | None:
     fld = m.group(1)
     op_chars = m.group(2)
     value_portion = m.group(3)
-    operator = _classify_operator(op_chars, value_portion)
-    values = _extract_values(value_portion, operator)
+    # Falcon spells a wildcard match with the star *before* the value —
+    # `hostname:*'*prod*'`, which every console query uses. The star was read
+    # as part of the value, so the pattern never matched and every wildcard
+    # query in FQL answered with nothing.
+    starred = value_portion.startswith("*")
+    if starred:
+        value_portion = value_portion[1:]
+    negated_wildcard = starred and op_chars in ("!", "!=")
+    if negated_wildcard:
+        operator = "not_wildcard"
+    elif starred:
+        operator = "wildcard"
+    else:
+        operator = _classify_operator(op_chars, value_portion)
+    values = _extract_values(value_portion, "wildcard" if "wildcard" in operator else operator)
     return FqlClause(field=fld, operator=operator, values=values)
 
 
@@ -255,6 +269,9 @@ def _match_clause(record: object, clause: FqlClause) -> bool:
 
     if clause.operator == "wildcard":
         return any(fnmatch(c, v) for c in candidates for v in clause.values)
+
+    if clause.operator == "not_wildcard":
+        return all(not fnmatch(c, v) for c in candidates for v in clause.values)
 
     if clause.operator == "in":
         return any(c in clause.values for c in candidates)
