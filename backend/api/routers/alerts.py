@@ -83,6 +83,9 @@ def list_star_rules(
     status: str = Query(None),
     severity: str = Query(None),
     queryType: str = Query(None),  # noqa: N803 - the vendor's own name
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
 ) -> dict:
     """Return the STAR custom detection rules, filtered as the swagger declares."""
     params = {

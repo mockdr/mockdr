@@ -11,7 +11,7 @@ from repository.blocklist_repo import blocklist_repo
 from repository.exclusion_repo import exclusion_repo
 from utils.documented_params import documented_openapi, documented_params
 from utils.dt import utc_now
-from utils.filtering import FilterSpec, apply_filters
+from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.id_gen import new_id
 from utils.pagination import (
     RESTRICTION_CURSOR,
@@ -117,6 +117,9 @@ def list_blocklist(
     # See the note on the exclusions handler above.
     tenant: bool = Query(None),
     types: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -130,6 +133,7 @@ def list_blocklist(
     filtered = apply_filters(
         records, params, _BLOCKLIST_SPECS + DOCUMENTED_FILTERS.get("/restrictions", []),
     )
+    filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, RESTRICTION_CURSOR)
     stripped = [{k: v for k, v in r.items() if k not in _BLOCKLIST_INTERNAL} for r in page]
     return build_list_response(

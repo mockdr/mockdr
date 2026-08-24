@@ -50,6 +50,9 @@ def list_tags(
     description: str = Query(None),
     query: str = Query(None),
     scopePath: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -90,6 +93,9 @@ def list_installed_applications(
     agentIds: str = Query(None),
     agentIsDecommissioned: str = Query(None),
     installedAt__between: str = Query(None),
+    sortBy: str = Query(None),
+    sortOrder: str = Query(None),
+    skip: int = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -106,7 +112,14 @@ def list_installed_applications(
         limit,
         agent_is_decommissioned=agentIsDecommissioned,
         installed_at_between=installedAt__between,
-        documented=documented_params(request, "/installed-applications"),
+        documented={
+            **documented_params(request, "/installed-applications"),
+            **{
+                k: v for k, v in
+                {"sortBy": sortBy, "sortOrder": sortOrder, "skip": skip}.items()
+                if v is not None
+            },
+        },
     ).get("data", [])
     # ApplicationViewSchema_many: the declared fields only, with a pagination block.
     return build_list_response(

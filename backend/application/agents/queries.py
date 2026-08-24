@@ -240,6 +240,8 @@ def list_applications_for_agents(
         enriched = apply_filters(
             enriched, documented, DOCUMENTED_FILTERS.get("/installed-applications", []),
         )
+        # `sortBy`, `sortOrder` and `skip` are documented here too.
+        enriched = apply_query_options(enriched, documented)
 
     page, next_cursor, total = paginate(enriched, cursor, limit)
     # The records themselves: each route shapes them with its own schema. This

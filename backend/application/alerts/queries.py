@@ -75,8 +75,10 @@ def filter_star_rules(params: dict) -> list[dict]:
     """The STAR rules a request asks for; every rule when it asks for none."""
     from repository.store import store  # noqa: PLC0415 - avoids an import cycle
 
-    return apply_filters(
+    matched = apply_filters(
         list(store.get_all("star_rules")),
         params,
         RULE_FILTER_SPECS + DOCUMENTED_FILTERS.get("/cloud-detection/rules", []),
     )
+    # `sortBy`/`sortOrder`/`skip` are documented on this route like any other.
+    return apply_query_options(matched, params)
