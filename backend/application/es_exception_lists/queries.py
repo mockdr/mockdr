@@ -25,7 +25,7 @@ def find_lists(
     Returns:
         Kibana paginated list response.
     """
-    records = [record_dict(el) for el in es_exception_list_repo.list_all()]
+    records = [_serialise(el) for el in es_exception_list_repo.list_all()]
 
     if list_id:
         records = [r for r in records if r["list_id"] == list_id]
@@ -48,14 +48,26 @@ def get_list(list_id_or_id: str) -> dict | None:
     # Try by internal id first.
     el = es_exception_list_repo.get(list_id_or_id)
     if el:
-        return record_dict(el)
+        return _serialise(el)
 
     # Fall back to list_id.
     el = es_exception_list_repo.get_by_list_id(list_id_or_id)
     if el:
-        return record_dict(el)
+        return _serialise(el)
 
     return None
+
+
+def _serialise(record: object) -> dict:
+    """Render a list the way Kibana does — a `meta` it has no value for is absent.
+
+    Emitting `meta: null` told a client the member exists and is empty, where
+    a real list simply has no such member until one is set.
+    """
+    rendered = record_dict(record)
+    if rendered.get("meta") is None:
+        rendered.pop("meta", None)
+    return rendered
 
 
 def find_items(

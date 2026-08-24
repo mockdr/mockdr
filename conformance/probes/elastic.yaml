@@ -1439,3 +1439,164 @@ probes:
       json: {}
       headers: {kbn-xsrf: "true"}
       auth: basic
+
+  # ── Kibana: exception lists, in a dialect of their own (2.3.0) ─────────
+  #
+  # io-ts again, but every message carries the `[request query]` or
+  # `[request body]` prefix the Cases API leaves off — and paging starts
+  # at 1 rather than 0.
+
+  - id: kbn-exception-find-page-zero
+    endpoint: kibana
+    why: >
+      Paging starts at 1 here, and a value below it is a value error rather than an empty page.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"page": "0"}
+      auth: basic
+
+  - id: kbn-exception-find-per-page-zero
+    endpoint: kibana
+    why: >
+      So is a per_page of 0, which the Cases API takes.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"per_page": "0"}
+      auth: basic
+
+  - id: kbn-exception-find-per-page-not-a-number
+    endpoint: kibana
+    why: >
+      A page size that is not a number.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"per_page": "abc"}
+      auth: basic
+
+  - id: kbn-exception-find-namespace-unknown
+    endpoint: kibana
+    why: >
+      A namespace Kibana does not have; mockdr answered 200.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"namespace_type": "nonsense"}
+      auth: basic
+
+  - id: kbn-exception-find-sort-field-unknown
+    endpoint: kibana
+    why: >
+      A field the saved object is not indexed on, refused by the search with a message of its own.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"sort_field": "nope"}
+      auth: basic
+
+  - id: kbn-exception-find-sort-order-unknown
+    endpoint: kibana
+    why: >
+      A direction that is neither asc nor desc.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"sort_order": "bad"}
+      auth: basic
+
+  - id: kbn-exception-find-unknown-key
+    endpoint: kibana
+    why: >
+      A query key the endpoint does not have.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"nosuchparam": "1"}
+      auth: basic
+
+  - id: kbn-exception-find-several-problems
+    endpoint: kibana
+    why: >
+      Reported together, in the codec's order, behind the prefix this endpoint uses.
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"page": "0", "per_page": "-1", "namespace_type": "x"}
+      auth: basic
+
+  - id: kbn-exception-find-per-page-uncapped
+    endpoint: kibana
+    why: >
+      There is no page cap here, where the Cases API refuses anything above
+      100. What the two installs happen to hold is not the point.
+    ignore_paths:
+      - $.data
+      - $.total
+    request:
+      method: GET
+      path: /api/exception_lists/_find
+      query: {"per_page": "101"}
+      auth: basic
+
+  - id: kbn-exception-create-empty
+    endpoint: kibana
+    why: >
+      Every required member missing at once.
+    request:
+      method: POST
+      path: /api/exception_lists
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-exception-create-bad-type
+    endpoint: kibana
+    why: >
+      A type outside the enum used to create a list here.
+    request:
+      method: POST
+      path: /api/exception_lists
+      json: {"name": "n", "description": "d", "list_id": "probe-bad", "type": "nonsense"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-exception-create-unknown-key
+    endpoint: kibana
+    why: >
+      A member the codec does not have.
+    request:
+      method: POST
+      path: /api/exception_lists
+      json: {"name": "n", "description": "d", "list_id": "probe-key", "type": "detection", "nosuch": 1}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-exception-create-name-not-a-string
+    endpoint: kibana
+    why: >
+      A member of the wrong type.
+    request:
+      method: POST
+      path: /api/exception_lists
+      json: {"name": 5, "description": "d", "list_id": "probe-name", "type": "detection"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-exception-get-no-params
+    endpoint: kibana
+    why: Neither id nor list_id given.
+    request:
+      method: GET
+      path: /api/exception_lists
+      auth: basic
+
+  - id: kbn-exception-get-missing
+    endpoint: kibana
+    why: An id that names no list; mockdr worded the 404 its own way.
+    request:
+      method: GET
+      path: /api/exception_lists
+      query: {id: "no-such-list"}
+      auth: basic

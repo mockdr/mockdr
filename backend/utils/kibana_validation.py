@@ -306,3 +306,132 @@ def validate_case_body(body: Mapping[str, object]) -> None:
         raise CaseBodyError(
             f'Unauthorized to create case with owners: "{owner}"', forbidden=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Exception lists
+# ---------------------------------------------------------------------------
+
+#: A third dialect: io-ts again, but every message carries the `[request
+#: query]` or `[request body]` prefix the Cases API leaves off. The mock
+#: answered these in FastAPI's words, or not at all.
+_QUERY_PREFIX = "[request query]: "
+_BODY_PREFIX = "[request body]: "
+
+#: Where an exception list lives. Not a namespace Kibana knows is a value
+#: error, not an empty result.
+EXCEPTION_NAMESPACES: frozenset[str] = frozenset({"single", "agnostic"})
+
+#: What an exception list can be. `nonsense` used to create one here.
+EXCEPTION_TYPES: frozenset[str] = frozenset({
+    "detection", "rule_default", "endpoint", "endpoint_trusted_apps",
+    "endpoint_events", "endpoint_host_isolation_exceptions", "endpoint_blocklists",
+})
+
+#: The fields the saved object is indexed on, and so the ones it sorts by.
+#: Anything else is refused with a message of its own, without the prefix.
+EXCEPTION_SORT_FIELDS: frozenset[str] = frozenset({
+    "name", "created_at", "updated_at", "description", "list_id", "type",
+    "tie_breaker_id", "_score",
+})
+
+#: The order this codec reports its fields in.
+_EXCEPTION_QUERY_ORDER: tuple[str, ...] = (
+    "namespace_type", "page", "per_page", "sort_order",
+)
+
+_EXCEPTION_QUERY_KEYS: frozenset[str] = frozenset({
+    "list_id", "namespace_type", "page", "per_page", "filter", "sort_field",
+    "sort_order",
+})
+
+_EXCEPTION_BODY_KEYS: frozenset[str] = frozenset({
+    "name", "description", "list_id", "type", "namespace_type", "tags", "meta",
+    "version", "os_types",
+})
+
+_EXCEPTION_BODY_REQUIRED: tuple[str, ...] = ("description", "name", "type")
+
+
+class ExceptionListError(ValueError):
+    """Raised when an exception-list request is not one Kibana would run.
+
+    ``route_error`` marks what the route raises after the codec is satisfied.
+    Those come back in the Security Solution's own ``{message, status_code}``
+    envelope rather than Boom's, and carry no prefix.
+    """
+
+    def __init__(self, message: str, *, route_error: bool = False) -> None:
+        """Record the message and which envelope carries it."""
+        super().__init__(message)
+        self.route_error = route_error
+
+
+def _positive_integer(value: str) -> bool:
+    """Whether this is a whole number of at least one.
+
+    `page` and `per_page` both start at 1 here — a `per_page` of 0 is a value
+    error, where the Cases API takes it and returns an empty page.
+    """
+    try:
+        return float(value) >= 1 and float(value).is_integer()
+    except (TypeError, ValueError):
+        return False
+
+
+def validate_exception_find_query(params: Mapping[str, str]) -> None:
+    """Refuse an exception-list ``_find`` query the way Kibana refuses it.
+
+    Raises:
+        ExceptionListError: Carrying Kibana's own message.
+    """
+    problems: list[str] = []
+    for field in _EXCEPTION_QUERY_ORDER:
+        value = params.get(field)
+        if value is None:
+            continue
+        if field == "namespace_type" and value not in EXCEPTION_NAMESPACES:
+            problems.append(_invalid(field, value))
+        elif field == "sort_order" and value not in SORT_ORDERS:
+            problems.append(_invalid(field, value))
+        elif field in ("page", "per_page") and not _positive_integer(value):
+            problems.append(_invalid(field, value))
+    if problems:
+        raise ExceptionListError(_QUERY_PREFIX + ",".join(problems))
+
+    unknown = [key for key in params if key not in _EXCEPTION_QUERY_KEYS]
+    if unknown:
+        raise ExceptionListError(f'{_QUERY_PREFIX}invalid keys "{",".join(unknown)}"')
+
+    sort_field = params.get("sort_field")
+    if sort_field and sort_field not in EXCEPTION_SORT_FIELDS:
+        # Raised by the search itself, after the codec is satisfied, so it
+        # carries no prefix.
+        raise ExceptionListError(f"Unknown sort field {sort_field}", route_error=True)
+
+
+def validate_exception_list_body(body: Mapping[str, object]) -> None:
+    """Refuse an exception-list body the way Kibana refuses it.
+
+    Raises:
+        ExceptionListError: Carrying Kibana's own message.
+    """
+    problems: list[str] = []
+    for field in _EXCEPTION_BODY_REQUIRED:
+        if field not in body:
+            problems.append(f'Invalid value "undefined" supplied to "{field}"')
+    for field, allowed in (("type", EXCEPTION_TYPES),
+                           ("namespace_type", EXCEPTION_NAMESPACES)):
+        value = body.get(field)
+        if value is not None and value not in allowed:
+            problems.append(_invalid(field, str(value)))
+    for field in ("name", "description", "list_id"):
+        value = body.get(field)
+        if value is not None and not isinstance(value, str):
+            problems.append(_invalid(field, str(value)))
+    if problems:
+        raise ExceptionListError(_BODY_PREFIX + ",".join(problems))
+
+    unknown = [key for key in body if key not in _EXCEPTION_BODY_KEYS]
+    if unknown:
+        raise ExceptionListError(f'{_BODY_PREFIX}invalid keys "{",".join(unknown)}"')

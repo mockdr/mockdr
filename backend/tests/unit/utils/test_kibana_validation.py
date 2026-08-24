@@ -10,9 +10,12 @@ import pytest
 
 from utils.kibana_validation import (
     CaseBodyError,
+    ExceptionListError,
     FindQueryError,
     RulesQueryError,
     validate_case_body,
+    validate_exception_find_query,
+    validate_exception_list_body,
     validate_find_query,
     validate_rules_find_query,
 )
@@ -296,3 +299,96 @@ class TestCaseBody:
             **self.GOOD, "severity": "high", "assignees": [], "category": None,
             "customFields": [],
         })
+
+
+class TestExceptionLists:
+    """A third dialect again: io-ts, with the prefix the Cases API leaves off.
+
+    Measured against Kibana 8.15. `page=0`, an unknown `namespace_type`, a
+    `sort_field` the saved object is not indexed on and a `type` outside the
+    enum all came back 200 here — the last of which created a list a real
+    Kibana would have refused.
+    """
+
+    def refuse_query(self, **params: str) -> str:
+        with pytest.raises(ExceptionListError) as caught:
+            validate_exception_find_query(params)
+        return str(caught.value)
+
+    def refuse_body(self, **body: object) -> str:
+        with pytest.raises(ExceptionListError) as caught:
+            validate_exception_list_body(body)
+        return str(caught.value)
+
+    @pytest.mark.parametrize(("field", "value"), [
+        ("page", "0"), ("page", "-1"), ("per_page", "0"), ("per_page", "-1"),
+        ("per_page", "abc"),
+    ])
+    def test_paging_starts_at_one_here(self, field: str, value: str) -> None:
+        # Unlike the Cases API, a per_page of 0 is a value error rather than
+        # an empty page.
+        assert self.refuse_query(**{field: value}) == (
+            f'[request query]: Invalid value "{value}" supplied to "{field}"'
+        )
+
+    def test_there_is_no_page_cap(self) -> None:
+        validate_exception_find_query({"per_page": "101"})
+
+    @pytest.mark.parametrize("namespace", ["single", "agnostic"])
+    def test_the_namespaces_it_knows(self, namespace: str) -> None:
+        validate_exception_find_query({"namespace_type": namespace})
+
+    def test_a_namespace_it_does_not(self) -> None:
+        assert self.refuse_query(namespace_type="nonsense") == (
+            '[request query]: Invalid value "nonsense" supplied to "namespace_type"'
+        )
+
+    def test_an_unknown_sort_field_has_a_message_of_its_own(self) -> None:
+        # Raised by the search after the codec is satisfied, so no prefix.
+        assert self.refuse_query(sort_field="nope") == "Unknown sort field nope"
+
+    @pytest.mark.parametrize("field", ["name", "created_at", "updated_at",
+                                       "description", "list_id", "type", "_score"])
+    def test_the_fields_it_is_indexed_on(self, field: str) -> None:
+        validate_exception_find_query({"sort_field": field})
+
+    def test_an_unknown_query_key(self) -> None:
+        assert self.refuse_query(nosuchparam="1") == (
+            '[request query]: invalid keys "nosuchparam"'
+        )
+
+    def test_several_problems_in_the_codecs_order(self) -> None:
+        assert self.refuse_query(page="0", per_page="-1", namespace_type="x") == (
+            '[request query]: Invalid value "x" supplied to "namespace_type",'
+            'Invalid value "0" supplied to "page",'
+            'Invalid value "-1" supplied to "per_page"'
+        )
+
+    @pytest.mark.parametrize("list_type", [
+        "detection", "rule_default", "endpoint", "endpoint_trusted_apps",
+        "endpoint_events", "endpoint_host_isolation_exceptions", "endpoint_blocklists",
+    ])
+    def test_the_types_a_list_can_be(self, list_type: str) -> None:
+        validate_exception_list_body({"name": "n", "description": "d", "type": list_type})
+
+    def test_a_type_it_cannot_be(self) -> None:
+        assert self.refuse_body(name="n", description="d", type="nonsense") == (
+            '[request body]: Invalid value "nonsense" supplied to "type"'
+        )
+
+    def test_the_body_reports_what_is_missing(self) -> None:
+        assert self.refuse_body() == (
+            '[request body]: Invalid value "undefined" supplied to "description",'
+            'Invalid value "undefined" supplied to "name",'
+            'Invalid value "undefined" supplied to "type"'
+        )
+
+    def test_an_unknown_body_key(self) -> None:
+        assert self.refuse_body(
+            name="n", description="d", type="detection", nosuch=1,
+        ) == '[request body]: invalid keys "nosuch"'
+
+    def test_a_member_of_the_wrong_type(self) -> None:
+        assert self.refuse_body(name=5, description="d", type="detection") == (
+            '[request body]: Invalid value "5" supplied to "name"'
+        )

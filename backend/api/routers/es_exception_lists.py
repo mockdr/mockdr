@@ -6,12 +6,17 @@ endpoints at ``/api/exception_lists``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_exception_lists import commands as exc_commands
 from application.es_exception_lists import queries as exc_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_validation import (
+    ExceptionListError,
+    validate_exception_find_query,
+    validate_exception_list_body,
+)
 
 router = APIRouter(tags=["ES Exception Lists"])
 
@@ -21,18 +26,33 @@ router = APIRouter(tags=["ES Exception Lists"])
 
 @router.get("/api/exception_lists/_find")
 def find_lists(
+    request: Request,
     list_id: str = Query(None),
     namespace_type: str = Query(None),
-    page: int = Query(1),
-    per_page: int = Query(20, ge=0, le=1000),
+    # Untyped on purpose: FastAPI's own 422 would pre-empt the wording this
+    # endpoint answers with, which is a third dialect again — io-ts, but with
+    # the `[request query]` prefix the Cases API leaves off.
+    page: str = Query("1"),
+    per_page: str = Query("20"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Find exception lists with optional filters and pagination."""
+    try:
+        validate_exception_find_query(request.query_params)
+    except ExceptionListError as exc:
+        # The codec answers through Boom; what the search itself refuses —
+        # an unknown sort field — comes back in the Security Solution's own
+        # envelope. A client branching on the status reads a different member
+        # in each.
+        raise HTTPException(status_code=400, detail=(
+            build_security_solution_error(400, str(exc)) if exc.route_error
+            else build_kbn_error_response(400, str(exc))
+        )) from exc
     return exc_queries.find_lists(
         list_id=list_id,
         namespace_type=namespace_type,
-        page=page,
-        per_page=per_page,
+        page=int(float(page)),
+        per_page=int(float(per_page)),
     )
 
 
@@ -47,18 +67,16 @@ def get_list(
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(
-                400,
-                "Either list_id or id query parameter is required",
-            ),
+            # Kibana's own wording, in the Security Solution's envelope
+            # rather than Boom's (both measured on 8.15).
+            detail=build_security_solution_error(400, "id or list_id required"),
         )
     result = exc_queries.get_list(lookup)
     if result is None:
         raise HTTPException(
             status_code=404,
             detail=build_security_solution_error(
-                404,
-                f"Exception list {lookup} not found",
+                404, f'exception list id: "{lookup}" does not exist',
             ),
         )
     return result
@@ -69,8 +87,17 @@ def create_list(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Create a new exception list."""
-    _require_iots(body, ("description", "name", "type"))
+    """Create a new exception list.
+
+    The whole body is checked: a `type` outside the enum used to create a
+    list here, so a client could keep a type the real Kibana refuses.
+    """
+    try:
+        validate_exception_list_body(body)
+    except ExceptionListError as exc:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, str(exc),
+        )) from exc
     return exc_commands.create_list(body)
 
 
@@ -103,18 +130,16 @@ def delete_list(
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(
-                400,
-                "Either list_id or id query parameter is required",
-            ),
+            # Kibana's own wording, in the Security Solution's envelope
+            # rather than Boom's (both measured on 8.15).
+            detail=build_security_solution_error(400, "id or list_id required"),
         )
     deleted = exc_commands.delete_list(lookup)
     if not deleted:
         raise HTTPException(
             status_code=404,
             detail=build_security_solution_error(
-                404,
-                f"Exception list {lookup} not found",
+                404, f'exception list id: "{lookup}" does not exist',
             ),
         )
     return {}
