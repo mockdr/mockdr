@@ -252,7 +252,17 @@ def _render_row(row: dict) -> dict:
     client doing ``int(row["count"])`` worked here and a client comparing
     ``row["count"] == "38"`` — which is what real Splunk returns — did not.
     """
-    return {key: _render_value(value) for key, value in row.items()}
+    # A search over 600 events renders ~13 000 fields; most of them are
+    # already strings, so that case skips the type ladder entirely.
+    out: dict[str, str | list[str]] = {}
+    for key, value in row.items():
+        if type(value) is str:
+            out[key] = value
+        elif isinstance(value, (list, tuple)):
+            out[key] = [_scalar(v) for v in value]
+        else:
+            out[key] = _scalar(value)
+    return out
 
 
 def _render_value(value: object) -> str | list[str]:

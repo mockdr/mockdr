@@ -7,15 +7,18 @@ which is what the real server would have done.
 
 HEC (``/services/collector``) is exempt: it is a separate service that always
 answers in JSON and ignores ``output_mode``.
+
+Pure ASGI: a request outside ``/splunk`` never reaches the body-collecting
+path, and a Splunk request that asked for JSON is passed straight through.
 """
+
 from __future__ import annotations
 
-import json
+from urllib.parse import parse_qs
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from api.middleware.json_rewrite import rewrite_json_body
 from utils.splunk.xml_output import render_splunk_xml
 
 _SPLUNK_PREFIX = "/splunk"
@@ -25,84 +28,88 @@ _HEC_PREFIX = "/splunk/services/collector"
 # json.loads on the body and never sends output_mode. Rendering Atom XML
 # here broke every SDK KV Store call unconditionally.
 _KVSTORE_DATA_MARKER = "/storage/collections/data/"
+_FORM_TYPE = b"application/x-www-form-urlencoded"
 
 
-async def _asked_for_json(request: Request) -> bool:
-    """Whether the caller asked for JSON, in the query or in a form body.
+class SplunkOutputModeMiddleware:
+    """Render Splunk responses as XML unless ``output_mode=json`` was given."""
 
-    splunkd honours ``output_mode`` in either place, and splunklib relies on
-    the second: its ``post()`` puts every parameter, ``output_mode`` included,
-    into the form body. Reading only the query string rendered every SDK
-    POST that lacked a query parameter as Atom XML — which the harness
-    surfaced the moment a probe sent the parameter the way splunklib does.
-    """
-    if request.query_params.get("output_mode", "").lower() == "json":
-        return True
-    content_type = request.headers.get("content-type", "")
-    if request.method == "POST" and content_type.startswith("application/x-www-form-urlencoded"):
-        # body() first: it is what Starlette caches and replays to the route.
-        # form() alone streams straight from the socket, and the route then
-        # finds an empty form — every Splunk form POST broke at once.
-        await request.body()
-        form = await request.form()
-        return str(form.get("output_mode", "")).lower() == "json"
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Convert a JSON Splunk response body to Atom XML when appropriate."""
+        path = scope.get("path", "")
+        if (
+            scope["type"] != "http"
+            or not path.startswith(_SPLUNK_PREFIX)
+            or path.startswith(_HEC_PREFIX)
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
+        wants_json = _values(query, "output_mode").lower() == "json"
+        if not wants_json and _is_form_post(scope):
+            # splunklib's post() puts every parameter, output_mode included,
+            # into the form body; reading only the query string rendered every
+            # SDK form POST as Atom XML. The body is replayed to the route.
+            body, receive = await _buffered_body(receive)
+            form = parse_qs(body.decode("latin-1"))
+            wants_json = _values(form, "output_mode").lower() == "json"
+
+        if wants_json:
+            await self.app(scope, receive, send)
+            return
+
+        def claims(status: int, _headers: dict[bytes, bytes]) -> bool:
+            # Only the KV Store *data* itself is JSON-only. A refusal — no such
+            # collection, a query that is not JSON — comes back as Atom XML on
+            # splunkd like any other error (measured on 10.4.2).
+            return not (_KVSTORE_DATA_MARKER in path and status < 400)
+
+        await rewrite_json_body(
+            self.app, scope, receive, send,
+            claims=claims,
+            rewrite=lambda payload: (
+                render_splunk_xml(payload).encode(),
+                "text/xml; charset=UTF-8",
+            ),
+        )
+
+
+def _values(query: dict[str, list[str]], name: str) -> str:
+    values = query.get(name)
+    return values[0] if values else ""
+
+
+def _is_form_post(scope: Scope) -> bool:
+    if scope.get("method") != "POST":
+        return False
+    for name, value in scope.get("headers", []):
+        if name.lower() == b"content-type":
+            return bool(value.startswith(_FORM_TYPE))
     return False
 
 
-class SplunkOutputModeMiddleware(BaseHTTPMiddleware):
-    """Render Splunk responses as XML unless ``output_mode=json`` was given."""
+async def _buffered_body(receive: Receive) -> tuple[bytes, Receive]:
+    """Read the request body, and a ``receive`` that replays it to the route."""
+    chunks: list[bytes] = []
+    more = True
+    while more:
+        message = await receive()
+        if message["type"] == "http.disconnect":
+            break
+        chunks.append(bytes(message.get("body", b"")))
+        more = bool(message.get("more_body"))
+    body = b"".join(chunks)
+    replayed = False
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint,
-    ) -> Response:
-        """Convert a JSON Splunk response body to Atom XML when appropriate."""
-        path = request.url.path
-        splunk = path.startswith(_SPLUNK_PREFIX) and not path.startswith(_HEC_PREFIX)
-        # Read before the route runs: Starlette replays a body the middleware
-        # has consumed, so the route still sees its form. Only for a Splunk
-        # form POST — anything else is left untouched.
-        wants_json = splunk and await _asked_for_json(request)
+    async def replay() -> Message:
+        nonlocal replayed
+        if replayed:
+            return await receive()
+        replayed = True
+        return {"type": "http.request", "body": body, "more_body": False}
 
-        response = await call_next(request)
-
-        if not splunk:
-            return response
-        if _KVSTORE_DATA_MARKER in path and response.status_code < 400:
-            # Only the data itself is JSON-only. A refusal — no such
-            # collection, a query that is not JSON — comes back as Atom XML
-            # on splunkd like any other error (measured on 10.4.2).
-            return response
-        if wants_json:
-            return response
-        if not response.headers.get("content-type", "").startswith("application/json"):
-            return response
-        # Responses from call_next stream their body; anything else (a plain
-        # Response returned by an outer middleware) is passed through as-is.
-        body_iterator = getattr(response, "body_iterator", None)
-        if body_iterator is None:
-            return response
-
-        chunks = [chunk async for chunk in body_iterator]
-        body = b"".join(
-            chunk.encode() if isinstance(chunk, str) else bytes(chunk) for chunk in chunks
-        )
-        try:
-            payload = json.loads(body)
-        except ValueError:
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
-
-        xml = render_splunk_xml(payload)
-        headers = dict(response.headers)
-        headers.pop("content-length", None)
-        headers.pop("content-type", None)
-        return Response(
-            content=xml,
-            status_code=response.status_code,
-            headers=headers,
-            media_type="text/xml; charset=UTF-8",
-        )
+    return body, replay

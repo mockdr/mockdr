@@ -7,67 +7,62 @@ that contradicted it — ``perPage: 30`` alongside 48 entries.
 
 Doing this centrally keeps every collection consistent, which is how splunkd
 behaves: the paging rules belong to the Atom envelope, not to each endpoint.
+
+Pure ASGI: a request outside ``/splunk/services``, or one that names neither
+parameter, is passed straight through.
 """
+
 from __future__ import annotations
 
 import json
+from urllib.parse import parse_qs
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+from api.middleware.json_rewrite import rewrite_json_body
 
 _SPLUNK_PREFIX = "/splunk/services"
 _DEFAULT_COUNT = 30
 
 
-class SplunkPagingMiddleware(BaseHTTPMiddleware):
+class SplunkPagingMiddleware:
     """Slice Atom ``entry`` lists per the request's ``count``/``offset``."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint,
-    ) -> Response:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Apply paging to a Splunk collection response."""
-        response = await call_next(request)
+        if scope["type"] != "http" or not scope.get("path", "").startswith(_SPLUNK_PREFIX):
+            await self.app(scope, receive, send)
+            return
 
-        if not request.url.path.startswith(_SPLUNK_PREFIX):
-            return response
-        if not response.headers.get("content-type", "").startswith("application/json"):
-            return response
-        if "count" not in request.query_params and "offset" not in request.query_params:
-            return response
+        query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
+        if "count" not in query and "offset" not in query:
+            await self.app(scope, receive, send)
+            return
 
-        body_iterator = getattr(response, "body_iterator", None)
-        if body_iterator is None:
-            return response
-        raw = b"".join([chunk async for chunk in body_iterator])
+        offset = max(_as_int(_first(query, "offset"), 0), 0)
+        # Splunk documents count=0 as "all entries", and splunklib encodes it as
+        # `null_count = 0`; treating it as a limit returned nothing.
+        count = _as_int(_first(query, "count"), _DEFAULT_COUNT)
 
-        try:
-            payload = json.loads(raw)
-        except (ValueError, UnicodeDecodeError):
-            return Response(
-                content=raw,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
+        def rewrite(payload: object) -> tuple[bytes, str] | None:
+            if not isinstance(payload, dict) or not isinstance(payload.get("entry"), list):
+                return None
+            _apply_paging(payload, offset, count)
+            return json.dumps(payload).encode(), "application/json"
 
-        if not isinstance(payload, dict) or "entry" not in payload:
-            return Response(
-                content=raw,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
-
-        _apply_paging(payload, request)
-        return JSONResponse(
-            content=payload,
-            status_code=response.status_code,
-            headers={
-                k: v for k, v in response.headers.items()
-                if k.lower() not in ("content-length", "content-type")
-            },
+        await rewrite_json_body(
+            self.app, scope, receive, send,
+            claims=lambda status, headers: True,  # noqa: ARG005 - every JSON body here
+            rewrite=rewrite,
         )
+
+
+def _first(query: dict[str, list[str]], name: str) -> str | None:
+    values = query.get(name)
+    return values[0] if values else None
 
 
 def _as_int(value: str | None, default: int) -> int:
@@ -77,17 +72,10 @@ def _as_int(value: str | None, default: int) -> int:
         return default
 
 
-def _apply_paging(payload: dict, request: Request) -> None:
+def _apply_paging(payload: dict, offset: int, count: int) -> None:
     """Slice ``entry`` in place and make ``paging`` describe the result."""
-    entries = payload.get("entry")
-    if not isinstance(entries, list):
-        return
-
+    entries = payload["entry"]
     total = len(entries)
-    offset = max(_as_int(request.query_params.get("offset"), 0), 0)
-    # Splunk documents count=0 as "all entries", and splunklib encodes it as
-    # `null_count = 0`; treating it as a limit returned nothing.
-    count = _as_int(request.query_params.get("count"), _DEFAULT_COUNT)
 
     windowed = entries[offset:]
     if count > 0:

@@ -143,11 +143,48 @@ def bootstrap_elastic(
         ) from exc
     if not isinstance(rows, list):
         raise BootstrapError(f"{target}: expected an array from /_cat/indices")
-    names = [
+    names = sorted(
         str(row["index"]) for row in rows
         if isinstance(row, dict) and not str(row.get("index", "")).startswith(".")
-    ]
-    return {"index": names[0] if names else "_all"}
+    )
+    if names:
+        return {"index": names[0]}
+    # A fresh Elasticsearch has only Kibana's own system indices, and Kibana
+    # keeps creating and rolling them over while the probes run: a request
+    # against `_all` then measures that churn — an index whose stats are not
+    # yet available, a shard that is not yet allocated — rather than either
+    # product's API. One index of our own, created here, is stable.
+    return {"index": _create_probe_index(spec, target, clients)}
+
+
+_ES_PROBE_INDEX = "conformance-probe"
+
+
+def _create_probe_index(spec: PlatformSpec, target: str, clients: Clients) -> str:
+    """Create a single-shard, replica-free index and wait for it to go green."""
+    auth = (
+        spec.credentials[target].pair if target in spec.credentials
+        else httpx.USE_CLIENT_DEFAULT
+    )
+    client = clients.get("search", target)
+    created = client.put(
+        f"/{_ES_PROBE_INDEX}",
+        json={"settings": {"number_of_shards": 1, "number_of_replicas": 0}},
+        auth=auth,
+    )
+    if created.status_code not in (200, 400):  # 400: it already exists
+        raise BootstrapError(
+            f"cannot create {_ES_PROBE_INDEX} on {target}: HTTP {created.status_code} "
+            f"{created.text[:200]}",
+        )
+    health = client.get(
+        f"/_cluster/health/{_ES_PROBE_INDEX}",
+        params={"wait_for_status": "green", "timeout": "60s"},
+        auth=auth,
+    )
+    if health.status_code != 200 or health.json().get("timed_out"):
+        raise BootstrapError(f"{_ES_PROBE_INDEX} on {target} never went green")
+    return _ES_PROBE_INDEX
 
 
 def _await_allocated_shards(spec: PlatformSpec, target: str, clients: Clients) -> None:

@@ -203,10 +203,13 @@ probes:
 
   - id: es-from-too-large
     endpoint: search
-    why: from+size beyond the 10000 window.
+    why: >
+      from+size beyond the 10000 window. Scoped to the bootstrap's index: on
+      `_all`, a shard the cluster is still allocating adds its own cause to
+      the chain, which says nothing about the window rule.
     request:
       method: POST
-      path: /_search
+      path: /${index}/_search
       json: {from: 20000, size: 10}
       auth: basic
 
@@ -255,10 +258,14 @@ probes:
 
   - id: es-cat-indices
     endpoint: search
-    why: _cat/indices?format=json, the inventory a client lists.
+    why: >
+      _cat/indices?format=json, the row a client reads. Scoped to the
+      bootstrap's index: listing everything measures Kibana creating and
+      rolling over its own indices — a row whose stats are not yet available
+      — rather than the shape of the row itself.
     request:
       method: GET
-      path: /_cat/indices
+      path: /_cat/indices/${index}
       query: {format: json}
       auth: basic
 

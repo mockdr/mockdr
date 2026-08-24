@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Two Splunk-only middlewares taxed all 561 routes.** `SplunkOutputModeMiddleware`
+and `SplunkPagingMiddleware` were `BaseHTTPMiddleware`, which wraps every
+request in an anyio task group and a memory object stream whether or not the
+middleware touches the response. Both are pure ASGI now and share one
+body-rewriter (`api/middleware/json_rewrite.py`): a request outside `/splunk`
+is passed straight through, and a body is collected only when it is actually
+going to be rewritten. The middleware floor — what any response costs before
+its route runs — halves, from 0.79 ms to 0.39 ms. Verified against real
+splunkd: 72 conformance probes, 0 findings.
+
+**An unknown path cost fifteen times a served one.** The fallback that turns a
+typo into a vendor-shaped 404 probed all seven verbs against the whole route
+table, every time: 7.66 ms for a path nothing owns, on a mock whose floor is
+0.4 ms — and `hostile_probe.py` sends 16 000 of them. Starlette already
+distinguishes the two cases (a path that exists under another verb reports
+`PARTIAL`), so one pass answers most of it, and the route table is fixed once
+the app is built, so the answer is cached per path. Unknown path 7.66 → 1.10 ms,
+wrong verb 7.31 → 1.49 ms, with the same status, body and `Allow` header.
+
 **Serialisation was the request.** The weekly load test — new to CI, and the
 first run of it since 2.1.0 — failed on the runner: read p99 812 ms against
 a 500 ms gate. Three causes, all in the path every response takes:
@@ -21,9 +40,20 @@ a 500 ms gate. Three causes, all in the path every response takes:
 - `SecurityHeadersMiddleware` was a `BaseHTTPMiddleware`, which wraps every
   one of the 561 routes in an anyio task group; it is pure ASGI now.
 
-`GET /threats` 7.1 → 3.4 ms; the load test passes with room (read p99 449 ms
+Together with the middleware and fallback work above: `GET /threats`
+7.1 → 3.4 ms, Defender alerts −23 %, Elasticsearch `_search` −18 %, a Splunk
+oneshot search −17 % (medians of an interleaved A/B, three rounds). The load
+test passes with room (read p99 449 ms
 pinned to two cores, 186 ms at the concurrency CI uses). No response shape
 changes: 199 routes compared across six platforms, 0 drift.
+
+**The harness measured a moment, not a product, twice more.** After the shard
+wait, two probes still read Kibana's own lifecycle: `_cat/indices` listed the
+system indices it creates and rolls over (stats not yet available), and
+`_search` across `_all` caught a shard mid-allocation (an extra `caused_by`
+chain). Both now address an index the bootstrap guarantees on each target —
+creating `conformance-probe` on a cluster that has none of its own — so the
+row shape and the window rule are what they measure.
 
 **The harness measured a moment, not a product.** A conformance run on a
 cluster that was still allocating shards reported eight findings: the real

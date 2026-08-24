@@ -1,6 +1,7 @@
 import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from json import JSONDecodeError
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.routing import Match
+from starlette.types import Scope
 
 from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
@@ -885,7 +887,33 @@ def _wants_html(request: Request) -> bool:
     )
 
 
-def _allowed_methods(request: Request) -> list[str]:
+@lru_cache(maxsize=1024)
+def _path_is_registered(path: str) -> bool:
+    """Whether any route owns this path, whatever verb it takes.
+
+    The route table is fixed once the app is built, so the answer for a path
+    is too — and a client looping on a typo, or a probe walking the surface,
+    asks the same question thousands of times. ``PARTIAL`` is the marker: a
+    path that exists under another verb reports it, a path nothing owns
+    reports nothing.
+    """
+    scope: Scope = {
+        "type": "http", "method": "GET", "path": path, "root_path": "",
+        "headers": [], "query_string": b"", "app": app,
+    }
+    for route in app.routes:
+        if getattr(route, "path", None) == "/{full_path:path}":
+            continue
+        try:
+            match, _ = route.matches(scope)
+        except Exception:  # noqa: BLE001, S112 - an unmatchable route is not a match
+            continue
+        if match is not Match.NONE:
+            return True
+    return False
+
+
+def _allowed_methods(request: Request) -> tuple[str, ...]:
     """Return the verbs a registered route accepts for this exact path.
 
     Claiming every verb on the fallback hides Starlette's own
@@ -896,9 +924,25 @@ def _allowed_methods(request: Request) -> list[str]:
     resolve are the answer. Only unmatched requests reach here, so this never
     runs on a served route.
     """
+    return _allowed_methods_for(request.scope.get("path", ""))
+
+
+@lru_cache(maxsize=1024)
+def _allowed_methods_for(path: str) -> tuple[str, ...]:
+    """The verbs registered for ``path``; cached, because the route table is."""
+    # A path no route knows at all — a client's typo, a probe — matches
+    # nothing, and there is no verb to offer. Only a path that exists under
+    # another verb reports PARTIAL, and only that case pays the seven-verb
+    # probe below.
+    if not _path_is_registered(path):
+        return ()
+
     allowed: list[str] = []
     for method in _FALLBACK_METHODS:
-        scope = {**request.scope, "method": method}
+        scope: Scope = {
+            "type": "http", "method": method, "path": path, "root_path": "",
+            "headers": [], "query_string": b"", "app": app,
+        }
         for route in app.routes:
             if getattr(route, "path", None) == "/{full_path:path}":
                 continue
@@ -915,7 +959,7 @@ def _allowed_methods(request: Request) -> list[str]:
     # one, so probing never reports it.
     if "GET" in allowed and "HEAD" not in allowed:
         allowed.append("HEAD")
-    return allowed
+    return tuple(allowed)
 
 
 @app.api_route("/{full_path:path}", methods=_FALLBACK_METHODS, include_in_schema=False)
