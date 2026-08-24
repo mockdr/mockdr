@@ -330,9 +330,15 @@ probes:
   - id: job-list
     endpoint: management
     why: The job collection splunklib's jobs.list() reads.
-    ignore_paths:  # profile of the search that ran and the sourcetypes it touched: data, not shape
+    # What the listed job happens to have done: which commands ran and how
+    # long each took, and the span of the index it touched (absent on a job
+    # that matched nothing). All of it is the run, not the shape of a job.
+    ignore_paths:
       - $.entry[*].content.performance
       - $.entry[*].content.searchTelemetry.desc.sourcetypes
+      - $.entry[*].content.searchTelemetry.search_commands
+      - $.entry[*].content.indexEarliestTime
+      - $.entry[*].content.indexLatestTime
     request:
       method: GET
       path: /services/search/jobs
