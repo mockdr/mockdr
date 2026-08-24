@@ -8,6 +8,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every time filter matched nothing.** An Elasticsearch range bound written
+as date math — `now-30d`, `now/d`, `2026-01-01||+1M/M` — was compared as a
+*string*, and `"2026-08-06T16:16:51.000Z" >= "now-30d"` is false for every
+document. The one filter that appears in every Kibana time picker, every
+detection rule and every SIEM dashboard answered `200` with an empty result
+set. `utils/es_datemath.py` implements the grammar, and the rounding is the
+measured one: `gte: now/d` means since midnight, `lte: now/d` through the end
+of today, operators apply left to right, months clamp the day, weeks begin on
+Monday.
+
+**Splunk snapped its windows on a multiple of seconds.** `@` rounding was
+modulo arithmetic, which is right by accident below a day and wrong above it:
+the epoch fell on a Thursday, so `@w` snapped to a Thursday rather than the
+preceding Sunday, `@mon` to a multiple of 30 days, `@y` to 365. `earliest=-1mon@mon`
+— "since the start of last month", the most common dashboard window there is
+— landed up to a fortnight off. Worse, a modifier the grammar could not read
+resolved to "no bound": `earliest=-30x` returned every event here and none in
+production. splunkd dispatches the job, returns nothing, and says why; so
+does this now, in splunkd's own words, with the job marked FAILED.
+
+**A parenthesised search answered 500.** `search index=main (host=a OR host=b)`
+raised "unknown function 'main'" out of the handler: the expression parser
+treated any word before a bracket as a function call, in the search clause as
+well as in `eval`, and SPL has no functions in the search clause.
+
+**`date_histogram` left out the quiet days.** Every interval no document
+landed in was omitted, so a series plotted from the response skipped them
+instead of drawing them at zero, and a calendar interval was a fixed span of
+seconds — `1M` meant 30 days and `1w` a week beginning on a Thursday, the
+same bug as Splunk's `@w`. Numeric metrics came back as ints where
+Elasticsearch sends doubles, and `key_as_string` as `+00:00` where it writes
+`.000Z`.
+
+**An index you created did not exist.** `PUT /{index}` was not a route at all,
+so the mock answered 404 to a create and then 404 to every search of the index
+that create was supposed to make. A document written with `PUT /{index}/_doc/{id}`
+was stored and readable by id but invisible to every search — an ingest that
+looks like it worked and a dashboard that stays empty. And `HEAD /{index}`,
+how every client library asks whether an index exists, answered 405. The whole
+lifecycle is measured against 8.15 now, down to `forced_refresh` and the 201
+that separates a create from a replacement.
+
+**Kibana's query strings were read past.** `severity=nonsens` came back as
+`200` with no cases, which a client reads as "there are none" rather than as
+the typo it is; `sortField=nope` came back sorted by something else; a case
+was created with a severity outside the enum and a `status` no client may set.
+The Cases API validates with io-ts, the Detection Rules API with zod, and they
+word everything differently — including a rule the rules schema cannot express
+(`sort_field` without `sort_order`), which arrives in an envelope of its own.
+Both dialects are now measured, message for message, precedence for
+precedence. `DELETE /api/cases` took its ids in the body and answered 204
+whatever happened; Kibana takes them in the query string and answers 404
+naming the saved object when one is missing.
+
+**Smaller ones, all measured the same way.** SPL: `tail` reverses its rows,
+`stats ... by` sorts its groups and drops a row missing a by-field, `top`
+carries `_tc` and six decimals of percentage, `table` drops a field a row does
+not have, `_time` renders as ISO-8601 rather than as the epoch the pipeline
+sorts on, a single-valued field is a string rather than a one-element array,
+`stdev`/`var`/`perc<N>`/`mode`/`earliest`/`latest` exist, and `round(10, 2)`
+is `10.00`. Elasticsearch: hits carry the `sort` values `search_after` needs,
+a document without the sort field goes last whichever way the sort runs,
+`track_total_hits` caps at 10 000 with `relation: gte`, a written document
+keeps the id it was given, Lucene's `[a TO b]` works and `@timestamp:x` names
+a field, and four malformed `range` shapes are refused by name — one of which
+the fuzzer reached as a 500. Kibana: a case carries `comments`,
+`customFields`, `category`, `duration` and `external_service`, and no longer
+carries mockdr's own `alert_ids`.
+
+
 **The guard that was too strict.** The shard-allocation wait added above
 refused to probe until `unassigned_shards` reached zero — which on a
 single-node Elasticsearch never happens, because every replica is
@@ -137,6 +207,19 @@ and "nothing ran" stay distinguishable.
 config of its own (the backend's rules, with the allowances a script earns)
 and is checked in CI and by `ci.sh`; the 34 findings that had accumulated
 are fixed, including a probe that bound to `0.0.0.0` to talk to itself.
+
+### Added
+
+**The harness compares answers, not only shapes.** Every probe until now
+compared the *shape* of a reply against an empty real install — which cannot
+see a wrong answer, because a search that matches nothing agrees with every
+other search that matches nothing. That blind spot is where the time filters,
+the snapping, the bucketing and the sort order above all survived.
+`--seeded` puts the same five events into both Splunk targets' HEC and the
+same six documents into both Elasticsearch targets, and 56 probes then run
+the same query against both and compare the rows themselves
+(`needs_seed: true` + `compare: values`, with the fields that name the
+instance rather than the API dropped first). CI runs both probe files seeded.
 
 ### Changed
 
