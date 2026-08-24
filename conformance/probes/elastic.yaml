@@ -1018,3 +1018,198 @@ probes:
       content: '{"query": {"match_all": {}}}'
       headers: {Content-Type: application/json}
       auth: basic
+
+  # ── Kibana: what a _find query is allowed to say (2.3.0) ───────────────
+  #
+  # Kibana validates the whole query string before it looks at any data.
+  # mockdr accepted almost all of this silently, which is the failure mode
+  # the harness exists to catch: a 200 that answers a question nobody asked.
+
+  - id: kbn-cases-find-perpage-too-high
+    endpoint: kibana
+    why: >
+      Kibana caps a page at 100 and says so; mockdr served 101.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"perPage": "101"}
+      auth: basic
+
+  - id: kbn-cases-find-perpage-negative
+    endpoint: kibana
+    why: >
+      A negative page size reaches Elasticsearch, which reports it as [size].
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"perPage": "-1"}
+      auth: basic
+
+  - id: kbn-cases-find-page-zero
+    endpoint: kibana
+    why: >
+      Page 0 is a negative window, reported as [from] with the offset it computed.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"page": "0"}
+      auth: basic
+
+  - id: kbn-cases-find-page-not-a-number
+    endpoint: kibana
+    why: >
+      A page that is not a number.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"page": "bad"}
+      auth: basic
+
+  - id: kbn-cases-find-sort-field-unknown
+    endpoint: kibana
+    why: >
+      A field this endpoint will not sort by; mockdr sorted by something else and answered 200.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"sortField": "nope"}
+      auth: basic
+
+  - id: kbn-cases-find-sort-field-owner
+    endpoint: kibana
+    why: >
+      A perfectly good case field that is still not sortable here.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"sortField": "owner"}
+      auth: basic
+
+  - id: kbn-cases-find-sort-order-unknown
+    endpoint: kibana
+    why: >
+      A direction that is neither asc nor desc.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"sortOrder": "sideways"}
+      auth: basic
+
+  - id: kbn-cases-find-severity-unknown
+    endpoint: kibana
+    why: >
+      mockdr answered 200 with no cases, which a client reads as there being none rather than as the typo it is.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"severity": "nonsense"}
+      auth: basic
+
+  - id: kbn-cases-find-status-unknown
+    endpoint: kibana
+    why: >
+      The same for status.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"status": "nonsense"}
+      auth: basic
+
+  - id: kbn-cases-find-unknown-key
+    endpoint: kibana
+    why: >
+      A query key the endpoint does not have.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"nosuchparam": "1"}
+      auth: basic
+
+  - id: kbn-cases-find-unknown-keys
+    endpoint: kibana
+    why: >
+      Two of them, named together.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"nosuchparam": "1", "another": "2"}
+      auth: basic
+
+  - id: kbn-cases-find-several-problems
+    endpoint: kibana
+    why: >
+      Kibana reports every value it could not accept, joined, in its codec's order.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"status": "bad", "sortField": "bad"}
+      auth: basic
+
+  - id: kbn-cases-find-cap-after-values
+    endpoint: kibana
+    why: >
+      And appends the page-size cap after those.
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"perPage": "101", "sortOrder": "bad"}
+      auth: basic
+
+  - id: kbn-cases-find-sort-field-allowed
+    endpoint: kibana
+    why: >
+      A sort this endpoint does take, compared as a shape. It is the only
+      probe that reaches a case object, and it is how the members mockdr was
+      missing — comments, customFields, category, duration, external_service
+      — were found, along with an `alert_ids` no real case carries.
+    # What each install's cases happen to hold: whether any was ever closed
+    # or updated, and what its creator's directory entry says. The members
+    # around them are the shape this compares.
+    ignore_paths:
+      - $.cases[*].status
+      - $.cases[*].closed_at
+      - $.cases[*].closed_by
+      - $.cases[*].updated_at
+      - $.cases[*].updated_by
+      - $.cases[*].created_by
+      - $.count_open_cases
+      - $.count_in_progress_cases
+      - $.count_closed_cases
+      - $.total
+    request:
+      method: GET
+      path: /api/cases/_find
+      query: {"sortField": "title", "sortOrder": "asc"}
+      auth: basic
+
+  - id: kbn-cases-delete-no-ids
+    endpoint: kibana
+    why: >
+      Deleting with no ids at all. mockdr read them from the body and
+      answered 204 either way, so a client sending the documented form
+      deleted nothing here and everything there.
+    request:
+      method: DELETE
+      path: /api/cases
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-delete-unknown-id
+    endpoint: kibana
+    why: A saved object that is not there is a 404 naming it, not a silent success.
+    request:
+      method: DELETE
+      path: /api/cases
+      query: {ids: '["no-such-case"]'}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-delete-ids-not-an-array
+    endpoint: kibana
+    why: The ids parameter names the JSON type it got, the way JavaScript names it.
+    request:
+      method: DELETE
+      path: /api/cases
+      query: {ids: '"x"'}
+      headers: {kbn-xsrf: "true"}
+      auth: basic

@@ -17,9 +17,37 @@ _CASE_FIELD_ALIASES: dict[str, str] = {
 }
 
 
+#: What a case was opened from is mockdr's own bookkeeping — `totalAlerts` is
+#: derived from it. Kibana carries no such member; the alerts on a case live
+#: in its comments.
+_CASE_INTERNAL_FIELDS: frozenset[str] = frozenset({"alert_ids"})
+
+#: Members every Kibana case carries that the dataclass has no slot for. A
+#: client reading `case.comments` or `case.customFields` found nothing here
+#: (measured against Kibana 8.15).
+_CASE_DEFAULTS: dict[str, Any] = {
+    "category": None,
+    "comments": [],
+    "customFields": [],
+    "duration": None,
+    "external_service": None,
+}
+
+
 def serialise_case(record: dict[str, Any]) -> dict[str, Any]:
-    """Rename a case dict's internal fields to their Kibana-facing names."""
-    return {_CASE_FIELD_ALIASES.get(key, key): value for key, value in record.items()}
+    """Render a case the way Kibana's ``CaseRt`` does.
+
+    Internal names become the ones Kibana declares, mockdr's own bookkeeping
+    is dropped, and the members every case carries are filled in.
+    """
+    rendered = {
+        _CASE_FIELD_ALIASES.get(key, key): value
+        for key, value in record.items()
+        if key not in _CASE_INTERNAL_FIELDS
+    }
+    for key, value in _CASE_DEFAULTS.items():
+        rendered.setdefault(key, list(value) if isinstance(value, list) else value)
+    return rendered
 
 
 def status_counts(records: list[dict[str, Any]]) -> dict[str, int]:

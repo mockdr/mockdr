@@ -5,13 +5,16 @@ Implements the Elastic Security Cases API endpoints at ``/api/cases``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+import json
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_cases import commands as case_commands
 from application.es_cases import queries as case_queries
 from utils.es_response import build_kbn_error_response
+from utils.kibana_find import FindQueryError, validate_find_query
 
 router = APIRouter(tags=["ES Cases"])
 
@@ -21,11 +24,14 @@ router = APIRouter(tags=["ES Cases"])
 
 @router.get("/api/cases/_find")
 def find_cases(
+    request: Request,
     status: str = Query(None),
     tags: str = Query(None, description="Comma-separated tags"),
     owner: str = Query(None),
-    page: int = Query(1),
-    per_page: int = Query(20, ge=0, le=1000, alias="perPage"),
+    # Untyped on purpose: FastAPI's own 422 would pre-empt Kibana's wording,
+    # and the whole point of validating here is to send what Kibana sends.
+    page: str = Query("1"),
+    per_page: str = Query("20", alias="perPage"),
     severity: str = Query(None),
     search: str = Query(None),
     reporters: str = Query(None, description="Comma-separated usernames"),
@@ -38,12 +44,18 @@ def find_cases(
     severity, search, reporters, sortField and sortOrder are documented on
     this endpoint but were declared on no parameter, so FastAPI dropped them
     and a filtered request returned the full unfiltered list.
+
+    Kibana validates the whole query before it looks at any data, and mockdr
+    accepted almost all of it: `severity=nonsens` came back as 200 with no
+    cases, which a client reads as "there are none" rather than as the typo
+    it is.
     """
-    if status is not None and status not in ("open", "in-progress", "closed"):
-        # io-ts wording for a value outside the enum (measured on 8.15).
+    try:
+        validate_find_query(request.query_params)
+    except FindQueryError as exc:
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
-            400, f'Invalid value "{status}" supplied to "status"',
-        ))
+            400, str(exc),
+        )) from exc
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     reporter_list = (
         [r.strip() for r in reporters.split(",") if r.strip()] if reporters else None
@@ -52,8 +64,8 @@ def find_cases(
         status=status,
         tags=tag_list,
         owner=owner,
-        page=page,
-        per_page=per_page,
+        page=int(float(page)),
+        per_page=int(float(per_page)),
         severity=severity,
         search=search,
         reporters=reporter_list,
@@ -161,14 +173,47 @@ def update_cases(
     return updated
 
 
+#: Kibana names a JSON type the way JavaScript does, not the way Python does.
+_JSON_TYPE_NAMES: dict[type, str] = {
+    str: "string", int: "number", float: "number", bool: "boolean",
+    dict: "Object", type(None): "null",
+}
+
+
 @router.delete("/api/cases", dependencies=[Depends(require_kbn_xsrf)])
 def delete_cases(
-    body: list[str] = Body(...),
+    ids: str = Query(None),
     _: dict = Depends(require_es_write),
 ) -> Response:
-    """Delete one or more cases by ID (body is a list of IDs)."""
-    for case_id in body:
-        case_commands.delete_case(case_id)
+    """Delete cases named by ``?ids=["a","b"]``.
+
+    The ids belong in the query string, not the body: Kibana refuses a body
+    with the same message it uses for no ids at all, and mockdr read the body
+    and answered 204 either way — so a client sending the documented form
+    deleted nothing here and everything there.
+    """
+    if ids is None:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request query.ids]: expected value of type [array] but got [undefined]",
+        ))
+    try:
+        wanted = json.loads(ids)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, f"[request query.ids]: could not parse array value from json input: {ids}",
+        )) from exc
+    if not isinstance(wanted, list):
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request query.ids]: expected value of type [array] but got "
+                 f"[{_JSON_TYPE_NAMES.get(type(wanted), 'Object')}]",
+        ))
+    for case_id in wanted:
+        if not case_commands.delete_case(str(case_id)):
+            # A saved object that is not there is a 404 naming it, not a
+            # silent success.
+            raise HTTPException(status_code=404, detail=build_kbn_error_response(
+                404, f"Saved object [cases/{case_id}] not found",
+            ))
     return Response(status_code=204)
 
 

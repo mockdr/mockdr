@@ -4,7 +4,9 @@ Verifies case CRUD, comments, tags, and Kibana pagination at
 ``/kibana/api/cases``.
 """
 import base64
+import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 ES_AUTH = {
@@ -150,7 +152,7 @@ class TestCreateCase:
         before = client.get(
             "/kibana/api/cases/_find",
             headers=ES_AUTH,
-            params={"perPage": 200},
+            params={"perPage": 100},
         ).json()["total"]
 
         client.post(
@@ -165,7 +167,7 @@ class TestCreateCase:
         after = client.get(
             "/kibana/api/cases/_find",
             headers=ES_AUTH,
-            params={"perPage": 200},
+            params={"perPage": 100},
         ).json()["total"]
         assert after == before + 1
 
@@ -369,7 +371,7 @@ class TestDeleteCase:
             "DELETE",
             "/kibana/api/cases",
             headers=KBN_WRITE_HEADERS,
-            json=[case_id],
+            params={"ids": json.dumps([case_id])},
         )
         # DELETE returns 204 (no content)
         assert resp.status_code == 204
@@ -383,7 +385,7 @@ class TestDeleteCase:
         before = client.get(
             "/kibana/api/cases/_find",
             headers=ES_AUTH,
-            params={"perPage": 200},
+            params={"perPage": 100},
         ).json()["total"]
 
         case_id = _get_first_case_id(client)
@@ -391,12 +393,103 @@ class TestDeleteCase:
             "DELETE",
             "/kibana/api/cases",
             headers=KBN_WRITE_HEADERS,
-            json=[case_id],
+            params={"ids": json.dumps([case_id])},
         )
 
         after = client.get(
             "/kibana/api/cases/_find",
             headers=ES_AUTH,
-            params={"perPage": 200},
+            params={"perPage": 100},
         ).json()["total"]
         assert after == before - 1
+
+
+class TestCaseObjectShape:
+    """Every member Kibana's ``CaseRt`` declares, and nothing it does not.
+
+    Measured against Kibana 8.15 by reading a case back from a real instance.
+    A client reading `case.comments` or `case.customFields` found nothing
+    here, and `alert_ids` — mockdr's own bookkeeping behind `totalAlerts` —
+    was exposed as though it were part of the API.
+    """
+
+    def test_the_members_a_real_case_carries(self, client: TestClient) -> None:
+        case = client.get(
+            "/kibana/api/cases/_find", headers=ES_AUTH, params={"perPage": 1},
+        ).json()["cases"][0]
+        assert set(case) == {
+            "assignees", "category", "closed_at", "closed_by", "comments",
+            "connector", "created_at", "created_by", "customFields",
+            "description", "duration", "external_service", "id", "owner",
+            "settings", "severity", "status", "tags", "title", "totalAlerts",
+            "totalComment", "updated_at", "updated_by", "version",
+        }
+
+    def test_the_bookkeeping_behind_total_alerts_stays_internal(
+        self, client: TestClient,
+    ) -> None:
+        case = client.get(
+            "/kibana/api/cases/_find", headers=ES_AUTH, params={"perPage": 1},
+        ).json()["cases"][0]
+        assert "alert_ids" not in case
+        # The count derived from it is what Kibana exposes.
+        assert isinstance(case["totalAlerts"], int)
+
+
+class TestFindQueryIsValidated:
+    """Kibana refuses a query before it looks at any data; so does this."""
+
+    @pytest.mark.parametrize(("params", "message"), [
+        ({"severity": "nonsense"}, 'Invalid value "nonsense" supplied to "severity"'),
+        ({"sortField": "nope"}, 'Invalid value "nope" supplied to "sortField"'),
+        ({"sortOrder": "sideways"}, 'Invalid value "sideways" supplied to "sortOrder"'),
+        ({"perPage": "101"},
+         "The provided perPage value is too high. The maximum allowed perPage value is 100."),
+        ({"nosuchparam": "1"}, 'invalid keys "nosuchparam"'),
+    ])
+    def test_a_refused_query_carries_kibanas_wording(
+        self, client: TestClient, params: dict, message: str,
+    ) -> None:
+        response = client.get("/kibana/api/cases/_find", headers=ES_AUTH, params=params)
+        assert response.status_code == 400
+        assert response.json()["message"] == message
+
+    def test_a_usable_query_still_runs(self, client: TestClient) -> None:
+        response = client.get(
+            "/kibana/api/cases/_find", headers=ES_AUTH,
+            params={"sortField": "title", "sortOrder": "asc", "perPage": "5"},
+        )
+        assert response.status_code == 200
+
+
+class TestDeleteTakesIdsInTheQuery:
+    """The ids belong in the query string, and a missing case is a 404."""
+
+    def test_no_ids_is_refused(self, client: TestClient) -> None:
+        response = client.delete("/kibana/api/cases", headers=KBN_WRITE_HEADERS)
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            "[request query.ids]: expected value of type [array] but got [undefined]"
+        )
+
+    def test_an_unknown_id_is_a_404_naming_it(self, client: TestClient) -> None:
+        response = client.delete(
+            "/kibana/api/cases", headers=KBN_WRITE_HEADERS,
+            params={"ids": json.dumps(["no-such-case"])},
+        )
+        assert response.status_code == 404
+        assert response.json()["message"] == "Saved object [cases/no-such-case] not found"
+
+    @pytest.mark.parametrize(("value", "named"), [
+        ('"x"', "string"), ("5", "number"), ('{"a":1}', "Object"), ("true", "boolean"),
+    ])
+    def test_ids_that_are_not_an_array_name_their_json_type(
+        self, client: TestClient, value: str, named: str,
+    ) -> None:
+        response = client.delete(
+            "/kibana/api/cases", headers=KBN_WRITE_HEADERS, params={"ids": value},
+        )
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            f"[request query.ids]: expected value of type [array] but got [{named}]"
+        )

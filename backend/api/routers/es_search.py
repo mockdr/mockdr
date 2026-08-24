@@ -13,7 +13,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 
 from api.es_auth import require_es_auth, require_es_write
-from api.spa import spa_response
+from api.spa import spa_response, wants_html
 from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
 from utils.es_query import ESQueryError
@@ -438,9 +438,13 @@ async def get_index(request: Request, index: str) -> Response:
     Authentication is checked after that, for the same reason: a navigation
     must not be answered with the API's 401.
     """
-    navigation = spa_response(request)
-    if navigation is not None:
-        return navigation
+    if wants_html(request):
+        # A UI navigation, whether or not the frontend is built: answering it
+        # with the API's 401 would put an auth prompt in front of a page.
+        navigation = spa_response(request)
+        if navigation is not None:
+            return navigation
+        raise HTTPException(status_code=404, detail=build_es_index_not_found(index))
     await require_es_auth(request, request.headers.get("authorization", ""))
     if index.startswith("_"):
         raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
