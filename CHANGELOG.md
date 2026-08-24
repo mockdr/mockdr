@@ -50,17 +50,29 @@ how every client library asks whether an index exists, answered 405. The whole
 lifecycle is measured against 8.15 now, down to `forced_refresh` and the 201
 that separates a create from a replacement.
 
-**Kibana's query strings were read past.** `severity=nonsens` came back as
-`200` with no cases, which a client reads as "there are none" rather than as
-the typo it is; `sortField=nope` came back sorted by something else; a case
-was created with a severity outside the enum and a `status` no client may set.
-The Cases API validates with io-ts, the Detection Rules API with zod, and they
-word everything differently — including a rule the rules schema cannot express
-(`sort_field` without `sort_order`), which arrives in an envelope of its own.
-Both dialects are now measured, message for message, precedence for
-precedence. `DELETE /api/cases` took its ids in the body and answered 204
-whatever happened; Kibana takes them in the query string and answers 404
-naming the saved object when one is missing.
+**Kibana's requests were read past.** `severity=nonsens` came back as `200`
+with no cases, which a client reads as "there are none" rather than as the
+typo it is; `sortField=nope` came back sorted by something else; a case was
+created with a severity outside the enum and a `status` no client may set; an
+exception list was created with a `type` a real Kibana refuses; a response
+action with an unreadable body came back as a 404 about an endpoint rather
+than a 400 about the request.
+
+Kibana speaks **four** validation dialects, and they differ in wording,
+precedence and envelope: io-ts on the Cases API, io-ts *with* a `[request
+query]` prefix on the exception lists, zod on the Detection Rules, and
+`@kbn/config-schema` on the Endpoint routes — which stops at the first
+failure where the others join every complaint, and counts pages from 0 where
+the others count from 1. What a route raises after its schema is satisfied
+comes back in a different envelope again: `{message, status_code}` rather
+than Boom's. All four are now measured, message for message.
+
+`DELETE /api/cases` took its ids in the body and answered 204 whatever
+happened; Kibana takes them in the query string and answers 404 naming the
+saved object when one is missing. The Endpoint metadata route declared four
+filters Kibana does not have and spelled the page size its own way — a client
+written against the mock sent a query the real one refuses, so those are gone
+and the UI now sends what a real client sends.
 
 **Smaller ones, all measured the same way.** SPL: `tail` reverses its rows,
 `stats ... by` sorts its groups and drops a row missing a by-field, `top`
