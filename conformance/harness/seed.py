@@ -46,6 +46,34 @@ SEED_EPOCH = 1787500000
 SEED_INDEX = "main"
 
 
+#: The Elasticsearch side of the same idea. Six documents, an explicit date
+#: mapping so both engines agree the timestamp is a date, and one document
+#: without the sort field so missing-value ordering has something to order.
+ES_SEED_INDEX = "conformance-seeded"
+
+ES_SEED_MAPPING: dict = {
+    "settings": {"number_of_shards": 1, "number_of_replicas": 0},
+    "mappings": {"properties": {
+        "@timestamp": {"type": "date"},
+        "host": {"type": "keyword"},
+        "sev": {"type": "integer"},
+        "name": {"type": "keyword"},
+    }},
+}
+
+#: Absolute timestamps, so a window written against them means the same thing
+#: on every run. Spread over ten days, with two documents sharing a day, so a
+#: date_histogram has both a populated gap and an empty one to draw.
+ES_SEED_DOCUMENTS: tuple[tuple[str, dict], ...] = (
+    ("a", {"@timestamp": "2026-08-01T04:00:00.000Z", "host": "srv-1", "sev": 10, "name": "a"}),
+    ("b", {"@timestamp": "2026-08-01T20:00:00.000Z", "host": "srv-1", "sev": 20, "name": "b"}),
+    ("c", {"@timestamp": "2026-08-03T09:00:00.000Z", "host": "srv-2", "sev": 30, "name": "c"}),
+    ("d", {"@timestamp": "2026-08-10T09:00:00.000Z", "host": "srv-3", "sev": 40, "name": "d"}),
+    ("e", {"@timestamp": "2026-08-10T09:00:00.000Z", "host": "srv-2", "sev": 50, "name": "e"}),
+    ("f", {"host": "srv-4", "sev": 60, "name": "f"}),
+)
+
+
 class SeedError(RuntimeError):
     """Raised when a target would not take the events."""
 
@@ -117,3 +145,38 @@ def await_indexed(
                 return
         time.sleep(2)
     raise SeedError(f"{target} did not index the seed events within 120s")
+
+
+def seed_elastic(target: str, clients: Clients, auth: object) -> str:
+    """Create the seed index on one target and fill it with the documents.
+
+    The index is dropped first: a run has to start from the same six
+    documents, and a real cluster keeps what the last run left.
+
+    Returns:
+        The index name, for the probes to search.
+
+    Raises:
+        SeedError: If the target would not take the index or the documents.
+    """
+    client = clients.get("search", target)
+    client.delete(f"/{ES_SEED_INDEX}", auth=auth)
+    created = client.put(f"/{ES_SEED_INDEX}", json=ES_SEED_MAPPING, auth=auth)
+    if created.status_code != 200:
+        raise SeedError(
+            f"{target} would not create {ES_SEED_INDEX}: HTTP "
+            f"{created.status_code} {created.text[:200]}",
+        )
+    for doc_id, source in ES_SEED_DOCUMENTS:
+        written = client.put(
+            f"/{ES_SEED_INDEX}/_doc/{doc_id}",
+            params={"refresh": "true"},
+            json=source,
+            auth=auth,
+        )
+        if written.status_code not in (200, 201):
+            raise SeedError(
+                f"{target} refused seed document {doc_id}: HTTP "
+                f"{written.status_code} {written.text[:200]}",
+            )
+    return ES_SEED_INDEX

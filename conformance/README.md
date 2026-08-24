@@ -41,7 +41,9 @@ to leave its groups unsorted, and `_time` to render as an epoch where splunkd
 renders ISO-8601. Each of those passed every structural probe.
 
 `--seeded` closes that. The bootstrap puts the same five events into both
-targets' HEC, under a sourcetype unique to the run, and the probes marked
+targets' HEC, under a sourcetype unique to the run, and creates
+`conformance-seeded` on both Elasticsearch targets with the same six
+documents. The probes marked
 
 ```yaml
     needs_seed: true
@@ -56,6 +58,12 @@ the API — bucket ids, index times, the server's own name — are listed under
 A seeded probe has to establish its own row order: the order splunkd returns
 raw events in is a property of how they landed in buckets, not something it
 documents. `| sort <field>` before the command under test is enough.
+
+Elasticsearch's seeded probes anchor their windows to the documents rather
+than to the clock — `2026-08-03T09:00:00.000Z||/d` resolves to the same
+instant on every run, where `now-30d` would stop being true. Two of them use
+a `now` bound wide enough to stay true regardless, so the resolver itself is
+still exercised.
 
 Two differences are left in place deliberately, both measured and both
 recorded in `backend/tests/unit/splunk/test_spl_against_splunk.py`: splunkd's

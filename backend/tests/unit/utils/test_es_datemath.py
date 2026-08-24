@@ -22,6 +22,7 @@ from utils.es_query import (
     doc_positions,
     emits_sort_values,
     parse_sort_keys,
+    sort_field_kinds,
     validate_search_body,
     wrap_as_hits,
 )
@@ -358,3 +359,50 @@ class TestMalformedRanges:
         with pytest.raises(ESQueryError) as caught:
             validate_search_body({"search_after": [1]})
         assert caught.value.shard_failure
+
+
+class TestMissingSortValues:
+    """What a hit's ``sort`` array carries when the document has no value.
+
+    Elasticsearch puts the extreme of a long there — the one that lands the
+    document where ``missing`` says — so a client paging with `search_after`
+    can send it back and continue. A keyword field gets ``null`` instead,
+    which is why the field's kind has to be judged before the value is
+    rendered. All four combinations measured against 8.15.
+    """
+
+    LONG_MAX = 2**63 - 1
+    LONG_MIN = -(2**63)
+
+    RECORDS = [
+        {"name": "with", "@timestamp": "2026-08-01T00:00:00.000Z", "host": "srv-1"},
+        {"name": "without"},
+    ]
+
+    def _sort_value(self, spec: list) -> object:
+        keys = parse_sort_keys(spec)
+        kinds = sort_field_kinds(self.RECORDS, keys)
+        hit = wrap_as_hits([self.RECORDS[1]], sort_keys=keys, kinds=kinds)[0]
+        return hit["sort"][0]
+
+    @pytest.mark.parametrize(("spec", "expected_max"), [
+        ([{"@timestamp": "asc"}], True),
+        ([{"@timestamp": "desc"}], False),
+        ([{"@timestamp": {"order": "asc", "missing": "_first"}}], False),
+        ([{"@timestamp": {"order": "desc", "missing": "_first"}}], True),
+    ])
+    def test_the_extreme_matches_where_the_document_lands(
+        self, spec: list, expected_max: bool,
+    ) -> None:
+        expected = self.LONG_MAX if expected_max else self.LONG_MIN
+        assert self._sort_value(spec) == expected
+
+    def test_a_keyword_field_gets_null_instead(self) -> None:
+        # There is no long that sorts a string, and Elasticsearch sends null.
+        assert self._sort_value([{"host": "asc"}]) is None
+
+    def test_the_kind_is_judged_from_the_documents_that_have_a_value(self) -> None:
+        keys = parse_sort_keys([{"@timestamp": "asc"}, {"host": "asc"}])
+        assert sort_field_kinds(self.RECORDS, keys) == {
+            "@timestamp": "number", "host": "keyword",
+        }

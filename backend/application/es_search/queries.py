@@ -23,6 +23,7 @@ from utils.es_query import (
     emits_sort_values,
     hit_id,
     parse_sort_keys,
+    sort_field_kinds,
     validate_search_body,
     wrap_as_hits,
 )
@@ -131,8 +132,8 @@ def created_indices() -> list[str]:
     return sorted(store.get_all_with_keys("es_indices"))
 
 
-def _written_documents(index: str) -> list[dict]:
-    """The documents a client wrote to this index, ready to search.
+def _written_documents(index: str) -> list[tuple[str, dict]]:
+    """The documents a client wrote to this index, with the ids it gave them.
 
     The count on the registry entry keeps this off the hot path: an index
     nobody has written to costs one dict lookup rather than a scan of every
@@ -143,7 +144,7 @@ def _written_documents(index: str) -> list[dict]:
         return []
     prefix = f"{index}:"
     return [
-        dict(record.get("_source") or {})
+        (key[len(prefix):], dict(record.get("_source") or {}))
         for key, record in store.get_all_with_keys("es_documents").items()
         if key.startswith(prefix)
     ]
@@ -207,7 +208,9 @@ def known_index_prefixes() -> tuple[str, ...]:
     return _KNOWN_PREFIXES
 
 
-def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tuple[list[dict], str]:
+def _resolve_collection(
+    index: str, *, ignore_unavailable: bool = False,
+) -> tuple[list[dict], str, dict[int, str]]:
     """Resolve an index pattern to the backing in-memory collection.
 
     Args:
@@ -216,7 +219,9 @@ def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tupl
                             mirroring the query parameter of the same name.
 
     Returns:
-        Tuple of (records as dicts, canonical index name).
+        The records, the canonical index name, and the ids of the documents a
+        client wrote — keyed by object identity, so a hit can carry the id it
+        was given rather than one derived from its contents.
 
     Raises:
         IndexNotFoundError: If a concrete index name is unknown.
@@ -237,12 +242,15 @@ def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tupl
         records += [to_ecs_document(record_dict(a), idx) for a in es_alert_repo.list_all()]
     if any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
         records += [record_dict(ep) for ep in es_endpoint_repo.list_all()]
+    written: dict[int, str] = {}
     for name in names:
         # A document written through the index API is searchable, as it is on
         # a real cluster; it used to be readable by id and invisible to every
         # search, which is the shape of an ingest that looks like it worked.
-        records += _written_documents(name)
-    return records, idx
+        for doc_id, source in _written_documents(name):
+            written[id(source)] = doc_id
+            records.append(source)
+    return records, idx, written
 
 
 # ── Public query functions ───────────────────────────────────────────────────
@@ -261,7 +269,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     Raises:
         IndexNotFoundError: If a concrete index name is unknown.
     """
-    records, canonical_index = _resolve_collection(
+    records, canonical_index, written_ids = _resolve_collection(
         index, ignore_unavailable=ignore_unavailable,
     )
 
@@ -291,6 +299,8 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
             index=canonical_index,
             sort_keys=sort_keys,
             positions=doc_positions(records),
+            ids=written_ids,
+            kinds=sort_field_kinds(records, sort_keys),
         ),
         body.get("_source"),
     )
@@ -349,7 +359,7 @@ def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dic
     Raises:
         IndexNotFoundError: If a concrete index name is unknown.
     """
-    records, _ = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
+    records, _, _written = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
     query_clause = (body or {}).get("query")
     if query_clause:
         predicate = build_predicate(query_clause)
@@ -364,7 +374,7 @@ def es_cat_indices() -> list[dict]:
     """Return the ``_cat/indices`` rows, in the JSON form ``format=json`` gives."""
     rows = []
     for prefix in _KNOWN_PREFIXES:
-        records, _ = _resolve_collection(prefix, ignore_unavailable=True)
+        records, _, _written = _resolve_collection(prefix, ignore_unavailable=True)
         rows.append({
             "health": "green",
             "status": "open",
@@ -482,7 +492,7 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
             "_source": written.get("_source", {}),
         }
 
-    records, canonical_index = _resolve_collection(index)
+    records, canonical_index, _written = _resolve_collection(index)
 
     for rec in records:
         # An ECS document keeps its identity under kibana.alert.uuid or
@@ -656,7 +666,7 @@ def es_get_stats(index: str, *, ignore_unavailable: bool = False) -> dict:
     Returns:
         Elasticsearch index stats response dict.
     """
-    records, _ = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
+    records, _, _written = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
     doc_count = len(records)
 
     return {

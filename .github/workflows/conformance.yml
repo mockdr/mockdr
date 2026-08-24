@@ -61,7 +61,7 @@ jobs:
           echo "KV store never became ready"; exit 1
 
       - name: Elasticsearch + Kibana probes
-        run: python -m harness.runner probes/elastic.yaml
+        run: python -m harness.runner probes/elastic.yaml --seeded
 
       # `--seeded` puts the same five events into both targets' HEC first,
       # so the probes that compare result *values* have something to compare.

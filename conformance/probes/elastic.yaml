@@ -19,6 +19,16 @@ credentials:
   mock: {user: elastic, password: mock-elastic-password}
   real: {user: elastic, password: "${env:ELASTIC_PASSWORD:-Probe-Passw0rd!}"}
 
+# What an Elasticsearch hit says about the cluster rather than about the API.
+# `took` is the run's own timing and `_shards` its topology; `max_score` is
+# compared, because whether a search is scored at all is behaviour.
+volatile_fields:
+  - took
+  - _shards
+  - _seq_no
+  - _primary_term
+  - _version
+
 significant_keys:
   - status
   - statusCode
@@ -674,5 +684,337 @@ probes:
       method: POST
       path: /${index}/_search
       content: '{"size":0,"aggs":{"p":{"date_histogram":{"field":"@timestamp","interval":"1d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  # ── Seeded semantics: the same documents on both sides (2.3.0) ─────────
+  #
+  # These need --seeded, which creates `conformance-seeded` on both targets
+  # and fills it with six known documents. Every window below is anchored
+  # to those documents rather than to the clock, so the expectations do not
+  # drift; the two `now`-relative bounds are wide enough to stay true.
+
+  - id: es-seeded-date-math-window
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A relative window. Compared as a string, `now-30d` was false for every document, so every Kibana time picker matched nothing.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "query": {"range": {"@timestamp": {"gte": "now-10y", "lte": "now+1y"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-date-math-anchored
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Anchored date math, which resolves to the same instant on every run.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"gte": "2026-08-03T00:00:00.000Z||-1d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-date-math-rounding-gte
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `gte: <date>||/d` rounds down, taking in the whole day.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"gte": "2026-08-03T09:00:00.000Z||/d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-date-math-rounding-lt
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `lt` rounds down too, which excludes that whole day.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"lt": "2026-08-03T09:00:00.000Z||/d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-date-math-rounding-lte
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `lte` rounds up instead, which includes it.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"lte": "2026-08-03T09:00:00.000Z||/d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-query-string-range
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Lucene's own range spelling, which had no support at all here.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"query_string": {"query": "@timestamp:[2026-08-02T00:00:00.000Z TO 2026-08-11T00:00:00.000Z]"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-query-string-field
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `@timestamp:x` names a field; the tokeniser used to read it as a bare word and search every field.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"query_string": {"query": "host:srv-2"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-sorted-hits-carry-sort-values
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A sorted hit carries the sort array a client pages with, and a sorted search is not a scored one.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 2, "sort": [{"@timestamp": "desc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-search-after-page-two
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The second page, resumed from the first page's last sort value.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 2, "sort": [{"@timestamp": "desc"}], "search_after": [1786266000000], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-missing-values-sort-last-desc
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A document without the sort field goes last whichever way the sort runs; descending used to lead with it.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"@timestamp": "desc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-missing-values-sort-last-asc
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The same, ascending.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"@timestamp": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-missing-values-first
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `missing: _first` puts it at the front instead.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"@timestamp": {"order": "desc", "missing": "_first"}}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-terms
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A terms breakdown, ordered by count then key.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"by_host": {"terms": {"field": "host"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-date-histogram-days
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Every interval between the first and the last, empty ones drawn at zero — they used to be left out, so a chart skipped quiet days.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"per_day": {"date_histogram": {"field": "@timestamp", "calendar_interval": "1d"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-date-histogram-min-doc-count
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `min_doc_count` suppresses them again.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"per_day": {"date_histogram": {"field": "@timestamp", "calendar_interval": "1d", "min_doc_count": 1}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-date-histogram-week
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A calendar week begins on Monday, not on the weekday the epoch fell on.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"per_week": {"date_histogram": {"field": "@timestamp", "calendar_interval": "1w"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-date-histogram-month
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And a calendar month is a month, not thirty days.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"per_month": {"date_histogram": {"field": "@timestamp", "calendar_interval": "1M"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-date-histogram-fixed
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A fixed interval is anchored on the epoch instead.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"per": {"date_histogram": {"field": "@timestamp", "fixed_interval": "36h"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-metrics-are-doubles
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Every numeric metric is a double, even one that divides evenly.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"a": {"avg": {"field": "sev"}}, "s": {"sum": {"field": "sev"}}, "mn": {"min": {"field": "sev"}}, "mx": {"max": {"field": "sev"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-stats
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `stats` reports a count as an int and the rest as doubles.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"s": {"stats": {"field": "sev"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-range-bucket-keys
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A range bucket's key renders its bounds as doubles.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"r": {"range": {"field": "sev", "ranges": [{"to": 25}, {"from": 25, "to": 45}, {"from": 45}]}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-nested
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A metric under a bucket.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"by_host": {"terms": {"field": "host"}, "aggs": {"avg_sev": {"avg": {"field": "sev"}}}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-track-total-hits-cap
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A capped total says so with `relation: gte` rather than reporting an exact count.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "track_total_hits": 2}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-track-total-hits-false
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And `false` reports no total at all.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "track_total_hits": false}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-count-endpoint
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `_count` has its own envelope.
+    request:
+      method: POST
+      path: /${seed_index}/_count
+      content: '{"query": {"match_all": {}}}'
       headers: {Content-Type: application/json}
       auth: basic

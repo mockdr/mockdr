@@ -806,10 +806,42 @@ def emits_sort_values(sort_keys: list[SortKey]) -> bool:
     return any(key.field != "_score" for key in sort_keys)
 
 
+#: What Elasticsearch puts in a hit's ``sort`` array for a document that has
+#: no value for the sort field: the extreme of a long, chosen so the document
+#: lands last whichever way the sort runs. A keyword field gets ``null``
+#: instead, which is why the kind has to be known.
+_LONG_MAX = 2**63 - 1
+_LONG_MIN = -(2**63)
+
+
+def sort_field_kinds(
+    records: list[dict], sort_keys: list[SortKey],
+) -> dict[str, str]:
+    """Whether each sort field holds numbers or strings, judged from the data.
+
+    Elasticsearch knows from the mapping; a mock without one reads the values
+    it has. The answer decides only what a *missing* value sorts as — the
+    extreme of a long for a number or a date, ``null`` for a keyword.
+    """
+    kinds: dict[str, str] = {}
+    for key in sort_keys:
+        if key.field in ("_score", "_doc"):
+            continue
+        for record in records:
+            value = _get_nested(record, key.field)
+            if value is None:
+                continue
+            rendered = _sort_value(value)
+            kinds[key.field] = "number" if isinstance(rendered, (int, float)) else "keyword"
+            break
+    return kinds
+
+
 def sort_values(
     record: dict,
     sort_keys: list[SortKey],
     positions: dict[int, int] | None = None,
+    kinds: dict[str, str] | None = None,
 ) -> list:
     """The ``sort`` array Elasticsearch attaches to a hit when a sort is given.
 
@@ -826,7 +858,15 @@ def sort_values(
         elif key.field == "_score":
             values.append(1.0)
         else:
-            values.append(_sort_value(_get_nested(record, key.field)))
+            raw = _get_nested(record, key.field)
+            if raw is None and (kinds or {}).get(key.field) == "number":
+                # The extreme that puts the document where `missing` says: last
+                # by default, first when asked, whichever way the sort runs.
+                values.append(
+                    _LONG_MIN if key.desc != key.missing_first else _LONG_MAX,
+                )
+            else:
+                values.append(_sort_value(raw))
     return values
 
 
@@ -972,6 +1012,8 @@ def wrap_as_hits(
     index: str = ".siem-signals-default",
     sort_keys: list[SortKey] | None = None,
     positions: dict[int, int] | None = None,
+    ids: dict[int, str] | None = None,
+    kinds: dict[str, str] | None = None,
 ) -> list[dict]:
     """Wrap plain dicts as Elasticsearch hit objects.
 
@@ -984,6 +1026,13 @@ def wrap_as_hits(
         sort_keys: Parsed sort keys; when given, each hit carries the ``sort``
                    array a client needs to page with ``search_after``.
         positions: Document positions, for a ``_doc`` sort key.
+        ids:       Ids a client gave documents it wrote, by object identity.
+                   Without them a written document came back under an id
+                   derived from its contents rather than the one it was
+                   indexed with.
+        kinds:     What each sort field holds, from
+                   :func:`sort_field_kinds`; it decides what a document with
+                   no value for that field sorts as.
 
     Returns:
         List of Elasticsearch-style hit dicts.
@@ -992,13 +1041,13 @@ def wrap_as_hits(
     for rec in records:
         hit: dict[str, Any] = {
             "_index": index,
-            "_id": hit_id(rec),
+            "_id": (ids or {}).get(id(rec)) or hit_id(rec),
             # A sorted search has no relevance score in Elasticsearch.
             "_score": None if sort_keys else 1.0,
             "_source": rec,
         }
         if sort_keys:
-            hit["sort"] = sort_values(rec, sort_keys, positions)
+            hit["sort"] = sort_values(rec, sort_keys, positions, kinds)
         hits.append(hit)
     return hits
 

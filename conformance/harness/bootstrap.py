@@ -15,7 +15,13 @@ from __future__ import annotations
 import httpx
 
 from harness.clients import Clients
-from harness.seed import SeedError, await_indexed, seed_sourcetype, seed_splunk
+from harness.seed import (
+    SeedError,
+    await_indexed,
+    seed_elastic,
+    seed_sourcetype,
+    seed_splunk,
+)
 from harness.spec import PlatformSpec
 
 #: mockdr's seeded HEC token. Fixed on purpose — reproducibility is a feature
@@ -149,13 +155,13 @@ def _restrict_indexes(
 
 
 def bootstrap_elastic(
-    spec: PlatformSpec, target: str, clients: Clients, *, seeded: bool = False,  # noqa: ARG001
+    spec: PlatformSpec, target: str, clients: Clients, *, seeded: bool = False,
 ) -> dict[str, str]:
     """Report an index that exists on this target.
 
-    ``seeded`` is part of the bootstrap signature the runner calls; seeding
-    Elasticsearch needs index creation on both sides, which mockdr does not
-    offer yet, so the Elastic probes stay structural.
+    With ``seeded``, an index of six known documents is created on both
+    targets as well, and reported as ``seed_index`` — which is what lets a
+    probe compare what a query *answers* rather than only how it is shaped.
 
     Structural probes do not need one, but any probe that reads documents
     does, and which index exists differs: mockdr seeds its own names, a fresh
@@ -192,13 +198,35 @@ def bootstrap_elastic(
         if isinstance(row, dict) and not str(row.get("index", "")).startswith(".")
     )
     if names:
-        return {"index": names[0]}
+        return _with_elastic_seed(
+            {"index": names[0]}, spec, target, clients, seeded=seeded,
+        )
     # A fresh Elasticsearch has only Kibana's own system indices, and Kibana
     # keeps creating and rolling them over while the probes run: a request
     # against `_all` then measures that churn — an index whose stats are not
     # yet available, a shard that is not yet allocated — rather than either
     # product's API. One index of our own, created here, is stable.
-    return {"index": _create_probe_index(spec, target, clients)}
+    return _with_elastic_seed(
+        {"index": _create_probe_index(spec, target, clients)},
+        spec, target, clients, seeded=seeded,
+    )
+
+
+def _with_elastic_seed(
+    context: dict[str, str], spec: PlatformSpec, target: str, clients: Clients, *,
+    seeded: bool,
+) -> dict[str, str]:
+    """Add the seeded index to the context, when the run asked for one."""
+    if not seeded:
+        return context
+    auth = (
+        spec.credentials[target].pair if target in spec.credentials
+        else httpx.USE_CLIENT_DEFAULT
+    )
+    try:
+        return {**context, "seed_index": seed_elastic(target, clients, auth)}
+    except SeedError as exc:
+        raise BootstrapError(str(exc)) from exc
 
 
 _ES_PROBE_INDEX = "conformance-probe"
