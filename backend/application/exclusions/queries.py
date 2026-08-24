@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.exclusion_repo import exclusion_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import EXCLUSION_INTERNAL_FIELDS
@@ -36,7 +37,11 @@ def _api_scope(record: dict) -> dict:
 
 def list_exclusions(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of exclusions with internal fields stripped."""
-    filtered = apply_filters(exclusion_repo.list_all(), params, FILTER_SPECS)  # before strip
+    filtered = apply_filters(
+        exclusion_repo.list_all(),
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/exclusions", []),
+    )  # before strip
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, EXCLUSION_CURSOR)
     stripped = [_api_scope(strip_fields(record_dict(e), EXCLUSION_INTERNAL_FIELDS)) for e in page]

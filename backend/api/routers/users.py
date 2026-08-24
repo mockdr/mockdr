@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin, require_auth
 from api.dto.requests import UserBulkDeleteBody, UserCreateBody, UserUpdateBody
 from application.users import commands as user_commands
 from application.users import queries as user_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Users"])
 
 
-@router.get("/users")
+@router.get("/users", openapi_extra=documented_openapi("/users"))
 def list_users(
+    request: Request,
     ids: str = Query(None),
     accountIds: str = Query(None),
     roles: str = Query(None),
@@ -22,7 +25,11 @@ def list_users(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of management console users."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/users"))
     return user_queries.list_users(params, cursor, limit)
 
 

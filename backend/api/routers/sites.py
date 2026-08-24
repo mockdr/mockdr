@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import SiteCreateBody, SiteUpdateBody
 from application.sites import commands as site_commands
 from application.sites import queries as site_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Sites"])
 
 
-@router.get("/sites")
+@router.get("/sites", openapi_extra=documented_openapi("/sites"))
 def list_sites(
+    request: Request,
     ids: str = Query(None),
     accountIds: str = Query(None),
     states: str = Query(None),
@@ -25,7 +28,11 @@ def list_sites(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered list of sites in the S1 allSites envelope format."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/sites"))
     return site_queries.list_sites(params, cursor, limit)
 
 

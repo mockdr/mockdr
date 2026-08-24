@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import AccountCreateBody, AccountUpdateBody
 from application.accounts import commands as account_commands
 from application.accounts import queries as account_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Accounts"])
 
 
-@router.get("/accounts")
+@router.get("/accounts", openapi_extra=documented_openapi("/accounts"))
 def list_accounts(
+    request: Request,
     accountIds: str = Query(None),  # noqa: N803 - the vendor's own names
     name: str = Query(None),
     states: str = Query(None),
@@ -20,7 +23,11 @@ def list_accounts(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of accounts, filtered as the swagger declares."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/accounts"))
     return account_queries.list_accounts(params, cursor, limit)
 
 

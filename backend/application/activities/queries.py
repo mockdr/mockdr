@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.activity_repo import activity_repo
 from repository.user_repo import user_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
@@ -52,7 +53,11 @@ def list_activities(params: dict, cursor: str | None, limit: int) -> dict:
             if str(getattr(u, "email", "")).lower() in wanted
         }
         records = [r for r in records if str(r.get("userId") or "") in ids]
-    filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_filters(
+        records,
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/activities", []),
+    )
     filtered.sort(key=lambda r: r.get("id", 0))
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, ACTIVITY_CURSOR)

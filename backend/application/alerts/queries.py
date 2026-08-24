@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.alert_repo import alert_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.nested import get_nested
@@ -36,7 +37,11 @@ FILTER_SPECS = [
 
 def list_alerts(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of alerts sorted by creation date."""
-    filtered = apply_filters(alert_repo.list_all(), params, FILTER_SPECS)
+    filtered = apply_filters(
+        alert_repo.list_all(),
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/cloud-detection/alerts", []),
+    )
     filtered.sort(key=lambda a: get_nested(a, "alertInfo.createdAt") or "", reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, ALERT_CURSOR)
@@ -70,4 +75,8 @@ def filter_star_rules(params: dict) -> list[dict]:
     """The STAR rules a request asks for; every rule when it asks for none."""
     from repository.store import store  # noqa: PLC0415 - avoids an import cycle
 
-    return apply_filters(list(store.get_all("star_rules")), params, RULE_FILTER_SPECS)
+    return apply_filters(
+        list(store.get_all("star_rules")),
+        params,
+        RULE_FILTER_SPECS + DOCUMENTED_FILTERS.get("/cloud-detection/rules", []),
+    )

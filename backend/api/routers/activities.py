@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Query
+from starlette.requests import Request
 
 from application.activities import queries as activity_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Activities"])
 
@@ -12,8 +14,9 @@ def list_activity_types() -> dict:
     return activity_queries.list_activity_types()
 
 
-@router.get("/activities")
+@router.get("/activities", openapi_extra=documented_openapi("/activities"))
 def list_activities(
+    request: Request,
     accountIds: str = Query(None),
     siteIds: str = Query(None),
     userIds: str = Query(None),
@@ -29,5 +32,9 @@ def list_activities(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of activity log entries."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/activities"))
     return activity_queries.list_activities(params, cursor, limit)

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import (
@@ -9,6 +10,7 @@ from api.dto.requests import (
 from application.device_control import commands as dc_commands
 from application.device_control import queries as dc_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Device Control"])
 
@@ -45,8 +47,9 @@ def delete_device_control_rules(
     return {"data": {"affected": affected}}
 
 
-@router.get("/device-control")
+@router.get("/device-control", openapi_extra=documented_openapi("/device-control"))
 def list_device_control_rules(
+    request: Request,
     ids: str = Query(None),
     # `tenant=true` asks for the whole tenant rather than the caller's own
     # scope. mockdr seeds one tenant, and the account scoping a non-admin
@@ -71,5 +74,9 @@ def list_device_control_rules(
     parameter, so FastAPI dropped them and every seeded value round-tripped to
     the full list.
     """
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/device-control"))
     return dc_queries.list_rules(params, cursor, limit)

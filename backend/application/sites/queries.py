@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.site_repo import site_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import SITE_INTERNAL_FIELDS
@@ -26,7 +27,11 @@ def list_sites(params: dict, cursor: str | None, limit: int) -> dict:
 
     Real S1 API wraps sites list as ``{"data": {"allSites": {...}, "sites": [...]}}``.
     """
-    filtered = apply_filters(site_repo.list_all(), params, FILTER_SPECS)
+    filtered = apply_filters(
+        site_repo.list_all(),
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/sites", []),
+    )
     filtered = apply_query_options(filtered, params)
 
     # `limit` was ignored and nextCursor hardcoded to None, so a client paging

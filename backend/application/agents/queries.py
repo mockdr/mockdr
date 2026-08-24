@@ -1,5 +1,6 @@
 import json
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from infrastructure.process_gen import generate_processes_for_agent
 from repository.agent_repo import agent_repo
 from repository.store import store
@@ -80,7 +81,11 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
     to serve 100 rows at forty times the default seed.
     """
     records = _apply_tag_filters(agent_repo.list_all(), params)
-    filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_filters(
+        records,
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/agents", []),
+    )
     filtered.sort(key=lambda a: get_nested(a, "lastActiveDate") or "", reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, AGENT_CURSOR)
@@ -93,7 +98,11 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
 def count_agents(params: dict) -> dict:
     """Return the count of agents matching the given filter parameters."""
     records = _apply_tag_filters(agent_repo.list_all(), params)
-    filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_filters(
+        records,
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/agents", []),
+    )
     filtered = apply_query_options(filtered, params)
     # S1's own AgentsCountSchema_200 declares `total`, not `count`.
     return {"data": {"total": len(filtered)}}
@@ -102,10 +111,26 @@ def count_agents(params: dict) -> dict:
 def list_passphrases(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a paginated list of agent passphrases matching the given filters."""
     records = [record_dict(a) for a in agent_repo.list_all()]
-    filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_filters(
+        records,
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/agents/passphrases", []),
+    )
     filtered = apply_query_options(filtered, params)
+    # The schema's own columns, from the agent they belong to. Only three
+    # were filled, so the fixture supplied `id`, `uuid`, `domain` and
+    # `lastLoggedInUserName` — the same four values for all sixty agents, and
+    # an identity column a client cannot use.
     passphrases = [
-        {"agentId": r["id"], "computerName": r["computerName"], "passphrase": r["passphrase"]}
+        {
+            "id": r["id"],
+            "uuid": r.get("uuid"),
+            "domain": r.get("domain"),
+            "computerName": r["computerName"],
+            "lastLoggedInUserName": r.get("lastLoggedInUserName"),
+            "passphrase": r["passphrase"],
+            "createdAt": r.get("createdAt"),
+        }
         for r in filtered
     ]
     page, next_cursor, total = paginate(passphrases, cursor, limit)
@@ -162,6 +187,7 @@ def list_applications_for_agents(
     limit: int,
     agent_is_decommissioned: str | None = None,
     installed_at_between: str | None = None,
+    documented: dict | None = None,
 ) -> dict:
     """Return installed applications across multiple agents (global endpoint).
 
@@ -173,6 +199,7 @@ def list_applications_for_agents(
         limit: Page size.
         agent_is_decommissioned: Filter by agent decommission status (``"true"``/``"false"``).
         installed_at_between: Date range filter ``"START,END"`` for ``installedDate``.
+        documented: The other filters the swagger declares for this route.
     """
     apps = store.get_all("installed_apps")
 
@@ -205,9 +232,44 @@ def list_applications_for_agents(
                         filtered.append(r)
                 apps = filtered
 
-    page, next_cursor, total = paginate(apps, cursor, limit)
+    # Enriched before the documented filters run: half of them name an agent
+    # column (osType, agentMachineType), which the application record itself
+    # does not carry.
+    enriched = [_with_agent_fields(a) for a in apps]
+    if documented:
+        enriched = apply_filters(
+            enriched, documented, DOCUMENTED_FILTERS.get("/installed-applications", []),
+        )
+
+    page, next_cursor, total = paginate(enriched, cursor, limit)
+    # The records themselves: each route shapes them with its own schema. This
+    # used to restrict here to the *per-agent* schema, which declares five
+    # fields — so the global endpoint lost `type`, `riskLevel` and every
+    # `agent*` field its own schema declares, and the completion filled them
+    # with fixture defaults. Every application came back owned by
+    # "MY_COMPUTER_1234".
+    return {"data": page}
+
+
+def _with_agent_fields(application: dict) -> dict:
+    """An installed application with the agent columns its global schema declares."""
+    agent = agent_repo.get(str(application.get("agentId", "")))
+    if agent is None:
+        return dict(application)
     return {
-        "data": [restrict_item(i, "agents.schemas_AgentApplicationsSchema_many_200") for i in page]
+        **application,
+        "agentComputerName": agent.computerName,
+        "agentDomain": agent.domain,
+        "agentInfected": agent.infected,
+        "agentIsActive": agent.isActive,
+        "agentIsDecommissioned": agent.isDecommissioned,
+        "agentMachineType": agent.machineType,
+        "agentNetworkStatus": agent.networkStatus,
+        "agentOperationalState": agent.operationalState,
+        "agentOsType": agent.osType,
+        "agentUuid": agent.uuid,
+        "agentVersion": agent.agentVersion,
+        "osType": agent.osType,
     }
 
 

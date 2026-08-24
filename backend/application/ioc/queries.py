@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.ioc_repo import ioc_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.nested import get_nested
@@ -20,7 +21,11 @@ FILTER_SPECS = [
 
 def list_iocs(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of IOCs sorted by creation date."""
-    filtered = apply_filters(ioc_repo.list_all(), params, FILTER_SPECS)
+    filtered = apply_filters(
+        ioc_repo.list_all(),
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/threat-intelligence/iocs", []),
+    )
     filtered.sort(key=lambda i: get_nested(i, "creationTime") or "", reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, IOC_CURSOR)

@@ -1,5 +1,6 @@
 """Read-only queries for scoped tag definitions."""
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.agent_repo import agent_repo
 from repository.group_repo import group_repo
 from repository.site_repo import site_repo
@@ -133,7 +134,11 @@ def list_tags(params: dict, cursor: str | None, limit: int) -> dict:
         records = [r for r in records if (r["scopeLevel"], r.get("scopeId", "")) in scope_set]
 
     # Standard field filters
-    filtered = apply_filters(records, params, FILTER_SPECS)
+    filtered = apply_filters(
+        records,
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/agents/tags", []),
+    )
     filtered.sort(key=lambda r: r.get("createdAt", ""), reverse=True)
     filtered = apply_query_options(filtered, params)
 

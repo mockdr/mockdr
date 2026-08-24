@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.user_repo import user_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import USER_INTERNAL_FIELDS
@@ -17,7 +18,11 @@ FILTER_SPECS = [
 
 def list_users(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of users with internal fields stripped."""
-    filtered = apply_filters(user_repo.list_all(), params, FILTER_SPECS)  # filter before strip
+    filtered = apply_filters(
+        user_repo.list_all(),
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/users", []),
+    )  # filter before strip
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, USER_CURSOR)
     stripped = [strip_fields(record_dict(u), USER_INTERNAL_FIELDS) for u in page]

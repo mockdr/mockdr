@@ -1,16 +1,22 @@
 from fastapi import APIRouter, Body, Depends, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import IocCreateBody, IocDeleteBody
 from application.ioc import commands as ioc_commands
 from application.ioc import queries as ioc_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Threat Intelligence / IOC"])
 
 
-@router.get("/threat-intelligence/iocs")
+@router.get(
+    "/threat-intelligence/iocs",
+    openapi_extra=documented_openapi("/threat-intelligence/iocs"),
+)
 def list_iocs(
+    request: Request,
     ids: str = Query(None),
     # `tenant=true` asks for the whole tenant rather than the caller's own
     # scope. mockdr seeds one tenant, and the account scoping a non-admin
@@ -30,7 +36,11 @@ def list_iocs(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of IOC indicators."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/threat-intelligence/iocs"))
     return ioc_queries.list_iocs(params, cursor, limit)
 
 

@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import BulkDeleteBody
+from application.documented_filters import DOCUMENTED_FILTERS
 from application.exclusions import commands as exclusion_commands
 from application.exclusions import queries as exclusion_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from repository.blocklist_repo import blocklist_repo
 from repository.exclusion_repo import exclusion_repo
+from utils.documented_params import documented_openapi, documented_params
 from utils.dt import utc_now
 from utils.filtering import FilterSpec, apply_filters
 from utils.id_gen import new_id
@@ -28,8 +31,9 @@ _BLOCKLIST_SPECS = [
 _BLOCKLIST_INTERNAL = {"siteId"}
 
 
-@router.get("/exclusions")
+@router.get("/exclusions", openapi_extra=documented_openapi("/exclusions"))
 def list_exclusions(
+    request: Request,
     ids: str = Query(None),
     # `tenant=true` asks for the whole tenant rather than the caller's own
     # scope. mockdr seeds one tenant, and the account scoping a non-admin
@@ -53,7 +57,11 @@ def list_exclusions(
 
     Accepts both ``type`` (singular) and ``types`` (plural) query parameters.
     """
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/exclusions"))
     # ``type`` (singular) is normalised to ``types`` for the filter engine
     if "type" in params and "types" not in params:
         params["types"] = params.pop("type")
@@ -102,8 +110,9 @@ def delete_exclusion(exclusion_id: str, _: dict = Depends(require_admin)) -> dic
     return exclusion_commands.delete_exclusion(exclusion_id)
 
 
-@router.get("/restrictions")
+@router.get("/restrictions", openapi_extra=documented_openapi("/restrictions"))
 def list_blocklist(
+    request: Request,
     siteIds: str = Query(None),
     # See the note on the exclusions handler above.
     tenant: bool = Query(None),
@@ -112,9 +121,15 @@ def list_blocklist(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of hash blocklist entries."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/restrictions"))
     records = blocklist_repo.list_all()
-    filtered = apply_filters(records, params, _BLOCKLIST_SPECS)
+    filtered = apply_filters(
+        records, params, _BLOCKLIST_SPECS + DOCUMENTED_FILTERS.get("/restrictions", []),
+    )
     page, next_cursor, total = paginate(filtered, cursor, limit, RESTRICTION_CURSOR)
     stripped = [{k: v for k, v in r.items() if k not in _BLOCKLIST_INTERNAL} for r in page]
     return build_list_response(

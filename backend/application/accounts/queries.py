@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.account_repo import account_repo
 from utils.filtering import FilterSpec, apply_filters
 from utils.pagination import ACCOUNT_CURSOR, build_list_response, build_single_response, paginate
@@ -17,7 +18,11 @@ FILTER_SPECS = [
 
 def list_accounts(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a paginated list of accounts, narrowed by the request's filters."""
-    records = apply_filters([record_dict(a) for a in account_repo.list_all()], params, FILTER_SPECS)
+    records = apply_filters(
+        [record_dict(a) for a in account_repo.list_all()],
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/accounts", []),
+    )
     page, next_cursor, total = paginate(records, cursor, limit, ACCOUNT_CURSOR)
     return build_list_response(
         page,

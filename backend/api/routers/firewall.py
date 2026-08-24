@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import FirewallCreateBody, FirewallDeleteBody, FirewallUpdateBody
 from application.firewall import commands as firewall_commands
 from application.firewall import queries as firewall_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Firewall Control"])
 
@@ -49,8 +51,9 @@ def delete_firewall_rules(body: FirewallDeleteBody, _: dict = Depends(require_ad
     return {"data": {"affected": affected}}
 
 
-@router.get("/firewall-control")
+@router.get("/firewall-control", openapi_extra=documented_openapi("/firewall-control"))
 def list_firewall_rules(
+    request: Request,
     ids: str = Query(None),
     # `tenant=true` asks for the whole tenant rather than the caller's own
     # scope. mockdr seeds one tenant, and the account scoping a non-admin
@@ -67,5 +70,9 @@ def list_firewall_rules(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of firewall rules."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/firewall-control"))
     return firewall_queries.list_rules(params, cursor, limit)

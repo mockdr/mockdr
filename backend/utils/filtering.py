@@ -19,8 +19,13 @@ class FilterSpec:
     Attributes:
         param: URL query parameter name (e.g. ``"siteIds"``).
         field: Dot-path into the record dict (e.g. ``"agentDetectionInfo.siteId"``).
-        type: Filter strategy — one of ``"eq"``, ``"in"``, ``"contains"``,
-              ``"bool"``, ``"gte_dt"``, ``"lte_dt"``, ``"full_text"``.
+        type: Filter strategy — one of ``"eq"``, ``"in"``, ``"nin"``,
+              ``"contains"``, ``"bool"``, ``"gt"``, ``"gte"``, ``"lt"``,
+              ``"lte"``, ``"between"``, ``"gte_dt"``, ``"lte_dt"``,
+              ``"full_text"``. The four bare comparisons work on numbers and
+              on ISO-8601 timestamps alike, which is how the vendor declares
+              them: ``createdAt__gte`` and ``activeThreats__gt`` are the same
+              operator over different fields.
         enum: The value comes from a declared set that the API spells one way
               in a filter and another in a response — SentinelOne accepts
               ``incidentStatus=UNRESOLVED`` and answers
@@ -31,6 +36,35 @@ class FilterSpec:
     field: str
     type: str
     enum: bool = False
+
+
+def _ordered(field_value: object, target: object, op: str) -> bool:
+    """Compare a record's value with the filter's, as numbers or as timestamps.
+
+    A field the record does not carry never satisfies a range: the vendor
+    returns the rows it can compare, not the rows it cannot.
+    """
+    if field_value is None or target is None or target == "":
+        return False
+    left: object
+    right: object
+    try:
+        left, right = float(str(field_value)), float(str(target))
+    except (TypeError, ValueError):
+        left_dt, right_dt = _parse_dt(str(field_value)), _parse_dt(str(target))
+        if left_dt is None or right_dt is None:
+            # Neither numbers nor timestamps: compare as text, which is what
+            # an ordering over version strings and names amounts to.
+            left, right = str(field_value), str(target)
+        else:
+            left, right = left_dt, right_dt
+    if op == "gt":
+        return left > right  # type: ignore[operator]
+    if op == "gte":
+        return left >= right  # type: ignore[operator]
+    if op == "lt":
+        return left < right  # type: ignore[operator]
+    return left <= right  # type: ignore[operator]
 
 
 def _enum_key(value: object) -> str:
@@ -113,6 +147,32 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
             dt = _parse_dt(str(raw))
             if dt:
                 result = [r for r in result if _compare_dt(_get_field(r, spec.field), dt, "lte")]
+
+        elif spec.type == "nin":
+            if isinstance(raw, (list, tuple, set)):
+                values = {str(v).strip() for v in raw}
+            else:
+                values = {v.strip() for v in str(raw).split(",")}
+            if spec.enum:
+                unwanted = {_enum_key(v) for v in values}
+                result = [
+                    r for r in result
+                    if _enum_key(_get_field(r, spec.field) or "") not in unwanted
+                ]
+            else:
+                result = [r for r in result if str(_get_field(r, spec.field) or "") not in values]
+
+        elif spec.type in ("gt", "gte", "lt", "lte"):
+            result = [r for r in result if _ordered(_get_field(r, spec.field), raw, spec.type)]
+
+        elif spec.type == "between":
+            # The vendor spells a range as "low-high" in one parameter.
+            low, _, high = str(raw).partition("-")
+            result = [
+                r for r in result
+                if _ordered(_get_field(r, spec.field), low.strip(), "gte")
+                and _ordered(_get_field(r, spec.field), high.strip(), "lte")
+            ]
 
         elif spec.type == "full_text":
             needle = str(raw).lower()

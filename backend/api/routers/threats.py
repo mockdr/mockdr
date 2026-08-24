@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from api.auth import require_auth, require_write
 from api.dto.common import FilterBody
 from application.threats import commands as threat_commands
 from application.threats import queries as threat_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Threats"])
 
@@ -20,8 +22,9 @@ class NoteBody(BaseModel):
 # ── Queries ───────────────────────────────────────────────────────────────────
 
 
-@router.get("/threats")
+@router.get("/threats", openapi_extra=documented_openapi("/threats"))
 def list_threats(
+    request: Request,
     ids: str = Query(None),
     # `tenant=true` asks for the whole tenant rather than the caller's own
     # scope. mockdr seeds one tenant, and the account scoping a non-admin
@@ -50,7 +53,11 @@ def list_threats(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of threats."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/threats"))
     return threat_queries.list_threats(params, cursor, limit)
 
 

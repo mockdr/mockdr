@@ -1,4 +1,5 @@
 
+from application.documented_filters import DOCUMENTED_FILTERS
 from repository.group_repo import group_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import GROUP_INTERNAL_FIELDS
@@ -23,7 +24,11 @@ FILTER_SPECS = [
 
 def list_groups(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of groups with internal fields stripped."""
-    filtered = apply_filters(group_repo.list_all(), params, FILTER_SPECS)
+    filtered = apply_filters(
+        group_repo.list_all(),
+        params,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/groups", []),
+    )
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, GROUP_CURSOR)
     stripped = [strip_fields(record_dict(g), GROUP_INTERNAL_FIELDS) for g in page]

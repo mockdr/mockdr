@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import GroupCreateBody, GroupMoveAgentsBody, GroupUpdateBody
 from application.groups import commands as group_commands
 from application.groups import queries as group_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Groups"])
 
 
-@router.get("/groups")
+@router.get("/groups", openapi_extra=documented_openapi("/groups"))
 def list_groups(
+    request: Request,
     ids: str = Query(None),
     id: str = Query(None),  # noqa: A002 - the swagger's own name
     accountIds: str = Query(None),
@@ -28,7 +31,11 @@ def list_groups(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of agent groups."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/groups"))
     return group_queries.list_groups(params, cursor, limit)
 
 

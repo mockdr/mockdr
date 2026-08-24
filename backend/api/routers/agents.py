@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
+from starlette.requests import Request
 
 from api.auth import require_auth, require_write
 from api.dto.common import BulkActionBody
@@ -8,7 +9,9 @@ from application.agents import commands as agent_commands
 from application.agents import queries as agent_queries
 from application.tags import queries as tag_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from utils.documented_params import documented_openapi, documented_params
 from utils.pagination import build_list_response
+from utils.s1_fixtures import restrict_item
 
 router = APIRouter(tags=["Agents"])
 
@@ -31,8 +34,9 @@ def count_agents(
     return agent_queries.count_agents(params)
 
 
-@router.get("/agents/tags")
+@router.get("/agents/tags", openapi_extra=documented_openapi("/agents/tags"))
 def list_tags(
+    request: Request,
     siteIds: str = Query(None),
     accountIds: str = Query(None),
     groupIds: str = Query(None),
@@ -50,12 +54,17 @@ def list_tags(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of scoped tag definitions."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/agents/tags"))
     return tag_queries.list_tags(params, cursor, limit)
 
 
-@router.get("/agents/passphrases")
+@router.get("/agents/passphrases", openapi_extra=documented_openapi("/agents/passphrases"))
 def list_passphrases(
+    request: Request,
     ids: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),
@@ -66,12 +75,17 @@ def list_passphrases(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a paginated list of agent disk-encryption passphrases."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    params.update(documented_params(request, "/agents/passphrases"))
     return agent_queries.list_passphrases(params, cursor, limit)
 
 
-@router.get("/installed-applications")
+@router.get("/installed-applications", openapi_extra=documented_openapi("/installed-applications"))
 def list_installed_applications(
+    request: Request,
     ids: str = Query(None),
     agentIds: str = Query(None),
     agentIsDecommissioned: str = Query(None),
@@ -92,6 +106,7 @@ def list_installed_applications(
         limit,
         agent_is_decommissioned=agentIsDecommissioned,
         installed_at_between=installedAt__between,
+        documented=documented_params(request, "/installed-applications"),
     ).get("data", [])
     # ApplicationViewSchema_many: the declared fields only, with a pagination block.
     return build_list_response(
@@ -114,7 +129,15 @@ def list_agent_applications(
     Accepts ``?ids=<agentId1>,<agentId2>`` matching the real S1 API contract.
     """
     agent_ids = [i.strip() for i in ids.split(",") if i.strip()] if ids else []
-    return agent_queries.list_applications_for_agents(agent_ids, cursor, limit)
+    apps = agent_queries.list_applications_for_agents(agent_ids, cursor, limit).get("data", [])
+    # AgentApplicationsSchema declares five fields; the global endpoint's
+    # schema declares two dozen. Each route shapes with its own — and this
+    # one's response carries no pagination block, as the swagger says.
+    return {
+        "data": [
+            restrict_item(a, "agents.schemas_AgentApplicationsSchema_many_200") for a in apps
+        ]
+    }
 
 
 @router.get("/agents/processes")
@@ -134,8 +157,9 @@ def list_agent_processes(
 # ── List + actions ────────────────────────────────────────────────────────────
 
 
-@router.get("/agents")
+@router.get("/agents", openapi_extra=documented_openapi("/agents"))
 def list_agents(
+    request: Request,
     ids: str = Query(None),
     accountIds: str = Query(None),
     siteIds: str = Query(None),
@@ -162,7 +186,12 @@ def list_agents(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return a filtered, paginated list of agents."""
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    params = {
+        k: v for k, v in locals().items()
+        if v is not None and k not in ("cursor", "limit", "request")
+    }
+    # Every other filter the swagger declares for this route (generated).
+    params.update(documented_params(request, "/agents"))
     return agent_queries.list_agents(params, cursor, limit)
 
 
