@@ -8,7 +8,7 @@ import os
 #:
 #: Note this is *mockdr's* version, not the version of any API it mocks — the
 #: SentinelOne surface stays pinned at v2.1 via ``API_PREFIX``.
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 
 API_PREFIX = "/web/api/v2.1"
 DEFAULT_PAGE_SIZE = 25
