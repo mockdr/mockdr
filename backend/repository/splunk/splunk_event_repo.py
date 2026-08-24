@@ -46,5 +46,16 @@ class SplunkEventRepository(Repository[SplunkEvent]):
         """Return the number of events in the given index."""
         return sum(1 for e in self.list_all() if e.index == index)
 
+    def counts_by_index(self) -> dict[str, int]:
+        """Every index's event count, in one pass over the events.
+
+        Counting per index meant a scan per index; the index listing needs
+        all of them at once.
+        """
+        counts: dict[str, int] = {}
+        for event in self.list_all():
+            counts[event.index] = counts.get(event.index, 0) + 1
+        return counts
+
 
 splunk_event_repo = SplunkEventRepository()

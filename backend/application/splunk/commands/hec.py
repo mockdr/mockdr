@@ -7,7 +7,36 @@ import uuid
 
 from domain.splunk.splunk_event import SplunkEvent
 from repository.splunk.splunk_event_repo import splunk_event_repo
-from repository.splunk.splunk_index_repo import splunk_index_repo
+
+
+def _build_event(
+    event_data: dict,
+    default_index: str,
+    default_sourcetype: str,
+) -> SplunkEvent:
+    """Turn one HEC payload into the event that gets indexed."""
+    event_body = event_data.get("event", event_data)
+    index = event_data.get("index", default_index) or default_index
+    sourcetype = event_data.get("sourcetype", default_sourcetype) or default_sourcetype
+    event_time = event_data.get("time", time.time())
+
+    if isinstance(event_body, dict):
+        raw = json.dumps(event_body)
+        fields = dict(event_body)
+    else:
+        raw = str(event_body)
+        fields = {}
+
+    return SplunkEvent(
+        id=str(uuid.uuid4()),
+        index=index,
+        sourcetype=sourcetype,
+        source=event_data.get("source", ""),
+        host=event_data.get("host", "mockdr"),
+        time=float(event_time),
+        raw=raw,
+        fields=fields,
+    )
 
 
 def submit_event(
@@ -25,32 +54,8 @@ def submit_event(
     Returns:
         HEC success response dict.
     """
-    event_body = event_data.get("event", event_data)
-    index = event_data.get("index", default_index) or default_index
-    sourcetype = event_data.get("sourcetype", default_sourcetype) or default_sourcetype
-    source = event_data.get("source", "")
-    host = event_data.get("host", "mockdr")
-    event_time = event_data.get("time", time.time())
-
-    if isinstance(event_body, dict):
-        raw = json.dumps(event_body)
-        fields = dict(event_body)
-    else:
-        raw = str(event_body)
-        fields = {}
-
-    event = SplunkEvent(
-        id=str(uuid.uuid4()),
-        index=index,
-        sourcetype=sourcetype,
-        source=source,
-        host=host,
-        time=float(event_time),
-        raw=raw,
-        fields=fields,
-    )
+    event = _build_event(event_data, default_index, default_sourcetype)
     splunk_event_repo.save(event)
-    _update_index_count(index)
 
     return {"text": "Success", "code": 0}
 
@@ -70,8 +75,11 @@ def submit_events_batch(
     Returns:
         HEC success response dict.
     """
+    # One count per index, not one per event: the count is a scan of the
+    # event store, and running it per event made a 200-event batch scan the
+    # store 200 times — 4.8 million comparisons for one request.
     for event_data in events:
-        submit_event(event_data, default_index, default_sourcetype)
+        splunk_event_repo.save(_build_event(event_data, default_index, default_sourcetype))
     return {"text": "Success", "code": 0}
 
 
@@ -105,13 +113,6 @@ def submit_raw(
         fields={},
     )
     splunk_event_repo.save(event)
-    _update_index_count(index)
     return {"text": "Success", "code": 0}
 
 
-def _update_index_count(index_name: str) -> None:
-    """Increment the event count for an index."""
-    idx = splunk_index_repo.get(index_name)
-    if idx:
-        idx.total_event_count = splunk_event_repo.count_by_index(index_name)
-        splunk_index_repo.save(idx)
