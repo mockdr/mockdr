@@ -4,6 +4,7 @@ from __future__ import annotations
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
 from utils.nested import get_nested
 from utils.serde import record_dict
+from utils.xdr_filters import apply_xdr_sort
 from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 
@@ -48,6 +49,8 @@ def get_endpoints(request_data: dict) -> dict:
     id_list = request_data.get("endpoint_id_list")
     if id_list:
         all_endpoints = [x for x in all_endpoints if get_nested(x, "endpoint_id") in id_list]
+
+    all_endpoints = apply_xdr_sort(all_endpoints, request_data.get("sort"))
 
     total = len(all_endpoints)
     search_from = request_data.get("search_from", 0)

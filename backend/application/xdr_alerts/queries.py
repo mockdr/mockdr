@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from repository.xdr_alert_repo import xdr_alert_repo
 from utils.serde import record_dict
-from utils.xdr_filters import apply_xdr_filters
+from utils.xdr_filters import apply_xdr_filters, apply_xdr_sort
 from utils.xdr_response import build_xdr_list_reply
 
 #: Filter fields this endpoint supports, mapped to the stored record key.
@@ -46,6 +46,8 @@ def get_alerts(request_data: dict) -> dict:
     matched = apply_xdr_filters(
         xdr_alert_repo.list_all(), request_data.get("filters"), _ALERT_FILTER_FIELDS,
     )
+
+    matched = apply_xdr_sort(matched, request_data.get("sort"))
 
     total = len(matched)
     search_from = request_data.get("search_from", 0)
@@ -111,6 +113,8 @@ def get_alerts_multi_events(request_data: dict) -> dict:
     matched = apply_xdr_filters(
         xdr_alert_repo.list_all(), request_data.get("filters"), _ALERT_FILTER_FIELDS,
     )
+    matched = apply_xdr_sort(matched, request_data.get("sort"))
+
     total = len(matched)
     search_from = request_data.get("search_from", 0)
     search_to = request_data.get("search_to", search_from + 100)

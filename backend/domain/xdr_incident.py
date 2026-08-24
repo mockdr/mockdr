@@ -34,6 +34,7 @@ class XdrIncident:
     incident_sources: list[str] = field(default_factory=list)
 
     rule_based_score: int = 0
+    starred: bool = False
     manual_score: int = 0
 
     @property

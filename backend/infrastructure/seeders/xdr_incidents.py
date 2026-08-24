@@ -86,6 +86,9 @@ def seed_xdr_incidents(fake: Faker, endpoint_ids: list[str]) -> list[str]:
                 k=min(len(XDR_ALERT_SOURCES), random.randint(1, 3)),
             ),
             rule_based_score=random.randint(0, 100),
+            # A console has a handful of starred incidents; the field was
+            # constant False because it lived only in the fixture.
+            starred=(i % 7 == 0),
             manual_score=random.choice([0, 0, 0, random.randint(1, 100)]),
         ))
 

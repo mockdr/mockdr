@@ -121,3 +121,30 @@ def apply_xdr_filters(
         operand = entry.get("value")
         result = [r for r in result if _compare(get_nested(r, key), operand, operator)]
     return result
+
+
+def apply_xdr_sort(records: list, sort: dict | None) -> list:
+    """Order records by the request's ``sort`` block.
+
+    Every Cortex integration sends one — the XSOAR pack sorts incidents by
+    creation or modification time on each fetch — and it was ignored, so the
+    client paged through the mock's own order believing it was the one it
+    asked for.
+    """
+    if not isinstance(sort, dict):
+        return records
+    field = str(sort.get("field") or "").strip()
+    if not field:
+        return records
+    descending = str(sort.get("keyword") or "asc").lower() == "desc"
+
+    def key(record: object) -> tuple[int, float, str]:
+        value = get_nested(record, field)
+        if value is None:
+            return (2, 0.0, "")
+        try:
+            return (0, float(value), "")
+        except (TypeError, ValueError):
+            return (1, 0.0, str(value))
+
+    return sorted(records, key=key, reverse=descending)
