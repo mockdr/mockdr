@@ -256,8 +256,14 @@ def _with_agent_fields(application: dict) -> dict:
     agent = agent_repo.get(str(application.get("agentId", "")))
     if agent is None:
         return dict(application)
+    installed = application.get("installedDate")
     return {
         **application,
+        # The schema's own name for the record's `installedDate`; without it
+        # every application answered with the fixture's one date.
+        "installedAt": installed,
+        "createdAt": installed,
+        "updatedAt": installed,
         "agentComputerName": agent.computerName,
         "agentDomain": agent.domain,
         "agentInfected": agent.infected,

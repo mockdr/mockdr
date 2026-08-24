@@ -31,6 +31,14 @@ _TAG_POOL: list[str] = ["Production", "Development", "Staging", "Critical", "VIP
 _LOGON_TYPES: list[str] = ["Interactive", "Network", "RemoteInteractive", "Service"]
 
 
+#: The onboarding states Defender documents, weighted the way an estate is.
+MDE_ONBOARDING_STATES: list[str] = [
+    "Onboarded", "Onboarded", "Onboarded", "CanBeOnboarded", "Unsupported", "InsufficientInfo",
+]
+#: How the device is managed, per the same documentation.
+MDE_MANAGED_STATES: list[str] = ["Active", "Active", "Active", "Inactive", "Unknown"]
+
+
 def seed_mde_machines(fake: Faker) -> list[str]:
     """Create MDE machine records from existing S1 agent fleet.
 
@@ -46,7 +54,7 @@ def seed_mde_machines(fake: Faker) -> list[str]:
     s1_agents = agent_repo.list_all()
     machine_ids: list[str] = []
 
-    for agent in s1_agents:
+    for index, agent in enumerate(s1_agents):
         machine_id = mde_guid()
         machine_ids.append(machine_id)
 
@@ -109,7 +117,9 @@ def seed_mde_machines(fake: Faker) -> list[str]:
             healthStatus=random.choice(MDE_HEALTH_STATUSES),
             riskScore=random.choice(MDE_RISK_SCORES) or "None",
             exposureLevel=random.choice(MDE_EXPOSURE_LEVELS) or "None",
-            onboardingStatus="Onboarded",
+            # Documented values; a fleet where every device is onboarded lets
+            # no client exercise the filter the API declares.
+            onboardingStatus=MDE_ONBOARDING_STATES[index % len(MDE_ONBOARDING_STATES)],
             sensorHealthState=random.choice(["Active"] * 9 + ["Inactive"]),
             lastSeen=agent.lastActiveDate,
             firstSeen=agent.createdAt,
@@ -125,7 +135,7 @@ def seed_mde_machines(fake: Faker) -> list[str]:
             loggedOnUsers=logged_on_users,
             groupName=agent.groupName,
             managedBy="MDE",
-            managedByStatus="Active",
+            managedByStatus=MDE_MANAGED_STATES[index % len(MDE_MANAGED_STATES)],
         ))
 
     return machine_ids

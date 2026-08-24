@@ -29,6 +29,16 @@ _ENDPOINT_TYPE_MAP: dict[str, str] = {
 }
 
 
+#: The values Cortex XDR documents for these columns. A fleet where every
+#: endpoint is unisolated and never scanned cannot exercise the filters the
+#: API declares over them.
+XDR_ISOLATION: list[str] = ["unisolated", "unisolated", "unisolated", "isolated"]
+XDR_SCAN_STATES: list[str] = ["none", "success", "success", "in_progress", "canceled"]
+XDR_OPERATIONAL: list[str] = [
+    "protected", "protected", "protected", "partially_protected", "unprotected",
+]
+
+
 def seed_xdr_endpoints(fake: Faker) -> list[str]:
     """Create XDR endpoint records from existing S1 agent fleet.
 
@@ -44,7 +54,7 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
     s1_agents = agent_repo.list_all()
     endpoint_ids: list[str] = []
 
-    for agent in s1_agents:
+    for index, agent in enumerate(s1_agents):
         eid = xdr_id("EP")
         endpoint_ids.append(eid)
 
@@ -84,11 +94,11 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
             install_date=rand_epoch_ms(365),
             content_version=random.choice(XDR_CONTENT_VERSIONS),
             endpoint_version=random.choice(XDR_AGENT_VERSIONS),
-            is_isolated="unisolated",
+            is_isolated=XDR_ISOLATION[index % len(XDR_ISOLATION)],
             isolated_date=None,
             group_name=group_names,
-            operational_status="fully_protected",
-            scan_status="none",
+            operational_status=XDR_OPERATIONAL[index % len(XDR_OPERATIONAL)],
+            scan_status=XDR_SCAN_STATES[index % len(XDR_SCAN_STATES)],
             users=users,
         ))
 
