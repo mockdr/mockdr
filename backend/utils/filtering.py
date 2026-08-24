@@ -21,11 +21,21 @@ class FilterSpec:
         field: Dot-path into the record dict (e.g. ``"agentDetectionInfo.siteId"``).
         type: Filter strategy — one of ``"eq"``, ``"in"``, ``"contains"``,
               ``"bool"``, ``"gte_dt"``, ``"lte_dt"``, ``"full_text"``.
+        enum: The value comes from a declared set that the API spells one way
+              in a filter and another in a response — SentinelOne accepts
+              ``incidentStatus=UNRESOLVED`` and answers
+              ``"incidentStatus": "Unresolved"``. Both forms then match.
     """
 
     param: str
     field: str
     type: str
+    enum: bool = False
+
+
+def _enum_key(value: object) -> str:
+    """A declared value in a form both spellings share (``TRUE_POSITIVE``/``True positive``)."""
+    return str(value).strip().lower().replace("_", " ")
 
 
 def _parse_dt(value: str) -> datetime | None:
@@ -70,7 +80,7 @@ def apply_filters(records: list[dict], params: dict, specs: list[FilterSpec]) ->
         if spec.type == "eq":
             result = [r for r in result if str(_get_field(r, spec.field) or "") == str(raw)]
 
-        elif spec.type == "in":
+        elif spec.type == "in":  # noqa: SIM114 - the enum branch differs below
             # Query params arrive comma-separated, request bodies as JSON
             # arrays. Splitting unconditionally turned ["abc"] into the literal
             # "['abc']", so a body-supplied filter silently matched nothing.
@@ -78,7 +88,13 @@ def apply_filters(records: list[dict], params: dict, specs: list[FilterSpec]) ->
                 values = {str(v).strip() for v in raw}
             else:
                 values = {v.strip() for v in str(raw).split(",")}
-            result = [r for r in result if str(_get_field(r, spec.field) or "") in values]
+            if spec.enum:
+                wanted = {_enum_key(v) for v in values}
+                result = [
+                    r for r in result if _enum_key(_get_field(r, spec.field) or "") in wanted
+                ]
+            else:
+                result = [r for r in result if str(_get_field(r, spec.field) or "") in values]
 
         elif spec.type == "contains":
             needle = str(raw).lower()

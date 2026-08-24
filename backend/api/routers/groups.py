@@ -12,6 +12,7 @@ router = APIRouter(tags=["Groups"])
 @router.get("/groups")
 def list_groups(
     ids: str = Query(None),
+    id: str = Query(None),  # noqa: A002 - the swagger's own name
     accountIds: str = Query(None),
     siteIds: str = Query(None),
     types: str = Query(None),

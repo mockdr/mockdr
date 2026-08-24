@@ -6,6 +6,11 @@ from utils.serde import record_dict
 
 FILTER_SPECS = [
     FilterSpec("ids", "uuid", "in"),
+    # The swagger's own names beside this mock's plurals; `type` is declared
+    # with an enum (DNS, IPV4, …) that the records already spell that way.
+    FilterSpec("uuids", "uuid", "in"),
+    FilterSpec("type", "type", "in", enum=True),
+    FilterSpec("source", "source", "in"),
     FilterSpec("types", "type", "in"),
     FilterSpec("sources", "source", "in"),
     FilterSpec("value", "value", "contains"),

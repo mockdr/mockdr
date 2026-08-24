@@ -25,6 +25,11 @@ def list_alerts(
     categories: str = Query(None),
     analystVerdicts: str = Query(None),
     incidentStatuses: str = Query(None),
+    # The swagger's own names, beside the plural ones this mock has always
+    # taken (see application/alerts/queries.py).
+    severity: str = Query(None),
+    analystVerdict: str = Query(None),
+    incidentStatus: str = Query(None),
     query: str = Query(None),
     createdAt__gte: str = Query(None),
     createdAt__lte: str = Query(None),

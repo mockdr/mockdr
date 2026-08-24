@@ -9,6 +9,7 @@ from utils.strip import strip_fields
 
 FILTER_SPECS = [
     FilterSpec("ids", "id", "in"),
+    FilterSpec("id", "id", "in"),  # the swagger's own name, beside this mock's plural
     FilterSpec("accountIds", "accountId", "in"),
     FilterSpec("siteIds", "siteId", "in"),
     FilterSpec("types", "type", "in"),

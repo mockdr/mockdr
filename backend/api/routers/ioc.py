@@ -14,6 +14,9 @@ def list_iocs(
     ids: str = Query(None),
     types: str = Query(None),
     sources: str = Query(None),
+    uuids: str = Query(None),
+    type: str = Query(None),  # noqa: A002 - the swagger's own name
+    source: str = Query(None),
     value: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),

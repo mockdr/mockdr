@@ -8,6 +8,7 @@ Every script prints what it is for at the top of its file; this is the map.
 |---|---|
 | `fetch_swagger.sh` | Download the SentinelOne Management API 2.1 swagger into `data/` (gitignored, 14 MB). |
 | `field_drift.py` | Compare the mock's SentinelOne responses with that swagger; exit 1 on a missing or surplus field. |
+| `param_drift.py` | Compare the *query parameters* each route takes with the ones the swagger declares — a filter the vendor documents and the mock drops answers 200 with the whole collection. |
 | `fuzz_parsers.py` | Fuzz the hand-written parsers (SPL, KQL, OData, FQL, ES DSL, HEC) for unintended exceptions. |
 | `hostile_probe.py` | Hostile bodies and parameters against every mounted route; flags any plain-text 500 or crash. |
 

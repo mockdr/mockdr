@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A documented filter that filtered nothing.** SentinelOne's swagger declares
+`incidentStatus`, `analystVerdict`, `severity` (alerts), `type`, `source`,
+`uuids` (IOCs) and `id` (groups); this mock declared only its own plurals
+(`incidentStatuses`, `types`, `ids`, …). A client written against the vendor's
+documentation sent the documented name, FastAPI dropped it, and the route
+answered `200` with the entire collection — the silent wrongness this project
+exists to prevent, in the one place `field_drift.py` cannot see, because it
+compares response fields and a filter is a request. The documented names are
+taken now, beside the plurals this mock has always had. SentinelOne also
+spells a filter value one way and answers another —
+`incidentStatus=UNRESOLVED` returns alerts whose `incidentStatus` reads
+`Unresolved` — so a filter over a declared set matches both forms
+(`FilterSpec(..., enum=True)`).
+
+`scripts/param_drift.py` measures the rest and states it: of 89 routes both
+sides describe, **1 066 documented parameters this mock does not take** (the
+vendor declares dozens of `__contains`/`__gt` variants per route) and **20 it
+takes that the swagger does not declare**. Numbers, not surprises.
+
 **Two Splunk-only middlewares taxed all 561 routes.** `SplunkOutputModeMiddleware`
 and `SplunkPagingMiddleware` were `BaseHTTPMiddleware`, which wraps every
 request in an anyio task group and a memory object stream whether or not the

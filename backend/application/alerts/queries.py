@@ -10,10 +10,18 @@ FILTER_SPECS = [
     FilterSpec("siteIds", "agentDetectionInfo.siteId", "in"),
     FilterSpec("agentIds", "agentRealtimeInfo.id", "in"),
     FilterSpec("severities", "ruleInfo.severity", "in"),
+    # The names and spellings the 2.1 swagger declares. SentinelOne takes the
+    # enum form in a filter (`UNRESOLVED`) and answers the readable one
+    # (`Unresolved`); a client written against the docs sent the documented
+    # name, the mock declared only its own plural, and the filter was dropped
+    # — a 200 with everything in it.
+    FilterSpec("severity", "ruleInfo.severity", "in", enum=True),
+    FilterSpec("analystVerdict", "alertInfo.analystVerdict", "in", enum=True),
+    FilterSpec("incidentStatus", "alertInfo.incidentStatus", "in", enum=True),
     FilterSpec("categories", "ruleInfo.treatAsThreat", "in"),
     FilterSpec("groupIds", "agentRealtimeInfo.groupId", "in"),
-    FilterSpec("analystVerdicts", "alertInfo.analystVerdict", "in"),
-    FilterSpec("incidentStatuses", "alertInfo.incidentStatus", "in"),
+    FilterSpec("analystVerdicts", "alertInfo.analystVerdict", "in", enum=True),
+    FilterSpec("incidentStatuses", "alertInfo.incidentStatus", "in", enum=True),
     FilterSpec("query", "ruleInfo.name|ruleInfo.description", "full_text"),
     FilterSpec("createdAt__gte", "alertInfo.createdAt", "gte_dt"),
     FilterSpec("createdAt__lte", "alertInfo.createdAt", "lte_dt"),
