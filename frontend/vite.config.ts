@@ -16,6 +16,25 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Every lucide icon is its own module, so Rollup gave each one its own
+        // ~200-byte chunk: a navigation fetched 46 files for 8 kB of icons.
+        // Grouping them — and the shared app code — turns that into a handful
+        // of requests. Charts stay separate: only six dashboards use them, and
+        // 184 kB has no business on the login screen.
+        manualChunks(id: string) {
+          if (id.includes('node_modules/lucide-vue-next')) return 'icons'
+          // Nothing else is grouped. Naming a chunk pins it into the static
+          // graph: a `charts` chunk put 250 kB of Chart.js on the login
+          // screen, and an `app-core` chunk put every vendor client there.
+          // Vite's per-usage splitting keeps both behind their routes.
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     proxy: {

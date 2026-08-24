@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every icon was its own download.** Rollup gave each `lucide-vue-next` icon
+its own ~200-byte chunk, so opening a view fetched 42–46 JavaScript files for
+about 8 kB of icons. They are one chunk now (20 kB, cached once): a view costs
+15–18 JS requests instead of 42–46, and 21–24 requests in total instead of
+44–52. Nothing else is grouped — naming a chunk pins it into the static graph,
+and both obvious groupings made the login screen worse (a `charts` chunk put
+250 kB of Chart.js on it, an `app-core` chunk put every vendor client there).
+The login page still loads 9 requests and no Chart.js.
+
 **A documented filter that filtered nothing.** SentinelOne's swagger declares
 `incidentStatus`, `analystVerdict`, `severity` (alerts), `type`, `source`,
 `uuids` (IOCs) and `id` (groups); this mock declared only its own plurals
