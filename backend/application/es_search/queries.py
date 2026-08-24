@@ -18,12 +18,19 @@ from utils.es_query import (
     apply_es_query,
     apply_source_filter,
     build_predicate,
+    doc_positions,
+    emits_sort_values,
     hit_id,
+    parse_sort_keys,
     validate_search_body,
     wrap_as_hits,
 )
 from utils.es_response import build_es_index_not_found, build_es_search_response
 from utils.serde import record_dict
+
+#: How far Elasticsearch counts before it reports ``relation: "gte"`` instead
+#: of an exact total (``index.max_result_window``'s sibling default).
+DEFAULT_TRACK_TOTAL_HITS = 10_000
 
 # ── Index pattern routing ────────────────────────────────────────────────────
 
@@ -170,10 +177,19 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     else:
         total = total_before
 
+    sort_keys = parse_sort_keys(body.get("sort") or [])
+    if not emits_sort_values(sort_keys):
+        sort_keys = []
     hits = apply_source_filter(
-        wrap_as_hits(filtered, index=canonical_index), body.get("_source"),
+        wrap_as_hits(
+            filtered,
+            index=canonical_index,
+            sort_keys=sort_keys,
+            positions=doc_positions(records),
+        ),
+        body.get("_source"),
     )
-    response = build_es_search_response(hits, total)
+    response = build_es_search_response(hits, total, sorted_search=bool(sort_keys))
 
     # Aggregations run over everything the query matched, not the page.
     aggs = body.get("aggs") or body.get("aggregations")
@@ -188,11 +204,30 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
             matched, aggs, index=canonical_index,
         )
 
-    # `track_total_hits: false` tells ES not to report a total at all.
-    if body.get("track_total_hits") is False:
-        response["hits"].pop("total", None)
+    _apply_total_hits_tracking(
+        response, body.get("track_total_hits", DEFAULT_TRACK_TOTAL_HITS), total,
+    )
 
     return response
+
+
+def _apply_total_hits_tracking(
+    response: dict, tracking: bool | int | None, total: int,
+) -> None:
+    """Report the total the way ``track_total_hits`` asks for.
+
+    Elasticsearch stops counting at 10 000 by default and says so with
+    ``relation: "gte"``; a client that trusts an exact count from the mock
+    would misread the real cluster's capped one as the whole backlog.
+    """
+    if tracking is False:
+        response["hits"].pop("total", None)
+        return
+    if tracking is True:
+        return
+    limit = tracking if isinstance(tracking, int) else DEFAULT_TRACK_TOTAL_HITS
+    if total > limit:
+        response["hits"]["total"] = {"value": limit, "relation": "gte"}
 
 
 def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dict:

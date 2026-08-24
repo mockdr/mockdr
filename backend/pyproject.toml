@@ -158,6 +158,8 @@ convention = "google"
 "utils/cs_fql.py" = ["ANN401"]
 "utils/xdr_filters.py" = ["ANN401"]
 "utils/es_query.py" = ["ANN401"]
+# A stored field value may be any JSON type; date parsing has to see it raw.
+"utils/es_datemath.py" = ["ANN401"]
 "utils/es_aggs.py" = ["ANN401"]
 "utils/es_ecs.py" = ["ANN401"]
 "utils/mde_odata.py" = ["ANN401"]

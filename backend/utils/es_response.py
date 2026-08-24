@@ -12,13 +12,18 @@ def build_es_search_response(
     hits: list[dict],
     total: int,
     took: int = 5,
+    *,
+    sorted_search: bool = False,
 ) -> dict:
     """Build an Elasticsearch ``_search`` response envelope.
 
     Args:
-        hits:  List of hit documents to include.
-        total: Total number of matching documents.
-        took:  Simulated query time in milliseconds.
+        hits:          List of hit documents to include.
+        total:         Total number of matching documents.
+        took:          Simulated query time in milliseconds.
+        sorted_search: Whether the request carried a ``sort``. Elasticsearch
+                       does not score a sorted search, so ``max_score`` is
+                       null there — as is each hit's ``_score``.
 
     Returns:
         Complete Elasticsearch search response envelope.
@@ -29,7 +34,7 @@ def build_es_search_response(
         "_shards": {"total": 1, "successful": 1, "skipped": 0, "failed": 0},
         "hits": {
             "total": {"value": total, "relation": "eq"},
-            "max_score": 1.0 if hits else None,
+            "max_score": None if (sorted_search or not hits) else 1.0,
             "hits": hits,
         },
     }

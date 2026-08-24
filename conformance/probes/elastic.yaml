@@ -601,3 +601,56 @@ probes:
       json: {a: {b: 1}}
       headers: {kbn-xsrf: "true"}
       auth: basic
+
+  # ── Elasticsearch: time filters and deep paging (2.3.0) ─────────────────
+  - id: es-range-bad-date-math
+    endpoint: search
+    why: >
+      A range bound in a unit the date-math grammar has no letter for.
+      Elasticsearch names the unit in a parse_exception; accepting it would
+      apply a window the client never asked for and answer 200.
+    request:
+      method: POST
+      path: /_search
+      json: {size: 0, query: {range: {"@timestamp": {gte: now-30q}}}}
+      auth: basic
+
+  - id: es-search-after-without-sort
+    endpoint: search
+    why: >
+      search_after is meaningless without a sort, and Elasticsearch says so
+      rather than paging from an arbitrary point.
+    request:
+      method: POST
+      path: /_search
+      json: {size: 2, search_after: [1]}
+      auth: basic
+
+  - id: es-search-after-length-mismatch
+    endpoint: search
+    why: >
+      A cursor with more values than the sort has keys — the shape of a
+      client that changed its sort mid-page.
+    request:
+      method: POST
+      path: /_search
+      json: {size: 2, sort: [{"@timestamp": desc}], search_after: [1, 2]}
+      auth: basic
+
+  - id: es-sorted-search-envelope
+    endpoint: search
+    why: >
+      A sorted search is not a scored one: Elasticsearch nulls `max_score`,
+      and each hit carries a `sort` array instead of a `_score`. Without
+      those values no client can page with search_after at all.
+    request:
+      method: POST
+      path: /_search
+      json: {size: 1, sort: [{"@timestamp": desc}]}
+      auth: basic
+    ignore_paths:
+      # Hit contents are fixture: the real cluster here is empty, mockdr is
+      # seeded. The envelope around them is what this probe compares.
+      - $.hits.hits
+      - $._shards
+      - $.hits.total.value

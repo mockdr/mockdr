@@ -22,9 +22,13 @@ import json
 import re
 import uuid
 from collections.abc import Callable
+from datetime import datetime
 from fnmatch import fnmatch
-from typing import Any
+from typing import Any, NamedTuple
 
+from utils.es_datemath import ROUNDS_UP, DateMathError, is_date_math
+from utils.es_datemath import parse_datetime as parse_es_datetime
+from utils.es_datemath import resolve as resolve_date_math
 from utils.nested import get_nested as _get_nested
 
 _DEFAULT_SIZE = 10
@@ -67,6 +71,22 @@ def validate_search_body(body: dict) -> None:
             if value is False:
                 token = "VALUE_FALSE"
             raise ESQueryError(f"Unknown key for a {token} in [{key}].", clause=key)
+    search_after = body.get("search_after")
+    if search_after is not None:
+        sort_keys = parse_sort_keys(body.get("sort") or [])
+        if not emits_sort_values(sort_keys):
+            raise ESQueryError(
+                "Sort must contain at least one field.",
+                es_type="illegal_argument_exception",
+            )
+        if len(search_after) != len(sort_keys):
+            # The real message, because a client that pages wrongly needs to
+            # see why rather than an empty page.
+            raise ESQueryError(
+                f"search_after has {len(search_after)} value(s) but sort has "
+                f"{len(sort_keys)}.",
+                es_type="illegal_argument_exception",
+            )
     start = _as_bound(body.get("from"), "from") or 0
     size = _as_bound(body.get("size"), "size")
     size = 10 if size is None else size
@@ -322,19 +342,61 @@ def _build_terms(body: dict) -> Callable[[dict], bool]:
 
 
 def _build_range(body: dict) -> Callable[[dict], bool]:
-    """Build predicate for ``range``."""
+    """Build predicate for ``range``.
+
+    A bound written as date math (``now-30d``, ``now/d``) is resolved once,
+    here, so every document in one search sees the same ``now`` — as it does
+    in Elasticsearch. Rounding direction comes from the operator, which is
+    what makes ``gte: "now/d"`` mean *since midnight* and ``lte: "now/d"``
+    *through the end of today*.
+    """
     field, bounds = next(iter(body.items()))
+    time_zone = bounds.get("time_zone") if isinstance(bounds, dict) else None
+
+    resolved: list[tuple[str, Any, datetime | None]] = []
+    for op, target in bounds.items():
+        # Ignore non-operator keys like "format", "time_zone", "boost".
+        if op not in ("gte", "gt", "lte", "lt"):
+            continue
+        moment: datetime | None = None
+        if is_date_math(target):
+            try:
+                moment = resolve_date_math(
+                    target, round_up=ROUNDS_UP[op], time_zone=time_zone,
+                )
+            except DateMathError as exc:
+                raise ESQueryError(str(exc), es_type="parse_exception") from exc
+        resolved.append((op, target, moment))
 
     def predicate(rec: dict) -> bool:
         val = _get_nested(rec, field)
-        for op, target in bounds.items():
-            if op in ("gte", "gt", "lte", "lt"):
-                if not _compare_range(val, target, op):
+        for op, target, moment in resolved:
+            if moment is not None:
+                if not _compare_moment(val, moment, op):
                     return False
-            # Ignore non-operator keys like "format", "time_zone".
+            elif not _compare_range(val, target, op):
+                return False
         return True
 
     return predicate
+
+
+def _compare_moment(field_val: Any, bound: datetime, op: str) -> bool:
+    """Compare a stored value against a resolved instant.
+
+    A value that is not a date cannot be inside a date window; Elasticsearch
+    would have rejected it at index time against a ``date`` mapping.
+    """
+    moment = parse_es_datetime(field_val)
+    if moment is None:
+        return False
+    if op == "gte":
+        return moment >= bound
+    if op == "gt":
+        return moment > bound
+    if op == "lte":
+        return moment <= bound
+    return moment < bound
 
 
 def _build_wildcard(body: dict) -> Callable[[dict], bool]:
@@ -411,17 +473,28 @@ def _build_bool(body: dict, depth: int = 0) -> Callable[[dict], bool]:
 # Tokenises query_string into field:value pairs joined by AND/OR/NOT.
 _QS_TOKEN_RE = re.compile(
     r"""
-    \b(NOT)\b                        # NOT keyword
-    | \b(AND)\b                      # AND keyword
-    | \b(OR)\b                       # OR keyword
-    | ([A-Za-z_][A-Za-z0-9_.]*):     # field name followed by colon
-      (?:"([^"]*)"                   # quoted value
-      |(\S+))                        # unquoted value
-    | "([^"]*)"                      # bare quoted phrase (default field)
-    | (\S+)                          # bare word (default field)
+    \b(?P<not_>NOT)\b                       # NOT keyword
+    | \b(?P<and_>AND)\b                     # AND keyword
+    | \b(?P<or_>OR)\b                       # OR keyword
+    # ``@`` leads the name of every ECS timestamp; without it `@timestamp:x`
+    # tokenised as a bare word and searched every field instead of that one.
+    | (?P<field>[A-Za-z_@][A-Za-z0-9_.@\-]*):
+                                            # field name followed by colon
+      (?:"(?P<quoted>[^"]*)"                # quoted value
+      |(?P<ranged>[\[{][^\]}]*[\]}])        # [a TO b] / {a TO b} range
+      |(?P<bare>\S+))                       # unquoted value
+    | "(?P<phrase>[^"]*)"                   # bare quoted phrase (default field)
+    | (?P<word>\S+)                         # bare word (default field)
     """,
     re.VERBOSE,
 )
+
+#: ``[a TO b]`` and ``{a TO b}`` — square brackets include the bound, braces
+#: exclude it, and the two ends may differ.
+_QS_RANGE_RE = re.compile(r"^([\[{])\s*(\S+)\s+TO\s+(\S+)\s*([\]}])$")
+
+#: ``field:>=5`` — the shorthand Lucene allows for a one-sided range.
+_QS_CMP_RE = re.compile(r"^(>=|<=|>|<)(.+)$")
 
 
 def _build_query_string(body: dict) -> Callable[[dict], bool]:
@@ -445,20 +518,22 @@ def _qs_tokenise(query: str) -> list[tuple[str, str, str]]:
     """
     tokens: list[tuple[str, str, str]] = []
     for m in _QS_TOKEN_RE.finditer(query):
-        if m.group(1):  # NOT
+        if m.group("not_"):
             tokens.append(("NOT", "", ""))
-        elif m.group(2):  # AND
+        elif m.group("and_"):
             tokens.append(("AND", "", ""))
-        elif m.group(3):  # OR
+        elif m.group("or_"):
             tokens.append(("OR", "", ""))
-        elif m.group(4):  # field:value
-            field = m.group(4)
-            value = m.group(5) if m.group(5) is not None else m.group(6)
-            tokens.append(("term", field, value))
-        elif m.group(7) is not None:  # bare quoted phrase
-            tokens.append(("term", "", m.group(7)))
-        elif m.group(8):  # bare word
-            tokens.append(("term", "", m.group(8)))
+        elif m.group("field"):
+            for group in ("quoted", "ranged", "bare"):
+                value = m.group(group)
+                if value is not None:
+                    break
+            tokens.append(("term", m.group("field"), value or ""))
+        elif m.group("phrase") is not None:
+            tokens.append(("term", "", m.group("phrase")))
+        elif m.group("word"):
+            tokens.append(("term", "", m.group("word")))
     return tokens
 
 
@@ -473,6 +548,11 @@ def _qs_make_term_pred(
     field: str, value: str, default_field: str,
 ) -> Callable[[dict], bool]:
     """Build a predicate for a single query_string term."""
+    if field:
+        ranged = _qs_range_pred(field, value)
+        if ranged is not None:
+            return ranged
+
     has_wildcard = "*" in value or "?" in value
 
     def predicate(rec: dict) -> bool:
@@ -490,6 +570,37 @@ def _qs_make_term_pred(
         return _search_all_values(rec, val_lower, has_wildcard)
 
     return predicate
+
+
+def _qs_range_pred(field: str, value: str) -> Callable[[dict], bool] | None:
+    """Build a predicate for Lucene's range spellings, or ``None`` if absent.
+
+    ``field:[a TO b]`` includes both bounds, ``{a TO b}`` excludes them, and
+    the two ends may differ; ``field:>=5`` is the one-sided shorthand. ``*``
+    means unbounded. Detection rules and Kibana's Lucene mode write their
+    time windows this way, and until now every one of them tokenised as a
+    substring match that could not hit.
+    """
+    bounds: dict[str, str] = {}
+
+    match = _QS_RANGE_RE.match(value)
+    if match:
+        left, lower, upper, right = match.groups()
+        if lower != "*":
+            bounds["gte" if left == "[" else "gt"] = lower
+        if upper != "*":
+            bounds["lte" if right == "]" else "lt"] = upper
+    else:
+        cmp_match = _QS_CMP_RE.match(value)
+        if not cmp_match:
+            return None
+        symbol, operand = cmp_match.groups()
+        bounds[{">": "gt", ">=": "gte", "<": "lt", "<=": "lte"}[symbol]] = operand
+
+    if not bounds:
+        # `field:[* TO *]` bounds nothing, which is an existence check.
+        return lambda rec: _get_nested(rec, field) is not None
+    return _build_range({field: bounds})
 
 
 def _search_all_values(record: dict, val_lower: str, wildcard: bool) -> bool:
@@ -603,6 +714,146 @@ _BUILDERS: dict[str, Callable[[dict], Callable[[dict], bool]]] = {
 # Sorting
 # ---------------------------------------------------------------------------
 
+class SortKey(NamedTuple):
+    """One key of a sort, as the DSL spells it.
+
+    Attributes:
+        field:         Field to sort on, or ``_score`` / ``_doc``.
+        desc:          Whether the order is descending.
+        missing_first: Whether documents lacking the field come first;
+                       Elasticsearch's default is last, in *both* directions.
+    """
+
+    field: str
+    desc: bool = False
+    missing_first: bool = False
+
+
+def parse_sort_keys(sort_spec: list) -> list[SortKey]:
+    """Read a sort array as ``SortKey`` entries, in priority order.
+
+    Accepts every spelling the DSL allows: ``"field"``, ``{"field": "desc"}``
+    and ``{"field": {"order": "desc", "missing": "_first"}}``.
+    """
+    sort_keys: list[SortKey] = []
+    for entry in sort_spec:
+        if isinstance(entry, str):
+            sort_keys.append(SortKey(entry))
+        elif isinstance(entry, dict):
+            for field, opts in entry.items():
+                if isinstance(opts, dict):
+                    desc = opts.get("order", "asc") == "desc"
+                    missing_first = opts.get("missing") == "_first"
+                else:
+                    desc = str(opts).lower() == "desc"
+                    missing_first = False
+                sort_keys.append(SortKey(field, desc, missing_first))
+    return sort_keys
+
+
+def doc_positions(records: list[dict]) -> dict[int, int]:
+    """Give each record the stable position ``_doc`` sorts and reports on.
+
+    Elasticsearch numbers documents by their position in the index; here that
+    is their position in the resolved collection, which is insertion order.
+    Keyed by identity so the number survives sorting and paging.
+    """
+    return {id(record): position for position, record in enumerate(records)}
+
+
+def emits_sort_values(sort_keys: list[SortKey]) -> bool:
+    """Whether this sort makes Elasticsearch attach a ``sort`` array to hits.
+
+    A search sorted only by ``_score`` is still a scored search: it keeps its
+    scores and carries no sort values, so it cannot be paged with
+    ``search_after`` either.
+    """
+    return any(key.field != "_score" for key in sort_keys)
+
+
+def sort_values(
+    record: dict,
+    sort_keys: list[SortKey],
+    positions: dict[int, int] | None = None,
+) -> list:
+    """The ``sort`` array Elasticsearch attaches to a hit when a sort is given.
+
+    Without it no client can page with ``search_after`` — the recommended way
+    past the 10 000-document result window, and what every Elastic SIEM
+    integration uses to pull a backlog. A date comes back as epoch
+    milliseconds, the way a ``date`` field's doc values do; ``_doc`` is the
+    document's position and ``_score`` its score.
+    """
+    values: list = []
+    for key in sort_keys:
+        if key.field == "_doc":
+            values.append((positions or {}).get(id(record), 0))
+        elif key.field == "_score":
+            values.append(1.0)
+        else:
+            values.append(_sort_value(_get_nested(record, key.field)))
+    return values
+
+
+def _sort_value(value: Any) -> Any:
+    """Render one field value as its doc-value form for a ``sort`` array."""
+    if isinstance(value, str) and _LOOKS_LIKE_DATE.match(value):
+        moment = parse_es_datetime(value)
+        if moment is not None:
+            return int(moment.timestamp() * 1000)
+    if isinstance(value, (list, tuple, set)):
+        # A multi-valued field sorts on one member; ES picks min for asc, but
+        # the array itself is never the sort value.
+        return _sort_value(min((str(v) for v in value), default=None))
+    return value
+
+
+#: ``2026-08-06`` or ``2026-08-06T16:16:51.000Z`` — enough to tell a date
+#: string from a keyword before paying for a parse.
+_LOOKS_LIKE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]|$)")
+
+
+def apply_search_after(
+    records: list[dict],
+    search_after: list,
+    sort_keys: list[SortKey],
+    positions: dict[int, int] | None = None,
+) -> list[dict]:
+    """Keep only the records that follow *search_after* in the sort order.
+
+    Args:
+        records:      Records already in sorted order.
+        search_after: The ``sort`` array of the last hit of the previous page.
+        sort_keys:    Parsed sort keys, in priority order.
+        positions:    Document positions, for a ``_doc`` sort key.
+
+    Returns:
+        The tail of *records* strictly after that point.
+    """
+    return [
+        record
+        for record in records
+        if _follows(sort_values(record, sort_keys, positions), search_after, sort_keys)
+    ]
+
+
+def _follows(values: list, target: list, sort_keys: list[SortKey]) -> bool:
+    """Whether *values* sorts strictly after *target* under *sort_keys*."""
+    for value, bound, key in zip(values, target, sort_keys, strict=False):
+        left, right = _sort_key(value), _sort_key(bound)
+        if left == right:
+            continue
+        # A number against a string is a client error, not a crash: the two
+        # tuples would raise rather than compare.
+        numeric = isinstance(left[1], (int, float)) and isinstance(right[1], (int, float))
+        if left[0] == right[0] and not numeric and type(left[1]) is not type(right[1]):
+            return False
+        return left < right if key.desc else left > right
+    # Exactly equal to the previous page's last hit: that document is behind
+    # us, not ahead of us.
+    return False
+
+
 def apply_es_sort(records: list[dict], sort_spec: list) -> list[dict]:
     """Apply an Elasticsearch sort specification to records.
 
@@ -617,34 +868,33 @@ def apply_es_sort(records: list[dict], sort_spec: list) -> list[dict]:
     if not sort_spec:
         return list(records)
 
-    # Parse sort spec into (field, reverse) pairs — applied in reverse order
-    # so that the first sort key has highest priority.
-    sort_keys: list[tuple[str, bool]] = []
-    for entry in sort_spec:
-        if isinstance(entry, str):
-            sort_keys.append((entry, False))
-        elif isinstance(entry, dict):
-            for field, opts in entry.items():
-                if isinstance(opts, dict):
-                    desc = opts.get("order", "asc") == "desc"
-                else:
-                    desc = str(opts).lower() == "desc"
-                sort_keys.append((field, desc))
-
+    sort_keys = parse_sort_keys(sort_spec)
     result = list(records)
-    for field, reverse in reversed(sort_keys):
+    for key in reversed(sort_keys):
         # `_score` and `_doc` are metadata, not `_source` fields. Looking them
         # up nested found nothing and bucketed every document equally, so the
         # sort silently did nothing. Every document scores the same here, and
         # `_doc` is index order, so both preserve the current order.
-        if field in ("_score", "_doc"):
+        if key.field in ("_score", "_doc"):
             continue
 
-        def _make_key(f: str) -> Callable[[dict], tuple[int, Any]]:
-            def key(rec: dict) -> tuple[int, Any]:
-                return _sort_key(_get_nested(rec, f))
-            return key
-        result.sort(key=_make_key(field), reverse=reverse)
+        # A document without the field sorts last whichever way the order
+        # runs — Elasticsearch's `missing: "_last"` default. Since the list
+        # sort reverses every part of the key, the group has to be inverted
+        # for a descending sort to keep those documents at the end. They used
+        # to lead a descending sort, so "the newest N alerts" answered with
+        # the ones carrying no timestamp at all.
+        absent_group = int(bool(key.missing_first) == bool(key.desc))
+
+        def _make_key(field: str, absent: int) -> Callable[[dict], tuple[int, Any]]:
+            def sort_key(rec: dict) -> tuple[int, Any]:
+                value = _get_nested(rec, field)
+                if value is None:
+                    return (absent, "")
+                return (1 - absent, _sort_key(value)[1])
+            return sort_key
+
+        result.sort(key=_make_key(key.field, absent_group), reverse=key.desc)
     return result
 
 
@@ -685,6 +935,8 @@ def _sort_key(val: Any) -> tuple[int, Any]:
 def wrap_as_hits(
     records: list[dict],
     index: str = ".siem-signals-default",
+    sort_keys: list[SortKey] | None = None,
+    positions: dict[int, int] | None = None,
 ) -> list[dict]:
     """Wrap plain dicts as Elasticsearch hit objects.
 
@@ -692,21 +944,28 @@ def wrap_as_hits(
     ``_source`` keys, matching the Elasticsearch ``hits.hits[]`` format.
 
     Args:
-        records: List of plain dicts.
-        index:   Index name to set on each hit.
+        records:   List of plain dicts.
+        index:     Index name to set on each hit.
+        sort_keys: Parsed sort keys; when given, each hit carries the ``sort``
+                   array a client needs to page with ``search_after``.
+        positions: Document positions, for a ``_doc`` sort key.
 
     Returns:
         List of Elasticsearch-style hit dicts.
     """
-    return [
-        {
+    hits: list[dict[str, Any]] = []
+    for rec in records:
+        hit: dict[str, Any] = {
             "_index": index,
             "_id": hit_id(rec),
-            "_score": 1.0,
+            # A sorted search has no relevance score in Elasticsearch.
+            "_score": None if sort_keys else 1.0,
             "_source": rec,
         }
-        for rec in records
-    ]
+        if sort_keys:
+            hit["sort"] = sort_values(rec, sort_keys, positions)
+        hits.append(hit)
+    return hits
 
 
 def hit_id(rec: dict) -> str:
@@ -826,6 +1085,8 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
     Returns:
         Filtered, sorted, and paginated records.
     """
+    positions = doc_positions(records)
+
     # Filter.
     query_clause = query_body.get("query")
     if query_clause:
@@ -836,6 +1097,11 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
     sort_spec = query_body.get("sort")
     if sort_spec:
         records = apply_es_sort(records, sort_spec)
+        search_after = query_body.get("search_after")
+        if search_after:
+            records = apply_search_after(
+                records, search_after, parse_sort_keys(sort_spec), positions,
+            )
 
     # Paginate.
     # ES rejects a non-numeric from/size; slicing by one raised TypeError out
