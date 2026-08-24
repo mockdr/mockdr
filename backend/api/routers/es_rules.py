@@ -12,7 +12,7 @@ from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_rules import commands as rule_commands
 from application.es_rules import queries as rule_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
-from utils.kibana_find import RulesQueryError, validate_rules_find_query
+from utils.kibana_validation import RulesQueryError, validate_rules_find_query
 
 _RULE_TYPES = frozenset({
     "eql", "query", "saved_query", "threshold", "threat_match", "machine_learning",

@@ -8,9 +8,11 @@ something else entirely.
 """
 import pytest
 
-from utils.kibana_find import (
+from utils.kibana_validation import (
+    CaseBodyError,
     FindQueryError,
     RulesQueryError,
+    validate_case_body,
     validate_find_query,
     validate_rules_find_query,
 )
@@ -208,3 +210,89 @@ class TestRulesFindQuery:
     def test_what_this_endpoint_does_accept(self, params: dict) -> None:
         # Unlike the Cases API, it takes an unknown key and has no page cap.
         validate_rules_find_query(params)
+
+
+class TestCaseBody:
+    """What the Cases API takes when a case is created.
+
+    mockdr took a severity outside the enum, a title that was a number, and a
+    `status` no client may set at creation — all with 200, so the case
+    existed and nobody learned of the typo. Measured against Kibana 8.15.
+    """
+
+    GOOD = {
+        "title": "t", "description": "d", "tags": [],
+        "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+        "settings": {"syncAlerts": False}, "owner": "securitySolution",
+    }
+
+    def refuse(self, **overrides: object) -> CaseBodyError:
+        with pytest.raises(CaseBodyError) as caught:
+            validate_case_body({**self.GOOD, **overrides})
+        return caught.value
+
+    def test_a_valid_body_passes(self) -> None:
+        validate_case_body(self.GOOD)
+
+    @pytest.mark.parametrize("severity", ["low", "medium", "high", "critical"])
+    def test_the_severities_it_takes(self, severity: str) -> None:
+        validate_case_body({**self.GOOD, "severity": severity})
+
+    def test_a_severity_outside_the_enum(self) -> None:
+        assert str(self.refuse(severity="nonsense")) == (
+            'Invalid value "nonsense" supplied to "severity"'
+        )
+
+    @pytest.mark.parametrize(("field", "value"), [
+        ("title", 5), ("description", 5), ("tags", "a"),
+        ("connector", "x"), ("settings", "x"), ("assignees", "x"),
+    ])
+    def test_a_member_of_the_wrong_type(self, field: str, value: object) -> None:
+        assert str(self.refuse(**{field: value})) == (
+            f'Invalid value "{value}" supplied to "{field}"'
+        )
+
+    def test_a_missing_member_is_undefined(self) -> None:
+        with pytest.raises(CaseBodyError) as caught:
+            validate_case_body({})
+        # Reported in the codec's own order, all six at once.
+        assert str(caught.value) == ",".join(
+            f'Invalid value "undefined" supplied to "{f}"'
+            for f in ("description", "tags", "title", "connector", "settings", "owner")
+        )
+
+    def test_a_status_cannot_be_asked_for(self) -> None:
+        # A case is created open; asking for another state is an unknown key,
+        # not a state to honour.
+        assert str(self.refuse(status="open")) == 'invalid keys "status"'
+
+    def test_unknown_keys_are_named_together(self) -> None:
+        assert str(self.refuse(nosuch=1, another=2)) == 'invalid keys "nosuch,another"'
+
+    def test_a_bad_value_is_reported_before_an_unknown_key(self) -> None:
+        assert str(self.refuse(severity="x", nosuch=1)) == (
+            'Invalid value "x" supplied to "severity"'
+        )
+
+    def test_several_bad_values_come_in_the_codecs_order(self) -> None:
+        assert str(self.refuse(title=5, severity="x", tags="a")) == (
+            'Invalid value "a" supplied to "tags",'
+            'Invalid value "5" supplied to "title",'
+            'Invalid value "x" supplied to "severity"'
+        )
+
+    @pytest.mark.parametrize("owner", ["securitySolution", "cases", "observability"])
+    def test_the_plugins_that_own_cases(self, owner: str) -> None:
+        validate_case_body({**self.GOOD, "owner": owner})
+
+    def test_an_unknown_owner_is_forbidden_rather_than_invalid(self) -> None:
+        error = self.refuse(owner="nosuchowner")
+        assert str(error) == 'Unauthorized to create case with owners: "nosuchowner"'
+        # 403, where every other failure here is a 400.
+        assert error.forbidden
+
+    def test_the_optional_members_it_takes(self) -> None:
+        validate_case_body({
+            **self.GOOD, "severity": "high", "assignees": [], "category": None,
+            "customFields": [],
+        })

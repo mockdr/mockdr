@@ -1164,7 +1164,9 @@ probes:
       — were found, along with an `alert_ids` no real case carries.
     # What each install's cases happen to hold: whether any was ever closed
     # or updated, and what its creator's directory entry says. The members
-    # around them are the shape this compares.
+    # around them are the shape this compares. It assumes the real install
+    # starts empty, as the whole harness does — a Kibana left dirty by an
+    # earlier run reports its leftovers here rather than a defect.
     ignore_paths:
       - $.cases[*].status
       - $.cases[*].closed_at
@@ -1344,3 +1346,96 @@ probes:
       - $.total
       - $.page
       - $.perPage
+
+  # ── Kibana: what a case may be created with (2.3.0) ────────────────────
+  #
+  # mockdr checked which members were present and nothing else, so a case
+  # with a severity outside the enum was created and nobody learned of it.
+
+  - id: kbn-case-create-bad-severity
+    endpoint: kibana
+    why: >
+      A severity outside the enum. mockdr created the case and said nothing.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": "probe", "description": "d", "tags": [], "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "securitySolution", "severity": "nonsense"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-status-in-body
+    endpoint: kibana
+    why: >
+      A case is created open; asking for another state is an unknown key, not a state to honour.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": "probe", "description": "d", "tags": [], "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "securitySolution", "status": "open"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-unknown-key
+    endpoint: kibana
+    why: >
+      A member the codec does not have.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": "probe", "description": "d", "tags": [], "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "securitySolution", "nosuchfield": "x"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-title-not-a-string
+    endpoint: kibana
+    why: >
+      A member of the wrong type.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": 5, "description": "d", "tags": [], "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "securitySolution"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-tags-not-a-list
+    endpoint: kibana
+    why: >
+      And another.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": "probe", "description": "d", "tags": "a", "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "securitySolution"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-several-problems
+    endpoint: kibana
+    why: >
+      Reported together, in the codec's own order.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": 5, "description": "d", "tags": "a", "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "securitySolution", "severity": "x"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-unknown-owner
+    endpoint: kibana
+    why: >
+      An owner outside the plugins that own cases: a 403, where every other failure here is a 400.
+    request:
+      method: POST
+      path: /api/cases
+      json: {"title": "probe", "description": "d", "tags": [], "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}, "settings": {"syncAlerts": false}, "owner": "nosuchowner"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-create-empty-body
+    endpoint: kibana
+    why: >
+      Every required member missing at once.
+    request:
+      method: POST
+      path: /api/cases
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic

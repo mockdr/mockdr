@@ -14,7 +14,12 @@ from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_cases import commands as case_commands
 from application.es_cases import queries as case_queries
 from utils.es_response import build_kbn_error_response
-from utils.kibana_find import FindQueryError, validate_find_query
+from utils.kibana_validation import (
+    CaseBodyError,
+    FindQueryError,
+    validate_case_body,
+    validate_find_query,
+)
 
 router = APIRouter(tags=["ES Cases"])
 
@@ -105,8 +110,20 @@ def create_case(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Create a new case."""
-    _require_iots(body, ("description", "tags", "title", "connector", "settings", "owner"))
+    """Create a new case.
+
+    The whole body is checked, not only which members are present: mockdr
+    took a severity outside the enum, a title that was a number, and a
+    `status` no client may set at creation — all with 200, so the case
+    existed and nobody learned of the typo.
+    """
+    try:
+        validate_case_body(body)
+    except CaseBodyError as exc:
+        status = 403 if exc.forbidden else 400
+        raise HTTPException(status_code=status, detail=build_kbn_error_response(
+            status, str(exc),
+        )) from exc
     return case_commands.create_case(body)
 
 

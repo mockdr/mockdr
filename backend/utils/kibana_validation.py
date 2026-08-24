@@ -1,4 +1,4 @@
-"""Validating a Kibana ``_find`` query the way Kibana validates it.
+"""Refusing what Kibana refuses, in the words Kibana refuses it with.
 
 Kibana runs the query string through an io-ts codec before it looks at any
 data, and reports *every* value it could not accept in one message, joined
@@ -228,3 +228,81 @@ def validate_rules_find_query(params: Mapping[str, str]) -> None:
     # Checked by the route itself, once the schema is satisfied.
     if bool(params.get("sort_field")) != bool(params.get("sort_order")):
         raise RulesQueryError(SORT_PAIR_MESSAGE, sort_pair=True)
+
+
+# ---------------------------------------------------------------------------
+# Creating a case
+# ---------------------------------------------------------------------------
+
+#: The order the case codec reports its fields in — the six required ones
+#: first, then the optional ones. Measured by sending an empty body.
+_CASE_FIELD_ORDER: tuple[str, ...] = (
+    "description", "tags", "title", "connector", "settings", "owner",
+    "severity", "assignees", "category", "customFields",
+)
+
+_CASE_REQUIRED: frozenset[str] = frozenset({
+    "description", "tags", "title", "connector", "settings", "owner",
+})
+
+#: What each member has to be. `status` is deliberately absent: a case is
+#: created open, and asking for another one is an `invalid keys` error rather
+#: than a state to honour.
+_CASE_TYPES: dict[str, type | tuple[type, ...]] = {
+    "description": str, "tags": list, "title": str, "connector": dict,
+    "settings": dict, "owner": str, "severity": str, "assignees": list,
+    "category": (str, type(None)), "customFields": list,
+}
+
+#: The plugins that own cases. An owner outside them is a 403, not a 400:
+#: Kibana reads it as a case you may not create rather than as a bad value.
+CASE_OWNERS: frozenset[str] = frozenset({"securitySolution", "cases", "observability"})
+
+
+class CaseBodyError(ValueError):
+    """Raised when a case body is not one Kibana would accept.
+
+    ``forbidden`` marks the owner check, which answers 403 where every other
+    failure here answers 400.
+    """
+
+    def __init__(self, message: str, *, forbidden: bool = False) -> None:
+        """Record the message and which status carries it."""
+        super().__init__(message)
+        self.forbidden = forbidden
+
+
+def validate_case_body(body: Mapping[str, object]) -> None:
+    """Refuse a case body the way the Cases API refuses it.
+
+    mockdr took a case with a severity outside the enum, a title that was a
+    number, and a `status` no client may set at creation — all with 200, so
+    the case existed and nobody learned of the typo.
+
+    Raises:
+        CaseBodyError: Carrying Kibana's own message.
+    """
+    problems: list[str] = []
+    for field in _CASE_FIELD_ORDER:
+        if field not in body:
+            if field in _CASE_REQUIRED:
+                problems.append(f'Invalid value "undefined" supplied to "{field}"')
+            continue
+        value = body[field]
+        expected = _CASE_TYPES[field]
+        if isinstance(value, bool) or not isinstance(value, expected):
+            problems.append(_invalid(field, str(value)))
+        elif field == "severity" and value not in SEVERITIES:
+            problems.append(_invalid(field, str(value)))
+    if problems:
+        raise CaseBodyError(",".join(problems))
+
+    unknown = [key for key in body if key not in _CASE_TYPES]
+    if unknown:
+        raise CaseBodyError(f'invalid keys "{",".join(unknown)}"')
+
+    owner = body.get("owner")
+    if owner not in CASE_OWNERS:
+        raise CaseBodyError(
+            f'Unauthorized to create case with owners: "{owner}"', forbidden=True,
+        )
