@@ -52,6 +52,13 @@ beside them. Seeded STAR rules now carry the swagger's spread of statuses
 instead of `Active` twenty times over — a filter no seed can exercise is a
 filter nobody can trust.
 
+**`tenant` was dropped on seven routes.** SentinelOne declares it wherever a
+request can be widened from the caller's own scope to the whole tenant;
+FastAPI dropped it, so it never reached the mock's OpenAPI either. It is
+declared now. mockdr seeds one tenant and a non-admin token stays scoped, so
+the answer is the same set — the point is that a declared parameter is no
+longer silently discarded.
+
 **A documented filter that filtered nothing.** SentinelOne's swagger declares
 `incidentStatus`, `analystVerdict`, `severity` (alerts), `type`, `source`,
 `uuids` (IOCs) and `id` (groups); this mock declared only its own plurals

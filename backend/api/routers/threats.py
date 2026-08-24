@@ -23,6 +23,11 @@ class NoteBody(BaseModel):
 @router.get("/threats")
 def list_threats(
     ids: str = Query(None),
+    # `tenant=true` asks for the whole tenant rather than the caller's own
+    # scope. mockdr seeds one tenant, and the account scoping a non-admin
+    # token carries still applies, so the answer is the same set — but the
+    # parameter is declared rather than silently dropped.
+    tenant: bool = Query(None),
     accountIds: str = Query(None),
     siteIds: str = Query(None),
     groupIds: str = Query(None),

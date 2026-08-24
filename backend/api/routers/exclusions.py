@@ -31,6 +31,11 @@ _BLOCKLIST_INTERNAL = {"siteId"}
 @router.get("/exclusions")
 def list_exclusions(
     ids: str = Query(None),
+    # `tenant=true` asks for the whole tenant rather than the caller's own
+    # scope. mockdr seeds one tenant, and the account scoping a non-admin
+    # token carries still applies, so the answer is the same set — but the
+    # parameter is declared rather than silently dropped.
+    tenant: bool = Query(None),
     siteIds: str = Query(None),
     type: str = Query(None),
     types: str = Query(None),
@@ -100,6 +105,8 @@ def delete_exclusion(exclusion_id: str, _: dict = Depends(require_admin)) -> dic
 @router.get("/restrictions")
 def list_blocklist(
     siteIds: str = Query(None),
+    # See the note on the exclusions handler above.
+    tenant: bool = Query(None),
     types: str = Query(None),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),

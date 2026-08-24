@@ -48,6 +48,11 @@ def delete_device_control_rules(
 @router.get("/device-control")
 def list_device_control_rules(
     ids: str = Query(None),
+    # `tenant=true` asks for the whole tenant rather than the caller's own
+    # scope. mockdr seeds one tenant, and the account scoping a non-admin
+    # token carries still applies, so the answer is the same set — but the
+    # parameter is declared rather than silently dropped.
+    tenant: bool = Query(None),
     siteIds: str = Query(None),
     accountIds: str = Query(None),
     deviceTypes: str = Query(None),

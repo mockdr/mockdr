@@ -12,6 +12,11 @@ router = APIRouter(tags=["Threat Intelligence / IOC"])
 @router.get("/threat-intelligence/iocs")
 def list_iocs(
     ids: str = Query(None),
+    # `tenant=true` asks for the whole tenant rather than the caller's own
+    # scope. mockdr seeds one tenant, and the account scoping a non-admin
+    # token carries still applies, so the answer is the same set — but the
+    # parameter is declared rather than silently dropped.
+    tenant: bool = Query(None),
     types: str = Query(None),
     sources: str = Query(None),
     uuids: str = Query(None),

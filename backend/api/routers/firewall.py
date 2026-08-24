@@ -52,6 +52,11 @@ def delete_firewall_rules(body: FirewallDeleteBody, _: dict = Depends(require_ad
 @router.get("/firewall-control")
 def list_firewall_rules(
     ids: str = Query(None),
+    # `tenant=true` asks for the whole tenant rather than the caller's own
+    # scope. mockdr seeds one tenant, and the account scoping a non-admin
+    # token carries still applies, so the answer is the same set — but the
+    # parameter is declared rather than silently dropped.
+    tenant: bool = Query(None),
     siteIds: str = Query(None),
     statuses: str = Query(None),
     actions: str = Query(None),
