@@ -11,6 +11,8 @@ The UI routes under the same top-level prefixes as the APIs it mocks
 (``/graph/users`` is a page, ``/graph/v1.0/users`` is an endpoint), so the
 fallback tells them apart by ``Accept``, the way a browser navigation does.
 """
+import base64
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -21,11 +23,15 @@ VENDOR_PATHS = [
     ("mde", "/mde/api/no-such-endpoint", "error"),
     ("graph", "/graph/v1.0/no-such-endpoint", "error"),
     ("xdr", "/xdr/public_api/v1/no-such-endpoint", "reply"),
-    ("elasticsearch", "/elastic/no-such-endpoint", "error"),
     ("kibana", "/kibana/api/no-such-endpoint", "statusCode"),
     ("splunk", "/splunk/services/no-such-endpoint", "messages"),
     ("sentinel", "/sentinel/no-such-endpoint", "error"),
 ]
+
+# Elasticsearch is deliberately absent from the list above: it has no
+# "unknown route" for a single segment, because a single segment *is* an index
+# name. Its answers are measured in TestElasticsearchIsNotLikeTheOthers below
+# and in tests/integration/api/elastic/test_index_lifecycle.py.
 
 JSON_ACCEPT = {"Accept": "application/json"}
 BROWSER_ACCEPT = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
@@ -136,3 +142,45 @@ class TestWrongVerbStillFiveOhFive:
         resp = client.delete("/mde/api/machines", headers=JSON_ACCEPT)
         assert resp.status_code == 405
         assert "error" in resp.json()
+
+
+class TestElasticsearchIsNotLikeTheOthers:
+    """Elasticsearch answers an unknown path by its own rules, not with a 404.
+
+    Measured against 8.15: a single segment names an index, so an unknown one
+    is `index_not_found_exception`; a verb that index paths do not take is a
+    405 carrying a bare string rather than the nested error object; and
+    without credentials nothing gets that far.
+    """
+
+    ES_AUTH = {
+        "Authorization": "Basic "
+        + base64.b64encode(b"elastic:mock-elastic-password").decode(),
+        "Accept": "application/json",
+    }
+
+    def test_a_single_unknown_segment_is_a_missing_index(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/elastic/no-such-endpoint", headers=self.ES_AUTH)
+        assert response.status_code == 404
+        assert response.json()["error"]["type"] == "index_not_found_exception"
+
+    def test_a_verb_an_index_path_does_not_take_is_a_405(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post("/elastic/no-such-endpoint", headers=self.ES_AUTH, json={})
+        assert response.status_code == 405
+        body = response.json()
+        # A bare string, which is the shape Elasticsearch uses here and
+        # nowhere else.
+        assert body["status"] == 405
+        assert body["error"].startswith("Incorrect HTTP method for uri ")
+        assert "allowed: [" in body["error"]
+
+    def test_without_credentials_it_never_gets_that_far(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/elastic/no-such-endpoint", headers=JSON_ACCEPT)
+        assert response.status_code == 401
+        assert response.json()["error"]["type"] == "security_exception"

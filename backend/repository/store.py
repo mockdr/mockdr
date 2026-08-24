@@ -17,6 +17,7 @@ CAPS: dict[str, int] = {
     "splunk_search_jobs": 5_000,
     "splunk_sessions": 5_000,
     "es_documents": 100_000,
+    "es_indices": 1_000,
     "agent_uploads": 200,
     "cs_oauth_tokens": 5_000,
     "mde_oauth_tokens": 5_000,
@@ -75,6 +76,11 @@ class InMemoryStore:
             # "{index}:{id}". POST _doc used to acknowledge a write it never
             # performed, so the document was absent on the very next read.
             "es_documents": {},
+            # Indices a client created through `PUT /{index}`, and how many
+            # documents each holds. Without the registry a created index
+            # answered 404 on the very next search, and a written document
+            # was readable by id but invisible to a search.
+            "es_indices": {},
             "es_cases": {},
             "es_case_comments": {},
             "es_exception_lists": {},

@@ -300,8 +300,10 @@ class TestDocumentWritesPersist:
 
     def test_put_is_served(self, client: TestClient) -> None:
         # PUT is the primary index API in real ES; only POST was routed.
+        # A first write is 201, which is how a client tells a create from a
+        # replacement without reading the body (measured on 8.15).
         resp = client.put(self.URL, json={"n": 1}, headers=ES_AUTH)
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
     def test_delete_removes_the_document(self, client: TestClient) -> None:
         client.post(self.URL, json={"n": 1}, headers=ES_AUTH)

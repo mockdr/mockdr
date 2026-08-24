@@ -288,7 +288,7 @@ def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
         return []
     last_command = parsed.commands[-1] if parsed.commands else None
     last = last_command.name if last_command else ""
-    if last == "table":
+    if last_command is not None and last == "table":
         # `table` declares its columns, so splunkd lists every name it was
         # given — including one no row turned out to carry.
         names = [f.strip() for f in re.split(r"[,\s]+", last_command.arg) if f.strip()]

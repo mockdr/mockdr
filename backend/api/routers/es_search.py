@@ -10,12 +10,19 @@ import json
 from fnmatch import fnmatch
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 
 from api.es_auth import require_es_auth, require_es_write
+from api.spa import spa_response
 from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
 from utils.es_query import ESQueryError
-from utils.es_response import build_es_error_response, build_es_index_not_found
+from utils.es_response import (
+    build_es_error_response,
+    build_es_index_not_found,
+    build_es_invalid_index_name,
+    build_es_resource_exists,
+)
 from utils.id_gen import new_hex
 
 router = APIRouter(tags=["ES Search"])
@@ -372,25 +379,104 @@ def index_doc(
     index: str,
     doc_id: str,
     body: dict = Body(...),
+    refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
-) -> dict:
+) -> JSONResponse:
     """Index (create or replace) a document.
 
-    The document is stored, so a subsequent ``GET _doc`` finds it. This used
-    to answer ``result: created`` without writing anything, which meant the
-    very next read 404'd.
+    The document is stored and searchable, so a subsequent ``GET _doc`` and a
+    subsequent search both find it. This used to answer ``result: created``
+    without writing anything, which meant the very next read 404'd.
     """
-    return search_queries.es_index_doc(index, doc_id, body)
+    forced = _forced_refresh(refresh)
+    result = search_queries.es_index_doc(index, doc_id, body)
+    if forced:
+        result["forced_refresh"] = True
+    # 201 the first time, 200 for a replacement — which is how a client tells
+    # a create from an update without reading the body.
+    created = result.get("result") == "created"
+    return JSONResponse(status_code=201 if created else 200, content=result)
+
+
+def _forced_refresh(refresh: str | None) -> bool:
+    """Read the ``refresh`` parameter, refusing a value Elasticsearch refuses."""
+    try:
+        return search_queries.refresh_forced(refresh)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "illegal_argument_exception", str(exc),
+        )) from exc
+
+
+@router.put("/{index}", operation_id="es_create_index")
+def create_index(
+    index: str,
+    body: dict | None = Body(default=None),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Create an index, so a client can search what it then writes to it."""
+    if index.startswith("_"):
+        raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
+    try:
+        return search_queries.create_index(index, (body or {}).get("settings"))
+    except search_queries.IndexExistsError as exc:
+        raise HTTPException(status_code=400, detail=build_es_resource_exists(
+            exc.index, exc.uuid,
+        )) from exc
+
+
+@router.get("/{index}", operation_id="es_get_index")
+async def get_index(request: Request, index: str) -> Response:
+    """The index's settings and mappings.
+
+    `HEAD /{index}` — how every client asks whether an index exists — is
+    served from this by the HEAD middleware, so both answer 200 or 404
+    together, as they do on a real cluster.
+
+    The UI routes under this prefix too (``/elastic/rules`` is a page), so a
+    browser navigation gets the SPA and only an API client gets the index.
+    Authentication is checked after that, for the same reason: a navigation
+    must not be answered with the API's 401.
+    """
+    navigation = spa_response(request)
+    if navigation is not None:
+        return navigation
+    await require_es_auth(request, request.headers.get("authorization", ""))
+    if index.startswith("_"):
+        raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
+    described = search_queries.describe_index(index)
+    if described is None:
+        raise HTTPException(
+            status_code=404, detail=build_es_index_not_found(index),
+        )
+    return JSONResponse(content=described)
+
+
+@router.delete("/{index}", operation_id="es_delete_index")
+def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
+    """Delete an index and everything written to it."""
+    if index.startswith("_"):
+        raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
+    result = search_queries.delete_index(index)
+    if result is None:
+        raise HTTPException(
+            status_code=404, detail=build_es_index_not_found(index),
+        )
+    return result
 
 
 @router.delete("/{index}/_doc/{doc_id}")
 def delete_doc(
     index: str,
     doc_id: str,
+    refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Delete a document written through the index API."""
+    forced = _forced_refresh(refresh)
     result = search_queries.es_delete_doc(index, doc_id)
+    if result is not None and forced:
+        result["forced_refresh"] = True
     if result is None:
         raise HTTPException(
             status_code=404,

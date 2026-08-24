@@ -3,7 +3,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from json import JSONDecodeError
-from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.routing import Match
 from starlette.types import Scope
 
+from api import spa
 from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
@@ -880,31 +880,16 @@ for _graph_module in [
 # any API-only deployment, and gating this block on the build meant every mocked
 # vendor answered FastAPI's `{"detail": "Not Found"}` there instead of its own
 # envelope — the exact mismatch this fallback exists to remove.
-_DIST = Path(__file__).parent.parent / "frontend" / "dist"
-_SPA_AVAILABLE = _DIST.exists()
+# The SPA decision lives in api/spa.py, so the routes that share a path with
+# a UI route reach the same answer this fallback does.
+_DIST = spa.DIST
+_SPA_AVAILABLE = spa.SPA_AVAILABLE
 
 if _SPA_AVAILABLE:
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
 _FALLBACK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
-_SAFE_METHODS = ("GET", "HEAD")
-
-
-def _wants_html(request: Request) -> bool:
-    """Return whether this looks like a browser navigation.
-
-    Browsers name ``text/html`` explicitly when navigating; API clients send
-    ``application/json`` or ``*/*``. The UI routes under the same top-level
-    prefixes as the APIs it mocks — ``/graph/users`` is a page,
-    ``/graph/v1.0/users`` is an endpoint — so the path alone cannot say which
-    of the two an unmatched request wanted. Only a safe method can be a
-    navigation, so a POST carrying a browser's Accept header is still an API
-    call and still wants the vendor's error.
-    """
-    return (
-        request.method in _SAFE_METHODS
-        and "text/html" in request.headers.get("accept", "")
-    )
+_SAFE_METHODS = spa.SAFE_METHODS
 
 
 @lru_cache(maxsize=1024)
@@ -1015,6 +1000,16 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
             content={"messages": [{"type": "ERROR", "text":
                 f'Cannot perform action "{request.method}" without a target name to act on.'}]},
         )
+    if allowed and vendor == "elasticsearch":
+        # Elasticsearch's 405 carries a bare string, not the nested error
+        # object every other status uses, and it names the verbs the uri does
+        # take (measured on 8.15).
+        inner = path[len("/elastic"):] if path.startswith("/elastic") else path
+        return JSONResponse(status_code=405, content={
+            "error": f"Incorrect HTTP method for uri [{inner}] and method "
+                     f"[{request.method}], allowed: [{', '.join(allowed)}]",
+            "status": 405,
+        }, headers={"Allow": ", ".join(allowed)})
     if allowed:
         return JSONResponse(
             status_code=405,
@@ -1024,7 +1019,7 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
             headers={"Allow": ", ".join(allowed)},
         )
 
-    if _SPA_AVAILABLE and _wants_html(request):
+    if _SPA_AVAILABLE and spa.wants_html(request):
         return FileResponse(_DIST / "index.html")
 
     if vendor is not None:

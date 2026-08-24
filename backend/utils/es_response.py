@@ -170,6 +170,36 @@ def build_es_index_not_found(index: str) -> dict:
     }
 
 
+def build_es_invalid_index_name(index: str) -> dict:
+    """Build ``invalid_index_name_exception`` for a name Elasticsearch refuses.
+
+    An index name may not start with an underscore, and Elasticsearch says so
+    with a 400 rather than reporting the index as missing (measured on 8.15).
+    """
+    detail = {
+        "type": "invalid_index_name_exception",
+        "reason": f"Invalid index name [{index}], must not start with '_'.",
+        "index_uuid": "_na_",
+        "index": index,
+    }
+    return {"error": {"root_cause": [dict(detail)], **detail}, "status": 400}
+
+
+def build_es_resource_exists(index: str, uuid: str) -> dict:
+    """Build ``resource_already_exists_exception`` for a repeated create.
+
+    The reason quotes the index and its uuid together, and both appear as
+    members beside it — measured on 8.15.
+    """
+    detail = {
+        "type": "resource_already_exists_exception",
+        "reason": f"index [{index}/{uuid}] already exists",
+        "index_uuid": uuid,
+        "index": index,
+    }
+    return {"error": {"root_cause": [dict(detail)], **detail}, "status": 400}
+
+
 #: Challenges Elasticsearch offers on a 401, ordered by its own scheme priority.
 #: Measured against Elasticsearch 8.15.0 with default security: Basic first,
 #: then ApiKey, and no Bearer — the token service only advertises itself when

@@ -7,6 +7,7 @@ response envelopes.
 from __future__ import annotations
 
 import hashlib
+import time
 from fnmatch import fnmatch
 
 from repository.es_alert_repo import es_alert_repo
@@ -47,6 +48,105 @@ class IndexNotFoundError(LookupError):
         """Record the index name so the 404 body can name it."""
         self.index = index
         super().__init__(f"no such index [{index}]")
+
+
+class IndexExistsError(ValueError):
+    """Raised when a client creates an index that is already there.
+
+    Elasticsearch answers ``resource_already_exists_exception``; silently
+    acknowledging the second create would let a client believe it had a fresh
+    index and then find another run's documents in it.
+    """
+
+    def __init__(self, index: str, uuid: str) -> None:
+        """Record the index and the uuid the message quotes."""
+        self.index = index
+        self.uuid = uuid
+        super().__init__(f"index [{index}/{uuid}] already exists")
+
+
+def create_index(index: str, settings: dict | None = None) -> dict:
+    """Create an index, and report it the way Elasticsearch does.
+
+    Raises:
+        IndexExistsError: If the index is already there.
+    """
+    existing = store.get("es_indices", index)
+    if existing:
+        raise IndexExistsError(index, str(existing.get("uuid", "")))
+    store.save("es_indices", index, {
+        "uuid": _index_uuid(index), "settings": dict(settings or {}), "docs": 0,
+        "created": int(time.time() * 1000),
+    })
+    return {"acknowledged": True, "shards_acknowledged": True, "index": index}
+
+
+def delete_index(index: str) -> dict | None:
+    """Delete an index and the documents written to it, or ``None`` if absent."""
+    if not store.get("es_indices", index):
+        return None
+    for key in list(store.get_all_with_keys("es_documents")):
+        if key.startswith(f"{index}:"):
+            store.delete("es_documents", key)
+    store.delete("es_indices", index)
+    return {"acknowledged": True}
+
+
+def describe_index(index: str) -> dict | None:
+    """The index metadata ``GET /{index}`` answers with, or ``None`` if absent.
+
+    Elasticsearch keys the document by the index name and reports every
+    setting as a *string*, which is what a client parsing `number_of_shards`
+    has to cope with.
+    """
+    entry = store.get("es_indices", index)
+    if entry is None and index.startswith(_KNOWN_PREFIXES):
+        entry = {"uuid": _index_uuid(index), "settings": {}}
+    if entry is None:
+        return None
+    settings = {str(k): str(v) for k, v in (entry.get("settings") or {}).items()}
+    return {
+        index: {
+            "aliases": {},
+            "mappings": {},
+            "settings": {"index": {
+                "number_of_shards": settings.get("number_of_shards", "1"),
+                "number_of_replicas": settings.get("number_of_replicas", "0"),
+                "provided_name": index,
+                "creation_date": str(entry.get("created", 0)),
+                "uuid": str(entry.get("uuid", "")),
+                "version": {"created": "8512000"},
+            }},
+        },
+    }
+
+
+def index_exists(index: str) -> bool:
+    """Whether a client can search this index — created here or seeded."""
+    return bool(store.get("es_indices", index)) or index.startswith(_KNOWN_PREFIXES)
+
+
+def created_indices() -> list[str]:
+    """Every index a client created, for ``_cat/indices``."""
+    return sorted(store.get_all_with_keys("es_indices"))
+
+
+def _written_documents(index: str) -> list[dict]:
+    """The documents a client wrote to this index, ready to search.
+
+    The count on the registry entry keeps this off the hot path: an index
+    nobody has written to costs one dict lookup rather than a scan of every
+    document in the store.
+    """
+    entry = store.get("es_indices", index) or {}
+    if not entry.get("docs"):
+        return []
+    prefix = f"{index}:"
+    return [
+        dict(record.get("_source") or {})
+        for key, record in store.get_all_with_keys("es_documents").items()
+        if key.startswith(prefix)
+    ]
 
 
 #: Index-name prefixes this mock actually backs, grouped by their source.
@@ -97,7 +197,7 @@ def _missing_target(index: str) -> str | None:
             continue
         # Elasticsearch rejects uppercase index names outright, so a target
         # that only matches when folded cannot name a real index.
-        if raw != name or not name.startswith(_KNOWN_PREFIXES):
+        if raw != name or not index_exists(name):
             return raw
     return None
 
@@ -137,6 +237,11 @@ def _resolve_collection(index: str, *, ignore_unavailable: bool = False) -> tupl
         records += [to_ecs_document(record_dict(a), idx) for a in es_alert_repo.list_all()]
     if any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
         records += [record_dict(ep) for ep in es_endpoint_repo.list_all()]
+    for name in names:
+        # A document written through the index API is searchable, as it is on
+        # a real cluster; it used to be readable by id and invisible to every
+        # search, which is the shape of an ingest that looks like it worked.
+        records += _written_documents(name)
     return records, idx
 
 
@@ -396,6 +501,31 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
     return None
 
 
+#: What ``refresh`` takes, and whether each value forces one. An empty value
+#: is the bare `?refresh`, which means true. `wait_for` blocks for the next
+#: scheduled refresh rather than forcing one, so it reports nothing.
+_REFRESH_VALUES: dict[str, bool] = {
+    "": True, "true": True, "false": False, "wait_for": False,
+}
+
+
+def refresh_forced(value: str | None) -> bool:
+    """Whether this ``refresh`` value forces one.
+
+    Raises:
+        ValueError: For a value Elasticsearch does not take. It refuses the
+            write outright rather than guessing at the visibility the client
+            asked for.
+    """
+    if value is None:
+        return False
+    forced = _REFRESH_VALUES.get(value.lower())
+    if forced is None:
+        msg = f"Unknown value for refresh: [{value}]."
+        raise ValueError(msg)
+    return forced
+
+
 def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
     """Store a document so a subsequent read finds it.
 
@@ -415,6 +545,8 @@ def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
     existing = store.get("es_documents", key)
     version = int(existing.get("_version", 0)) + 1 if existing else 1
     store.save("es_documents", key, {"_version": version, "_source": dict(body)})
+    if not existing:
+        _count_document(index, 1)
     return {
         "_index": index,
         "_id": doc_id,
@@ -426,6 +558,19 @@ def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
     }
 
 
+def _count_document(index: str, delta: int) -> None:
+    """Keep the registry's document count, creating the index if it is new.
+
+    Elasticsearch creates an index on first write, so a client that indexes
+    into a name that does not exist yet gets one.
+    """
+    entry = store.get("es_indices", index) or {
+        "uuid": _index_uuid(index), "settings": {}, "docs": 0,
+    }
+    entry = {**entry, "docs": max(0, int(entry.get("docs", 0)) + delta)}
+    store.save("es_indices", index, entry)
+
+
 def es_delete_doc(index: str, doc_id: str) -> dict | None:
     """Delete a document written through the index API."""
     key = f"{index}:{doc_id}"
@@ -433,6 +578,7 @@ def es_delete_doc(index: str, doc_id: str) -> dict | None:
     if not existing:
         return None
     store.delete("es_documents", key)
+    _count_document(index, -1)
     return {
         "_index": index,
         "_id": doc_id,
