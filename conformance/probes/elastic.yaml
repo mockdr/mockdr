@@ -81,6 +81,14 @@ probes:
       path: /_search
       json: {size: 0}
       auth: basic
+    ignore_paths:
+      # `_shards.failures` appears only when a shard failed. Kibana keeps
+      # creating and rolling over its own indices while the probes run, so a
+      # search across `_all` can catch one mid-allocation
+      # (`no_shard_available_action_exception`). That is the cluster's state
+      # at that second, not the API's shape — and a mock with no shards can
+      # never produce it.
+      - $._shards.failures
 
   # ── Kibana ──────────────────────────────────────────────────────────────
   - id: kbn-status
