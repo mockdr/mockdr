@@ -25,6 +25,14 @@ a 500 ms gate. Three causes, all in the path every response takes:
 pinned to two cores, 186 ms at the concurrency CI uses). No response shape
 changes: 199 routes compared across six platforms, 0 drift.
 
+**The harness measured a moment, not a product.** A conformance run on a
+cluster that was still allocating shards reported eight findings: the real
+Elasticsearch answered a search with `_shards.failures`
+(`no_shard_available_action_exception`), which the mock has no way to
+produce. `bootstrap_elastic` now waits for every shard to be allocated
+before the first probe and says so if it never happens — "nothing differed"
+and "nothing ran" stay distinguishable.
+
 **The scripts were the only Python nothing linted.** `scripts/` has a ruff
 config of its own (the backend's rules, with the allowances a script earns)
 and is checked in CI and by `ci.sh`; the 34 findings that had accumulated

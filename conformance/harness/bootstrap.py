@@ -120,6 +120,8 @@ def bootstrap_elastic(
     if "search" not in spec.endpoints:
         raise BootstrapError("elastic spec has no 'search' endpoint")
 
+    _await_allocated_shards(spec, target, clients)
+
     response = clients.get("search", target).get(
         "/_cat/indices", params={"format": "json"},
         auth=spec.credentials[target].pair if target in spec.credentials else None,
@@ -146,6 +148,40 @@ def bootstrap_elastic(
         if isinstance(row, dict) and not str(row.get("index", "")).startswith(".")
     ]
     return {"index": names[0] if names else "_all"}
+
+
+def _await_allocated_shards(spec: PlatformSpec, target: str, clients: Clients) -> None:
+    """Block until the real cluster has every shard allocated.
+
+    A cluster that is still allocating answers a search with a populated
+    ``_shards.failures`` (``no_shard_available_action_exception``). The mock
+    has no shards to fail, so the harness would report the difference as
+    drift — a measurement of the moment, not of either product.
+    """
+    if target != "real":
+        return
+    response = clients.get("search", target).get(
+        "/_cluster/health",
+        params={
+            "wait_for_status": "yellow",
+            "wait_for_no_initializing_shards": "true",
+            "wait_for_no_relocating_shards": "true",
+            "timeout": "120s",
+        },
+        auth=spec.credentials[target].pair if target in spec.credentials else None,
+    )
+    if response.status_code != 200:
+        raise BootstrapError(
+            f"cluster health on {target}: HTTP {response.status_code} "
+            f"{response.text[:200]}",
+        )
+    health = response.json()
+    if health.get("timed_out") or health.get("unassigned_shards"):
+        raise BootstrapError(
+            f"{target} still has {health.get('unassigned_shards')} unassigned shard(s) "
+            f"after 120s (status {health.get('status')}) — probing now would "
+            f"measure the allocation, not the API",
+        )
 
 
 BOOTSTRAPS = {
