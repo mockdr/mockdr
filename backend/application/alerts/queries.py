@@ -18,6 +18,11 @@ FILTER_SPECS = [
     FilterSpec("severity", "ruleInfo.severity", "in", enum=True),
     FilterSpec("analystVerdict", "alertInfo.analystVerdict", "in", enum=True),
     FilterSpec("incidentStatus", "alertInfo.incidentStatus", "in", enum=True),
+    # Sent by the XSOAR SentinelOne V2 integration, declared by the swagger,
+    # and dropped here until now: the OS the alert's agent runs, and a
+    # substring of the rule's name.
+    FilterSpec("osType", "agentDetectionInfo.osFamily", "in", enum=True),
+    FilterSpec("ruleName__contains", "ruleInfo.name", "contains"),
     FilterSpec("categories", "ruleInfo.treatAsThreat", "in"),
     FilterSpec("groupIds", "agentRealtimeInfo.groupId", "in"),
     FilterSpec("analystVerdicts", "alertInfo.analystVerdict", "in", enum=True),
@@ -50,3 +55,19 @@ def get_alert(alert_id: str) -> dict | None:
     if not alert:
         return None
     return build_single_response(record_dict(alert))
+
+
+#: The swagger's own filters for GET /cloud-detection/rules. `status` and
+#: `severity` are declared with enums the records already spell that way.
+RULE_FILTER_SPECS = [
+    FilterSpec("status", "status", "in", enum=True),
+    FilterSpec("severity", "severity", "in", enum=True),
+    FilterSpec("queryType", "queryType", "in"),
+]
+
+
+def filter_star_rules(params: dict) -> list[dict]:
+    """The STAR rules a request asks for; every rule when it asks for none."""
+    from repository.store import store  # noqa: PLC0415 - avoids an import cycle
+
+    return apply_filters(list(store.get_all("star_rules")), params, RULE_FILTER_SPECS)

@@ -41,6 +41,17 @@ and both obvious groupings made the login screen worse (a `charts` chunk put
 250 kB of Chart.js on it, an `app-core` chunk put every vendor client there).
 The login page still loads 9 requests and no Chart.js.
 
+**The filters a real integration actually sends.** The XSOAR SentinelOne V2
+integration — the connector most mockdr users point at it — sends 27
+documented query parameters; six of them this mock ignored, so the
+integration's own filtered queries came back unfiltered: `osType` and
+`ruleName__contains` on alerts, `status` on STAR rules, `updatedAt` on
+accounts and sites, `userEmails` on activities (resolved through the users,
+because an activity stores only the id), plus the account and site filters
+beside them. Seeded STAR rules now carry the swagger's spread of statuses
+instead of `Active` twenty times over — a filter no seed can exercise is a
+filter nobody can trust.
+
 **A documented filter that filtered nothing.** SentinelOne's swagger declares
 `incidentStatus`, `analystVerdict`, `severity` (alerts), `type`, `source`,
 `uuids` (IOCs) and `id` (groups); this mock declared only its own plurals

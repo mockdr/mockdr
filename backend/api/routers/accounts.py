@@ -11,11 +11,17 @@ router = APIRouter(tags=["Accounts"])
 
 @router.get("/accounts")
 def list_accounts(
+    accountIds: str = Query(None),  # noqa: N803 - the vendor's own names
+    name: str = Query(None),
+    states: str = Query(None),
+    accountType: str = Query(None),  # noqa: N803
+    updatedAt: str = Query(None),  # noqa: N803
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
-    """Return a paginated list of all accounts."""
-    return account_queries.list_accounts(cursor, limit)
+    """Return a paginated list of accounts, filtered as the swagger declares."""
+    params = {k: v for k, v in locals().items() if v is not None and k not in ("cursor", "limit")}
+    return account_queries.list_accounts(params, cursor, limit)
 
 
 @router.post("/accounts")

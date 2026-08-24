@@ -30,6 +30,8 @@ def list_alerts(
     severity: str = Query(None),
     analystVerdict: str = Query(None),
     incidentStatus: str = Query(None),
+    osType: str = Query(None),
+    ruleName__contains: str = Query(None),  # noqa: N803 - the vendor's own name
     query: str = Query(None),
     createdAt__gte: str = Query(None),
     createdAt__lte: str = Query(None),
@@ -64,9 +66,14 @@ def set_incident_status(body: FilterBody, current_user: dict = Depends(require_w
 
 
 @router.get("/cloud-detection/rules")
-def list_star_rules() -> dict:
-    """Return all STAR custom detection rules."""
-    rules = alert_commands.list_star_rules().get("data", [])
+def list_star_rules(
+    status: str = Query(None),
+    severity: str = Query(None),
+    queryType: str = Query(None),  # noqa: N803 - the vendor's own name
+) -> dict:
+    """Return the STAR custom detection rules, filtered as the swagger declares."""
+    params = {k: v for k, v in locals().items() if v is not None}
+    rules = alert_queries.filter_star_rules(params)
     # RuleViewSchema_many: the declared fields only, with a pagination block.
     return build_list_response(
         rules,

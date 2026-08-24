@@ -17,6 +17,7 @@ def list_activities(
     accountIds: str = Query(None),
     siteIds: str = Query(None),
     userIds: str = Query(None),
+    userEmails: str = Query(None),  # noqa: N803 - the vendor's own name
     agentIds: str = Query(None),
     activityTypes: str = Query(None),
     createdAt__gte: str = Query(None),

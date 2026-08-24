@@ -12,6 +12,11 @@ FILTER_SPECS = [
     FilterSpec("accountIds", "accountId", "in"),
     FilterSpec("states", "state", "in"),
     FilterSpec("name", "name", "contains"),
+    # The swagger's own names, sent by the XSOAR SentinelOne integration and
+    # dropped here until now.
+    FilterSpec("siteIds", "id", "in"),
+    FilterSpec("externalId", "externalId", "eq"),
+    FilterSpec("updatedAt", "updatedAt", "eq"),
 ]
 
 

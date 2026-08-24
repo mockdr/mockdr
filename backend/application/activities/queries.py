@@ -1,5 +1,6 @@
 
 from repository.activity_repo import activity_repo
+from repository.user_repo import user_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.pagination import ACTIVITY_CURSOR, build_list_response, paginate
 from utils.serde import record_dict
@@ -40,6 +41,17 @@ def list_activities(params: dict, cursor: str | None, limit: int) -> dict:
     records = [
         {k: ("" if v is None and k in string_fields else v) for k, v in r.items()} for r in raw
     ]
+    # `userEmails` is documented and the XSOAR integration sends it; an
+    # activity stores only the user's id, so the addresses are resolved to
+    # ids first — which is what the product does behind the parameter.
+    emails = params.get("userEmails")
+    if emails:
+        wanted = {e.strip().lower() for e in str(emails).split(",") if e.strip()}
+        ids = {
+            str(u.id) for u in user_repo.list_all()
+            if str(getattr(u, "email", "")).lower() in wanted
+        }
+        records = [r for r in records if str(r.get("userId") or "") in ids]
     filtered = apply_filters(records, params, FILTER_SPECS)
     filtered.sort(key=lambda r: r.get("id", 0))
     filtered = apply_query_options(filtered, params)

@@ -18,6 +18,10 @@ from repository.alert_repo import alert_repo
 from repository.store import store
 from utils.id_gen import new_id
 
+#: The swagger's own rule statuses; most rules in a console are live, so the
+#: spread is weighted rather than uniform.
+STAR_RULE_STATUSES: list[str] = ["Active", "Active", "Active", "Draft", "Disabled"]
+
 
 def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
     """Create ``SEED_COUNT_ALERTS`` alert records and persist them.
@@ -26,7 +30,7 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
         fake: Shared :class:`~faker.Faker` instance (seeded externally).
         agent_ids: Pool of agent IDs to randomly associate alerts with.
     """
-    for _ in range(SEED_COUNT_ALERTS):
+    for index in range(SEED_COUNT_ALERTS):
         alid = new_id()
         rule_id = new_id()
         agent = agent_repo.get(random.choice(agent_ids))
@@ -135,7 +139,10 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
             "groupIds": [],
             "accountIds": [agent.accountId],
             "treatAsThreat": "UNDEFINED",
-            "status": "Active",
+            # The swagger's own enum. Seeding only "Active" left the
+            # documented status filter untestable and the console's rule list
+            # uniform, which no console ever is.
+            "status": STAR_RULE_STATUSES[index % len(STAR_RULE_STATUSES)],
             "expirationMode": "Permanent",
             "expiration": None,
             "networkQuarantine": False,

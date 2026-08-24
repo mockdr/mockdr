@@ -91,3 +91,61 @@ class TestIocAndGroupFilters:
         everything = _data(client, "/groups", auth_headers, limit="100")
         wanted = everything[0]["id"]
         assert [g["id"] for g in _data(client, "/groups", auth_headers, id=wanted)] == [wanted]
+
+
+class TestFiltersTheXsoarIntegrationSends:
+    """The XSOAR SentinelOne V2 integration sends these; the mock dropped them."""
+
+    def test_alerts_by_os_type_and_rule_name(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        everything = _data(client, "/cloud-detection/alerts", auth_headers, limit="100")
+        wanted = everything[0]["agentDetectionInfo"]["osFamily"]
+        by_os = _data(
+            client, "/cloud-detection/alerts", auth_headers, osType=wanted, limit="100"
+        )
+        assert by_os and all(
+            a["agentDetectionInfo"]["osFamily"] == wanted for a in by_os
+        )
+
+        fragment = everything[0]["ruleInfo"]["name"][:6]
+        by_rule = _data(
+            client, "/cloud-detection/alerts", auth_headers,
+            ruleName__contains=fragment, limit="100",
+        )
+        assert by_rule and all(fragment.lower() in a["ruleInfo"]["name"].lower() for a in by_rule)
+
+    def test_rules_by_status(self, client: TestClient, auth_headers: dict) -> None:
+        everything = _data(client, "/cloud-detection/rules", auth_headers)
+        statuses = {r["status"] for r in everything}
+        assert len(statuses) > 1, "the seed cannot prove a status filter"
+
+        drafts = _data(client, "/cloud-detection/rules", auth_headers, status="Draft")
+        assert drafts and all(r["status"] == "Draft" for r in drafts)
+        assert len(drafts) < len(everything)
+
+    def test_accounts_and_sites_by_name(self, client: TestClient, auth_headers: dict) -> None:
+        accounts = _data(client, "/accounts", auth_headers)
+        fragment = accounts[0]["name"][:4]
+        narrowed = _data(client, "/accounts", auth_headers, name=fragment)
+        assert narrowed and all(fragment.lower() in a["name"].lower() for a in narrowed)
+
+        response = client.get(f"{BASE}/sites", headers=auth_headers, params={"limit": "100"})
+        sites = response.json()["data"]["sites"]
+        wanted = sites[0]["id"]
+        by_id = client.get(
+            f"{BASE}/sites", headers=auth_headers, params={"siteIds": wanted},
+        ).json()["data"]["sites"]
+        assert [s["id"] for s in by_id] == [wanted]
+
+    def test_activities_by_user_email(self, client: TestClient, auth_headers: dict) -> None:
+        users = _data(client, "/users", auth_headers)
+        activities = _data(client, "/activities", auth_headers, limit="200")
+        with_user = [a for a in activities if a.get("userId")]
+        assert with_user, "the seed has no activity with a user"
+
+        owner = next(u for u in users if str(u["id"]) == str(with_user[0]["userId"]))
+        by_email = _data(
+            client, "/activities", auth_headers, userEmails=owner["email"], limit="200",
+        )
+        assert by_email and all(str(a["userId"]) == str(owner["id"]) for a in by_email)
