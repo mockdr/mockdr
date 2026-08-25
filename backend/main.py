@@ -621,6 +621,14 @@ def _body_position(body: bytes, clause: str) -> tuple[int, int]:
     return text.count("\n", 0, offset) + 1, offset - text.rfind("\n", 0, offset)
 
 
+def _searched_index(request: Request) -> str:
+    """The index a search was addressed to, read from its path."""
+    parts = [p for p in request.url.path.split("/") if p]
+    if len(parts) >= 2 and parts[0] == "elastic" and not parts[1].startswith("_"):
+        return parts[1]
+    return "mockdr"
+
+
 @app.exception_handler(ESQueryError)
 async def es_query_exception_handler(
     _request: Request, exc: ESQueryError,
@@ -641,8 +649,11 @@ async def es_query_exception_handler(
         error: dict = {
             "root_cause": [dict(cause)], "type": "search_phase_execution_exception",
             "reason": "all shards failed", "phase": "query", "grouped": True,
-            "failed_shards": [{"shard": 0, "index": "mockdr", "node": "mockdr-node-1",
-                               "reason": dict(cause)}],
+            # The failed shard names the index the search was against, which
+            # is the one in the path: a client reading the failure to find
+            # out *where* it happened was told "mockdr" every time.
+            "failed_shards": [{"shard": 0, "index": _searched_index(_request),
+                               "node": "mockdr-node-1", "reason": dict(cause)}],
         }
         if exc.es_type == "illegal_argument_exception":
             error["caused_by"] = {**cause, "caused_by": dict(cause)}

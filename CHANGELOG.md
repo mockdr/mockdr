@@ -8,6 +8,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Elasticsearch: the index mapping a client sends, and what it is for.**
+mockdr took the `mappings` on `PUT /{index}` and threw them away, so
+`GET /{index}` answered `"mappings": {}` where a cluster echoes back what it
+was given, and `_field_caps` — what every Kibana data view asks for before
+it can draw anything — was not served at all. Both are there now, along with
+`PUT /{index}/_mapping` (which takes new fields and refuses a type change,
+because the documents are already indexed under the type they have) and
+`GET /{index}/_mapping/field/{field}`.
+
+A cluster also *adds* to the mapping as documents arrive, and the types it
+picks are not obvious: a string becomes `text` with a `.keyword` subfield
+capped at 256 characters, a string that parses as a date becomes `date`, a
+whole number `long` and a fractional one `float`, an array takes its
+element's type, an object becomes nested `properties`, and an empty array or
+a null maps to nothing at all. Measured field by field against 8.15.
+
+The mapping earns its keep immediately: **a `terms` aggregation over a text
+field is refused**, the way a cluster refuses it — fielddata is off, so
+there is nothing to group by. The mock grouped by the whole sentence and
+answered buckets no cluster would produce, which is the shape of a client's
+broken query looking fine against the mock and failing in production.
+
+A shard failure also names the index it happened on rather than saying
+"mockdr" every time.
+
 **Elasticsearch: the query clauses a SIEM client sends.** `prefix`,
 `regexp`, `fuzzy`, `ids`, `multi_match`, `simple_query_string`,
 `match_phrase_prefix`, `match_bool_prefix`, `terms_set`, `constant_score`,

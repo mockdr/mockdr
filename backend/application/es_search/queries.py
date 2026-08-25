@@ -15,6 +15,11 @@ from repository.es_endpoint_repo import es_endpoint_repo
 from repository.store import store
 from utils.es_aggs import apply_aggregations
 from utils.es_ecs import to_ecs_document
+from utils.es_mapping import (
+    field_capabilities,
+    infer_properties,
+    merge_properties,
+)
 from utils.es_query import (
     apply_es_query,
     apply_source_filter,
@@ -67,8 +72,15 @@ class IndexExistsError(ValueError):
         super().__init__(f"index [{index}/{uuid}] already exists")
 
 
-def create_index(index: str, settings: dict | None = None) -> dict:
+def create_index(
+    index: str, settings: dict | None = None, mappings: dict | None = None,
+) -> dict:
     """Create an index, and report it the way Elasticsearch does.
+
+    The mappings a client sends are kept: a cluster echoes them back from
+    ``GET /{index}`` and answers ``_field_caps`` from them, and mockdr threw
+    them away — so a data view built against the mock saw an index with no
+    fields at all.
 
     Raises:
         IndexExistsError: If the index is already there.
@@ -79,6 +91,7 @@ def create_index(index: str, settings: dict | None = None) -> dict:
     store.save("es_indices", index, {
         "uuid": _index_uuid(index), "settings": dict(settings or {}), "docs": 0,
         "created": int(time.time() * 1000),
+        "properties": dict((mappings or {}).get("properties") or {}),
     })
     return {"acknowledged": True, "shards_acknowledged": True, "index": index}
 
@@ -92,6 +105,66 @@ def delete_index(index: str) -> dict | None:
             store.delete("es_documents", key)
     store.delete("es_indices", index)
     return {"acknowledged": True}
+
+
+def index_properties(index: str) -> dict:
+    """Everything the index maps: what was declared, plus what was written.
+
+    A cluster adds a field to the mapping the first time a document carries
+    it, and never changes one already there.
+    """
+    entry = store.get("es_indices", index) or {}
+    properties: dict = dict(entry.get("properties") or {})
+    for _doc_id, source in _written_documents(index):
+        properties = merge_properties(properties, infer_properties(source))
+    return properties
+
+
+def put_mapping(index: str, body: dict) -> dict:
+    """Add fields to an index's mapping, refusing a type change.
+
+    Raises:
+        IndexNotFoundError:   If the index is not there.
+        MappingConflictError: If a field's type would change.
+    """
+    entry = store.get("es_indices", index)
+    if entry is None:
+        raise IndexNotFoundError(index)
+    # Checked against what the index *maps*, not only what was declared: a
+    # field a document introduced is mapped too, and a cluster refuses to
+    # change its type just the same.
+    merged = merge_properties(
+        index_properties(index), dict(body.get("properties") or {}), strict=True,
+    )
+    store.save("es_indices", index, {**entry, "properties": merged})
+    return {"acknowledged": True}
+
+
+def es_field_caps(index: str, fields: list[str]) -> dict:
+    """The ``_field_caps`` body, which every Kibana data view asks for.
+
+    Raises:
+        IndexNotFoundError: If a concrete index name is unknown.
+    """
+    missing = _missing_target(index)
+    if missing is not None:
+        raise IndexNotFoundError(missing)
+    names = [t.strip() for t in index.lower().split(",") if t.strip()]
+    properties: dict = {}
+    for name in names:
+        properties = merge_properties(properties, _mapped_properties(name))
+    return {
+        "indices": names,
+        "fields": field_capabilities(properties, fields),
+    }
+
+
+def _mapped_properties(index: str) -> dict:
+    """The properties for one index, canned patterns included."""
+    canned = _canned_properties(index)
+    return merge_properties(canned, index_properties(index)) if canned else (
+        index_properties(index)
+    )
 
 
 def describe_index(index: str) -> dict | None:
@@ -110,7 +183,10 @@ def describe_index(index: str) -> dict | None:
     return {
         index: {
             "aliases": {},
-            "mappings": {},
+            "mappings": (
+                {"properties": index_properties(index)}
+                if index_properties(index) else {}
+            ),
             "settings": {"index": {
                 "number_of_shards": settings.get("number_of_shards", "1"),
                 "number_of_replicas": settings.get("number_of_replicas", "0"),
@@ -338,6 +414,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
             matched = records
         response["aggregations"] = apply_aggregations(
             matched, aggs, index=canonical_index, ids=written_ids,
+            properties=lambda: _mapped_properties(canonical_index),
         )
 
     _apply_total_hits_tracking(
@@ -644,8 +721,24 @@ def es_get_mapping(index: str, *, ignore_unavailable: bool = False) -> dict:
     idx = index.lower()
     names = [t.strip() for t in idx.split(",") if t.strip()]
 
+    properties = _canned_properties(idx)
+    for name in names:
+        properties = merge_properties(properties, index_properties(name))
+
+    return {
+        index: {
+            "mappings": {
+                "properties": properties,
+            },
+        },
+    }
+
+
+def _canned_properties(index: str) -> dict:
+    """The fields mockdr's own collections carry, by index pattern."""
+    names = [t.strip() for t in index.lower().split(",") if t.strip()]
     if any(_pattern_hits(n, _ALERT_PREFIXES) for n in names):
-        properties = {
+        return {
             "@timestamp": {"type": "date"},
             "signal.rule.id": {"type": "keyword"},
             "signal.rule.name": {"type": "keyword"},
@@ -655,8 +748,8 @@ def es_get_mapping(index: str, *, ignore_unavailable: bool = False) -> dict:
             "agent.id": {"type": "keyword"},
             "host.name": {"type": "keyword"},
         }
-    elif any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
-        properties = {
+    if any(_pattern_hits(n, _ENDPOINT_PREFIXES) for n in names):
+        return {
             "@timestamp": {"type": "date"},
             "agent.id": {"type": "keyword"},
             "agent.status": {"type": "keyword"},
@@ -665,16 +758,7 @@ def es_get_mapping(index: str, *, ignore_unavailable: bool = False) -> dict:
             "host.os.platform": {"type": "keyword"},
             "host.ip": {"type": "ip"},
         }
-    else:
-        properties = {}
-
-    return {
-        index: {
-            "mappings": {
-                "properties": properties,
-            },
-        },
-    }
+    return {}
 
 
 def es_get_stats(index: str, *, ignore_unavailable: bool = False) -> dict:

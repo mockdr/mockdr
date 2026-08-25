@@ -28,6 +28,11 @@ volatile_fields:
   - _seq_no
   - _primary_term
   - _version
+  # The node a shard failure happened on, and the settings a cluster records
+  # about itself: an id, a creation time, and where it decided to put the
+  # shards. None of it is an answer about the API.
+  - node
+  - settings
 
 significant_keys:
   - status
@@ -2082,5 +2087,120 @@ probes:
       method: POST
       path: /${seed_index}/_search
       content: '{"size": 0, "aggs": {"t": {"top_hits": {"size": 2, "_source": ["name"], "sort": [{"sev": "desc"}]}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  # ── Mappings and field capabilities (2.3.1) ─────────────────────────────
+  #
+  # mockdr took a client's `mappings` on PUT /{index} and threw them away, so
+  # `GET /{index}` said the index had no fields; `_field_caps` — what every
+  # Kibana data view asks for before it can draw anything — was not served at
+  # all. The seed index declares five fields and its documents introduce
+  # none, so both engines should report exactly the declared mapping.
+
+  - id: es-mapping-declared
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The mapping the index was created with comes back.
+    request:
+      method: GET
+      path: /${seed_index}/_mapping
+      auth: basic
+
+  - id: es-mapping-in-get-index
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      GET /{index} reports the mapping too.
+    request:
+      method: GET
+      path: /${seed_index}
+      auth: basic
+
+  - id: es-mapping-one-field
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      One field, in the shape _mapping/field answers with.
+    request:
+      method: GET
+      path: /${seed_index}/_mapping/field/host
+      auth: basic
+
+  - id: es-mapping-unknown-field
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A field the index does not have reports nothing.
+    request:
+      method: GET
+      path: /${seed_index}/_mapping/field/nosuchfield
+      auth: basic
+
+  - id: es-field-caps
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      What each field is, and whether it can be aggregated.
+    request:
+      method: GET
+      path: /${seed_index}/_field_caps
+      query: {fields: 'host,message,sev,tags'}
+      auth: basic
+
+  - id: es-field-caps-body
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The fields can be named in the body instead.
+    request:
+      method: POST
+      path: /${seed_index}/_field_caps
+      content: '{"fields": ["host"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-field-caps-missing-index
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And a missing index is a 404, not an empty answer.
+    request:
+      method: GET
+      path: /no-such-index-xyz/_field_caps
+      query: {fields: '*'}
+      auth: basic
+
+  - id: es-agg-terms-on-text
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A terms aggregation over a text field: fielddata is off, so a cluster refuses it where the mock grouped by the whole sentence.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"a": {"terms": {"field": "message"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-agg-terms-on-keyword-subfield
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The keyword subfield it tells you to use instead.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"a": {"terms": {"field": "message.keyword"}}}}'
       headers: {Content-Type: application/json}
       auth: basic

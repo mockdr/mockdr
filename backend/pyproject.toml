@@ -170,6 +170,8 @@ convention = "google"
 "application/mde_advanced_hunting/queries.py" = ["ANN401"]
 # An eval argument is genuinely any SPL value.
 "utils/splunk/spl_functions.py" = ["ANN401"]
+# A document field is genuinely any JSON value; its type is what is inferred.
+"utils/es_mapping.py" = ["ANN401"]
 # SPL values are genuinely dynamic — a field may hold a string, number or list.
 "utils/splunk/spl_expr.py" = ["ANN401"]
 "utils/splunk/spl_exec.py" = ["ANN401"]

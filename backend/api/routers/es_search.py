@@ -16,6 +16,7 @@ from api.es_auth import require_es_auth, require_es_write
 from api.spa import spa_response, wants_html
 from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
+from utils.es_mapping import MappingConflictError, flatten_properties
 from utils.es_query import ESQueryError
 from utils.es_response import (
     build_es_error_response,
@@ -327,6 +328,68 @@ def get_mapping(
         raise _missing_index(exc) from exc
 
 
+@router.get("/{index}/_mapping/field/{field}")
+def get_field_mapping(
+    index: str,
+    field: str,
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """One field's mapping, in the shape ``_mapping/field`` answers with."""
+    try:
+        mapping = search_queries.es_get_mapping(index)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+    entry: dict = next(iter(mapping.values()), {})
+    properties = (entry.get("mappings") or {}).get("properties") or {}
+    spec = flatten_properties(properties).get(field)
+    fields = {} if spec is None else {
+        field: {"full_name": field, "mapping": {field: spec}},
+    }
+    return {index: {"mappings": fields}}
+
+
+@router.put("/{index}/_mapping", operation_id="es_put_mapping")
+def put_mapping(
+    index: str,
+    body: dict = Body(...),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Add fields to an index's mapping.
+
+    A cluster takes new fields and refuses a type change, because the
+    documents are already indexed under the type they have.
+    """
+    try:
+        return search_queries.put_mapping(index, body)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+    except MappingConflictError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "illegal_argument_exception", str(exc),
+        )) from exc
+
+
+@router.get("/{index}/_field_caps", operation_id="es_field_caps_get")
+@router.post("/{index}/_field_caps", operation_id="es_field_caps_post")
+def field_caps(
+    index: str,
+    fields: str | None = Query(default=None),
+    body: dict | None = Body(default=None),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """What each field is and whether it can be searched or aggregated.
+
+    Every Kibana data view asks for this before it can draw anything, and
+    mockdr did not serve it at all.
+    """
+    wanted = [f for f in (fields or "").split(",") if f]
+    wanted += [str(f) for f in (body or {}).get("fields", [])]
+    try:
+        return search_queries.es_field_caps(index, wanted)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
 @router.get("/{index}/_stats")
 def get_stats(
     index: str,
@@ -418,7 +481,9 @@ def create_index(
     if index.startswith("_"):
         raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
     try:
-        return search_queries.create_index(index, (body or {}).get("settings"))
+        return search_queries.create_index(
+            index, (body or {}).get("settings"), (body or {}).get("mappings"),
+        )
     except search_queries.IndexExistsError as exc:
         raise HTTPException(status_code=400, detail=build_es_resource_exists(
             exc.index, exc.uuid,

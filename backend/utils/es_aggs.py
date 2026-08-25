@@ -14,13 +14,16 @@ underneath.
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from utils.es_datemath import _add_months, _next_unit, _round_down
 from utils.es_datemath import _zone as _datemath_zone
+from utils.es_mapping import flatten_properties
 from utils.es_query import (
+    ESQueryError,
     apply_es_sort,
     apply_source_filter,
     build_predicate,
@@ -49,6 +52,10 @@ class _Context:
 
     index: str
     ids: dict[int, str] | None = None
+    #: Reads the index's mapped fields, called only when an aggregation
+    #: needs to know what a field is. Walking the documents to work that out
+    #: is not worth doing for a search that never asks.
+    properties: Callable[[], dict] | None = None
 
 # Bucket aggregations get sub-aggregations; metric aggregations do not.
 _BUCKET_TYPES = frozenset({
@@ -90,6 +97,7 @@ def apply_aggregations(
     *,
     index: str = "",
     ids: dict[int, str] | None = None,
+    properties: Callable[[], dict] | None = None,
     _depth: int = 0,
 ) -> dict:
     """Evaluate an ``aggs`` block against *records*.
@@ -100,6 +108,8 @@ def apply_aggregations(
         index:   Index name, used when ``top_hits`` wraps documents.
         ids:     Ids of documents a client wrote, by object identity, so a
                  ``top_hits`` hit answers to the id it was indexed with.
+        properties: Reads the index's mapped fields; an aggregation over a
+                 text field is refused the way a cluster refuses it.
         _depth:  Recursion guard for nested sub-aggregations.
 
     Returns:
@@ -117,7 +127,7 @@ def apply_aggregations(
         if not isinstance(definition, dict):
             msg = f"[{name}] is not a valid aggregation definition"
             raise ESAggregationError(msg)
-        context = _Context(index, ids)
+        context = _Context(index, ids, properties)
         result[name] = _evaluate(name, definition, records, context, _depth)
     return result
 
@@ -152,6 +162,38 @@ def _evaluate(
 # Bucket aggregations
 # ---------------------------------------------------------------------------
 
+#: What a real cluster says when asked to aggregate or sort on a text field.
+#: Its terms are analysed and fielddata is off, so there is nothing to group
+#: by — the mock grouped by the whole sentence and answered buckets no
+#: cluster would produce.
+_FIELDDATA = (
+    "Fielddata is disabled on [{field}] in [{index}]. Text fields are not "
+    "optimised for operations that require per-document field data like "
+    "aggregations and sorting, so these operations are disabled by default. "
+    "Please use a keyword field instead. Alternatively, set fielddata=true on "
+    "[{field}] in order to load field data by uninverting the inverted index. "
+    "Note that this can use significant memory."
+)
+
+
+def refuse_text_field(ctx: _Context, field: str) -> None:
+    """Refuse an aggregation over a text field, the way a cluster does.
+
+    Raises:
+        ESQueryError: If the mapping says this field is text.
+    """
+    if not field or ctx.properties is None:
+        return
+    spec = flatten_properties(ctx.properties()).get(field)
+    if spec is None or spec.get("type") != "text":
+        return
+    raise ESQueryError(
+        _FIELDDATA.format(field=field, index=ctx.index),
+        es_type="illegal_argument_exception",
+        shard_failure=True,
+    )
+
+
 def _bucket(
     agg_type: str,
     body: dict,
@@ -185,6 +227,7 @@ def _bucket(
 
 def _terms(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int) -> dict:
     field = body.get("field", "")
+    refuse_text_field(ctx, field)
     size = int(body.get("size", 10))
     min_doc_count = int(body.get("min_doc_count", 1))
 
@@ -355,7 +398,8 @@ def _with_sub(
     return {
         **bucket,
         **apply_aggregations(
-            members, sub, index=ctx.index, ids=ctx.ids, _depth=depth + 1,
+            members, sub, index=ctx.index, ids=ctx.ids,
+            properties=ctx.properties, _depth=depth + 1,
         ),
     }
 
@@ -366,6 +410,7 @@ def _with_sub(
 
 def _metric(agg_type: str, body: dict, records: list[dict], ctx: _Context) -> dict:
     field = body.get("field", "")
+    refuse_text_field(ctx, field)
 
     if agg_type == "value_count":
         return {"value": sum(1 for r in records if get_nested(r, field) is not None)}
