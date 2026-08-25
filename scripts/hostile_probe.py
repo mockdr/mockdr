@@ -12,7 +12,9 @@ It authenticates against every mount with the seeded credentials, fills path
 parameters with plausible values, and sends each route null, arrays, strings,
 deep nesting, a 300 KB string, negative and non-numeric query parameters.
 A route is flagged for a 5xx, a plain-text or HTML body on a vendor mount,
-or a traceback in the response. Exit status 1 when anything is flagged.
+or a traceback in the response — except where text *is* the contract:
+Splunk's Atom XML and Elasticsearch's `_cat` tables. Exit status 1 when
+anything is flagged.
 """
 
 import base64
@@ -170,6 +172,10 @@ for path, methods in paths.items():
                 if (
                     not bad
                     and mount != "splunk"
+                    # `_cat` is a *text* API: every one of its endpoints
+                    # answers a table unless asked for json, so a text body
+                    # there is the right answer rather than a leaked error.
+                    and "/_cat/" not in path
                     and r.status_code != 204
                     and not ct.startswith(
                         (

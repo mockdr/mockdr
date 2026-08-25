@@ -13,7 +13,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
 
 from api.es_auth import optional_es_auth, require_es_auth
 from application.es_endpoints import queries as endpoint_queries
@@ -178,3 +180,168 @@ def _fleet_agent(entry: dict) -> dict:
             },
         },
     }
+
+
+# ── The rest of the platform surface ─────────────────────────────────────────
+#
+# An endpoint sweep against a running Kibana found these answering 404 here.
+# Each is small, and each is something a client calls *around* the work: it
+# lists the saved objects and data views to find out what it can search,
+# reads Fleet's policies and readiness, and — where it only has Kibana —
+# talks to Elasticsearch through the console proxy.
+
+
+@router.get("/api/saved_objects/_find")
+def find_saved_objects(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=0, le=10000),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Find saved objects of a type.
+
+    The `type` is required, and Kibana says so in the words its config
+    schema uses — a client that forgets it gets a 400 rather than every
+    object there is.
+    """
+    if not request.query_params.getlist("type"):
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400,
+            "[request query.type]: expected at least one defined value but got "
+            "[undefined]",
+        ))
+    return {"page": page, "per_page": per_page, "total": 0, "saved_objects": []}
+
+
+@router.get("/api/data_views")
+def list_data_views(_: dict = Depends(require_es_auth)) -> dict:
+    """The data views this space defines, of which mockdr defines none."""
+    return {"data_view": []}
+
+
+@router.get("/api/fleet/agent_policies")
+def list_agent_policies(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=1000, alias="perPage"),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """The Fleet policies agents are enrolled into."""
+    return {"items": [], "page": page, "perPage": per_page, "total": 0}
+
+
+@router.get("/api/fleet/agents/setup")
+def fleet_setup(_: dict = Depends(require_es_auth)) -> dict:
+    """Whether Fleet is ready to enrol agents.
+
+    mockdr's Fleet holds agents, so it says it is ready — where a fresh
+    Kibana with no Fleet server reports `fleet_server` missing.
+    """
+    return {
+        "isReady": True,
+        "is_secrets_storage_enabled": False,
+        "missing_requirements": [],
+        "missing_optional_features": [],
+        "package_verification_key_id": "d27d666cd88e42b4",
+    }
+
+
+@router.get("/api/timelines")
+def list_timelines(_: dict = Depends(require_es_auth)) -> dict:
+    """The Security Solution timelines this space holds."""
+    return {
+        "timeline": [],
+        "totalCount": 0,
+        "defaultTimelineCount": 0,
+        "templateTimelineCount": 0,
+        "favoriteCount": 0,
+        "elasticTemplateTimelineCount": 0,
+        "customTemplateTimelineCount": 0,
+    }
+
+
+@router.get("/api/timeline")
+def get_timeline(
+    _id: str | None = Query(default=None, alias="id"),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """One timeline. A timeline that is not there is an empty object there."""
+    return {}
+
+
+@router.get("/api/note")
+def list_notes(_: dict = Depends(require_es_auth)) -> dict:
+    """The notes attached to timelines and events."""
+    return {"notes": [], "totalCount": 0}
+
+
+@router.get("/api/cases/configure")
+def case_configuration(_: dict = Depends(require_es_auth)) -> list[dict]:
+    """The case connectors this space configures, of which mockdr has none."""
+    return []
+
+
+@router.get("/api/osquery/packs")
+def osquery_packs(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=0, le=1000),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """The Osquery packs this space defines, of which mockdr defines none."""
+    return {"page": page, "per_page": per_page, "total": 0, "data": []}
+
+
+@router.post("/api/console/proxy")
+async def console_proxy(
+    request: Request,
+    path: str | None = Query(default=None),
+    method: str = Query(default="GET"),
+    _: dict = Depends(require_es_auth),
+) -> Response:
+    """Talk to Elasticsearch through Kibana, the way the console does.
+
+    A client that only reaches Kibana uses this as its gateway, and mockdr
+    answered 404 — so the gateway was closed. The request is forwarded to
+    this instance's own Elasticsearch API and the answer relayed as it came,
+    pretty-printed the way the console shows it. Note what the *proxy*
+    answers: 200, whatever Elasticsearch said, with the error in the body
+    (measured).
+    """
+    if not path:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400,
+            "[request query.path]: expected value of type [string] but got "
+            "[undefined]",
+        ))
+    body = await request.body()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=request.app), base_url="http://mockdr",
+    ) as client:
+        answer = await client.request(
+            method.upper(),
+            f"/elastic/{path.lstrip('/')}",
+            content=body or None,
+            headers={
+                "Authorization": request.headers.get("authorization", ""),
+                "Content-Type": "application/json",
+            },
+        )
+    content_type = answer.headers.get("content-type", "application/json")
+    if content_type.startswith("application/json"):
+        return Response(
+            content=_console_json(answer.text),
+            media_type="application/json; charset=utf-8",
+        )
+    return Response(content=answer.text, media_type=content_type)
+
+
+def _console_json(text: str) -> str:
+    """Elasticsearch's own pretty printing, which the console asks for.
+
+    Two-space indentation and a space either side of the colon — a client
+    that diffs the body against a recorded one sees the difference.
+    """
+    try:
+        document = json.loads(text)
+    except ValueError:
+        return text
+    return json.dumps(document, indent=2).replace('": ', '" : ') + "\n"

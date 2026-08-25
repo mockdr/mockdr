@@ -2395,6 +2395,126 @@ probes:
       path: /${seed_index}/_settings
       auth: basic
 
+  # ── The rest of the platform surface (2.3.1) ────────────────────────────
+  #
+  # What a client calls *around* the work: it lists the saved objects and
+  # data views to find out what it can search, reads Fleet's policies and
+  # readiness, and — where it only reaches Kibana — talks to Elasticsearch
+  # through the console proxy. `_cat` is here too: every one of those
+  # endpoints answers a *table*, and mockdr answered json regardless.
+
+  - id: kbn-saved-objects-find
+    endpoint: kibana
+    why: >
+      Saved objects of a type.
+    request:
+      method: GET
+      path: /api/saved_objects/_find
+      query: {type: 'index-pattern'}
+      auth: basic
+
+  - id: kbn-saved-objects-no-type
+    endpoint: kibana
+    why: >
+      The type is required, in the config schema's words.
+    request:
+      method: GET
+      path: /api/saved_objects/_find
+      auth: basic
+
+  - id: kbn-data-views
+    endpoint: kibana
+    why: >
+      The data views a space defines.
+    request:
+      method: GET
+      path: /api/data_views
+      auth: basic
+
+  - id: kbn-fleet-agent-policies
+    endpoint: kibana
+    why: >
+      The policies agents are enrolled into.
+    request:
+      method: GET
+      path: /api/fleet/agent_policies
+      auth: basic
+
+  - id: kbn-timelines
+    endpoint: kibana
+    why: >
+      The Security Solution timelines a space holds.
+    request:
+      method: GET
+      path: /api/timelines
+      auth: basic
+
+  - id: kbn-timeline-missing
+    endpoint: kibana
+    why: >
+      A timeline that is not there is an empty object.
+    request:
+      method: GET
+      path: /api/timeline
+      query: {id: 'no-such-timeline'}
+      auth: basic
+
+  - id: kbn-notes
+    endpoint: kibana
+    why: >
+      The notes attached to timelines and events.
+    request:
+      method: GET
+      path: /api/note
+      auth: basic
+
+  - id: kbn-cases-configure
+    endpoint: kibana
+    why: >
+      The case connectors a space configures.
+    request:
+      method: GET
+      path: /api/cases/configure
+      auth: basic
+
+  - id: kbn-osquery-packs
+    endpoint: kibana
+    why: >
+      The Osquery packs it defines.
+    request:
+      method: GET
+      path: /api/osquery/packs
+      auth: basic
+
+  - id: kbn-console-proxy-no-path
+    endpoint: kibana
+    why: >
+      The console proxy needs a path, and says so the way its schema does.
+    request:
+      method: POST
+      path: /api/console/proxy
+      query: {method: 'GET'}
+      auth: basic
+
+  - id: es-cat-indices-text
+    endpoint: search
+    why: >
+      `_cat` answers a table, which is what it is for.
+    request:
+      method: GET
+      path: /_cat/indices
+      query: {v: 'true'}
+      auth: basic
+
+  - id: es-cat-health-text
+    endpoint: search
+    why: >
+      The same for the health line.
+    request:
+      method: GET
+      path: /_cat/health
+      auth: basic
+
   # ── Writes (2.3.1) ──────────────────────────────────────────────────────
   #
   # Last in the file on purpose: these change the seeded documents, so every

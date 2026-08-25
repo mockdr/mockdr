@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Kibana: the rest of the platform surface, and the console proxy.** What a
+client calls *around* the work, all of it 404 before: `saved_objects/_find`
+(whose `type` is required, in the words its config schema uses),
+`data_views`, Fleet's `agent_policies` and `agents/setup`, the Security
+Solution's `timelines`, `timeline` and `note`, `cases/configure` and
+`osquery/packs`.
+
+And **`/api/console/proxy`** — how a client that only reaches Kibana talks
+to Elasticsearch. The request is forwarded to this instance's own
+Elasticsearch API and the answer relayed as it came, pretty-printed the way
+the console shows it. Note what the *proxy* answers: 200, whatever
+Elasticsearch said, with the error in the body (measured).
+
 **Splunk: the catalogues beside the data.** Eleven more endpoints the sweep
 found answering 404: the health tree a monitor polls, the extended index
 list an app reads sizes from, the licence a client checks before offering a
@@ -270,6 +283,12 @@ newlines. A field a row has no value for is empty rather than `""`. Measured
 against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
+
+**`_cat` answered JSON.** Every `_cat` endpoint answers a *table* unless the
+caller asks for `format=json` — that is what `_cat` is for — and mockdr
+answered a JSON document regardless, so a script reading columns got one
+long line of braces. `v` adds the header row and `h` picks the columns, both
+measured.
 
 **The XML results document had no fields at all.** splunkd names them once
 in a `<meta><fieldOrder>` block, numbers each result with the offset a

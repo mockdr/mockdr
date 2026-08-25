@@ -133,3 +133,68 @@ class TestExceptionItemsForAMissingList:
         )
         assert response.status_code == 200
         assert response.json()["page"] == 1
+
+
+class TestTheRestOfThePlatform:
+    """What a client calls around the work, all of it 404 before.
+
+    It lists the saved objects and data views to find out what it can
+    search, reads Fleet's policies and readiness, and — where it only
+    reaches Kibana — talks to Elasticsearch through the console proxy.
+    """
+
+    def test_saved_objects_need_a_type(self, client: TestClient) -> None:
+        response = client.get("/kibana/api/saved_objects/_find", headers=AUTH)
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            "[request query.type]: expected at least one defined value but got "
+            "[undefined]"
+        )
+
+    def test_saved_objects_of_a_type(self, client: TestClient) -> None:
+        body = client.get("/kibana/api/saved_objects/_find", headers=AUTH,
+                          params={"type": "index-pattern"}).json()
+        assert body == {"page": 1, "per_page": 20, "total": 0, "saved_objects": []}
+
+    def test_data_views(self, client: TestClient) -> None:
+        assert client.get("/kibana/api/data_views", headers=AUTH).json() == {
+            "data_view": [],
+        }
+
+    def test_fleet_is_ready_because_mockdr_has_agents(self, client: TestClient) -> None:
+        body = client.get("/kibana/api/fleet/agents/setup", headers=AUTH).json()
+        assert body["isReady"] is True
+        assert body["missing_requirements"] == []
+
+    def test_timelines_and_notes(self, client: TestClient) -> None:
+        assert client.get("/kibana/api/timelines", headers=AUTH).json()["totalCount"] == 0
+        assert client.get("/kibana/api/note", headers=AUTH).json() == {
+            "notes": [], "totalCount": 0,
+        }
+        # A timeline that is not there is an empty object, not a 404.
+        assert client.get("/kibana/api/timeline", headers=AUTH,
+                          params={"id": "nope"}).json() == {}
+
+    def test_the_console_proxy_reaches_elasticsearch(self, client: TestClient) -> None:
+        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+                               params={"path": "/.siem-signals-default/_count",
+                                       "method": "GET"})
+        assert response.status_code == 200
+        # Pretty-printed the way Elasticsearch prints for the console: two
+        # spaces, and a space either side of the colon.
+        assert '"count" : ' in response.text
+
+    def test_and_relays_what_elasticsearch_said(self, client: TestClient) -> None:
+        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+                               params={"path": "/no-such-index/_search",
+                                       "method": "GET"})
+        # The proxy answers 200 whatever Elasticsearch said; the error is in
+        # the body (measured).
+        assert response.status_code == 200
+        assert "index_not_found_exception" in response.text
+
+    def test_the_proxy_needs_a_path(self, client: TestClient) -> None:
+        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+                               params={"method": "GET"})
+        assert response.status_code == 400
+        assert "query.path" in response.json()["message"]

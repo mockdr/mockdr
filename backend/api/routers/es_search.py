@@ -64,24 +64,28 @@ def cluster_health(
 @router.get("/_cat/indices/{pattern}")
 def cat_indices(
     pattern: str = "",
-    format: str = Query(default="json"),  # noqa: A002 - ES's own parameter name
+    format: str = Query(default=""),  # noqa: A002 - ES's own parameter name
+    v: bool = Query(default=False),
+    h: str = Query(default=""),
     _: dict = Depends(require_es_auth),
-) -> list[dict]:
-    """List indices. Only ``format=json`` is served; the text table is not."""
+) -> Response:
+    """List indices, as a text table unless the caller asks for json."""
     rows = search_queries.es_cat_indices()
     if pattern and pattern not in ("*", "_all"):
         rows = [r for r in rows if fnmatch(str(r["index"]), pattern)]
-    return rows
+    return _cat_response(rows, format, headers=v, columns=h)
 
 
 @router.get("/_cat/health")
 def cat_health(
-    format: str = Query(default="json"),  # noqa: A002 - ES's own parameter name
+    format: str = Query(default=""),  # noqa: A002 - ES's own parameter name
+    v: bool = Query(default=False),
+    h: str = Query(default=""),
     _: dict = Depends(require_es_auth),
-) -> list[dict]:
-    """One-row cluster health, as ``_cat/health?format=json`` returns."""
+) -> Response:
+    """One-row cluster health, as a text table unless json is asked for."""
     health = search_queries.es_cluster_health()
-    return [{
+    rows = [{
         "epoch": "0",
         "timestamp": "00:00:00",
         "cluster": health["cluster_name"],
@@ -97,6 +101,34 @@ def cat_health(
         "max_task_wait_time": "-",
         "active_shards_percent": "100.0%",
     }]
+    return _cat_response(rows, format, headers=v, columns=h)
+
+
+def _cat_response(
+    rows: list[dict], format: str, *, headers: bool, columns: str,  # noqa: A002
+) -> Response:
+    """A `_cat` answer, as json or as the text table that is its default.
+
+    Every `_cat` endpoint answers a *table* unless the caller asks for json,
+    and mockdr answered json regardless — so a script reading columns got a
+    document. The columns are padded to their widest value, `v` adds the
+    header row and `h` picks the columns (all measured against 8.15).
+    """
+    if format.lower() == "json":
+        return JSONResponse(content=rows)
+    names = [c.strip() for c in columns.split(",") if c.strip()] or (
+        list(rows[0]) if rows else []
+    )
+    table = [[str(row.get(name, "")) for name in names] for row in rows]
+    if headers:
+        table.insert(0, names)
+    widths = [max((len(cell[i]) for cell in table), default=0) for i in range(len(names))]
+    lines = [
+        " ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=False)).rstrip()
+        for row in table
+    ]
+    text = "".join(f"{line}\n" for line in lines)
+    return Response(content=text, media_type="text/plain; charset=UTF-8")
 
 
 @router.get("/_security/_authenticate")

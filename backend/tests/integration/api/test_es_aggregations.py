@@ -207,12 +207,32 @@ class TestClusterApis:
         assert "number_of_nodes" in body
 
     def test_cat_indices_lists_backed_indices(self, client: TestClient) -> None:
-        rows = client.get("/elastic/_cat/indices", headers=ES_AUTH).json()
+        rows = client.get("/elastic/_cat/indices", headers=ES_AUTH,
+                          params={"format": "json"}).json()
         assert rows
         assert {"index", "health", "docs.count"} <= set(rows[0])
 
+    def test_cat_answers_a_text_table_by_default(self, client: TestClient) -> None:
+        # Which is what `_cat` is *for*: a client reading columns got a JSON
+        # document instead.
+        response = client.get("/elastic/_cat/indices", headers=ES_AUTH)
+        assert response.headers["content-type"].startswith("text/plain")
+        assert "\n" in response.text
+        assert not response.text.startswith("[")
+
+    def test_v_adds_the_header_row(self, client: TestClient) -> None:
+        response = client.get("/elastic/_cat/indices", headers=ES_AUTH,
+                              params={"v": "true"})
+        assert response.text.split("\n")[0].split()[:3] == ["health", "status", "index"]
+
+    def test_h_picks_the_columns(self, client: TestClient) -> None:
+        response = client.get("/elastic/_cat/indices", headers=ES_AUTH,
+                              params={"h": "index,docs.count"})
+        assert len(response.text.split("\n")[0].split()) == 2
+
     def test_cat_health(self, client: TestClient) -> None:
-        rows = client.get("/elastic/_cat/health", headers=ES_AUTH).json()
+        rows = client.get("/elastic/_cat/health", headers=ES_AUTH,
+                          params={"format": "json"}).json()
         assert len(rows) == 1
 
     def test_authenticate_reports_the_user(self, client: TestClient) -> None:
