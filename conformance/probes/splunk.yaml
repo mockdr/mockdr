@@ -2606,3 +2606,109 @@ probes:
       path: /services/apps/local
       query: {output_mode: 'json_rows', count: '1'}
       auth: basic
+
+  # ── The catalogues beside the data (2.3.1) ──────────────────────────────
+  #
+  # The endpoint sweep found each of these answering 404 here: the health
+  # tree a monitor polls, the extended index list an app reads sizes from,
+  # the licence a client checks before offering a feature, and the knowledge
+  # objects a content pack enumerates. Where mockdr has none of a thing it
+  # serves an *empty collection* — which is the difference between "this
+  # deployment has none" and "this endpoint does not exist".
+
+  - id: spl-server-health
+    endpoint: management
+    why: >
+      The health tree, which a monitor polls.
+    request:
+      method: GET
+      path: /services/server/health/splunkd
+      auth: basic
+
+  - id: spl-indexes-extended
+    endpoint: management
+    why: >
+      Every index with the detail an app reads sizes from.
+    request:
+      method: GET
+      path: /services/data/indexes-extended
+      query: {count: '2'}
+      auth: basic
+
+  - id: spl-licenses
+    endpoint: management
+    why: >
+      The licence this instance runs under.
+    request:
+      method: GET
+      path: /services/licenser/licenses
+      auth: basic
+
+  - id: spl-grantable-capabilities
+    endpoint: management
+    why: >
+      Which capabilities a role may hand on.
+    request:
+      method: GET
+      path: /services/authorization/grantable_capabilities
+      auth: basic
+
+  - id: spl-macros
+    endpoint: management
+    why: >
+      The search macros a deployment defines - `notable` among them.
+    request:
+      method: GET
+      path: /servicesNS/nobody/search/admin/macros
+      query: {count: '2'}
+      auth: basic
+
+  - id: spl-sourcetypes
+    endpoint: management
+    why: >
+      One entry per source type, with the settings a client reads.
+    request:
+      method: GET
+      path: /services/saved/sourcetypes
+      query: {count: '2'}
+      auth: basic
+
+  - id: spl-eventtypes
+    endpoint: management
+    why: >
+      An empty collection, not a 404.
+    request:
+      method: GET
+      path: /services/saved/eventtypes
+      query: {count: '2'}
+      auth: basic
+
+  - id: spl-lookups
+    endpoint: management
+    why: >
+      The same for lookup definitions.
+    request:
+      method: GET
+      path: /services/data/transforms/lookups
+      query: {count: '2'}
+      auth: basic
+
+  - id: spl-lookup-files
+    endpoint: management
+    why: >
+      And for lookup table files.
+    request:
+      method: GET
+      path: /services/data/lookup-table-files
+      query: {count: '2'}
+      auth: basic
+
+  - id: spl-inputs-monitor
+    endpoint: management
+    why: >
+      And for monitored files.
+    request:
+      method: GET
+      path: /services/data/inputs/monitor
+      query: {count: '2'}
+      auth: basic

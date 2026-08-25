@@ -288,6 +288,9 @@ from api.routers.splunk import (
     splunk_catalog as splunk_catalog_router,
 )
 from api.routers.splunk import (
+    splunk_catalogs as splunk_catalogs_router,
+)
+from api.routers.splunk import (
     splunk_hec as splunk_hec_router,
 )
 from api.routers.splunk import (
@@ -835,6 +838,7 @@ for _splunk_module in [
     splunk_indexes_router,
     splunk_alerts_router,
     splunk_catalog_router,
+    splunk_catalogs_router,
     splunk_inputs_router,
 ]:
     app.include_router(_splunk_module.router, prefix=SPLUNK_PREFIX)

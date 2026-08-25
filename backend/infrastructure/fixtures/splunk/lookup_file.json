@@ -1,0 +1,9 @@
+{
+  "content": {
+    "disabled": false,
+    "eai:acl": null,
+    "eai:appName": "search",
+    "eai:data": "/opt/splunk",
+    "eai:userName": "admin"
+  }
+}

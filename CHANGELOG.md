@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Splunk: the catalogues beside the data.** Eleven more endpoints the sweep
+found answering 404: the health tree a monitor polls, the extended index
+list an app reads sizes from, the licence a client checks before offering a
+feature, the capabilities a role may hand on, and the knowledge objects a
+content pack enumerates — macros (`notable` among them, which mockdr's own
+SPL understands), source types, event types, lookups, lookup files,
+monitored files and field extractions.
+
+Where mockdr has the thing it serves it: an entry per index, an entry per
+source type its events actually carry. Where it has none it serves an
+*empty collection* — the difference between "this deployment has none" and
+"this endpoint does not exist". Each entry's content is filled out from a
+recording of the real collection, because a client reads deep into these: an
+extended index carries a hundred and nineteen settings, a source type
+forty-two. A knowledge object also carries four more acl members than a
+system entry does, because it can be shared, and its collection offers
+`_acl`, `_reload` and `create` where a system one offers nothing.
+
 **Splunk: the endpoints a client checks first, and `/export` in every mode.**
 An endpoint sweep against splunkd 10.4.2 found each of these answering 404
 here: the **simple receiver** (`/services/receivers/simple`) — the pre-HEC

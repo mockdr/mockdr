@@ -1,0 +1,16 @@
+{
+  "content": {
+    "color": "none",
+    "description": "",
+    "disabled": false,
+    "eai:acl": null,
+    "eai:appName": "search",
+    "eai:userName": "admin",
+    "priority": 1,
+    "search": "index=_audit sourcetype=audittrailv2* category=system data.type=account",
+    "tags": [
+      "account",
+      "change"
+    ]
+  }
+}

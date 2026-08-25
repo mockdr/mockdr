@@ -1,0 +1,29 @@
+{
+  "content": {
+    "CAN_OPTIMIZE": true,
+    "CLEAN_KEYS": true,
+    "DEFAULT_VALUE": "",
+    "DEPTH_LIMIT": "1000",
+    "DEST_KEY": "",
+    "FORMAT": "",
+    "KEEP_EMPTY_VALS": false,
+    "LOOKAHEAD": "4096",
+    "MATCH_LIMIT": "100000",
+    "MV_ADD": false,
+    "REGEX": "",
+    "SOURCE_KEY": "_raw",
+    "WRITE_META": "False",
+    "disabled": false,
+    "eai:acl": null,
+    "eai:appName": "search",
+    "eai:userName": "admin",
+    "external_cmd": "external_lookup.py clienthost clientip",
+    "fields_array": [
+      "clienthost",
+      "clientip"
+    ],
+    "fields_list": "clienthost,clientip",
+    "python.required": "latest",
+    "type": "external"
+  }
+}

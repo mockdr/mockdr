@@ -1,0 +1,13 @@
+{
+  "content": {
+    "args": "filter",
+    "definition": "rex \"search='(?<search>.*?)', autojoin\"",
+    "disabled": false,
+    "eai:acl": null,
+    "eai:appName": "search",
+    "eai:userName": "nobody",
+    "errormsg": "1st arg \"perc\" must be a number between 0 and 1 (inclusive), 2nd arg \"hist_rate\" should be string representing a field name, and 3rd arg \"le\" must be the field name with the histogram buckets' upper boundaries.",
+    "iseval": true,
+    "validation": "isnum($perc$) and $perc$ >= 0 and $perc$ <= 1 and isstr($hist_rate$) and isstr($le$)"
+  }
+}
