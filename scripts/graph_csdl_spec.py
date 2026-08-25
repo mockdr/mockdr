@@ -1,5 +1,5 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E402, PLR2004, T201
-"""Reduce a Microsoft Graph CSDL into a type → property map.
+r"""Reduce a Microsoft Graph CSDL into a type → property map.
 
 ``graph_v1.0_types.json`` holds what the v1.0 metadata declares, and that is
 what most of the mock's Graph surface is measured against. It does not hold

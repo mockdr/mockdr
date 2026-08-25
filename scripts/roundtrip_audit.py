@@ -84,12 +84,14 @@ def cycle(mount, name):
 class Check:
     """The findings of one cycle, and the vocabulary to state them."""
 
-    def __init__(self, mount, name):
+    def __init__(self, mount: str, name: str) -> None:
+        """Start a cycle with nothing found yet."""
         self.mount, self.name, self.findings = mount, name, []
         self.headers = AUTH[mount]
 
     # ── requests ────────────────────────────────────────────────────────────
-    def request(self, method, path, expect=(200, 201), **kwargs):
+    def request(self, method, path, expect=(200, 201), **kwargs: object):
+        """Send one request, failing the cycle if the status is unexpected."""
         headers = {**self.headers, **kwargs.pop("headers", {})}
         response = client.request(method, path, headers=headers, **kwargs)
         if expect and response.status_code not in expect:
@@ -102,11 +104,13 @@ class Check:
         except ValueError:
             return response.text
 
-    def get(self, path, **kwargs):
+    def get(self, path, **kwargs: object):
+        """Read, with the same expectations as any other request."""
         return self.request("GET", path, **kwargs)
 
     # ── assertions ──────────────────────────────────────────────────────────
     def fail(self, where, what):
+        """Record one finding: where it was seen, and what was wrong."""
         self.findings.append((where, what))
 
     def echoes(self, where, sent, got):
@@ -121,12 +125,14 @@ class Check:
                 self.fail(where, f"changed {field!r} — sent {value!r}, got {got[field]!r}")
 
     def carries(self, where, record, field, value):
+        """One field of a record holds the value it should."""
         if not isinstance(record, dict):
             self.fail(where, f"answered {type(record).__name__}, not an object")
         elif record.get(field) != value:
             self.fail(where, f"{field!r} is {record.get(field)!r}, expected {value!r}")
 
     def listed(self, where, items, key, value, *, present=True):
+        """A record is in the collection it belongs to — or is gone from it."""
         if items is None:
             self.fail(where, "the listing carried no collection")
             return
@@ -136,7 +142,7 @@ class Check:
                              f" the listing of {len(items)} record(s)")
 
 
-def find(body, *keys):
+def find(body, *keys: object):
     """Follow a path of keys through an envelope, tolerating a missing step."""
     for key in keys:
         if isinstance(body, dict):
