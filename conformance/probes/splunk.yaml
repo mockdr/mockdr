@@ -1892,3 +1892,250 @@ probes:
       content: 'search=%7C%20makeresults%20format%3Dxml%20data%3D%22%3Ca%2F%3E%22&output_mode=json&exec_mode=oneshot&count=0'
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
+
+  # ── stats and streamstats ───────────────────────────────────────────────
+  #
+  # Inline data again, so both engines answer from the search text alone.
+  # The pairs here are about what splunkd does when an aggregation has
+  # *nothing* to compute — it writes no field, where the mock wrote 0 and ""
+  # — and about `median`, which is not `perc50`.
+
+  - id: spl-stats-sum-over-text
+    endpoint: management
+    compare: values
+    why: >
+      An aggregation with nothing to compute writes no field.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20stats%20count%2C%20sum%28g%29&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-group-keeps-its-key
+    endpoint: management
+    compare: values
+    why: >
+      The group is still a row; only the field it could not compute is gone.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20stats%20sum%28g%29%20by%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-nothing-computable
+    endpoint: management
+    compare: values
+    why: >
+      With no by-fields and nothing computable, there is no row at all.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20stats%20sum%28g%29&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-count-of-nothing
+    endpoint: management
+    compare: values
+    why: >
+      count over an empty result set is still a row saying 0.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20count%3D0%20%7C%20stats%20count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-sum-of-nothing
+    endpoint: management
+    compare: values
+    why: >
+      sum over the same is not.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20count%3D0%20%7C%20stats%20sum%28n%29%20as%20s&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-text-min-max
+    endpoint: management
+    compare: values
+    why: >
+      min and max fall back to text when the field holds no numbers.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22v%0Aa%0Ab%22%20%7C%20stats%20max%28v%29%20as%20mx%2C%20min%28v%29%20as%20mn&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-mixed-min-max
+    endpoint: management
+    compare: values
+    why: >
+      And a number wins over text in the same field.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22v%0A1%0Aa%0A3%22%20%7C%20stats%20max%28v%29%20as%20mx%2C%20sum%28v%29%20as%20s&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-median-even
+    endpoint: management
+    compare: values
+    why: >
+      median averages the middle pair and rounds an exact half up.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20stats%20median%28n%29%20as%20m%2C%20perc50%28n%29%20as%20p%2C%20p90%28n%29%20as%20q&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-unknown-function
+    endpoint: management
+    compare: values
+    why: >
+      A statistic splunkd does not have, refused by name.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20stats%20nosuchfunc%28n%29&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-stats-unknown-option
+    endpoint: management
+    compare: values
+    why: >
+      An argument it cannot read at all - which the mock used to ignore.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20stats%20count%20nosucharg%3D1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-running-count
+    endpoint: management
+    compare: values
+    why: >
+      streamstats: stats over the rows seen so far, added to each row.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-by-group
+    endpoint: management
+    compare: values
+    why: >
+      The same, counted per group.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20count%20by%20g&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-window
+    endpoint: management
+    compare: values
+    why: >
+      A window looks at the last N rows.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20count%20window%3D2&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-current-false
+    endpoint: management
+    compare: values
+    why: >
+      current=f looks only at the rows before this one.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20current%3Dfalse%20sum%28n%29%20as%20s&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-window-and-by
+    endpoint: management
+    compare: values
+    why: >
+      A window and a grouping together - the option belongs to the command, not to the by-clause it follows.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20count%20as%20c%20by%20g%20window%3D1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-reset-on-change
+    endpoint: management
+    compare: values
+    why: >
+      reset_on_change starts again when the by-fields change.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20count%20reset_on_change%3Dtrue%20by%20g&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-reset-before
+    endpoint: management
+    compare: values
+    why: >
+      reset_before starts again at the row the expression holds for.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20reset_before%3D%22n%3E2%22%20count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-reset-after
+    endpoint: management
+    compare: values
+    why: >
+      reset_after starts again below it.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20reset_after%3D%22n%3E2%22%20count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-missing-by-field
+    endpoint: management
+    compare: values
+    why: >
+      A row without the by-field is left exactly as it was.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20count%20by%20nosuchfield&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-streamstats-values
+    endpoint: management
+    compare: values
+    why: >
+      A multivalue statistic accumulating down the rows.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20values%28g%29%20as%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic

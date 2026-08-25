@@ -10,7 +10,11 @@ from domain.splunk.search_job import SearchJob
 from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.search_job_repo import search_job_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
-from utils.splunk.spl_exec import execute_pipeline, split_by
+from utils.splunk.spl_exec import (
+    aggregation_aliases,
+    execute_pipeline,
+    split_by,
+)
 from utils.splunk.spl_parser import (
     SPLQuery,
     current_time,
@@ -276,6 +280,13 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
 _TOP_SPECIALS = {"count": "count", "percent": "percent"}
 
 
+#: The commands that build a row rather than passing one along. After one of
+#: these the column order is theirs; without one it is alphabetical.
+_ORDERING_COMMANDS = frozenset({
+    "table", "fields", "stats", "timechart", "top", "rare",
+})
+
+
 def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
     """Describe the result columns the way splunkd's `fields` block does.
 
@@ -293,7 +304,16 @@ def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
         # given — including one no row turned out to carry.
         names = [f.strip() for f in re.split(r"[,\s]+", last_command.arg) if f.strip()]
     else:
-        names = list(results[0].keys())
+        # Every column any row carries, not only the ones the first row does:
+        # `streamstats current=f sum(n)` leaves the first row without it.
+        names = list(dict.fromkeys(k for row in results for k in row))
+        names.extend(_declared_columns(parsed, names))
+        if not any(c.name in _ORDERING_COMMANDS for c in parsed.commands):
+            # Nothing in the pipeline built the row, so splunkd lists the
+            # columns by name: `eval z=1, a=2` reads a before z, and so does
+            # a plain search. Only a command that constructs the row fixes
+            # the order it is written in.
+            names = sorted(names)
     by_fields = _last_group_by(parsed)
     created = set(parsed.evals)
 
@@ -308,6 +328,22 @@ def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
             entry["type_special"] = _TOP_SPECIALS[name]
         described.append(entry)
     return described
+
+
+def _declared_columns(parsed: SPLQuery, present: list[str]) -> list[str]:
+    """Columns ``stats`` named that no row ended up with.
+
+    `stats sum(text_field) by host` lists `sum(text_field)` and writes it in
+    no row. `streamstats` does not do this — a column it could not compute
+    for any row is absent from the block as well (both measured).
+    """
+    for command in reversed(parsed.commands):
+        if command.name == "stats":
+            return [
+                alias for alias in aggregation_aliases(command.arg)
+                if alias not in present
+            ]
+    return []
 
 
 def _last_group_by(parsed: SPLQuery) -> list[str]:

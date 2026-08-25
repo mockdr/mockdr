@@ -8,6 +8,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**`| streamstats`, and what `stats` writes when it cannot compute.** Two
+findings from the same measurement run, 62 searches against Splunk 10.4.2:
+
+* An aggregation with nothing to compute writes **no field**. `sum` over a
+  text field, `avg` over a field the rows do not have, `values` over the
+  same — splunkd leaves the column out of the row, and returns no row at all
+  when there is no `by` and nothing could be computed. The mock wrote `0`
+  and `""`, so a client reading `sum(bytes)` got a number here and no field
+  in production. `count` over an empty result set is still a row saying `0`,
+  and `min`/`max` fall back to text ordering when the field holds no
+  numbers, with a number winning over text in the same field.
+* `median` is not `perc50`. With an even number of values splunkd averages
+  the middle pair and rounds an exact half *up*: the median of 1 and 2 is 2,
+  of 1 and 4 is 3, of 1.2 and 1.4 is 1.3.
+
+`streamstats` itself — stats over the rows seen so far, added to each row as
+it passes — is what every "count since" and "compare with the previous row"
+search is built on, and the mock refused it as unknown. `window`,
+`current`, `by`, `reset_on_change`, `reset_before`, `reset_after` and
+`time_window`, each measured.
+
+Both commands now refuse an argument they cannot read — `stats nosuchfunc(n)`
+and `stats count nosucharg=1` are errors there, and the second was silently
+ignored here, so the command ran with a different meaning than the one asked
+for.
+
+**The response's field block was in the wrong order.** splunkd lists the
+columns *by name* unless a command in the pipeline built the row — `table`,
+`fields`, `stats`, `timechart`, `top`, `rare` — in which case the order is
+that command's. mockdr always used the row's own key order, so a search
+ending in `eval z=1, a=2` declared `z` before `a`. It also declared only
+what the *first* row carried, dropping a column that appears later, and left
+out a column `stats` named but could not compute — which splunkd lists
+anyway.
+
 **Fifty-three more `eval` functions, and the strictness around them.** The
 mock had nineteen; it has seventy-two. A search using `split`, `cidrmatch`,
 `strftime`, `spath`, `json_extract`, `printf`, `md5` or any of the multivalue

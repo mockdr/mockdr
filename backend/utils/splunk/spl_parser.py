@@ -39,7 +39,8 @@ __all__ = [
 KNOWN_COMMANDS = frozenset({
     "dedup", "eval", "fields", "fillnull", "head", "makeresults", "rare",
     "regex", "rename",
-    "rex", "search", "sort", "stats", "table", "tail", "timechart", "top",
+    "rex", "search", "sort", "stats", "streamstats", "table", "tail",
+    "timechart", "top",
     "where",
 })
 

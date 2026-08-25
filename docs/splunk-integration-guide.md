@@ -70,6 +70,9 @@ search index=<index> sourcetype=<sourcetype> <field>=<value>
 | head <N>                 | tail <N>
 | sort [-]<field>, ...     | dedup <field> ...
 | stats <func>(<field>) [as <name>] [by <field>]
+| streamstats <func>(<field>) [as <name>] [by <field>]
+      [window=<n>] [current=<bool>] [reset_on_change=<bool>]
+      [reset_before="<expr>"] [reset_after="<expr>"] [time_window=<span>]
 | timechart span=<span> <func>(<field>) [by <field>]
 | top [<N>] <field>        | rare [<N>] <field>
 | rex field=<field> "<regex>"   | regex <field>="<regex>"
