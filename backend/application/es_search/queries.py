@@ -7,6 +7,7 @@ response envelopes.
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from fnmatch import fnmatch
 
@@ -38,6 +39,7 @@ from utils.es_query import (
     wrap_as_hits,
 )
 from utils.es_response import build_es_index_not_found, build_es_search_response
+from utils.id_gen import new_hex
 from utils.nested import get_nested
 from utils.serde import record_dict
 
@@ -194,7 +196,9 @@ def describe_index(index: str) -> dict | None:
             ),
             "settings": {"index": {
                 "number_of_shards": settings.get("number_of_shards", "1"),
-                "number_of_replicas": settings.get("number_of_replicas", "0"),
+                # One, which is a cluster's default even on a single node —
+                # the number of replicas it *wants*, not the number it has.
+                "number_of_replicas": settings.get("number_of_replicas", "1"),
                 "provided_name": index,
                 "creation_date": str(entry.get("created", 0)),
                 "uuid": str(entry.get("uuid", "")),
@@ -258,6 +262,334 @@ def _pattern_hits(name: str, prefixes: tuple[str, ...]) -> bool:
     return name.startswith(prefixes)
 
 
+# ---------------------------------------------------------------------------
+# Aliases, settings and the multi-search
+#
+# An alias is how a SIEM addresses its indices — `.alerts-security.alerts` is
+# one on a real deployment — and mockdr answered 404 for every alias call, so
+# a client that created one could not then search through it.
+# ---------------------------------------------------------------------------
+
+def put_alias(index: str, alias: str) -> dict:
+    """Point *alias* at *index*.
+
+    Raises:
+        IndexNotFoundError: If the index is not there.
+    """
+    entry = store.get("es_indices", index)
+    if entry is None:
+        raise IndexNotFoundError(index)
+    aliases = dict(entry.get("aliases") or {})
+    aliases[alias] = {}
+    store.save("es_indices", index, {**entry, "aliases": aliases})
+    return {"acknowledged": True, "errors": False}
+
+
+def delete_alias(index: str, alias: str) -> dict:
+    """Take *alias* off *index*.
+
+    Raises:
+        IndexNotFoundError: If the index is not there.
+    """
+    entry = store.get("es_indices", index)
+    if entry is None:
+        raise IndexNotFoundError(index)
+    aliases = dict(entry.get("aliases") or {})
+    aliases.pop(alias, None)
+    store.save("es_indices", index, {**entry, "aliases": aliases})
+    return {"acknowledged": True, "errors": False}
+
+
+def update_aliases(actions: list[dict]) -> dict:
+    """The batch form: ``POST /_aliases`` with add and remove actions.
+
+    Raises:
+        IndexNotFoundError: If an action names an index that is not there.
+    """
+    for action in actions:
+        for verb, spec in action.items():
+            if not isinstance(spec, dict):
+                continue
+            names = spec.get("indices") or [spec.get("index")]
+            alias = str(spec.get("alias", ""))
+            for name in [str(n) for n in names if n]:
+                if verb == "add":
+                    put_alias(name, alias)
+                elif verb == "remove":
+                    delete_alias(name, alias)
+    return {"acknowledged": True, "errors": False}
+
+
+def alias_map(index: str = "") -> dict:
+    """Which aliases each index carries, for ``GET /_alias``."""
+    result: dict[str, dict] = {}
+    for name in created_indices():
+        entry = store.get("es_indices", name) or {}
+        aliases = dict(entry.get("aliases") or {})
+        if index and index not in (name, *aliases):
+            continue
+        result[name] = {"aliases": aliases}
+    return result
+
+
+def indices_for_alias(alias: str) -> list[str]:
+    """The indices an alias stands for, or nothing when it is not one."""
+    return [
+        name for name in created_indices()
+        if alias in (store.get("es_indices", name) or {}).get("aliases", {})
+    ]
+
+
+def resolve_index(expression: str) -> dict:
+    """``GET /_resolve/index/{name}``: what a name stands for."""
+    indices = []
+    for name in created_indices():
+        entry = store.get("es_indices", name) or {}
+        aliases = sorted(entry.get("aliases") or {})
+        if _pattern_hits(name, (expression,)) or expression in aliases:
+            indices.append({"name": name, "aliases": aliases, "attributes": ["open"]})
+    return {
+        "indices": [
+            {k: v for k, v in entry.items() if k != "aliases" or v}
+            for entry in indices
+        ],
+        "aliases": [],
+        "data_streams": [],
+    }
+
+
+def index_settings(index: str) -> dict:
+    """``GET /{index}/_settings``, which is the settings half of the index.
+
+    Raises:
+        IndexNotFoundError: If the index is not there.
+    """
+    described = describe_index(index)
+    if described is None:
+        raise IndexNotFoundError(index)
+    return {index: {"settings": described[index]["settings"]}}
+
+
+def put_settings(index: str, body: dict) -> dict:
+    """Change an index's settings.
+
+    Raises:
+        IndexNotFoundError: If the index is not there.
+    """
+    entry = store.get("es_indices", index)
+    if entry is None:
+        raise IndexNotFoundError(index)
+    incoming = body.get("index") if isinstance(body.get("index"), dict) else body
+    settings = {**(entry.get("settings") or {}), **(incoming or {})}
+    store.save("es_indices", index, {**entry, "settings": settings})
+    return {"acknowledged": True}
+
+
+# ---------------------------------------------------------------------------
+# Scroll and point-in-time
+#
+# The two ways a client reads more than a page. XSOAR's Elasticsearch
+# integration scrolls; Kibana opens a point in time and pages with
+# `search_after`. Neither was served, so a fetch that worked against the
+# cluster stopped after its first page here — with no error to say why.
+# ---------------------------------------------------------------------------
+
+_CONTEXTS = "es_search_contexts"
+
+#: What a search returns when the body does not say — Elasticsearch's own
+#: default, and what a scroll pages by.
+_SCROLL_DEFAULT_SIZE = 10
+
+
+def open_context(index: str, body: dict, kind: str) -> str:
+    """Remember a search so the client can page through it.
+
+    Returns:
+        The id the client sends back — a scroll id or a point-in-time id.
+    """
+    context_id = new_hex()[:32]
+    store.save(_CONTEXTS, context_id, {
+        "index": index, "body": dict(body), "offset": 0, "kind": kind,
+    })
+    return context_id
+
+
+def context_index(context_id: str) -> str | None:
+    """The index a point-in-time id stands for, or None if it is gone."""
+    context = store.get(_CONTEXTS, context_id)
+    return str(context["index"]) if context else None
+
+
+def close_context(context_id: str) -> dict:
+    """Free a scroll or a point in time."""
+    freed = 1 if store.get(_CONTEXTS, context_id) else 0
+    if freed:
+        store.delete(_CONTEXTS, context_id)
+    return {"succeeded": bool(freed), "num_freed": freed}
+
+
+class SearchContextMissingError(LookupError):
+    """Raised when a scroll id names a context that is gone."""
+
+    def __init__(self, context_id: str) -> None:
+        """Record the id, which the 404 names."""
+        self.context_id = context_id
+        super().__init__(f"No search context found for id [{context_id}]")
+
+
+def scroll(context_id: str) -> dict:
+    """The next page of a scrolled search.
+
+    Raises:
+        SearchContextMissingError: If the scroll is gone or was never opened.
+    """
+    context = store.get(_CONTEXTS, context_id)
+    if not context:
+        raise SearchContextMissingError(context_id)
+    body = dict(context["body"])
+    size = int(body.get("size", _SCROLL_DEFAULT_SIZE) or _SCROLL_DEFAULT_SIZE)
+    offset = int(context["offset"]) + size
+    store.save(_CONTEXTS, context_id, {**context, "offset": offset})
+    page = es_search(str(context["index"]), {**body, "from": offset, "size": size})
+    return {**page, "_scroll_id": context_id}
+
+
+def analyze_text(index: str, body: dict) -> dict:
+    """``_analyze``: the tokens a field's analyser would make.
+
+    The standard analyser splits on anything that is not a letter or a digit
+    and lower-cases what is left; a keyword field keeps the whole value. Each
+    token carries where it came from, which is what a client debugging a
+    "why does this not match" question reads.
+
+    Raises:
+        IndexNotFoundError: If the index is not there.
+        ValueError:         If the request carries no text.
+    """
+    missing = _missing_target(index)
+    if missing is not None:
+        raise IndexNotFoundError(missing)
+    raw = body.get("text")
+    if raw is None:
+        msg = "Validation Failed: 1: text is missing;"
+        raise ValueError(msg)
+    texts = raw if isinstance(raw, list) else [raw]
+    keyword = _analyses_as_keyword(index, body)
+
+    tokens: list[dict] = []
+    position = 0
+    offset = 0
+    for text in (str(item) for item in texts):
+        if keyword:
+            if text:
+                tokens.append(_token(text, offset, offset + len(text), position, "word"))
+            position += 1
+        else:
+            for match in _WORD.finditer(text):
+                word = match.group(0)
+                kind = "<NUM>" if word[0].isdigit() else "<ALPHANUM>"
+                tokens.append(_token(
+                    word.lower(), offset + match.start(), offset + match.end(),
+                    position, kind,
+                ))
+                position += 1
+        # The next string carries on where this one stopped, a hundred
+        # positions further along so a phrase cannot span the two.
+        offset += len(text) + 1
+        position += 100
+    return {"tokens": tokens}
+
+
+#: What the standard analyser keeps: letters and digits, with a dot or a
+#: dash inside a number left in place (`10.0.0.1` is one token there).
+_WORD = re.compile(r"\d[\d.]*\d|\w+")
+
+
+def _token(text: str, start: int, end: int, position: int, kind: str) -> dict:
+    return {
+        "token": text, "start_offset": start, "end_offset": end,
+        "type": kind, "position": position,
+    }
+
+
+def _analyses_as_keyword(index: str, body: dict) -> bool:
+    """Whether this request asks for the analyser that does not split."""
+    if str(body.get("analyzer", "")).lower() == "keyword":
+        return True
+    field = str(body.get("field", ""))
+    if not field:
+        return False
+    spec = flatten_properties(_mapped_properties(index)).get(field) or {}
+    return str(spec.get("type", "")) != "text"
+
+
+def validate_query(index: str, body: dict, *, explain: bool = False) -> dict:
+    """``_validate/query``: whether a query would run at all.
+
+    A valid one answers with the shards that judged it; an invalid one
+    answers ``{"valid": false}`` and nothing else — no shards, no status
+    other than 200. Only ``explain`` adds a reason.
+    """
+    missing = _missing_target(index)
+    if missing is not None:
+        raise IndexNotFoundError(missing)
+    clause = body.get("query")
+    if clause is None:
+        # A request with nothing to validate is refused rather than called
+        # valid — which is what mockdr answered.
+        msg = "Validation Failed: 1: query cannot be null;"
+        raise ValueError(msg)
+    try:
+        build_predicate(clause)
+    except (ESQueryError, ValueError) as exc:
+        return {"valid": False, "error": str(exc)} if explain else {"valid": False}
+    return {"valid": True, "_shards": {"total": 1, "successful": 1, "failed": 0}}
+
+
+def terms_enum(index: str, body: dict) -> dict:
+    """``_terms_enum``: the values of a field, for an autocomplete.
+
+    Only a field with doc values can be enumerated, so a text field and a
+    field the mapping does not have both come back empty rather than as an
+    error.
+
+    Raises:
+        IndexNotFoundError: If the index is not there.
+    """
+    records, canonical, _written = _resolve_collection(index)
+    field = str(body.get("field", ""))
+    prefix = str(body.get("string", ""))
+    size = int(body.get("size", 10))
+    insensitive = bool(body.get("case_insensitive"))
+
+    spec = flatten_properties(_mapped_properties(canonical)).get(field)
+    enumerable = spec is not None and str(spec.get("type", "")) == "keyword"
+    terms: list[str] = []
+    if enumerable:
+        seen = {
+            str(value)
+            for record in records
+            for value in _field_list(get_nested(record, field))
+        }
+        terms = sorted(
+            term for term in seen
+            if (term.lower().startswith(prefix.lower()) if insensitive
+                else term.startswith(prefix))
+        )[:size]
+    return {
+        "_shards": {"total": 1, "successful": 1, "failed": 0},
+        "terms": terms,
+        "complete": True,
+    }
+
+
+def _field_list(value: object) -> list:
+    """A field's values, whether it holds one or several."""
+    if value is None:
+        return []
+    return list(value) if isinstance(value, (list, tuple)) else [value]
+
+
 def _missing_target(index: str) -> str | None:
     """Return the first target in *index* that cannot be resolved.
 
@@ -280,7 +612,7 @@ def _missing_target(index: str) -> str | None:
             continue
         # Elasticsearch rejects uppercase index names outright, so a target
         # that only matches when folded cannot name a real index.
-        if raw != name or not index_exists(name):
+        if raw != name or not (index_exists(name) or indices_for_alias(name)):
             return raw
     return None
 
@@ -291,7 +623,8 @@ def known_index_prefixes() -> tuple[str, ...]:
 
 
 #: Sort keys that name a document's position or score rather than a field.
-_SORT_METADATA = frozenset({"_doc", "_score", "_id", "_index"})
+#: `_shard_doc` is the tiebreaker a point-in-time search adds of its own.
+_SORT_METADATA = frozenset({"_doc", "_score", "_id", "_index", "_shard_doc"})
 
 
 def _refuse_unsortable(index: str, sort_spec: list) -> None:
@@ -382,6 +715,9 @@ def _resolve_collection(
             raise IndexNotFoundError(missing)
 
     names = [t.strip().lower() for t in idx.split(",") if t.strip()]
+    # An alias stands for the indices behind it, so a search through one
+    # reads their documents rather than none.
+    names = [n for name in names for n in (indices_for_alias(name) or [name])]
     records: list[dict] = []
     if any(_pattern_hits(n, _ALERT_PREFIXES) for n in names):
         # Alerts are rendered as ECS here rather than at the response boundary,

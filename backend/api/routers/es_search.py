@@ -135,10 +135,35 @@ def es_search_all(
     handler — and a malformed query body never reached the parser at all,
     answering ``resource_not_found_exception`` where Elasticsearch answers
     ``parsing_exception``. Both measured against Elasticsearch 8.15.0.
+
+    A body carrying a ``pit`` is addressed to a point in time instead: the
+    index is the one it was opened on, and the answer names it back.
     """
+    search_body = _body_or_source(body, source)
+    pit = search_body.get("pit")
+    if isinstance(pit, dict):
+        return _search_in_pit(str(pit.get("id", "")), search_body)
     return search_queries.es_search(
-        "_all", _body_or_source(body, source), ignore_unavailable=ignore_unavailable,
+        "_all", search_body, ignore_unavailable=ignore_unavailable,
     )
+
+
+def _search_in_pit(pit_id: str, body: dict) -> dict:
+    """A search addressed to a point in time rather than to an index."""
+    index = search_queries.context_index(pit_id) if pit_id else None
+    if index is None:
+        raise HTTPException(status_code=404, detail=build_es_error_response(
+            404, "search_context_missing_exception",
+            f"No search context found for id [{pit_id}]",
+        ))
+    # A point-in-time search sorts by `_shard_doc` after whatever the client
+    # asked for, so every hit has a unique sort value to page from. Without
+    # it a `search_after` carrying the tiebreaker back is one value too long
+    # for the sort, and the next page is refused.
+    sort = [*(body.get("sort") or []), {"_shard_doc": "asc"}]
+    search_body = {k: v for k, v in body.items() if k != "pit"}
+    page = search_queries.es_search(index, {**search_body, "sort": sort})
+    return {**page, "pit_id": pit_id}
 
 
 def _body_or_source(body: dict, source: str | None) -> dict:
@@ -274,15 +299,65 @@ def es_search(
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
     source: str | None = Query(default=None),
+    scroll: str | None = Query(default=None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Execute an Elasticsearch query DSL search against a mock index."""
+    search_body = _body_or_source(body, source)
     try:
-        return search_queries.es_search(
-            index, _body_or_source(body, source), ignore_unavailable=ignore_unavailable,
+        page = search_queries.es_search(
+            index, search_body, ignore_unavailable=ignore_unavailable,
         )
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
+    if scroll:
+        # A scrolled search hands back the id the client pages with; without
+        # it a fetch that works against a cluster stops after one page here.
+        page["_scroll_id"] = search_queries.open_context(index, search_body, "scroll")
+    return page
+
+
+@router.post("/{index}/_pit", operation_id="es_open_pit")
+def open_pit(
+    index: str,
+    _keep_alive: str | None = Query(default=None, alias="keep_alive"),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Open a point in time over an index."""
+    if not search_queries.index_exists(index) and not search_queries.indices_for_alias(index):
+        raise _missing_index(IndexNotFoundError(index))
+    return {"id": search_queries.open_context(index, {}, "pit")}
+
+
+@router.delete("/_pit", operation_id="es_close_pit")
+def close_pit(body: dict = Body(...), _: dict = Depends(require_es_auth)) -> dict:
+    """Close a point in time."""
+    return search_queries.close_context(str(body.get("id", "")))
+
+
+@router.post("/_search/scroll", operation_id="es_scroll")
+@router.get("/_search/scroll", operation_id="es_scroll_get")
+def scroll_search(body: dict = Body(default={}), _: dict = Depends(require_es_auth)) -> dict:
+    """The next page of a scrolled search."""
+    try:
+        return search_queries.scroll(str(body.get("scroll_id", "")))
+    except search_queries.SearchContextMissingError as exc:
+        cause = {"type": "search_context_missing_exception", "reason": str(exc)}
+        raise HTTPException(status_code=404, detail={"error": {
+            "root_cause": [dict(cause)],
+            "type": "search_phase_execution_exception",
+            "reason": "all shards failed",
+            "phase": "query",
+            "grouped": True,
+            "failed_shards": [{"shard": -1, "index": None, "reason": dict(cause)}],
+            "caused_by": dict(cause),
+        }, "status": 404}) from exc
+
+
+@router.delete("/_search/scroll", operation_id="es_clear_scroll")
+def clear_scroll(body: dict = Body(default={}), _: dict = Depends(require_es_auth)) -> dict:
+    """Free a scroll the client is done with."""
+    return search_queries.close_context(str(body.get("scroll_id", "")))
 
 
 @router.get("/{index}/_count", operation_id="es_count_get")
@@ -483,6 +558,174 @@ def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
     return dict(_SHARD_ACK)
+
+
+@router.post("/_msearch", operation_id="es_msearch_all")
+@router.post("/{index}/_msearch", operation_id="es_msearch")
+async def msearch(request: Request, index: str = "", _: dict = Depends(require_es_auth)) -> dict:
+    """Several searches in one request, the way Kibana asks for them.
+
+    The body is NDJSON: a header line naming the index, then the search body,
+    twice over. Each answer carries the search's own ``status`` beside it, so
+    one failing search does not fail the request.
+    """
+    lines = [line for line in (await request.body()).decode().split("\n") if line.strip()]
+    responses: list[dict] = []
+    for i in range(0, len(lines) - 1, 2):
+        try:
+            header = json.loads(lines[i])
+            body = json.loads(lines[i + 1])
+        except json.JSONDecodeError as exc:
+            raise ESQueryError(f"Failed to parse request body: {exc}") from exc
+        target = str(header.get("index") or index or "_all")
+        try:
+            responses.append(_one_search(target, body))
+        except ESQueryError as exc:
+            # The position belongs to this line, which is the search the
+            # client wrote — not to its offset in the payload.
+            exc.body = lines[i + 1]
+            raise
+    return {"took": 1, "responses": responses}
+
+
+def _one_search(index: str, body: dict) -> dict:
+    """One member of a multi-search: its answer, or its error, plus a status.
+
+    Only what a *shard* raises belongs to the member — a missing index, a
+    field it cannot sort on. A body that will not **parse** fails the whole
+    request instead, which is what a cluster does: the error is in the
+    request, not in one of the searches (measured on 8.15).
+    """
+    try:
+        return {**search_queries.es_search(index, body), "status": 200}
+    except IndexNotFoundError as exc:
+        return {**build_es_index_not_found(exc.index), "status": 404}
+    except ESQueryError as exc:
+        if not exc.shard_failure:
+            raise
+        return {
+            **build_es_error_response(400, exc.es_type, str(exc)),
+            "status": 400,
+        }
+
+
+@router.get("/{index}/_settings", operation_id="es_get_settings")
+def get_settings(index: str, _: dict = Depends(require_es_auth)) -> dict:
+    """An index's settings, which is the half of it a client tunes."""
+    try:
+        return search_queries.index_settings(index)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.put("/{index}/_settings", operation_id="es_put_settings")
+def put_settings(
+    index: str, body: dict = Body(...), _: dict = Depends(require_es_write),
+) -> dict:
+    """Change an index's settings."""
+    try:
+        return search_queries.put_settings(index, body)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.put("/{index}/_alias/{alias}", operation_id="es_put_alias")
+def put_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> dict:
+    """Point an alias at an index."""
+    try:
+        return search_queries.put_alias(index, alias)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.delete("/{index}/_alias/{alias}", operation_id="es_delete_alias")
+def delete_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> dict:
+    """Take an alias off an index."""
+    try:
+        return search_queries.delete_alias(index, alias)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.get("/{index}/_alias", operation_id="es_get_index_alias")
+def get_index_alias(index: str, _: dict = Depends(require_es_auth)) -> dict:
+    """Which aliases an index carries."""
+    if not search_queries.index_exists(index):
+        raise _missing_index(IndexNotFoundError(index))
+    return search_queries.alias_map(index)
+
+
+@router.post("/_aliases", operation_id="es_update_aliases")
+def update_aliases(body: dict = Body(...), _: dict = Depends(require_es_write)) -> dict:
+    """Add and remove aliases in one request."""
+    try:
+        return search_queries.update_aliases(body.get("actions") or [])
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.get("/_alias/{alias}", operation_id="es_get_alias")
+def get_alias(alias: str, _: dict = Depends(require_es_auth)) -> dict:
+    """Every index an alias stands for."""
+    found = search_queries.alias_map(alias)
+    if not found:
+        # A plain string, where every other Elasticsearch error is an object:
+        # this one endpoint answers `{"error": "alias [x] missing"}`.
+        raise HTTPException(
+            status_code=404,
+            detail={"error": f"alias [{alias}] missing", "status": 404},
+        )
+    return found
+
+
+@router.get("/_resolve/index/{expression}", operation_id="es_resolve_index")
+def resolve_index(expression: str, _: dict = Depends(require_es_auth)) -> dict:
+    """What a name stands for: indices, aliases and data streams."""
+    return search_queries.resolve_index(expression)
+
+
+@router.post("/{index}/_analyze", operation_id="es_analyze")
+def analyze(
+    index: str, body: dict = Body(default={}), _: dict = Depends(require_es_auth),
+) -> dict:
+    """The tokens a field's analyser would make of some text."""
+    try:
+        return search_queries.analyze_text(index, body)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "action_request_validation_exception", str(exc),
+        )) from exc
+
+
+@router.post("/{index}/_validate/query", operation_id="es_validate_query")
+def validate_query(
+    index: str,
+    body: dict = Body(default={}),
+    explain: bool = Query(default=False),
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Whether a query would run, without running it."""
+    try:
+        return search_queries.validate_query(index, body, explain=explain)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "action_request_validation_exception", str(exc),
+        )) from exc
+
+
+@router.post("/{index}/_terms_enum", operation_id="es_terms_enum")
+def terms_enum(
+    index: str, body: dict = Body(default={}), _: dict = Depends(require_es_auth),
+) -> dict:
+    """The values of a field, which is what an autocomplete asks for."""
+    try:
+        return search_queries.terms_enum(index, body)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
 
 
 @router.get("/{index}/_stats")

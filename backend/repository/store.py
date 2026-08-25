@@ -18,6 +18,7 @@ CAPS: dict[str, int] = {
     "splunk_sessions": 5_000,
     "es_documents": 100_000,
     "es_indices": 1_000,
+    "es_search_contexts": 1_000,
     "agent_uploads": 200,
     "cs_oauth_tokens": 5_000,
     "mde_oauth_tokens": 5_000,
@@ -81,6 +82,10 @@ class InMemoryStore:
             # answered 404 on the very next search, and a written document
             # was readable by id but invisible to a search.
             "es_indices": {},
+            # Scrolls and points in time a client opened, so a fetch can page
+            # past the first hits. Capped: a client that opens one per poll
+            # and never closes it must not grow the process until it dies.
+            "es_search_contexts": {},
             "es_cases": {},
             "es_case_comments": {},
             "es_exception_lists": {},

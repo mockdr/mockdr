@@ -2246,6 +2246,155 @@ probes:
       headers: {Content-Type: application/json}
       auth: basic
 
+  # ── Aliases, multi-search and the rest of the surface (2.3.1) ───────────
+  #
+  # An endpoint sweep against the real cluster found these missing: every
+  # alias call was a 404, `_msearch` — what Kibana sends for almost every
+  # panel — fell through to the 404 handler, and a scrolled search came back
+  # without a scroll id, so a fetch stopped after its first page with nothing
+  # to say why. These read the seeded index, so they sit before the writes.
+
+  - id: es-msearch
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Several searches in one request, each with its own status.
+    request:
+      method: POST
+      path: /${seed_index}/_msearch
+      content: "{\"index\": \"conformance-seeded\"}\n{\"query\": {\"match_all\": {}}, \"size\": 0}\n{\"index\": \"conformance-seeded\"}\n{\"query\": {\"term\": {\"host\": \"srv-1\"}}, \"size\": 0}\n"
+      headers: {Content-Type: application/x-ndjson}
+      auth: basic
+
+  - id: es-msearch-one-fails
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A body that will not parse fails the whole request, where a shard failure belongs to its own search.
+    request:
+      method: POST
+      path: /_msearch
+      content: "{\"index\": \"conformance-seeded\"}\n{\"query\": {\"nosuchquery\": {}}}\n{\"index\": \"conformance-seeded\"}\n{\"query\": {\"match_all\": {}}, \"size\": 0}\n"
+      headers: {Content-Type: application/x-ndjson}
+      auth: basic
+
+  - id: es-analyze
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The tokens a standard analyser makes.
+    request:
+      method: POST
+      path: /${seed_index}/_analyze
+      content: '{"text": "srv-1, 10.0.0.1 FAILED"}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-analyze-keyword-field
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A keyword field keeps the whole value.
+    request:
+      method: POST
+      path: /${seed_index}/_analyze
+      content: '{"text": "a B", "field": "host"}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-analyze-no-text
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And text is required.
+    request:
+      method: POST
+      path: /${seed_index}/_analyze
+      content: '{}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-validate-query
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Whether a query would run.
+    request:
+      method: POST
+      path: /${seed_index}/_validate/query
+      content: '{"query": {"term": {"host": "srv-1"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-validate-query-bad
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      One that would not, which answers with nothing else.
+    request:
+      method: POST
+      path: /${seed_index}/_validate/query
+      content: '{"query": {"nosuchquery": {}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-terms-enum
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The values of a field, for an autocomplete.
+    request:
+      method: POST
+      path: /${seed_index}/_terms_enum
+      content: '{"field": "host"}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-terms-enum-prefix
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Narrowed by a prefix.
+    request:
+      method: POST
+      path: /${seed_index}/_terms_enum
+      content: '{"field": "host", "string": "srv-1"}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-terms-enum-text
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A text field has nothing to enumerate, and that is not an error.
+    request:
+      method: POST
+      path: /${seed_index}/_terms_enum
+      content: '{"field": "message"}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-settings
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The settings half of an index.
+    request:
+      method: GET
+      path: /${seed_index}/_settings
+      auth: basic
+
   # ── Writes (2.3.1) ──────────────────────────────────────────────────────
   #
   # Last in the file on purpose: these change the seeded documents, so every

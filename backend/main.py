@@ -672,7 +672,13 @@ async def es_query_exception_handler(
         # what they will see when they look.
         # GET _search?source= carries the body in the query string; the
         # position is found in whichever the client actually sent.
-        text = await _request.body() or _request.query_params.get("source", "").encode()
+        # A multi-search counts the position inside the search that failed,
+        # not inside the whole ndjson payload; the error carries that text.
+        text = (
+            exc.body.encode()
+            or await _request.body()
+            or _request.query_params.get("source", "").encode()
+        )
         line, col = _body_position(text, exc.clause)
         for entry in (content["error"], *content["error"].get("root_cause", [])):
             entry["line"] = line

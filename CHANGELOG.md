@@ -8,6 +8,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Elasticsearch: aliases, multi-search, and the rest of the surface a client
+touches.** An endpoint sweep against the real cluster found these missing —
+every one of them a 404 here and an answer there:
+
+* **Aliases.** `PUT/DELETE /{index}/_alias/{name}`, `POST /_aliases`,
+  `GET /_alias/{name}`, and — the point of them — a search *through* an
+  alias, which now reads the indices behind it. An alias nothing carries
+  answers `{"error": "alias [x] missing"}`: a plain string, where every
+  other Elasticsearch error is an object.
+* **`_msearch`**, which is what Kibana sends for almost every panel. Each
+  answer carries its own `status`, and a *shard* failure belongs to its own
+  search while a body that will not **parse** fails the whole request — with
+  the line and column counted inside the search that failed, not inside the
+  payload.
+* **`_settings`** (get and put), **`_analyze`** (with the `<ALPHANUM>`/`<NUM>`
+  token types and a keyword field's whole-value token), **`_validate/query`**
+  (whose invalid answer is `{"valid": false}` and nothing else),
+  **`_terms_enum`** for an autocomplete, and **`_resolve/index`**.
+* **Scroll and point-in-time**, the two ways to read more than a page. A
+  scrolled search hands back the `_scroll_id` it never used to, `POST
+  /_search/scroll` pages with it, and a cleared scroll is a
+  `search_context_missing_exception`. A point-in-time search names its
+  `pit_id` back and adds the `_shard_doc` tiebreaker to every hit's sort —
+  without which a `search_after` carrying it back is one value too long for
+  the sort, and the next page is refused.
+
+An index's `number_of_replicas` now defaults to 1, which is a cluster's own
+default even on a single node.
+
 **Elasticsearch: the writes a client makes around a search.** `_update`,
 `_update_by_query`, `_delete_by_query`, `GET _source` and the maintenance
 calls (`_refresh`, `_flush`, `_forcemerge`, `_cache/clear`) were not served

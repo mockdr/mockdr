@@ -125,7 +125,7 @@ class ESQueryError(ValueError):
     def __init__(
         self, message: str, *, clause: str | None = None,
         es_type: str = "parsing_exception", named_object: bool = False,
-        shard_failure: bool = False,
+        shard_failure: bool = False, body: str = "",
     ) -> None:
         """Record the message, the clause if any, and Elasticsearch's exception type.
 
@@ -139,11 +139,16 @@ class ESQueryError(ValueError):
         limit. Those come back wrapped in a ``search_phase_execution_exception``
         naming the failed shards; everything the coordinating node catches
         while parsing comes back flat.
+
+        ``body`` is the text the position is counted in, for a request whose
+        body is not one document: a multi-search reports the line and column
+        *within the search that failed*, not within the whole payload.
         """
         super().__init__(message)
         self.clause = clause
         self.es_type = es_type
         self.named_object = named_object
+        self.body = body
         self.shard_failure = shard_failure
 
 # ---------------------------------------------------------------------------
@@ -1352,6 +1357,10 @@ _LONG_MAX = 2**63 - 1
 _LONG_MIN = -(2**63)
 
 
+#: Sort keys that name where a document sits rather than what it holds.
+#: `_shard_doc` is the tiebreaker a point-in-time search adds of its own.
+_POSITION_KEYS = frozenset({"_score", "_doc", "_shard_doc"})
+
 #: The sort types whose missing value is `null` rather than a long's edge.
 _KEYWORD_TYPES = frozenset({"keyword", "text", "ip", "version", "boolean"})
 
@@ -1367,7 +1376,7 @@ def sort_field_kinds(
     """
     kinds: dict[str, str] = {}
     for key in sort_keys:
-        if key.field in ("_score", "_doc"):
+        if key.field in _POSITION_KEYS:
             continue
         if key.unmapped_type:
             # The client said what to assume, so the data does not decide.
@@ -1401,7 +1410,7 @@ def sort_values(
     """
     values: list = []
     for key in sort_keys:
-        if key.field == "_doc":
+        if key.field in ("_doc", "_shard_doc"):
             values.append((positions or {}).get(id(record), 0))
         elif key.field == "_score":
             values.append(1.0)
@@ -1498,7 +1507,7 @@ def apply_es_sort(records: list[dict], sort_spec: list) -> list[dict]:
         # up nested found nothing and bucketed every document equally, so the
         # sort silently did nothing. Every document scores the same here, and
         # `_doc` is index order, so both preserve the current order.
-        if key.field in ("_score", "_doc"):
+        if key.field in _POSITION_KEYS:
             continue
 
         # A document without the field sorts last whichever way the order
