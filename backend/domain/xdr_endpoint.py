@@ -35,6 +35,13 @@ class XdrEndpoint:
 
     users: list[str] = field(default_factory=list)
 
+    #: Cortex serves both of these on every endpoint, and both are filter
+    #: fields — `dist_name` narrows by installation package, `public_ip_list`
+    #: by the address the endpoint is seen from. They existed only as fixture
+    #: defaults, so the two filters accepted a value and answered nothing.
+    installation_package: str = ""
+    public_ip: list[str] = field(default_factory=list)
+
     #: The tags assigned through ``/tags/agents/assign/``. Cortex serves them
     #: in ``endpointTags``, which its reference example types as a string, so
     #: the read side joins these with commas. Kept as a list here because the

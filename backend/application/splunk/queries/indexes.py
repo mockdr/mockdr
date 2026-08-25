@@ -79,7 +79,7 @@ def list_indexes() -> dict:
         content = {**content, **idx.settings}
         entries.append(build_splunk_entry(
             idx.name, complete(content, "indexes"),
-            id_path=f"https://localhost:8089/services/data/indexes/{idx.name}",
+            collection="data/indexes",
             links=_index_links(idx.name), fields=False, acl_extra=_index_acl(idx.name),
         ))
     return build_splunk_envelope(entries, links=_INDEX_COLLECTION_LINKS)

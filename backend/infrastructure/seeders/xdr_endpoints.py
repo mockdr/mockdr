@@ -37,6 +37,11 @@ XDR_SCAN_STATES: list[str] = ["none", "success", "success", "in_progress", "canc
 XDR_OPERATIONAL: list[str] = [
     "protected", "protected", "protected", "partially_protected", "unprotected",
 ]
+#: The installer an endpoint was enrolled with, which `dist_name` filters on.
+XDR_INSTALL_PACKAGES: list[str] = [
+    "Windows Standard Installer", "Linux Standard Installer",
+    "macOS Standard Installer", "Windows VDI Installer",
+]
 
 
 def seed_xdr_endpoints(fake: Faker) -> list[str]:
@@ -100,6 +105,9 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
             operational_status=XDR_OPERATIONAL[index % len(XDR_OPERATIONAL)],
             scan_status=XDR_SCAN_STATES[index % len(XDR_SCAN_STATES)],
             users=users,
+            installation_package=XDR_INSTALL_PACKAGES[
+                index % len(XDR_INSTALL_PACKAGES)],
+            public_ip=[fake.ipv4_public()],
         ))
 
     return endpoint_ids

@@ -8,6 +8,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Filters that travel in a body, and the two that could only ever answer nothing.**
+`scripts/filter_effect.py` asks of every body-side filter what
+`param_effect.py` asks of every query parameter: does it do anything? That
+blind spot is not small — Cortex XDR is a POST-only API whose every list
+route filters through `request_data.filters`, and Elasticsearch's whole
+query language is a body. It cost nine of Cortex's thirteen endpoint filter
+fields, found earlier in this release by writing and reading back rather
+than by asking directly.
+
+Each filter is exercised in **both** directions, because one is not enough:
+a value nothing can match must answer empty, and a value a record holds must
+not — a filter that refuses everything passes the first test while being
+just as broken. A field mapped onto a record key nothing holds has no value
+to test with, and is reported for exactly that: it can only ever answer
+nothing.
+
+Which is what `dist_name` and `public_ip_list` were doing. Cortex serves
+`installation_package` and `public_ip` on every endpoint and filters on
+both; mockdr had them as fixture defaults only, never on the record, so the
+two filters accepted a value and answered nothing. Both are now on the
+endpoint and seeded.
+
+62 filters across the two dialects, and the tool was checked against a
+deliberately broken filter before its clean run was believed.
+
+**Where each Splunk entry lives.**
+An entry's `id` says which app owns it and under which user, and splunkd
+spells that in the id itself: `/servicesNS/{owner}/{app}/{collection}/{name}`
+for anything that lives in an app, `/services/{collection}/{name}` for what
+the instance owns. mockdr rendered every id in the plain form. Both are
+reachable — the namespace middleware rewrites one to the other — so a client
+that *follows* the link worked either way; one that parses owner and app out
+of it, as splunklib's `Entity.path` does and as any tool deciding where to
+write a change back must, found neither.
+
+Measured by reading one entry from each of the 28 collections mockdr serves,
+which is what the note left in `probes/splunk.yaml` at 2.3.0 was waiting
+for. The rule turned out to be simple: **the id is namespaced exactly when
+the entry's own ACL names an app** — and it comes from the ACL, not from the
+request path, so asking for an index under `/servicesNS/nobody/search/…`
+still answers `/servicesNS/nobody/system/…`, because that is where the index
+lives. `search/jobs` is the one measured exception: a job's ACL names the
+user and app it ran in, and its id is still plain.
+
+Deriving the id from the ACL meant the ACLs had to be right, and eleven
+collections' were not: users, roles, capabilities, the server's own
+description and the KV store status all claimed to live in the `search` app
+under `nobody`, where splunkd reports them owned by `system` with no app at
+all. Knowledge objects — macros, saved searches, event types, source types,
+lookups, HEC tokens — carry four more ACL members saying who may re-share
+them, and now do; a configuration object such as an index carries none of
+the four, and no longer does either. Six probes compare it against the real
+product.
+
+One correction to the `f` filter added earlier in this release: splunkd's
+job endpoint has a handler of its own and ignores `f` outright, answering
+all 65 content keys whatever is asked for. The middleware now leaves it
+alone rather than narrowing where the product does not.
+
 **And the mistake in the other direction: writes nobody checked the caller for.**
 `scripts/authz_audit.py` asks all 247 write routes whether a credential
 without the right to them is answered 2xx — with no credential at all, and

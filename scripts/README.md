@@ -11,6 +11,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `param_drift.py` | Compare the *query parameters* each route takes with the ones the swagger declares — a filter the vendor documents and the mock drops answers 200 with the whole collection. |
 | `fuzz_parsers.py` | Fuzz the hand-written parsers (SPL, KQL, OData, FQL, ES DSL, HEC) for unintended exceptions. |
 | `hostile_probe.py` | Hostile bodies and parameters against every mounted route; flags any plain-text 500 or crash. |
+| `filter_effect.py` | The same question for filters that travel in a *body* — Cortex's `request_data.filters`, Elasticsearch's query DSL — which `param_effect.py` cannot see. Each is sent a value nothing can match *and* one a record holds. Exit 1 on any. |
 | `param_effect.py` | Asks every route whether its parameters do anything: a limiter that does not limit, a filter that cannot match and returns everything, a `$select` that projects nothing. Exit 1 on any. |
 | `paging_audit.py` | Walks every collection a page at a time: flags a record that comes back twice, one that never appears, a total that disagrees with the pages, and paging that will not terminate. Exit 1 on any. |
 | `roundtrip_audit.py` | Writes something, then asks for it back: a create that drops the body, an update that answers 200 and changes nothing, a delete that leaves the record in the listing. Every other audit here only reads. Exit 1 on any. |

@@ -61,8 +61,15 @@ class TestEntryStructure:
     ) -> None:
         # Ids used to default to /services/{name}, so a user entry claimed to
         # live at /services/admin rather than under authentication/users.
+        # An entry that lives in an app names it too, between /servicesNS and
+        # the collection: /servicesNS/nobody/system/data/indexes/main.
+        collection = path[len("/services/"):]
         for entry in _get(client, path)["entry"]:
-            assert path in entry["id"], entry["id"]
+            assert f"/{collection}/" in entry["id"], entry["id"]
+            assert entry["id"].startswith((
+                "https://localhost:8089/services/",
+                "https://localhost:8089/servicesNS/",
+            )), entry["id"]
 
 
 @pytest.mark.parametrize("path", COLLECTIONS)

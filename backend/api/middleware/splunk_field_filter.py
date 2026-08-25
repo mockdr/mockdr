@@ -29,6 +29,12 @@ _SPLUNK_PREFIX = "/splunk/services"
 #: Present in a filtered entry's content whether or not it was selected.
 _ALWAYS = "eai:acl"
 
+#: The one collection that ignores ``f`` outright. splunkd's job endpoint has
+#: a handler of its own, and answers all 65 content keys whatever is asked
+#: for — measured on 10.4.2, where every other collection tried narrowed to
+#: one. Applying it here anyway would be a difference in the other direction.
+_IGNORES_F = ("/splunk/services/search/jobs", "/splunk/services/search/v2/jobs")
+
 
 class SplunkFieldFilterMiddleware:
     """Narrow each entry's ``content`` to the fields ``f`` names."""
@@ -39,6 +45,10 @@ class SplunkFieldFilterMiddleware:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Apply the field filter to a Splunk response."""
         if scope["type"] != "http" or not scope.get("path", "").startswith(_SPLUNK_PREFIX):
+            await self.app(scope, receive, send)
+            return
+
+        if scope["path"].startswith(_IGNORES_F):
             await self.app(scope, receive, send)
             return
 

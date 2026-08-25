@@ -2721,16 +2721,6 @@ probes:
   # index and refuses. What creation keeps is pinned by unit tests taken from
   # 10.4.2 directly. Reading is safe, and `f` is read-only.
 
-  # Not yet imitated, and visible here: splunkd renders an entry's `id` and
-  # its links in the namespaced form — `/servicesNS/{owner}/{app}/…` for the
-  # collections that have an owner and an app (indexes, saved searches),
-  # `/services/…` only for the global ones (authentication/users). mockdr
-  # renders every id in the `/services` form. Both are reachable — the
-  # namespace middleware rewrites one to the other — so a client following
-  # the link works either way; one parsing owner and app out of the id does
-  # not. Fixing it means measuring the owner and app of some thirty
-  # collections, which is its own piece of work, so this probe compares the
-  # shape rather than pretending the difference is not there.
   - id: spl-index-field-filter
     endpoint: management
     why: >
@@ -2798,3 +2788,73 @@ probes:
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 
+
+  # ── Where each entry lives (2.3.1) ───────────────────────────────────────
+  #
+  # An entry's `id` says which app owns it and under which user, and splunkd
+  # spells that in the id itself: `/servicesNS/{owner}/{app}/{collection}` for
+  # anything that lives in an app, `/services/{collection}` for what the
+  # instance owns. mockdr rendered every id in the plain form, and the
+  # namespace is what a client parses to decide where to write a change back.
+  # One probe per kind, and the ACL beside it, because the id is derived from
+  # the ACL rather than from the request path.
+
+  - id: spl-namespace-indexes
+    endpoint: management
+    why: >
+      An index lives in `system` under `nobody`, and says so in its id.
+    request:
+      method: GET
+      path: /services/data/indexes/main
+      query: {output_mode: json, f: datatype}
+      auth: basic
+
+  - id: spl-namespace-saved-searches
+    endpoint: management
+    why: >
+      A saved search lives in the `search` app, and its name is
+      percent-encoded into the id.
+    request:
+      method: GET
+      path: /services/saved/searches
+      query: {output_mode: json, count: '1', f: search}
+      auth: basic
+
+  - id: spl-namespace-users
+    endpoint: management
+    why: >
+      Users belong to no app: the instance owns them, and the id stays in the
+      plain `/services` form.
+    request:
+      method: GET
+      path: /services/authentication/users
+      query: {output_mode: json, count: '1', f: realname}
+      auth: basic
+
+  - id: spl-namespace-macros
+    endpoint: management
+    why: >
+      A macro is a knowledge object: it lives in an app and carries the four
+      ACL members that say who may re-share it.
+    request:
+      method: GET
+      path: /services/admin/macros
+      query: {output_mode: json, count: '1', f: definition}
+      auth: basic
+
+  # A job is deliberately not probed here: its content is a function of the
+  # search that produced it — `performance.command.<the commands that ran>`,
+  # and a telemetry block keyed the same way — so two installs that ran
+  # different searches differ in every key. That a job's id is *not*
+  # namespaced, though its ACL names a user and an app, is measured and
+  # pinned by a unit test instead.
+
+  - id: spl-namespace-server-info
+    endpoint: management
+    why: >
+      The instance describing itself is the instance's own.
+    request:
+      method: GET
+      path: /services/server/info
+      query: {output_mode: json, f: version}
+      auth: basic

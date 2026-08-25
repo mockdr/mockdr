@@ -157,7 +157,7 @@ def get_job(sid: str) -> dict | None:
     entry = build_splunk_entry(
         job.sid,
         _retime(complete(content, "search_jobs"), job),
-        id_path=f"https://localhost:8089/services/search/jobs/{job.sid}",
+        collection="search/jobs",
         links=_JOB_LINKS,
         fields=False,
         acl=_JOB_ACL,

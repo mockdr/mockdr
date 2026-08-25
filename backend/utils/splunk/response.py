@@ -29,6 +29,104 @@ _DEFAULT_ACL: dict[str, object] = {
     "sharing": "app",
 }
 
+#: Which app owns each collection's entries, and under which user. Measured
+#: on Splunk 10.4.2 by reading one entry per collection: an entry whose ACL
+#: names an app is served with a *namespaced* id —
+#: ``/servicesNS/{owner}/{app}/{collection}/{name}`` — and its links carry the
+#: same prefix. mockdr rendered every id in the plain ``/services`` form, so a
+#: client that parses the owner and app out of an id (splunklib's
+#: ``Entity.path`` does, and so does every tool that decides where to write a
+#: change back) found neither.
+_NAMESPACES: dict[str, tuple[str, str]] = {
+    "admin/macros": ("nobody", "search"),
+    "alerts/fired_alerts": ("nobody", "search"),
+    "apps/local": ("nobody", "system"),
+    "data/indexes": ("nobody", "system"),
+    "data/indexes-extended": ("nobody", "system"),
+    "data/inputs/http": ("nobody", "splunk_httpinput"),
+    "data/inputs/monitor": ("nobody", "system"),
+    "data/inputs/tcp/raw": ("nobody", "system"),
+    "data/lookup-table-files": ("nobody", "search"),
+    "data/props/extractions": ("nobody", "system"),
+    "data/transforms/lookups": ("nobody", "system"),
+    "saved/eventtypes": ("nobody", "search"),
+    "saved/searches": ("nobody", "search"),
+    "saved/sourcetypes": ("nobody", "system"),
+    "storage/collections/config": ("nobody", "system"),
+}
+
+#: Of those, the ones whose entries are *knowledge objects*: splunkd reports
+#: four extra ACL members saying who may re-share them. A configuration
+#: object — an index, a monitored file — carries none of the four.
+_SHAREABLE: frozenset[str] = frozenset({
+    "admin/macros", "apps/local", "data/inputs/http", "data/lookup-table-files",
+    "data/props/extractions", "data/transforms/lookups", "saved/eventtypes",
+    "saved/searches", "saved/sourcetypes",
+})
+
+#: ``sharing`` follows the app — an object in ``system`` is shared system-wide
+#: and one in an app is shared app-wide — with a single measured exception:
+#: an installed app is itself an app-level object whatever app it lives in.
+_SHARING_EXCEPTIONS: dict[str, str] = {"apps/local": "app"}
+
+#: The rest are the instance's own: splunkd reports them owned by ``system``
+#: with no app at all, and their ids stay in the plain ``/services`` form.
+#: ``search/jobs`` is the measured exception — a job's ACL names the user who
+#: ran it and the app they ran it in, and its id is still not namespaced.
+_SYSTEM_ACL: dict[str, object] = {
+    "app": "", "owner": "system", "sharing": "system",
+    "modifiable": False, "removable": False,
+}
+_NOT_NAMESPACED_WITH_AN_APP = frozenset({"search/jobs"})
+
+
+def _scoped_acl(collection: str, acl: dict, overrides: dict) -> dict:
+    """The ACL splunkd reports for an entry of this collection.
+
+    A collection the instance owns is ``system``-scoped with no app; one that
+    lives in an app carries that app and the user who owns the entry. What
+    the caller passed in ``acl_extra`` still wins — a system index says so
+    itself.
+    """
+    namespace = _NAMESPACES.get(collection)
+    if namespace is None:
+        return {**acl, **_SYSTEM_ACL, **overrides}
+    owner, app = namespace
+    scoped: dict[str, object] = {
+        **acl, "owner": owner, "app": app,
+        "sharing": _SHARING_EXCEPTIONS.get(
+            collection, "system" if app == "system" else "app"),
+        # A knowledge object is edited in place and unlinked from its app
+        # rather than deleted; splunkd reports it modifiable and not
+        # removable. An index says otherwise for itself, through `acl_extra`.
+        "modifiable": True,
+        "removable": False,
+    }
+    if collection in _SHAREABLE:
+        scoped |= {
+            "can_change_perms": True, "can_share_app": True,
+            "can_share_global": True, "can_share_user": False,
+        }
+    return {**scoped, **overrides}
+
+
+def _entry_id(collection: str, name: str, acl: dict) -> str:
+    """An entry's id, namespaced when splunkd namespaces it.
+
+    The namespace comes from the entry's own ACL rather than from the request
+    path: asking for ``/servicesNS/nobody/search/data/indexes/main`` still
+    answers with ``/servicesNS/nobody/system/…``, because that is where the
+    index lives.
+    """
+    if not collection:
+        return f"{_BASE_URL}/services/{quote(name, safe='')}"
+    app = str(acl.get("app") or "")
+    if not app or collection in _NOT_NAMESPACED_WITH_AN_APP:
+        return f"{_BASE_URL}/services/{collection}/{quote(name, safe='')}"
+    owner = str(acl.get("owner") or "nobody")
+    return (f"{_BASE_URL}/servicesNS/{quote(owner, safe='')}/{quote(app, safe='')}"
+            f"/{collection}/{quote(name, safe='')}")
+
 
 def _rel_path(entry_id: str) -> str:
     """The path portion of an entry id, which is what links carry."""
@@ -119,8 +217,10 @@ def build_splunk_entry(
     """
     if not updated:
         updated = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
-    prefix = f"{_BASE_URL}/services/{collection}" if collection else f"{_BASE_URL}/services"
-    entry_id = id_path or f"{prefix}/{quote(name, safe='')}"
+    entry_acl = acl if acl is not None else {**_DEFAULT_ACL, **(acl_extra or {})}
+    if acl is None and collection:
+        entry_acl = _scoped_acl(collection, entry_acl, acl_extra or {})
+    entry_id = id_path or _entry_id(collection, name, entry_acl)
     entry: dict = {
         "name": name,
         "id": entry_id,
@@ -140,7 +240,7 @@ def build_splunk_entry(
         # `_parse_atom_metadata` hoists these into Entity.access / Entity.fields;
         # Splunk's own reference says they apply to all endpoints.
         "author": "nobody",
-        "acl": acl if acl is not None else {**_DEFAULT_ACL, **(acl_extra or {})},
+        "acl": entry_acl,
         "content": content,
     }
     if fields is True:

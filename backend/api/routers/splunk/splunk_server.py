@@ -129,5 +129,8 @@ def server_settings(
         "mgmtHostPort": "0.0.0.0:8089",
         "enableSplunkWebSSL": False,
     }
-    entry = build_splunk_entry("server-settings", settings)
+    # splunkd names this entry `settings`, under its own collection — the
+    # entry carried no collection at all, so it claimed to live at
+    # `/services/server-settings`.
+    entry = build_splunk_entry("settings", settings, collection="server/settings")
     return build_splunk_envelope([entry], total=1)

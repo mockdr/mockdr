@@ -26,13 +26,6 @@ from repository.splunk.splunk_event_repo import splunk_event_repo
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
 
-#: The acl a system entry carries: no sharing members, because it cannot be
-#: shared.
-_SYSTEM_ACL: dict[str, object] = {
-    "app": "", "can_list": True, "can_write": True, "modifiable": False,
-    "owner": "system", "removable": False, "sharing": "system",
-}
-
 router = APIRouter(tags=["Splunk Catalogs"])
 
 #: The macro mockdr's SPL knows: `notable` stands for the notable index, and
@@ -43,13 +36,6 @@ _MACROS = {
 
 #: A knowledge object — a macro, an event type, a lookup — carries four more
 #: acl members than a system entry does, because it can be shared.
-_SHAREABLE_ACL = {
-    "can_change_perms": True,
-    "can_share_app": True,
-    "can_share_global": True,
-    "can_share_user": False,
-}
-
 #: What each collection offers as a whole. A system collection offers
 #: nothing; a knowledge-object one can be created in, reloaded and its
 #: permissions read (all measured on 10.4.2).
@@ -81,7 +67,7 @@ def server_health(_user: dict = Depends(require_splunk_auth)) -> dict:
         collection="server/health",
         links=("alternate", "list", "details"),
         fields=False,
-        acl={**_SYSTEM_ACL, "perms": {"read": ["admin", "splunk-system-role"],
+        acl_extra={"perms": {"read": ["admin", "splunk-system-role"],
                                       "write": []}},
     )
     return _collection([entry], "server/health")
@@ -104,7 +90,8 @@ def indexes_extended(_user: dict = Depends(require_splunk_auth)) -> dict:
             collection="data/indexes-extended",
             links=("alternate", "list"),
             fields=False,
-            acl={**_SYSTEM_ACL, "perms": {"read": ["*"], "write": []}},
+            # A read-only view of the indexes, not an editable object.
+            acl_extra={"modifiable": False, "perms": {"read": ["*"], "write": []}},
         )
         for index in splunk_index_repo.list_all()
     ]
@@ -121,7 +108,7 @@ def licenses(_user: dict = Depends(require_splunk_auth)) -> dict:
         collection="licenser/licenses",
         links=("alternate", "list", "edit"),
         fields=False,
-        acl={**_SYSTEM_ACL, "perms": {"read": ["admin", "splunk-system-role"],
+        acl_extra={"perms": {"read": ["admin", "splunk-system-role"],
                                       "write": ["admin", "splunk-system-role"]}},
     )
     return _collection([entry], "licenser/licenses", {"create": ""})
@@ -136,7 +123,7 @@ def grantable_capabilities(_user: dict = Depends(require_splunk_auth)) -> dict:
         collection="authorization/grantable_capabilities",
         links=("alternate", "list"),
         fields=False,
-        acl={**_SYSTEM_ACL, "perms": {"read": ["*"], "write": ["*"]}},
+        acl_extra={"perms": {"read": ["*"], "write": ["*"]}},
     )
     return _collection([entry], "authorization/grantable_capabilities")
 
@@ -155,8 +142,7 @@ def macros(
             collection="admin/macros",
             links=("_reload", "alternate", "disable", "edit", "list"),
             fields=False,
-            acl={**_SYSTEM_ACL, **_SHAREABLE_ACL,
-                 "perms": {"read": ["*"], "write": ["admin", "power"]}},
+            acl_extra={"perms": {"read": ["*"], "write": ["admin", "power"]}},
         )
         for name, definition in sorted(_MACROS.items())
     ]
@@ -175,8 +161,7 @@ def sourcetypes(_user: dict = Depends(require_splunk_auth)) -> dict:
             name, complete({}, "sourcetype"), collection="saved/sourcetypes",
             links=("_reload", "alternate", "edit", "list", "move", "remove"),
             fields=False,
-            acl={**_SYSTEM_ACL, **_SHAREABLE_ACL,
-                 "perms": {"read": ["*"], "write": ["*"]}},
+            acl_extra={"perms": {"read": ["*"], "write": ["*"]}},
         )
         for name in seen
     ]

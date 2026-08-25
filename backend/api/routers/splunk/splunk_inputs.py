@@ -32,7 +32,12 @@ def list_hec_tokens(
             "disabled": t.disabled,
             "useACK": t.use_ack,
         }
-        entries.append(build_splunk_entry(t.name, content, collection="data/inputs/http"))
+        # A HEC token is a knowledge object that *can* be deleted, unlike a
+        # macro or a saved search.
+        entries.append(build_splunk_entry(
+            t.name, content, collection="data/inputs/http",
+            acl_extra={"removable": True},
+        ))
     return build_splunk_envelope(entries)
 
 

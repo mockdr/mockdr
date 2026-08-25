@@ -393,3 +393,87 @@ class TestWhoMayWrite:
         resp = client.post("/splunk/services/notable_update", headers=self.VIEWER,
                            json={"ruleUIDs": ["x"], "status": "1"})
         assert resp.status_code == 403
+
+
+class TestWhereAnEntryLives:
+    """An entry's id says which app owns it, and under which user.
+
+    Measured across the collections Splunk 10.4.2 serves: an entry whose ACL
+    names an app is served with a namespaced id,
+    ``/servicesNS/{owner}/{app}/{collection}/{name}``, and its links carry
+    the same prefix. What the instance owns — users, roles, the server's own
+    description — stays in the plain ``/services`` form. mockdr rendered
+    every id plainly, so a client that parses owner and app out of an id
+    found neither.
+    """
+
+    def _entry(self, client: TestClient, collection: str) -> dict:
+        body = client.get(f"/splunk/services/{collection}", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "1"}).json()
+        return body["entry"][0]
+
+    def test_an_index_lives_in_system(self, client: TestClient) -> None:
+        entry = self._entry(client, "data/indexes")
+        assert entry["id"].startswith(
+            "https://localhost:8089/servicesNS/nobody/system/data/indexes/")
+        assert entry["acl"]["owner"] == "nobody"
+        assert entry["acl"]["app"] == "system"
+
+    def test_a_saved_search_lives_in_the_search_app(self, client: TestClient) -> None:
+        entry = self._entry(client, "saved/searches")
+        assert entry["id"].startswith(
+            "https://localhost:8089/servicesNS/nobody/search/saved/searches/")
+        assert entry["links"]["alternate"].startswith("/servicesNS/nobody/search/")
+
+    def test_a_name_with_spaces_is_encoded_into_the_id(self, client: TestClient) -> None:
+        entry = self._entry(client, "saved/searches")
+        assert " " not in entry["id"]
+        assert "%20" in entry["id"] or " " not in entry["name"]
+
+    def test_a_user_belongs_to_no_app(self, client: TestClient) -> None:
+        entry = self._entry(client, "authentication/users")
+        assert entry["id"].startswith(
+            "https://localhost:8089/services/authentication/users/")
+        assert entry["acl"]["app"] == ""
+        assert entry["acl"]["owner"] == "system"
+        assert entry["acl"]["sharing"] == "system"
+
+    def test_a_macro_is_a_knowledge_object(self, client: TestClient) -> None:
+        entry = self._entry(client, "admin/macros")
+        assert entry["id"].startswith(
+            "https://localhost:8089/servicesNS/nobody/search/admin/macros/")
+        # The four members that say who may re-share it.
+        assert entry["acl"]["can_change_perms"] is True
+        assert entry["acl"]["can_share_app"] is True
+        assert entry["acl"]["can_share_global"] is True
+        assert entry["acl"]["can_share_user"] is False
+        assert entry["acl"]["removable"] is False
+
+    def test_an_index_is_not_a_knowledge_object(self, client: TestClient) -> None:
+        entry = self._entry(client, "data/indexes")
+        assert "can_share_app" not in entry["acl"]
+
+    def test_a_hec_token_lives_in_the_httpinput_app(self, client: TestClient) -> None:
+        entry = self._entry(client, "data/inputs/http")
+        assert "/servicesNS/nobody/splunk_httpinput/data/inputs/http/" in entry["id"]
+        assert entry["acl"]["removable"] is True
+
+    def test_a_job_names_a_user_and_an_app_and_is_still_not_namespaced(
+        self, client: TestClient,
+    ) -> None:
+        """The measured exception."""
+        client.post("/splunk/services/search/jobs", headers=FORM, params=JSON_OUT,
+                    data={"search": "search index=main | head 1"})
+        entry = self._entry(client, "search/jobs")
+        assert entry["acl"]["app"] == "search"
+        assert entry["acl"]["owner"] == "admin"
+        assert entry["id"].startswith("https://localhost:8089/services/search/jobs/")
+
+    def test_the_job_endpoint_ignores_the_field_filter(self, client: TestClient) -> None:
+        """`f` narrows every other collection and not this one."""
+        client.post("/splunk/services/search/jobs", headers=FORM, params=JSON_OUT,
+                    data={"search": "search index=main | head 1"})
+        content = client.get("/splunk/services/search/jobs", headers=SPLUNK_AUTH,
+                             params={**JSON_OUT, "count": "1", "f": "zzzNoSuchField"},
+                             ).json()["entry"][0]["content"]
+        assert len(content) > 1

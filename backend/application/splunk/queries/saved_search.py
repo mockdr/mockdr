@@ -47,7 +47,7 @@ def list_saved_searches() -> dict:
                 complete(content, "saved_searches"),
                 acl_extra=_SAVED_ACL,
                 links=_SAVED_LINKS,
-                id_path=f"https://localhost:8089/services/saved/searches/{ss.name}",
+                collection="saved/searches",
                 fields=False,
             )
         )
@@ -75,7 +75,7 @@ def get_saved_search(name: str) -> dict | None:
         complete(content, "saved_searches"),
         acl_extra=_SAVED_ACL,
         links=_SAVED_LINKS,
-        id_path=f"https://localhost:8089/services/saved/searches/{ss.name}",
+        collection="saved/searches",
     )
     return build_splunk_envelope([entry], total=1)
 
