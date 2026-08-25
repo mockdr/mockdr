@@ -30,8 +30,19 @@ there is nothing to group by. The mock grouped by the whole sentence and
 answered buckets no cluster would produce, which is the shape of a client's
 broken query looking fine against the mock and failing in production.
 
+**Sorting is judged by the mapping too.** A `text` field cannot be sorted
+on, for the same reason it cannot be aggregated, and a field the mapping
+does not have at all is refused by the shard that would have sorted it —
+unless the client says what type to assume with `unmapped_type`, which now
+also decides what a missing value *sorts as*: the edge of a long for a
+numeric type, `null` for a keyword. Only an index mockdr holds a full
+mapping for is judged this way; for its own collections the mapping is a
+summary, and refusing a sort on a field it does not happen to list would be
+inventing a failure.
+
 A shard failure also names the index it happened on rather than saying
-"mockdr" every time.
+"mockdr" every time, and a `query_shard_exception` carries the index and its
+uuid the way a real shard's does.
 
 **Elasticsearch: the query clauses a SIEM client sends.** `prefix`,
 `regexp`, `fuzzy`, `ids`, `multi_match`, `simple_query_string`,

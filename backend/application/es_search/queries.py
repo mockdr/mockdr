@@ -16,11 +16,14 @@ from repository.store import store
 from utils.es_aggs import apply_aggregations
 from utils.es_ecs import to_ecs_document
 from utils.es_mapping import (
+    FIELDDATA_DISABLED,
     field_capabilities,
+    flatten_properties,
     infer_properties,
     merge_properties,
 )
 from utils.es_query import (
+    ESQueryError,
     apply_es_query,
     apply_source_filter,
     build_predicate,
@@ -285,6 +288,54 @@ def known_index_prefixes() -> tuple[str, ...]:
     return _KNOWN_PREFIXES
 
 
+#: Sort keys that name a document's position or score rather than a field.
+_SORT_METADATA = frozenset({"_doc", "_score", "_id", "_index"})
+
+
+def _refuse_unsortable(index: str, sort_spec: list) -> None:
+    """Refuse a sort a real cluster cannot run.
+
+    A cluster sorts on doc values, so a `text` field is refused for the same
+    reason it cannot be aggregated, and a field the mapping does not have at
+    all is refused as well — unless the client says what type to assume.
+    Only an index mockdr holds a full mapping for is judged: for its own
+    collections the mapping is a summary, and refusing a sort on a field it
+    does not happen to list would be inventing a failure.
+
+    Raises:
+        ESQueryError: If a sort key cannot be run.
+    """
+    entry = store.get("es_indices", index)
+    if not entry or not sort_spec:
+        return
+    properties = flatten_properties(_mapped_properties(index))
+    for key in sort_spec:
+        name, spec = _sort_key_name(key)
+        if not name or name in _SORT_METADATA or spec.get("unmapped_type"):
+            continue
+        mapped = properties.get(name)
+        if mapped is None or mapped.get("type") == "object":
+            raise ESQueryError(
+                f"No mapping found for [{name}] in order to sort on",
+                es_type="query_shard_exception", shard_failure=True,
+            )
+        if mapped.get("type") == "text":
+            raise ESQueryError(
+                FIELDDATA_DISABLED.format(field=name, index=index),
+                es_type="illegal_argument_exception", shard_failure=True,
+            )
+
+
+def _sort_key_name(key: object) -> tuple[str, dict]:
+    """The field one sort key names, and whatever it says about it."""
+    if isinstance(key, str):
+        return key, {}
+    if isinstance(key, dict) and key:
+        name, spec = next(iter(key.items()))
+        return str(name), spec if isinstance(spec, dict) else {}
+    return "", {}
+
+
 def _terms_lookup(index: str, doc_id: str, path: str) -> list:
     """The values a ``terms`` lookup points at, read from another document.
 
@@ -372,6 +423,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     total_before = len(records)
 
     validate_search_body(body)
+    _refuse_unsortable(canonical_index, body.get("sort") or [])
     # Apply query DSL (filter, sort, from/size).
     filtered = apply_es_query(records, body, written_ids, _terms_lookup)
 
@@ -544,6 +596,12 @@ def es_mget(index: str, body: dict) -> dict:
 def _document_id(record: dict) -> str:
     """The ``_id`` a record answers to, flat or ECS."""
     return hit_id(record)
+
+
+def es_index_uuid(index: str) -> str:
+    """The uuid an index reports, for a caller outside this module."""
+    entry = store.get("es_indices", index) or {}
+    return str(entry.get("uuid") or _index_uuid(index))
 
 
 def _index_uuid(index: str) -> str:

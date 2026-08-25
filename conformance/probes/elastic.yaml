@@ -33,6 +33,8 @@ volatile_fields:
   # shards. None of it is an answer about the API.
   - node
   - settings
+  # The uuid a shard failure names its index by: an install's own identifier.
+  - index_uuid
 
 significant_keys:
   - status
@@ -2202,5 +2204,44 @@ probes:
       method: POST
       path: /${seed_index}/_search
       content: '{"size": 0, "aggs": {"a": {"terms": {"field": "message.keyword"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-sort-on-text
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Sorting on a text field is refused for the same reason aggregating on one is.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 3, "sort": [{"message": "asc"}]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-sort-on-unmapped
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And a field the mapping does not have is refused by the shard that would sort it.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 3, "sort": [{"nosuchfield": "asc"}]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-sort-unmapped-type
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Unless the client says what type to assume.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 3, "sort": [{"nosuchfield": {"order": "asc", "unmapped_type": "long"}}, {"name": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic

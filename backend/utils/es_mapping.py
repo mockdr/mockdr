@@ -21,11 +21,27 @@ import re
 from typing import Any
 
 __all__ = [
+    "FIELDDATA_DISABLED",
     "field_capabilities",
     "flatten_properties",
     "infer_properties",
     "merge_properties",
 ]
+
+#: What a real cluster says when asked to aggregate or sort on a text field.
+#: Its terms are analysed and fielddata is off, so there is nothing to group
+#: by — the mock grouped by the whole sentence and answered buckets no
+#: cluster would produce.
+FIELDDATA_DISABLED = (
+    "Fielddata is disabled on [{field}] in [{index}]. Text fields are not "
+    "optimised for operations that require per-document field data like "
+    "aggregations and sorting, so these operations are disabled by default. "
+    "Please use a keyword field instead. Alternatively, set fielddata=true on "
+    "[{field}] in order to load field data by uninverting the inverted index. "
+    "Note that this can use significant memory."
+)
+
+
 
 #: The subfield Elasticsearch hangs off every dynamically mapped string.
 _KEYWORD_SUBFIELD = {"keyword": {"type": "keyword", "ignore_above": 256}}

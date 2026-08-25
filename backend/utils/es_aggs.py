@@ -21,7 +21,7 @@ from typing import Any
 
 from utils.es_datemath import _add_months, _next_unit, _round_down
 from utils.es_datemath import _zone as _datemath_zone
-from utils.es_mapping import flatten_properties
+from utils.es_mapping import FIELDDATA_DISABLED, flatten_properties
 from utils.es_query import (
     ESQueryError,
     apply_es_sort,
@@ -162,20 +162,6 @@ def _evaluate(
 # Bucket aggregations
 # ---------------------------------------------------------------------------
 
-#: What a real cluster says when asked to aggregate or sort on a text field.
-#: Its terms are analysed and fielddata is off, so there is nothing to group
-#: by — the mock grouped by the whole sentence and answered buckets no
-#: cluster would produce.
-_FIELDDATA = (
-    "Fielddata is disabled on [{field}] in [{index}]. Text fields are not "
-    "optimised for operations that require per-document field data like "
-    "aggregations and sorting, so these operations are disabled by default. "
-    "Please use a keyword field instead. Alternatively, set fielddata=true on "
-    "[{field}] in order to load field data by uninverting the inverted index. "
-    "Note that this can use significant memory."
-)
-
-
 def refuse_text_field(ctx: _Context, field: str) -> None:
     """Refuse an aggregation over a text field, the way a cluster does.
 
@@ -188,7 +174,7 @@ def refuse_text_field(ctx: _Context, field: str) -> None:
     if spec is None or spec.get("type") != "text":
         return
     raise ESQueryError(
-        _FIELDDATA.format(field=field, index=ctx.index),
+        FIELDDATA_DISABLED.format(field=field, index=ctx.index),
         es_type="illegal_argument_exception",
         shard_failure=True,
     )

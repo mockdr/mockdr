@@ -145,6 +145,53 @@ class TestFielddata:
         )
         assert response.status_code == 200
 
+    def test_sorting_on_text_is_refused_too(self, client: TestClient) -> None:
+        response = client.post(
+            f"/elastic/{INDEX}/_search", headers=AUTH,
+            json={"size": 3, "sort": [{"msg": "asc"}]},
+        )
+        assert response.status_code == 400
+        assert "Fielddata is disabled on [msg]" in (
+            response.json()["error"]["root_cause"][0]["reason"]
+        )
+
+    def test_sorting_on_a_field_the_index_lacks_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post(
+            f"/elastic/{INDEX}/_search", headers=AUTH,
+            json={"size": 3, "sort": [{"nope": "asc"}]},
+        )
+        assert response.status_code == 400
+        cause = response.json()["error"]["root_cause"][0]
+        assert cause["type"] == "query_shard_exception"
+        assert cause["reason"] == "No mapping found for [nope] in order to sort on"
+
+    def test_unless_the_client_says_what_to_assume(self, client: TestClient) -> None:
+        response = client.post(
+            f"/elastic/{INDEX}/_search", headers=AUTH,
+            json={"size": 3, "sort": [{"nope": {"order": "asc", "unmapped_type": "long"}}]},
+        )
+        assert response.status_code == 200
+
+    def test_sorting_on_a_keyword_field_is_fine(self, client: TestClient) -> None:
+        response = client.post(
+            f"/elastic/{INDEX}/_search", headers=AUTH,
+            json={"size": 3, "sort": [{"host": "asc"}]},
+        )
+        assert response.status_code == 200
+
+    def test_the_collections_mockdr_owns_are_not_judged(
+        self, client: TestClient,
+    ) -> None:
+        # Their mapping is a summary rather than the whole index, so refusing
+        # a sort on a field it does not list would be inventing a failure.
+        response = client.post(
+            "/elastic/.siem-signals-default/_search", headers=AUTH,
+            json={"size": 1, "sort": [{"kibana.alert.risk_score": "desc"}]},
+        )
+        assert response.status_code == 200
+
     def test_a_keyword_field_aggregates(self, client: TestClient) -> None:
         response = client.post(
             f"/elastic/{INDEX}/_search", headers=AUTH,

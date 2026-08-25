@@ -1287,18 +1287,24 @@ class SortKey(NamedTuple):
         desc:          Whether the order is descending.
         missing_first: Whether documents lacking the field come first;
                        Elasticsearch's default is last, in *both* directions.
+        unmapped_type: The type the client told the cluster to assume for a
+                       field the mapping does not have. It decides what a
+                       missing value *sorts as*: the extreme of a long for a
+                       numeric type, ``null`` for a keyword.
     """
 
     field: str
     desc: bool = False
     missing_first: bool = False
+    unmapped_type: str = ""
 
 
 def parse_sort_keys(sort_spec: list) -> list[SortKey]:
     """Read a sort array as ``SortKey`` entries, in priority order.
 
     Accepts every spelling the DSL allows: ``"field"``, ``{"field": "desc"}``
-    and ``{"field": {"order": "desc", "missing": "_first"}}``.
+    and ``{"field": {"order": "desc", "missing": "_first",
+    "unmapped_type": "long"}}``.
     """
     sort_keys: list[SortKey] = []
     for entry in sort_spec:
@@ -1309,10 +1315,12 @@ def parse_sort_keys(sort_spec: list) -> list[SortKey]:
                 if isinstance(opts, dict):
                     desc = opts.get("order", "asc") == "desc"
                     missing_first = opts.get("missing") == "_first"
+                    unmapped = str(opts.get("unmapped_type", ""))
                 else:
                     desc = str(opts).lower() == "desc"
                     missing_first = False
-                sort_keys.append(SortKey(field, desc, missing_first))
+                    unmapped = ""
+                sort_keys.append(SortKey(field, desc, missing_first, unmapped))
     return sort_keys
 
 
@@ -1344,6 +1352,10 @@ _LONG_MAX = 2**63 - 1
 _LONG_MIN = -(2**63)
 
 
+#: The sort types whose missing value is `null` rather than a long's edge.
+_KEYWORD_TYPES = frozenset({"keyword", "text", "ip", "version", "boolean"})
+
+
 def sort_field_kinds(
     records: list[dict], sort_keys: list[SortKey],
 ) -> dict[str, str]:
@@ -1356,6 +1368,12 @@ def sort_field_kinds(
     kinds: dict[str, str] = {}
     for key in sort_keys:
         if key.field in ("_score", "_doc"):
+            continue
+        if key.unmapped_type:
+            # The client said what to assume, so the data does not decide.
+            kinds[key.field] = (
+                "keyword" if key.unmapped_type in _KEYWORD_TYPES else "number"
+            )
             continue
         for record in records:
             value = _get_nested(record, key.field)

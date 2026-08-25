@@ -309,6 +309,7 @@ from api.routers.splunk import (
     splunk_server as splunk_server_router,
 )
 from api.sentinel_auth import require_arm_api_version
+from application.es_search.queries import es_index_uuid
 from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
@@ -645,14 +646,19 @@ async def es_query_exception_handler(
         # naming where it happened. An argument error also repeats itself down
         # a two-level caused_by; a date-math parse error does not — both
         # measured against 8.15.
+        index = _searched_index(_request)
         cause = {"type": exc.es_type, "reason": str(exc)}
+        if exc.es_type == "query_shard_exception":
+            # What the *shard* raises names the shard's index; what the
+            # coordinating node raises does not (both measured on 8.15).
+            cause = {**cause, "index_uuid": es_index_uuid(index), "index": index}
         error: dict = {
             "root_cause": [dict(cause)], "type": "search_phase_execution_exception",
             "reason": "all shards failed", "phase": "query", "grouped": True,
             # The failed shard names the index the search was against, which
             # is the one in the path: a client reading the failure to find
             # out *where* it happened was told "mockdr" every time.
-            "failed_shards": [{"shard": 0, "index": _searched_index(_request),
+            "failed_shards": [{"shard": 0, "index": index,
                                "node": "mockdr-node-1", "reason": dict(cause)}],
         }
         if exc.es_type == "illegal_argument_exception":
