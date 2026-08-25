@@ -15,6 +15,7 @@ request schema, cited where it is not obvious.
 from __future__ import annotations
 
 import base64
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -532,3 +533,62 @@ class TestARefusalIsShapedLikeItsVendor:
         assert set(resp.json()) == {
             "_index", "_id", "_version", "result", "_shards", "_seq_no", "_primary_term",
         }
+
+
+class TestTheSameRecordTwoWays:
+    """From ``scripts/consistency_audit.py``: a listing and a fetch by id
+    must describe the same record.
+
+    Each route tends to be built separately, and the two drift: one
+    serialises a field the other computes, one applies a projection the
+    other does not. The result is a listing that says one thing and a fetch
+    that says another, with a 200 either way.
+    """
+
+    def _both(self, client: TestClient, collection: str, name: str) -> tuple[dict, dict]:
+        listed = client.get(f"/splunk/services/{collection}", headers=SPLUNK_AUTH,
+                            params={**JSON_OUT, "count": "0"}).json()["entry"]
+        listed = next(e for e in listed if e["name"] == name)
+        fetched = client.get(f"/splunk/services/{collection}/{name}", headers=SPLUNK_AUTH,
+                             params=JSON_OUT).json()["entry"][0]
+        return listed["content"], fetched["content"]
+
+    def test_an_index_names_its_own_buckets_in_both(self, client: TestClient) -> None:
+        """The listing filled the three paths from the recorded `audit` entry."""
+        listed, fetched = self._both(client, "data/indexes", "main")
+        for key, expected in (
+            ("homePath", "$SPLUNK_DB/main/db"),
+            ("coldPath", "$SPLUNK_DB/main/colddb"),
+            ("thawedPath", "$SPLUNK_DB/main/thaweddb"),
+        ):
+            assert listed[key] == expected
+            assert fetched[key] == expected
+
+    def test_a_saved_search_reports_its_alert_in_both(self, client: TestClient) -> None:
+        """The single fetch left out the two members that define the alert."""
+        listed, fetched = self._both(
+            client, "saved/searches", "SentinelOne Threats - Last 24h")
+        assert listed["alert_comparator"] == fetched["alert_comparator"]
+        assert listed["alert_threshold"] == fetched["alert_threshold"]
+        assert fetched["alert_comparator"] != ""
+
+    def test_an_index_reports_the_time_range_it_holds(self, client: TestClient) -> None:
+        """Measured on 10.4.2: a populated index carries bounds, an empty one ''.
+
+        The offset has no colon here, which is not the format the rest of the
+        API uses.
+        """
+        entries = {
+            e["name"]: e["content"]
+            for e in client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                                params={**JSON_OUT, "count": "0"}).json()["entry"]
+        }
+        populated = next(c for c in entries.values() if c["totalEventCount"])
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}",
+                            populated["minTime"]), populated["minTime"]
+        assert populated["minTime"] <= populated["maxTime"]
+
+        empty = next((c for c in entries.values() if not c["totalEventCount"]), None)
+        if empty is not None:
+            assert empty["minTime"] == ""
+            assert empty["maxTime"] == ""

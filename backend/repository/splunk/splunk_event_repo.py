@@ -57,5 +57,17 @@ class SplunkEventRepository(Repository[SplunkEvent]):
             counts[event.index] = counts.get(event.index, 0) + 1
         return counts
 
+    def time_bounds_by_index(self) -> dict[str, tuple[float, float]]:
+        """The earliest and latest event time in each index, in one pass.
+
+        splunkd reports them as an index's ``minTime`` and ``maxTime``; an
+        index with no events reports neither.
+        """
+        bounds: dict[str, tuple[float, float]] = {}
+        for event in self.list_all():
+            first, last = bounds.get(event.index, (event.time, event.time))
+            bounds[event.index] = (min(first, event.time), max(last, event.time))
+        return bounds
+
 
 splunk_event_repo = SplunkEventRepository()

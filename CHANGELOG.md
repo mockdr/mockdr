@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**The same record, fetched two ways.**
+Every product here serves a record from more than one route, and a client
+moves between them freely: it lists to find an id, then fetches that id to
+act on it. `scripts/consistency_audit.py` fetches 21 records both ways and
+compares every key the two answers share. A mock is unusually good at
+breaking that assumption, because each route tends to be built separately
+and the two drift.
+
+* **The index listing filled the three bucket paths from the recorded entry**,
+  which was captured from the `audit` index — so listing `main` said its
+  buckets live in `$SPLUNK_DB/audit/db`, while fetching `main` by name said
+  `$SPLUNK_DB/main/db`.
+* **Fetching a saved search by name left out `alert_comparator` and
+  `alert_threshold`**, the two members that define its alert. The same
+  search read as a threshold alert in the listing and as no alert at all
+  when fetched.
+
+Both were the same shape of mistake — two hand-written content blocks for
+one object — and both routes now build theirs from one function.
+
+Following the second of those to the real product turned up a third: an
+index's `minTime` and `maxTime` are the bounds of the events *in* it, and
+mockdr answered `''` for every index while holding two hundred events in
+some of them. They are computed now, in splunkd's own format for this field
+(`2026-08-25T23:46:24+0000`, the offset without a colon, which the rest of
+the API does not use), and an index holding nothing still answers `''`.
+
 **Refusals a client of that vendor could not parse.**
 The hostile probe asks whether a route crashes. `scripts/error_envelope_audit.py`
 asks the quieter question beside it: when a route *refuses*, does it refuse

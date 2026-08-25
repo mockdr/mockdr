@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from repository.splunk.splunk_event_repo import splunk_event_repo
@@ -57,6 +58,48 @@ def _index_fields() -> dict:
     return dict(json.loads(path.read_text())["fields"])
 
 
+def _bound(epoch: float | None) -> str:
+    """A time bound as splunkd spells it, or empty when there is none.
+
+    Measured on 10.4.2: `2026-08-25T23:46:24+0000` — the offset without a
+    colon, which is not the format the rest of the API uses — and `''` for an
+    index holding nothing.
+    """
+    if not epoch:
+        return ""
+    return datetime.fromtimestamp(epoch, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def index_content(idx: object, event_count: int,
+                  bounds: tuple[float, float] | None = None) -> dict:
+    """One index's content block, wherever it is served from.
+
+    The listing and the single-entry route each built this by hand, and drifted:
+    the listing left the three paths out, so the recorded entry's values —
+    taken from the `audit` index — filled in for every index, and a client
+    listing `main` was told its buckets live in `$SPLUNK_DB/audit/db`.
+    """
+    return {
+        "totalEventCount": event_count,
+        "currentDBSizeMB": str(idx.current_db_size_mb),
+        "maxDataSize": idx.max_data_size,
+        "frozenTimePeriodInSecs": idx.frozen_time_period_in_secs,
+        "disabled": idx.disabled,
+        "datatype": idx.data_type,
+        # An index's time bounds are the events in it, not a stored value:
+        # mockdr answered `''` for every index while holding sixty events in
+        # some of them, so a client asking what range an index covers was told
+        # it covered nothing.
+        "minTime": _bound(bounds[0]) if bounds else idx.min_time,
+        "maxTime": _bound(bounds[1]) if bounds else idx.max_time,
+        # The three paths splunkd derives from the index name.
+        "homePath": f"$SPLUNK_DB/{idx.name}/db",
+        "coldPath": f"$SPLUNK_DB/{idx.name}/colddb",
+        "thawedPath": f"$SPLUNK_DB/{idx.name}/thaweddb",
+        **idx.settings,
+    }
+
+
 def list_indexes() -> dict:
     """Return all indexes in Splunk envelope format."""
     indexes = splunk_index_repo.list_all()
@@ -64,19 +107,11 @@ def list_indexes() -> dict:
     # made every write scan the event store, and this is the only place the
     # number is read.
     counts = splunk_event_repo.counts_by_index()
+    bounds = splunk_event_repo.time_bounds_by_index()
     entries = []
     for idx in indexes:
-        content = {
-            "totalEventCount": counts.get(idx.name, idx.total_event_count),
-            "currentDBSizeMB": str(idx.current_db_size_mb),
-            "maxDataSize": idx.max_data_size,
-            "frozenTimePeriodInSecs": idx.frozen_time_period_in_secs,
-            "disabled": idx.disabled,
-            "datatype": idx.data_type,
-            "minTime": idx.min_time,
-            "maxTime": idx.max_time,
-        }
-        content = {**content, **idx.settings}
+        content = index_content(
+            idx, counts.get(idx.name, idx.total_event_count), bounds.get(idx.name))
         entries.append(build_splunk_entry(
             idx.name, complete(content, "indexes"),
             collection="data/indexes",
@@ -90,19 +125,9 @@ def get_index(name: str) -> dict | None:
     idx = splunk_index_repo.get(name)
     if not idx:
         return None
-    content = {
-        "totalEventCount": splunk_event_repo.count_by_index(idx.name) or idx.total_event_count,
-        "currentDBSizeMB": str(idx.current_db_size_mb),
-        "maxDataSize": idx.max_data_size,
-        "frozenTimePeriodInSecs": idx.frozen_time_period_in_secs,
-        "disabled": idx.disabled,
-        "datatype": idx.data_type,
-        # The three paths splunkd derives from the index name.
-        "homePath": f"$SPLUNK_DB/{idx.name}/db",
-        "coldPath": f"$SPLUNK_DB/{idx.name}/colddb",
-        "thawedPath": f"$SPLUNK_DB/{idx.name}/thaweddb",
-        **idx.settings,
-    }
+    content = index_content(
+        idx, splunk_event_repo.count_by_index(idx.name) or idx.total_event_count,
+        splunk_event_repo.time_bounds_by_index().get(idx.name))
     entry = build_splunk_entry(
         idx.name, complete(content, "indexes"), collection="data/indexes",
         links=_index_links(idx.name), fields=_index_fields(),

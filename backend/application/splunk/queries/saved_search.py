@@ -23,24 +23,35 @@ _SAVED_ACL = {
 _SAVED_LINKS = fixture_links("saved_searches")
 
 
+def saved_search_content(ss: object) -> dict:
+    """One saved search's content block, wherever it is served from.
+
+    The listing and the single-entry route each built this by hand, and
+    drifted: the single one left out `alert_comparator` and
+    `alert_threshold`, so the same alert read as a threshold alert in the
+    listing and as no alert at all when fetched by name.
+    """
+    return {
+        "search": ss.search,
+        "description": ss.description,
+        "cron_schedule": ss.cron_schedule,
+        "is_scheduled": ss.is_scheduled,
+        "disabled": ss.disabled,
+        "dispatch.earliest_time": ss.dispatch_earliest_time,
+        "dispatch.latest_time": ss.dispatch_latest_time,
+        "alert_type": ss.alert_type,
+        "alert_comparator": ss.alert_comparator,
+        "alert_threshold": ss.alert_threshold,
+        "actions": ss.actions,
+    }
+
+
 def list_saved_searches() -> dict:
     """Return all saved searches in Splunk envelope format."""
     searches = saved_search_repo.list_all()
     entries = []
     for ss in searches:
-        content = {
-            "search": ss.search,
-            "description": ss.description,
-            "cron_schedule": ss.cron_schedule,
-            "is_scheduled": ss.is_scheduled,
-            "disabled": ss.disabled,
-            "dispatch.earliest_time": ss.dispatch_earliest_time,
-            "dispatch.latest_time": ss.dispatch_latest_time,
-            "alert_type": ss.alert_type,
-            "alert_comparator": ss.alert_comparator,
-            "alert_threshold": ss.alert_threshold,
-            "actions": ss.actions,
-        }
+        content = saved_search_content(ss)
         entries.append(
             build_splunk_entry(
                 ss.name,
@@ -59,17 +70,7 @@ def get_saved_search(name: str) -> dict | None:
     ss = saved_search_repo.get(name)
     if not ss:
         return None
-    content = {
-        "search": ss.search,
-        "description": ss.description,
-        "cron_schedule": ss.cron_schedule,
-        "is_scheduled": ss.is_scheduled,
-        "disabled": ss.disabled,
-        "dispatch.earliest_time": ss.dispatch_earliest_time,
-        "dispatch.latest_time": ss.dispatch_latest_time,
-        "alert_type": ss.alert_type,
-        "actions": ss.actions,
-    }
+    content = saved_search_content(ss)
     entry = build_splunk_entry(
         ss.name,
         complete(content, "saved_searches"),
