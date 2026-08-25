@@ -920,8 +920,19 @@ def delete_doc(
     if result is not None and forced:
         result["forced_refresh"] = True
     if result is None:
+        # Elasticsearch answers a delete that found nothing with the *document*
+        # envelope, not an error one — the same seven members a successful
+        # delete carries, with `result: "not_found"` (measured on 8.15). The
+        # mock sent three of the seven, so a client reading `_seq_no` or
+        # `_shards` from a delete reply — which is what optimistic concurrency
+        # does — found them missing on exactly the path where it matters.
         raise HTTPException(
             status_code=404,
-            detail={"_index": index, "_id": doc_id, "result": "not_found"},
+            detail={
+                "_index": index, "_id": doc_id, "_version": 1,
+                "result": "not_found",
+                "_shards": {"total": 2, "successful": 1, "failed": 0},
+                "_seq_no": 0, "_primary_term": 1,
+            },
         )
     return result

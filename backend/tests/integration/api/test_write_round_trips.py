@@ -477,3 +477,58 @@ class TestWhereAnEntryLives:
                              params={**JSON_OUT, "count": "1", "f": "zzzNoSuchField"},
                              ).json()["entry"][0]["content"]
         assert len(content) > 1
+
+
+class TestARefusalIsShapedLikeItsVendor:
+    """From ``scripts/error_envelope_audit.py``, which sweeps all 2 083 refusals.
+
+    A client parses errors with one parser per vendor. A refusal in some
+    other shape looks like a working refusal in a browser and breaks every
+    integration that inspects it.
+    """
+
+    ES_AUTH = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def test_a_summary_of_a_list_that_is_not_there_is_a_404(
+        self, client: TestClient,
+    ) -> None:
+        """It let the not-found straight out as a plain-text 500.
+
+        The hostile probe never saw it: it sends malformed values, and this
+        needs a *well-formed* id that resolves to nothing — the commonest
+        thing a client sends.
+        """
+        resp = client.get("/kibana/api/exception_lists/summary", headers=self.ES_AUTH,
+                          params={"list_id": "zzz-no-such-list"})
+        assert resp.status_code == 404
+        assert resp.headers["content-type"].startswith("application/json")
+        assert "zzz-no-such-list" in resp.json()["message"]
+        assert resp.json()["status_code"] == 404
+
+    def test_deleting_a_document_that_is_not_there_answers_the_document_envelope(
+        self, client: TestClient,
+    ) -> None:
+        """Measured on Elasticsearch 8.15: seven members, not an error object."""
+        client.put("/elastic/zzz-del-test/_doc/a", headers=self.ES_AUTH, json={"x": 1})
+        resp = client.delete("/elastic/zzz-del-test/_doc/no-such-doc", headers=self.ES_AUTH)
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["result"] == "not_found"
+        assert body["_index"] == "zzz-del-test"
+        assert body["_id"] == "no-such-doc"
+        # The four a client doing optimistic concurrency reads, which were absent.
+        assert body["_version"] == 1
+        assert body["_shards"] == {"total": 2, "successful": 1, "failed": 0}
+        assert body["_seq_no"] == 0
+        assert body["_primary_term"] == 1
+
+    def test_a_successful_delete_carries_the_same_members(
+        self, client: TestClient,
+    ) -> None:
+        client.put("/elastic/zzz-del-test2/_doc/a", headers=self.ES_AUTH, json={"x": 1})
+        resp = client.delete("/elastic/zzz-del-test2/_doc/a", headers=self.ES_AUTH)
+        assert resp.status_code == 200
+        assert set(resp.json()) == {
+            "_index", "_id", "_version", "result", "_shards", "_seq_no", "_primary_term",
+        }

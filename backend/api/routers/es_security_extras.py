@@ -440,9 +440,17 @@ def exception_list_summary(
             status_code=400,
             detail=build_security_solution_error(400, "list_id: Required"),
         )
-    items = exception_queries.find_items(
-        list_id=list_id, page=1, per_page=10_000,
-    )["data"]
+    try:
+        items = exception_queries.find_items(
+            list_id=list_id, page=1, per_page=10_000,
+        )["data"]
+    except exception_queries.ExceptionListNotFoundError as exc:
+        # The list route answers 404 for a list that is not there; this one
+        # let the exception out and became a plain-text 500. A well-formed id
+        # that resolves to nothing is the commonest thing a client sends.
+        raise HTTPException(
+            status_code=404, detail=build_security_solution_error(404, str(exc)),
+        ) from exc
 
     counts = {"windows": 0, "linux": 0, "macos": 0}
     for item in items:

@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Refusals a client of that vendor could not parse.**
+The hostile probe asks whether a route crashes. `scripts/error_envelope_audit.py`
+asks the quieter question beside it: when a route *refuses*, does it refuse
+in the vendor's own envelope? A client parses errors with one parser —
+`errors[0].message` for Falcon, `error.code` for Graph, `reply.err_msg` for
+Cortex, `messages[0].text` for splunkd — and a refusal in some other shape
+looks fine in a browser while breaking every integration that inspects it.
+2 083 refusals swept across every route.
+
+* **A summary of an exception list that does not exist was a plain-text
+  500.** The list route answers 404 for the same id; the summary route let
+  the not-found straight out. The hostile probe had never seen it, because
+  it sends *malformed* values and this needs a well-formed id that resolves
+  to nothing — which is the commonest thing a client sends.
+* **Deleting a document that is not there answered three of the seven
+  members Elasticsearch sends.** A delete that finds nothing is answered
+  with the *document* envelope and a 404, not an error object — `_version`,
+  `_shards`, `_seq_no` and `_primary_term` beside `result: "not_found"`
+  (measured on 8.15). A client doing optimistic concurrency reads exactly
+  those, and found them missing on the one path where it matters.
+
+Three shapes the audit had to be taught, each already pinned by a test or
+measured here: HEC refuses in its own shape rather than splunkd's,
+Elasticsearch's 405 carries a bare string where every other status carries
+the nested object, and a delete's 404 is not an error envelope at all.
+
 **Filters that travel in a body, and the two that could only ever answer nothing.**
 `scripts/filter_effect.py` asks of every body-side filter what
 `param_effect.py` asks of every query parameter: does it do anything? That
