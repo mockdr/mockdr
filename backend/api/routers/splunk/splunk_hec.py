@@ -6,7 +6,7 @@ import itertools
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.splunk_auth import require_hec_auth, require_splunk_auth
+from api.splunk_auth import require_hec_auth, require_splunk_ingest
 from application.splunk.commands.hec import submit_event, submit_events_batch, submit_raw
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.hec_validation import (
@@ -196,7 +196,7 @@ async def receivers_simple(
     sourcetype: str = Query(default=""),
     source: str = Query(default=""),
     host: str = Query(default=""),
-    _user: dict = Depends(require_splunk_auth),
+    _user: dict = Depends(require_splunk_ingest),
 ) -> JSONResponse:
     """Take a raw event body, the way splunkd's simple receiver does."""
     body = await request.body()

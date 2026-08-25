@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 
 from api.dto.splunk.requests import NotableUpdateRequest
-from api.splunk_auth import require_splunk_auth
+from api.splunk_auth import require_splunk_ingest
 from application.splunk.commands.notable import update_notable
 
 router = APIRouter(tags=["Splunk Notable Events"])
@@ -14,12 +14,17 @@ router = APIRouter(tags=["Splunk Notable Events"])
 async def notable_update(
     request: Request,
     output_mode: str = "json",
-    current_user: dict = Depends(require_splunk_auth),
+    current_user: dict = Depends(require_splunk_ingest),
 ) -> dict:
     """Update notable event(s).
 
     Used by XSOAR ``splunk-notable-update`` command.
     Accepts form-encoded or JSON body.
+
+    Enterprise Security gates this on the ``edit_notable_events`` capability,
+    which its analyst and admin roles hold and the plain ``user`` role does
+    not — so a read-only account changing a notable's status and owner, which
+    mockdr allowed, is something no ES would let it do.
     """
     content_type = request.headers.get("content-type", "")
     if "form" in content_type:

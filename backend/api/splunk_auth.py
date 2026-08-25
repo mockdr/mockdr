@@ -144,6 +144,14 @@ async def require_splunk_auth(
 
 
 _ADMIN_ROLES: frozenset[str] = frozenset({"admin", "sc_admin"})
+
+#: The roles that may put events into an index. Measured on Splunk 10.4.2: a
+#: `power` account posting to `receivers/simple` is answered 200 and a `user`
+#: account 403, so the plain `user` role reads and does not ingest. mockdr
+#: took an event from anyone who could log in, which is the quieter half of
+#: getting authorisation wrong — a client tested here learns nothing about
+#: what production will refuse.
+_INGEST_ROLES: frozenset[str] = _ADMIN_ROLES | {"power", "can_delete"}
 """Roles allowed to manage indexes, HEC tokens and KV Store collections.
 
 ``sc_admin`` is Splunk Cloud's administrator role and carries the same
@@ -177,6 +185,34 @@ async def require_splunk_admin(
                 f"You (user={user}) do not have permission to perform this "
                 f"operation (requires capability: admin_all_objects).",
             ),
+        )
+    return current_user
+
+
+async def require_splunk_ingest(
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """Require a role that may write events into an index.
+
+    splunkd's refusal here is not the management one: it answers 403 with a
+    ``WARN`` message and no mention of a capability, which is what a client
+    parses.
+
+    Args:
+        current_user: Injected by ``require_splunk_auth``.
+
+    Returns:
+        The authenticated user dict.
+
+    Raises:
+        HTTPException: 403 if the user may read but not ingest.
+    """
+    if not _INGEST_ROLES.intersection(current_user.get("roles", [])):
+        raise HTTPException(
+            status_code=403,
+            detail={"messages": [
+                {"type": "WARN", "text": "insufficient permission to access this resource"},
+            ]},
         )
     return current_user
 

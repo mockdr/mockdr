@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**And the mistake in the other direction: writes nobody checked the caller for.**
+`scripts/authz_audit.py` asks all 247 write routes whether a credential
+without the right to them is answered 2xx — with no credential at all, and
+with the read-only one each vendor issues. A mock that permits what the
+product refuses is as misleading as one that loses data: a playbook tested
+against it learns nothing about the 403 waiting in production.
+
+Two Splunk routes took a write from anyone who could log in. Measured on
+10.4.2: a `power` account posting to `receivers/simple` is answered 200 and
+a plain `user` account 403, with a `WARN` message that names no capability —
+not the management refusal, which names `admin_all_objects`. So the plain
+user role now reads and does not ingest, and the same guard covers
+`notable_update`, which Enterprise Security gates on `edit_notable_events`.
+
+Two routes the audit flagged are deliberately open, and it now says so:
+starting an XQL query runs a search, which Cortex's viewer role may do, and
+`/_dev/webhook-sink` is mockdr's own — the sink a delivered webhook is
+posted *to*, whose sender is a webhook and not a client with a credential.
+
 **What Splunk and Kibana actually answer to a write, measured.**
 The round-trip audit reached the two products `conformance/` can run, so
 the answers were compared rather than reasoned about.

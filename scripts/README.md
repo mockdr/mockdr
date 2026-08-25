@@ -14,6 +14,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `param_effect.py` | Asks every route whether its parameters do anything: a limiter that does not limit, a filter that cannot match and returns everything, a `$select` that projects nothing. Exit 1 on any. |
 | `paging_audit.py` | Walks every collection a page at a time: flags a record that comes back twice, one that never appears, a total that disagrees with the pages, and paging that will not terminate. Exit 1 on any. |
 | `roundtrip_audit.py` | Writes something, then asks for it back: a create that drops the body, an update that answers 200 and changes nothing, a delete that leaves the record in the listing. Every other audit here only reads. Exit 1 on any. |
+| `authz_audit.py` | Asks every write route whether a credential without the right to it gets a 2xx — no credential at all, and the read-only one the vendor issues. The mistake in the other direction: a mock that permits what the product refuses. Exit 1 on any. |
 
 ## Run before a release
 

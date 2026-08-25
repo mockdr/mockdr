@@ -357,3 +357,39 @@ class TestSplunkFieldFilter:
                              ).json()["entry"]
         assert entries
         assert all(set(e["content"]) == {"search", "eai:acl"} for e in entries)
+
+
+class TestWhoMayWrite:
+    """A read-only credential must not perform a write.
+
+    From ``scripts/authz_audit.py``, which asks every write route whether a
+    credential without the right to it gets a 2xx. The two Splunk cases are
+    measured: on 10.4.2 a ``power`` account posting to ``receivers/simple``
+    is answered 200 and a ``user`` account 403, with a ``WARN`` message that
+    names no capability — not the management refusal, which names one.
+    """
+
+    VIEWER = {"Authorization": "Basic " + base64.b64encode(
+        b"viewer:mockdr-viewer").decode()}
+
+    def test_a_reader_may_not_put_events_in_an_index(self, client: TestClient) -> None:
+        resp = client.post("/splunk/services/receivers/simple",
+                           params={"index": "main", "sourcetype": "zzz",
+                                   "output_mode": "json"},
+                           headers=self.VIEWER, content=b"a line")
+        assert resp.status_code == 403
+        assert resp.json()["messages"] == [
+            {"type": "WARN", "text": "insufficient permission to access this resource"},
+        ]
+
+    def test_an_admin_still_may(self, client: TestClient) -> None:
+        resp = client.post("/splunk/services/receivers/simple",
+                           params={"index": "main", "sourcetype": "zzz"},
+                           headers=SPLUNK_AUTH, content=b"a line")
+        assert resp.status_code == 200
+
+    def test_a_reader_may_not_change_a_notable(self, client: TestClient) -> None:
+        """Enterprise Security gates this on ``edit_notable_events``."""
+        resp = client.post("/splunk/services/notable_update", headers=self.VIEWER,
+                           json={"ruleUIDs": ["x"], "status": "1"})
+        assert resp.status_code == 403
