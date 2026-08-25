@@ -159,13 +159,18 @@ def find_items(
 ) -> dict:
     """Find exception items with optional filters and pagination."""
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
-    return exc_queries.find_items(
-        list_id=list_id,
-        namespace_type=namespace_type,
-        tags=tag_list,
-        page=page,
-        per_page=per_page,
-    )
+    try:
+        return exc_queries.find_items(
+            list_id=list_id,
+            namespace_type=namespace_type,
+            tags=tag_list,
+            page=page,
+            per_page=per_page,
+        )
+    except exc_queries.ExceptionListNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail=build_security_solution_error(404, str(exc)),
+        ) from exc
 
 
 @router.get("/api/exception_lists/items")

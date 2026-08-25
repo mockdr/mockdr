@@ -70,6 +70,19 @@ def _serialise(record: object) -> dict:
     return rendered
 
 
+class ExceptionListNotFoundError(LookupError):
+    """Raised when a query names an exception list that is not there.
+
+    Kibana answers it in the Security Solution's envelope —
+    ``{"message": ..., "status_code": 404}`` — rather than Boom's.
+    """
+
+    def __init__(self, list_id: str) -> None:
+        """Record the list id, which the message quotes."""
+        self.list_id = list_id
+        super().__init__(f'exception list id: "{list_id}" does not exist')
+
+
 def find_items(
     list_id: str | None = None,
     namespace_type: str | None = None,
@@ -92,6 +105,13 @@ def find_items(
     records = [record_dict(i) for i in es_exception_item_repo.list_all()]
 
     if list_id:
+        # A list that is not there is a 404, not an empty page: a client
+        # searching the wrong list was told it exists and holds nothing.
+        if not any(
+            record_dict(one).get("list_id") == list_id
+            for one in es_exception_list_repo.list_all()
+        ):
+            raise ExceptionListNotFoundError(list_id)
         records = [r for r in records if r["list_id"] == list_id]
     if namespace_type:
         records = [r for r in records if r["namespace_type"] == namespace_type]

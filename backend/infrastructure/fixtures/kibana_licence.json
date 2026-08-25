@@ -1,0 +1,115 @@
+{
+  "features": {
+    "aggregate_metric": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "analytics": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "archive": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "ccr": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "data_streams": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "data_tiers": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "enrich": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "enterprise_search": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "eql": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "esql": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "frozen_indices": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "graph": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "ilm": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "logstash": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "ml": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "monitoring": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "rollup": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "searchable_snapshots": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "security": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "slm": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "spatial": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "sql": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "transform": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "universal_profiling": {
+      "isAvailable": false,
+      "isEnabled": true
+    },
+    "voting_only": {
+      "isAvailable": true,
+      "isEnabled": true
+    },
+    "watcher": {
+      "isAvailable": false,
+      "isEnabled": true
+    }
+  },
+  "license": {
+    "mode": "basic",
+    "status": "active",
+    "type": "basic",
+    "uid": "383e3dc7-ae30-4d6e-94d3-c858f6058aeb"
+  },
+  "signature": "9a8c6ad54457962e10343195c297071338b8a8b542b148927b9ecf762105b69d"
+}

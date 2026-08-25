@@ -1,0 +1,342 @@
+[
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".email",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Email",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": true,
+    "enabled_in_config": true,
+    "enabled_in_license": true,
+    "id": ".index",
+    "is_system_action_type": false,
+    "minimum_license_required": "basic",
+    "name": "Index",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".pagerduty",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "PagerDuty",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".swimlane",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Swimlane",
+    "supported_feature_ids": [
+      "alerting",
+      "cases",
+      "siem"
+    ]
+  },
+  {
+    "enabled": true,
+    "enabled_in_config": true,
+    "enabled_in_license": true,
+    "id": ".server-log",
+    "is_system_action_type": false,
+    "minimum_license_required": "basic",
+    "name": "Server log",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".slack",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Slack",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".slack_api",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Slack API",
+    "supported_feature_ids": [
+      "alerting",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".webhook",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Webhook",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".cases-webhook",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Webhook - Case Management",
+    "supported_feature_ids": [
+      "cases"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".xmatters",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "xMatters",
+    "supported_feature_ids": [
+      "alerting",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".servicenow",
+    "is_system_action_type": false,
+    "minimum_license_required": "platinum",
+    "name": "ServiceNow ITSM",
+    "supported_feature_ids": [
+      "alerting",
+      "cases",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".servicenow-sir",
+    "is_system_action_type": false,
+    "minimum_license_required": "platinum",
+    "name": "ServiceNow SecOps",
+    "supported_feature_ids": [
+      "alerting",
+      "cases",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".servicenow-itom",
+    "is_system_action_type": false,
+    "minimum_license_required": "platinum",
+    "name": "ServiceNow ITOM",
+    "supported_feature_ids": [
+      "alerting",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".jira",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Jira",
+    "supported_feature_ids": [
+      "alerting",
+      "cases",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".teams",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Microsoft Teams",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".torq",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Torq",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".opsgenie",
+    "is_system_action_type": false,
+    "minimum_license_required": "platinum",
+    "name": "Opsgenie",
+    "supported_feature_ids": [
+      "alerting",
+      "uptime",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".tines",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "Tines",
+    "supported_feature_ids": [
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".gen-ai",
+    "is_system_action_type": false,
+    "minimum_license_required": "enterprise",
+    "name": "OpenAI",
+    "supported_feature_ids": [
+      "generativeAIForSecurity",
+      "generativeAIForObservability",
+      "generativeAIForSearchPlayground"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".bedrock",
+    "is_system_action_type": false,
+    "minimum_license_required": "enterprise",
+    "name": "Amazon Bedrock",
+    "supported_feature_ids": [
+      "generativeAIForSecurity",
+      "generativeAIForObservability",
+      "generativeAIForSearchPlayground"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".gemini",
+    "is_system_action_type": false,
+    "minimum_license_required": "enterprise",
+    "name": "Google Gemini",
+    "supported_feature_ids": [
+      "generativeAIForSecurity",
+      "generativeAIForSearchPlayground",
+      "generativeAIForObservability"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".d3security",
+    "is_system_action_type": false,
+    "minimum_license_required": "gold",
+    "name": "D3 Security",
+    "supported_feature_ids": [
+      "alerting",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".resilient",
+    "is_system_action_type": false,
+    "minimum_license_required": "platinum",
+    "name": "IBM Resilient",
+    "supported_feature_ids": [
+      "alerting",
+      "cases",
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".sentinelone",
+    "is_system_action_type": false,
+    "minimum_license_required": "enterprise",
+    "name": "Sentinel One",
+    "supported_feature_ids": [
+      "siem"
+    ]
+  },
+  {
+    "enabled": false,
+    "enabled_in_config": true,
+    "enabled_in_license": false,
+    "id": ".crowdstrike",
+    "is_system_action_type": false,
+    "minimum_license_required": "enterprise",
+    "name": "CrowdStrike",
+    "supported_feature_ids": [
+      "siem"
+    ]
+  }
+]

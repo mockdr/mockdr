@@ -2584,3 +2584,94 @@ probes:
       method: GET
       path: /${seed_index}/_count
       auth: basic
+
+  # ── Kibana: alerting, actions and identity (2.3.1) ──────────────────────
+  #
+  # An endpoint sweep found every one of these answering 404 here and 200 on
+  # a running Kibana. The rule-type catalogue, the licence and the task
+  # manager's health are captured from a running instance rather than typed
+  # out, because a client reads deep into each — and the task manager's own
+  # numbers move between runs, which is why only its shape is compared.
+
+  - id: kbn-alerting-health
+    endpoint: kibana
+    why: >
+      Whether the framework can run rules at all.
+    request:
+      method: GET
+      path: /api/alerting/_health
+      auth: basic
+
+  - id: kbn-alerting-rule-types
+    endpoint: kibana
+    why: >
+      The kinds of rule a deployment can run, read deep into.
+    request:
+      method: GET
+      path: /api/alerting/rule_types
+      auth: basic
+
+  - id: kbn-alerting-rules-find
+    endpoint: kibana
+    why: >
+      The rules it holds.
+    request:
+      method: GET
+      path: /api/alerting/rules/_find
+      query: {per_page: '1'}
+      auth: basic
+
+  - id: kbn-actions-connectors
+    endpoint: kibana
+    why: >
+      The connectors a rule acts through.
+    request:
+      method: GET
+      path: /api/actions/connectors
+      auth: basic
+
+  - id: kbn-actions-connector-types
+    endpoint: kibana
+    why: >
+      And their kinds, each carrying the licence it needs.
+    request:
+      method: GET
+      path: /api/actions/connector_types
+      auth: basic
+
+  - id: kbn-security-me
+    endpoint: kibana
+    why: >
+      Who Kibana thinks the caller is.
+    request:
+      method: GET
+      path: /internal/security/me
+      auth: basic
+
+  - id: kbn-licensing-info
+    endpoint: kibana
+    why: >
+      The licence, and which features it allows.
+    request:
+      method: GET
+      path: /api/licensing/info
+      auth: basic
+
+  - id: kbn-lists-find
+    endpoint: kibana
+    why: >
+      The value lists an exception can point at.
+    request:
+      method: GET
+      path: /api/lists/_find
+      auth: basic
+
+  - id: kbn-exception-items-missing-list
+    endpoint: kibana
+    why: >
+      A find against a list that is not there: a 404 in the Security Solution's envelope, where the mock said the list exists and holds nothing.
+    request:
+      method: GET
+      path: /api/exception_lists/items/_find
+      query: {list_id: 'no-such-list', namespace_type: 'single'}
+      auth: basic

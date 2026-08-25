@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Kibana: alerting, actions, and the identity behind them.** An endpoint
+sweep against a running Kibana 8.15 found these answering 404 here and 200
+there: the alerting framework's health and rule catalogue
+(`/api/alerting/_health`, `/rule_types`, `/rules/_find`), the connectors a
+rule can act through (`/api/actions/connectors`, `/connector_types`), the
+value lists an exception can point at (`/api/lists/_find`), and the three
+calls a client makes to find out who and what it is talking to —
+`/internal/security/me`, `/api/licensing/info` and the task manager's
+health.
+
+The rule-type catalogue, the licence and the task manager's health are
+captured from a running instance rather than written out: a client reads
+deep into each — action groups, authorized consumers, the alerts-as-data
+mapping, drift percentiles, which features a licence allows — and a
+hand-written version had arrays where Kibana has percentile objects and
+offered features a Basic licence refuses. The mapping block a rule type
+carries repeats across the forty-four of them, so the fixture stores each
+distinct one once and the loader puts it back.
+
 **Elasticsearch: aliases, multi-search, and the rest of the surface a client
 touches.** An endpoint sweep against the real cluster found these missing —
 every one of them a 404 here and an answer there:
@@ -36,13 +55,6 @@ every one of them a 404 here and an answer there:
 
 An index's `number_of_replicas` now defaults to 1, which is a cluster's own
 default even on a single node.
-
-### Fixed
-
-**`GET /{index}/_source` answered a plain-text 500** for an index that is
-not there — found by the hostile probe on the day it was added: the index
-check raised out of the handler instead of being turned into the 404 every
-other route answers with.
 
 **Elasticsearch: the writes a client makes around a search.** `_update`,
 `_update_by_query`, `_delete_by_query`, `GET _source` and the maintenance
@@ -88,20 +100,6 @@ there is nothing to group by. The mock grouped by the whole sentence and
 answered buckets no cluster would produce, which is the shape of a client's
 broken query looking fine against the mock and failing in production.
 
-**Sorting is judged by the mapping too.** A `text` field cannot be sorted
-on, for the same reason it cannot be aggregated, and a field the mapping
-does not have at all is refused by the shard that would have sorted it —
-unless the client says what type to assume with `unmapped_type`, which now
-also decides what a missing value *sorts as*: the edge of a long for a
-numeric type, `null` for a keyword. Only an index mockdr holds a full
-mapping for is judged this way; for its own collections the mapping is a
-summary, and refusing a sort on a field it does not happen to list would be
-inventing a failure.
-
-A shard failure also names the index it happened on rather than saying
-"mockdr" every time, and a `query_shard_exception` carries the index and its
-uuid the way a real shard's does.
-
 **Elasticsearch: the query clauses a SIEM client sends.** `prefix`,
 `regexp`, `fuzzy`, `ids`, `multi_match`, `simple_query_string`,
 `match_phrase_prefix`, `match_bool_prefix`, `terms_set`, `constant_score`,
@@ -136,17 +134,6 @@ default `or` operator `login -alice` matches every document that either says
 login or does not say alice; `+` is and, `|` is or, `~N` is an edit
 distance.
 
-**`top_hits` invented its ids.** It derived one from the contents instead of
-reporting the id each document was indexed with, so a client could not fetch
-back what it found; it also ignored `sort`, `from` and `_source`. And the
-`missing` aggregation — the other half of a `terms` aggregation — was not
-implemented.
-
-Three differences are left in place and named in the tests, each depending
-on something mockdr does not model: a `nested` query (no nested mappings), a
-`script` query (no Painless), and a `terms` aggregation over a text field,
-which a cluster refuses because fielddata is off.
-
 **Six commands SOAR content uses, which the mock refused outright.**
 `eventstats`, `mvexpand`, `filldown`, `spath`, `convert` and `bin`/`bucket`
 were unknown commands here, so any search containing one came back as a
@@ -162,12 +149,6 @@ processor rather than by the command.
 `bin` writes a numeric span as a range (`0-2`, `1.0-1.5` — the span decides
 the decimals) and a time span as the bucket's start on its own; `bins=` and
 `minspan=` round the span they work out up to a power of ten.
-
-**`| table *` selected a field called `*`.** Neither `table` nor `fields`
-read a wildcard, so `| table *` and `| fields host*` — ordinary SPL — quietly
-returned nothing. Both expand patterns now, in name order, which is the
-order splunkd reads an expansion in while keeping the order given for
-explicit names.
 
 **`| streamstats`, and what `stats` writes when it cannot compute.** Two
 findings from the same measurement run, 62 searches against Splunk 10.4.2:
@@ -194,15 +175,6 @@ Both commands now refuse an argument they cannot read — `stats nosuchfunc(n)`
 and `stats count nosucharg=1` are errors there, and the second was silently
 ignored here, so the command ran with a different meaning than the one asked
 for.
-
-**The response's field block was in the wrong order.** splunkd lists the
-columns *by name* unless a command in the pipeline built the row — `table`,
-`fields`, `stats`, `timechart`, `top`, `rare` — in which case the order is
-that command's. mockdr always used the row's own key order, so a search
-ending in `eval z=1, a=2` declared `z` before `a`. It also declared only
-what the *first* row carried, dropping a column that appears later, and left
-out a column `stats` named but could not compute — which splunkd lists
-anyway.
 
 **Fifty-three more `eval` functions, and the strictness around them.** The
 mock had nineteen; it has seventy-two. A search using `split`, `cidrmatch`,
@@ -258,6 +230,57 @@ newlines. A field a row has no value for is empty rather than `""`. Measured
 against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
+
+**An exception-item search against a list that does not exist answered
+`200`** with an empty page, where Kibana answers `404` with
+`{"message": "exception list id: \"x\" does not exist", "status_code": 404}`.
+A client searching the wrong list was told the list exists and holds
+nothing.
+
+**`GET /{index}/_source` answered a plain-text 500** for an index that is
+not there — found by the hostile probe on the day it was added: the index
+check raised out of the handler instead of being turned into the 404 every
+other route answers with.
+
+**Sorting is judged by the mapping too.** A `text` field cannot be sorted
+on, for the same reason it cannot be aggregated, and a field the mapping
+does not have at all is refused by the shard that would have sorted it —
+unless the client says what type to assume with `unmapped_type`, which now
+also decides what a missing value *sorts as*: the edge of a long for a
+numeric type, `null` for a keyword. Only an index mockdr holds a full
+mapping for is judged this way; for its own collections the mapping is a
+summary, and refusing a sort on a field it does not happen to list would be
+inventing a failure.
+
+A shard failure also names the index it happened on rather than saying
+"mockdr" every time, and a `query_shard_exception` carries the index and its
+uuid the way a real shard's does.
+
+**`top_hits` invented its ids.** It derived one from the contents instead of
+reporting the id each document was indexed with, so a client could not fetch
+back what it found; it also ignored `sort`, `from` and `_source`. And the
+`missing` aggregation — the other half of a `terms` aggregation — was not
+implemented.
+
+Three differences are left in place and named in the tests, each depending
+on something mockdr does not model: a `nested` query (no nested mappings), a
+`script` query (no Painless), and a `terms` aggregation over a text field,
+which a cluster refuses because fielddata is off.
+
+**`| table *` selected a field called `*`.** Neither `table` nor `fields`
+read a wildcard, so `| table *` and `| fields host*` — ordinary SPL — quietly
+returned nothing. Both expand patterns now, in name order, which is the
+order splunkd reads an expansion in while keeping the order given for
+explicit names.
+
+**The response's field block was in the wrong order.** splunkd lists the
+columns *by name* unless a command in the pipeline built the row — `table`,
+`fields`, `stats`, `timechart`, `top`, `rare` — in which case the order is
+that command's. mockdr always used the row's own key order, so a search
+ending in `eval z=1, a=2` declared `z` before `a`. It also declared only
+what the *first* row carried, dropping a column that appears later, and left
+out a column `stats` named but could not compute — which splunkd lists
+anyway.
 
 **A probe that could not fail.** `compare: values` parsed both bodies as
 JSON, so two CSV documents both became `None` and every csv probe agreed with

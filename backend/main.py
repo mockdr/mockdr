@@ -81,6 +81,9 @@ from api.routers import (
     cs_users as cs_users_router,
 )
 from api.routers import (
+    es_alerting as es_alerting_router,
+)
+from api.routers import (
     es_alerts as es_alerts_router,
 )
 from api.routers import (
@@ -781,6 +784,7 @@ app.include_router(es_search_router.router, prefix=ES_PREFIX)
 
 # Kibana Security API endpoints — each handler applies its own auth dependency
 for _es_module in [
+    es_alerting_router,
     es_endpoints_router,
     es_platform_router,
     es_security_extras_router,
