@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**A paging audit, and the two collections that could not be walked.**
+`scripts/paging_audit.py` walks every collection a page at a time and asks
+whether the whole of it came back exactly once — no duplicate, no gap, a
+total that agrees with the pages, and paging that terminates. A mock that
+pages wrongly looks right in every single answer; only a client that reads
+to the end sees the difference.
+
+* **`installed-applications` reported the page's own length as the total and
+  never handed back a cursor**, though the swagger declares both. A client
+  read one page of 707 applications and was told that was all of them.
+* **Kibana's endpoint list echoed the page after the one it was asked for**,
+  and left out the `sortField` and `sortDirection` it had applied — so a
+  client paging by the echoed number skipped every other page. The sort is
+  now applied as well as echoed, over the nine fields Kibana's schema
+  allows; a probe covers the successful listing, which none did before.
+
+The audit also learned what *cannot* be walked: SentinelOne publishes its
+per-agent applications and processes with `data` and nothing else, by its
+own swagger, so those two are reported as a fact rather than a finding.
+
 **Twelve parameters the routes declared and ignored.** A new audit —
 `scripts/param_effect.py` — asks every route, for every parameter it
 declares, whether the answer changes when the parameter cannot match: a

@@ -2515,6 +2515,26 @@ probes:
       path: /_cat/health
       auth: basic
 
+  - id: kbn-endpoint-metadata-listing
+    endpoint: kibana
+    why: >
+      The successful listing, which no probe covered: the envelope echoes the page it was asked for and the sort it applied.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"page": "1", "pageSize": "2"}
+      auth: basic
+
+  - id: kbn-endpoint-metadata-sorted
+    endpoint: kibana
+    why: >
+      And the sort it was given, echoed back.
+    request:
+      method: GET
+      path: /api/endpoint/metadata
+      query: {"sortField": "metadata.host.hostname", "sortDirection": "asc"}
+      auth: basic
+
   # ── Writes (2.3.1) ──────────────────────────────────────────────────────
   #
   # Last in the file on purpose: these change the seeded documents, so every

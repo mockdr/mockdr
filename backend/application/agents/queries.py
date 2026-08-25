@@ -250,7 +250,12 @@ def list_applications_for_agents(
     # `agent*` field its own schema declares, and the completion filled them
     # with fixture defaults. Every application came back owned by
     # "MY_COMPUTER_1234".
-    return {"data": page}
+    #
+    # The cursor and the total travel with the page: the swagger declares
+    # both for this schema, and the caller used to answer with the page's own
+    # length as the total and no cursor at all — so a client saw one page and
+    # was told that was everything.
+    return {"data": page, "nextCursor": next_cursor, "totalItems": total}
 
 
 def _with_agent_fields(application: dict) -> dict:

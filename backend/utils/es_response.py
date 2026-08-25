@@ -105,12 +105,24 @@ def build_kibana_endpoint_response(
     page: int,
     page_size: int,
     total: int,
+    sort_field: str = "enrolled_at",
+    sort_direction: str = "desc",
 ) -> dict:
     """Build the endpoint metadata list response.
 
-    The real endpoint returns ``pageSize``, not ``per_page``.
+    The real endpoint returns ``pageSize``, not ``per_page``, and it echoes
+    the sort it applied — ``enrolled_at`` descending unless the caller asked
+    for another. mockdr left both members out, so a client reading back what
+    it had asked for found nothing there.
     """
-    return {"data": data, "total": total, "page": page, "pageSize": page_size}
+    return {
+        "data": data,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "sortField": sort_field,
+        "sortDirection": sort_direction,
+    }
 
 
 def build_es_error_response(

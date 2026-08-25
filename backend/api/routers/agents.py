@@ -106,7 +106,7 @@ def list_installed_applications(
     filters matching the real S1 API contract.
     """
     agent_ids = [i.strip() for i in agentIds.split(",") if i.strip()] if agentIds else []
-    apps = agent_queries.list_applications_for_agents(
+    answer = agent_queries.list_applications_for_agents(
         agent_ids,
         cursor,
         limit,
@@ -120,17 +120,22 @@ def list_installed_applications(
                 if v is not None
             },
         },
-    ).get("data", [])
+    )
+    apps = answer.get("data", [])
+    next_cursor = answer.get("nextCursor")
+    total = answer.get("totalItems", len(apps))
     if ids:
         # The application-level ids. Declared on the route and matched
         # against nothing, so asking for one application listed them all.
         wanted = {i.strip() for i in ids.split(",") if i.strip()}
         apps = [app for app in apps if str(app.get("id")) in wanted]
-    # ApplicationViewSchema_many: the declared fields only, with a pagination block.
+        next_cursor, total = None, len(apps)
+    # ApplicationViewSchema_many: the declared fields only, with a pagination
+    # block carrying the cursor and the total the swagger declares.
     return build_list_response(
         apps,
-        None,
-        len(apps),
+        next_cursor,
+        total,
         definition="applications.schemas_ApplicationViewSchema_many_200",
         strict=True,
     )

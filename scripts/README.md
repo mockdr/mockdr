@@ -12,6 +12,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `fuzz_parsers.py` | Fuzz the hand-written parsers (SPL, KQL, OData, FQL, ES DSL, HEC) for unintended exceptions. |
 | `hostile_probe.py` | Hostile bodies and parameters against every mounted route; flags any plain-text 500 or crash. |
 | `param_effect.py` | Asks every route whether its parameters do anything: a limiter that does not limit, a filter that cannot match and returns everything, a `$select` that projects nothing. Exit 1 on any. |
+| `paging_audit.py` | Walks every collection a page at a time: flags a record that comes back twice, one that never appears, a total that disagrees with the pages, and paging that will not terminate. Exit 1 on any. |
 
 ## Run before a release
 

@@ -60,8 +60,13 @@ def list_endpoints(
             400, str(exc),
         )) from exc
     return endpoint_queries.list_endpoints(
-        page=int(float(page)) + 1, per_page=int(float(page_size)),
-    )
+        # The page counts from 0 here and is echoed back as it was asked
+        # for; mockdr answered with the number after it.
+        page=int(float(page)) + 1,
+        per_page=int(float(page_size)),
+        sort_field=request.query_params.get("sortField", "enrolled_at"),
+        sort_direction=request.query_params.get("sortDirection", "desc"),
+    ) | {"page": int(float(page))}
 
 
 @router.get("/api/endpoint/metadata/{agent_id}")
