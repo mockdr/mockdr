@@ -36,6 +36,15 @@ volatile_fields:
   # The uuid a shard failure names its index by: an install's own identifier.
   - index_uuid
 
+# What happened during this run rather than what the API answers: a shard
+# that was still allocating when a search reached it puts a `failures` list
+# in the real reply that a mock has no equivalent for. Measured in CI, where
+# a cluster is seconds old.
+ignore_paths:
+  - $._shards.failures
+  - $.hits.hits[*]._shard
+  - $._shards.skipped
+
 significant_keys:
   - status
   - statusCode

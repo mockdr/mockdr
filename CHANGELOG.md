@@ -457,6 +457,14 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**A conformance job that failed on the weather.**
+`es-count` reported eight differences in CI and none locally: a shard still
+allocating when the search reached it puts a whole `_shards.failures`
+subtree in a real Elasticsearch's reply that a mock has no equivalent for.
+That is what happened during *that run*, not what either product answers, so
+a spec may now name paths no probe compares — the counterpart of
+`volatile_fields`, which suppresses values and never applied to shape.
+
 **The KV store's delete ignored its query and emptied the collection.**
 `DELETE …/storage/collections/data/{name}?query={…}` cleared every record
 whatever it was asked, and answered 200 — so a client deleting the three

@@ -389,6 +389,34 @@ class TestSeedPayload:
         assert seed_sourcetype().startswith("probe:conformance:")
 
 
+class TestSpecLevelIgnorePaths:
+    """A path the spec ignores is ignored by every probe."""
+
+    def test_the_elastic_spec_ignores_shard_failures(self) -> None:
+        spec = load_spec(ROOT / "probes" / "elastic.yaml")
+        assert "$._shards.failures" in spec.ignore_paths
+
+    def test_a_spec_without_them_gets_an_empty_tuple(self) -> None:
+        spec = load_spec(ROOT / "probes" / "splunk.yaml")
+        assert spec.ignore_paths == ()
+
+    def test_an_ignored_path_produces_no_finding(self) -> None:
+        """The eight findings a still-allocating shard produced in CI."""
+        real = Response(status=200, headers={}, body={
+            "count": 6,
+            "_shards": {"total": 1, "successful": 0, "failed": 1, "failures": [
+                {"shard": 0, "index": "x", "reason": {"type": "no_shard_available_action_"
+                                                              "exception", "reason": None}},
+            ]},
+        })
+        mock = Response(status=200, headers={}, body={
+            "count": 6, "_shards": {"total": 1, "successful": 1, "failed": 0},
+        })
+        assert compare("es-count", mock, real, frozenset(),
+                       ("$._shards.failures",)) == []
+        assert compare("es-count", mock, real, frozenset()) != []
+
+
 class TestSeededProbesLoad:
     """The probe file's seeded entries parse into what the runner expects."""
 

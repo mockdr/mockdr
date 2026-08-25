@@ -125,6 +125,13 @@ class PlatformSpec:
     #: before a ``compare: values`` probe looks at it, because comparing them
     #: would report the two installs' identities as a difference.
     volatile_fields: frozenset[str] = frozenset()
+    #: Paths no probe compares at all, because they describe what happened
+    #: during *this run* rather than what the API answers. A shard that was
+    #: still allocating when a search reached it adds a whole
+    #: ``_shards.failures`` subtree to the real reply and none to the mock,
+    #: and reported eight differences that say nothing about either product.
+    #: Added to every probe's own ``ignore_paths``.
+    ignore_paths: tuple[str, ...] = ()
 
     def probe(self, probe_id: str) -> Probe:
         """Look one probe up by id, for running a single comparison."""
@@ -240,5 +247,6 @@ def load_spec(path: Path) -> PlatformSpec:
         probes=tuple(probes),
         significant_keys=frozenset(raw.get("significant_keys") or ()),
         volatile_fields=frozenset(raw.get("volatile_fields") or ()),
+        ignore_paths=tuple(raw.get("ignore_paths") or ()),
         credentials=_load_credentials(raw.get("credentials"), path),
     )

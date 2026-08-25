@@ -187,7 +187,8 @@ def run_platform(
                 else:
                     findings.extend(compare(
                         probe.id, responses["mock"], responses["real"],
-                        spec.significant_keys, probe.ignore_paths, probe.why,
+                        spec.significant_keys,
+                        (*spec.ignore_paths, *probe.ignore_paths), probe.why,
                     ))
 
     if not_run:
