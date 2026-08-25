@@ -308,7 +308,7 @@ def _relative_time(args: list[Any]) -> Any:
 _PATH_STEP = re.compile(r"([^.{}]+)|\{(\d*)\}")
 
 
-def _json_path(document: Any, path: str) -> Any:
+def json_path(document: Any, path: str) -> Any:
     """Follow *path* through an already-decoded document."""
     current = document
     for name, index in _PATH_STEP.findall(path):
@@ -347,7 +347,7 @@ def _extract(name: str) -> Callable[[list[Any]], Any]:
         except (ValueError, TypeError):
             # Not JSON is not an error; the field is left unassigned.
             return None
-        return _json_value(_json_path(document, _string(name, args[1])))
+        return _json_value(json_path(document, _string(name, args[1])))
     return run
 
 

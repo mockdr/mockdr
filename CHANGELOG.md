@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Six commands SOAR content uses, which the mock refused outright.**
+`eventstats`, `mvexpand`, `filldown`, `spath`, `convert` and `bin`/`bucket`
+were unknown commands here, so any search containing one came back as a
+refusal — including the JSON parsing (`spath`) and the time bucketing
+(`| bin _time span=1h | stats count by _time`) that SIEM content is built
+on. 62 searches measured against Splunk 10.4.2, down to the wording of each
+refusal: `mvexpand` says "Invalid argument: 'g'" for a second field name and
+"A field name is expected" for none, `bin` says "You must specify a field to
+discretize", `convert` names the conversion type it does not have, and a
+`limit` that is not a non-negative integer is refused by the search
+processor rather than by the command.
+
+`bin` writes a numeric span as a range (`0-2`, `1.0-1.5` — the span decides
+the decimals) and a time span as the bucket's start on its own; `bins=` and
+`minspan=` round the span they work out up to a power of ten.
+
+**`| table *` selected a field called `*`.** Neither `table` nor `fields`
+read a wildcard, so `| table *` and `| fields host*` — ordinary SPL — quietly
+returned nothing. Both expand patterns now, in name order, which is the
+order splunkd reads an expansion in while keeping the order given for
+explicit names.
+
 **`| streamstats`, and what `stats` writes when it cannot compute.** Two
 findings from the same measurement run, 62 searches against Splunk 10.4.2:
 

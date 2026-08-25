@@ -37,11 +37,10 @@ __all__ = [
 # Commands the executor implements. Anything outside this set is reported
 # rather than silently ignored.
 KNOWN_COMMANDS = frozenset({
-    "dedup", "eval", "fields", "fillnull", "head", "makeresults", "rare",
-    "regex", "rename",
-    "rex", "search", "sort", "stats", "streamstats", "table", "tail",
-    "timechart", "top",
-    "where",
+    "bin", "bucket", "convert", "dedup", "eval", "eventstats", "fields",
+    "filldown", "fillnull", "head", "makeresults", "mvexpand", "rare",
+    "regex", "rename", "rex", "search", "sort", "spath", "stats",
+    "streamstats", "table", "tail", "timechart", "top", "where",
 })
 
 # Field names that carry meaning in the search clause rather than being an

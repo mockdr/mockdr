@@ -66,7 +66,7 @@ search index=<index> sourcetype=<sourcetype> <field>=<value>
 | makeresults format=csv|json data="<inline rows>"
 | search <expr>            | where <expr>
 | eval <field>=<expr>      | fields [+|-] <field> ...
-| table <field> ...        | rename <old> as <new>
+| table <field|pattern> ...  | rename <old> as <new>
 | head <N>                 | tail <N>
 | sort [-]<field>, ...     | dedup <field> ...
 | stats <func>(<field>) [as <name>] [by <field>]
@@ -75,6 +75,12 @@ search index=<index> sourcetype=<sourcetype> <field>=<value>
       [reset_before="<expr>"] [reset_after="<expr>"] [time_window=<span>]
 | timechart span=<span> <func>(<field>) [by <field>]
 | top [<N>] <field>        | rare [<N>] <field>
+| eventstats <func>(<field>) [as <name>] [by <field>]
+| bin|bucket <field> [span=<n>[unit]] [bins=<n>] [minspan=<n>] [as <name>]
+| mvexpand <field> [limit=<n>]      | filldown [<field> ...]
+| spath [input=<field>] [output=<name>] [path=<path>]
+| convert [timeformat=<fmt>] <type>(<field>) [as <name>]
+      types: num, auto, none, rmunit, rmcomma, dur2sec, ctime, mktime, memk
 | rex field=<field> "<regex>"   | regex <field>="<regex>"
 | fillnull [value=<v>] [<field> ...]
 `notable`   (macro → search index=notable)

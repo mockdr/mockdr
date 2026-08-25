@@ -2139,3 +2139,334 @@ probes:
       content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20streamstats%20values%28g%29%20as%20v&output_mode=json&exec_mode=oneshot&count=0'
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
+
+  # ── the commands SOAR content uses ──────────────────────────────────────
+  #
+  # eventstats, mvexpand, filldown, spath, convert and bin were unknown
+  # commands here, so a search using any of them was refused outright — and
+  # `| table *` selected a field literally named `*`. Inline data again, so
+  # both engines answer from the search text alone.
+
+  - id: spl-eventstats-count
+    endpoint: management
+    compare: values
+    why: >
+      stats over the whole set, joined onto every row.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eventstats%20count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eventstats-by-group
+    endpoint: management
+    compare: values
+    why: >
+      Each row gets its own group's answer.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eventstats%20avg%28n%29%20as%20a%20by%20g&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eventstats-nothing-to-compute
+    endpoint: management
+    compare: values
+    why: >
+      The same absent-field rule as stats.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eventstats%20sum%28g%29%20as%20s&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eventstats-unknown-argument
+    endpoint: management
+    compare: values
+    why: >
+      An argument it cannot read.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eventstats%20count%20nosucharg%3D1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-mvexpand
+    endpoint: management
+    compare: values
+    why: >
+      One row per value of a multivalue field.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eval%20m%3Dsplit%28%22x%3By%22%2C%22%3B%22%29%20%7C%20mvexpand%20m%20%7C%20table%20n%2C%20m&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-mvexpand-limit
+    endpoint: management
+    compare: values
+    why: >
+      A limit caps the values taken from each row.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eval%20m%3Dsplit%28%22x%3By%22%2C%22%3B%22%29%20%7C%20mvexpand%20m%20limit%3D1%20%7C%20table%20n%2C%20m&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-mvexpand-two-fields
+    endpoint: management
+    compare: values
+    why: >
+      Only one field at a time.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20mvexpand%20n%2C%20g&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-mvexpand-no-field
+    endpoint: management
+    compare: values
+    why: >
+      And a field is required.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20mvexpand&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-mvexpand-bad-limit
+    endpoint: management
+    compare: values
+    why: >
+      A limit that is not a non-negative integer is refused by the search processor, not by the command.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eval%20m%3Dsplit%28%22x%3By%22%2C%22%3B%22%29%20%7C%20mvexpand%20m%20limit%3D-1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-filldown
+    endpoint: management
+    compare: values
+    why: >
+      The last value a field had, carried into the rows without it.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20eval%20x%3Dif%28n%3D2%2C%22v%22%2Cnull%28%29%29%20%7C%20filldown%20x%20%7C%20table%20n%2C%20x&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-spath-flatten
+    endpoint: management
+    compare: values
+    why: >
+      Every path in the document becomes a field.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Djson%20data%3D%22%5B%7B%5C%22a%5C%22%3A%7B%5C%22b%5C%22%3A1%7D%2C%5C%22c%5C%22%3A%5B1%2C2%5D%2C%5C%22d%5C%22%3A%5B%7B%5C%22e%5C%22%3A1%7D%2C%7B%5C%22e%5C%22%3A2%7D%5D%7D%5D%22%20%7C%20spath%20%7C%20table%20a%2C%20a.b%2C%20c%2C%20c%7B%7D%2C%20d%7B%7D.e&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-spath-path
+    endpoint: management
+    compare: values
+    why: >
+      A path selects one of them.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Djson%20data%3D%22%5B%7B%5C%22a%5C%22%3A%7B%5C%22b%5C%22%3A1%7D%2C%5C%22c%5C%22%3A%5B1%2C2%5D%2C%5C%22d%5C%22%3A%5B%7B%5C%22e%5C%22%3A1%7D%2C%7B%5C%22e%5C%22%3A2%7D%5D%7D%5D%22%20%7C%20spath%20path%3Da.b%20%7C%20table%20a.b&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-spath-output
+    endpoint: management
+    compare: values
+    why: >
+      And output names where it goes.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Djson%20data%3D%22%5B%7B%5C%22a%5C%22%3A%7B%5C%22b%5C%22%3A1%7D%2C%5C%22c%5C%22%3A%5B1%2C2%5D%2C%5C%22d%5C%22%3A%5B%7B%5C%22e%5C%22%3A1%7D%2C%7B%5C%22e%5C%22%3A2%7D%5D%7D%5D%22%20%7C%20spath%20output%3Dz%20path%3Dd%7B%7D.e%20%7C%20table%20z&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-spath-missing-path
+    endpoint: management
+    compare: values
+    why: >
+      A path that is not there writes nothing.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Djson%20data%3D%22%5B%7B%5C%22a%5C%22%3A%7B%5C%22b%5C%22%3A1%7D%2C%5C%22c%5C%22%3A%5B1%2C2%5D%2C%5C%22d%5C%22%3A%5B%7B%5C%22e%5C%22%3A1%7D%2C%7B%5C%22e%5C%22%3A2%7D%5D%7D%5D%22%20%7C%20spath%20path%3Dnosuch%20%7C%20table%20a.b&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-convert-num
+    endpoint: management
+    compare: values
+    why: >
+      convert num, and the field it cannot convert.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20convert%20num%28n%29%20as%20m%20%7C%20table%20m&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-convert-ctime
+    endpoint: management
+    compare: values
+    why: >
+      ctime renders an epoch, timeformat chooses how.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20convert%20timeformat%3D%22%25Y-%25m-%25d%22%20ctime%28n%29%20as%20t%20%7C%20table%20t&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-convert-unknown-type
+    endpoint: management
+    compare: values
+    why: >
+      A conversion type it does not have.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20convert%20nosuchfunc%28n%29&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-span
+    endpoint: management
+    compare: values
+    why: >
+      A numeric span writes the bucket as a range.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin%20n%20span%3D2%20%7C%20table%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-decimal-span
+    endpoint: management
+    compare: values
+    why: >
+      The span decides how the edges are written.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin%20n%20span%3D0.5%20%7C%20table%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-default-span
+    endpoint: management
+    compare: values
+    why: >
+      The default span is one.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin%20n%20%7C%20table%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-bins
+    endpoint: management
+    compare: values
+    why: >
+      bins rounds the span it works out up to a power of ten.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin%20n%20bins%3D2%20%7C%20table%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-as
+    endpoint: management
+    compare: values
+    why: >
+      as names the bucket and leaves the field alone.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin%20n%20span%3D2%20as%20z%20%7C%20table%20z%2C%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-no-field
+    endpoint: management
+    compare: values
+    why: >
+      A field is required.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-bin-unknown-argument
+    endpoint: management
+    compare: values
+    why: >
+      And an argument it cannot read is refused.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20bin%20n%20nosucharg%3D1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-table-wildcard
+    endpoint: management
+    compare: values
+    why: >
+      `table *` is every field, not a field named `*`.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20table%20%2A&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-table-prefix-wildcard
+    endpoint: management
+    compare: values
+    why: >
+      And a prefix selects what it matches.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20table%20n%2A&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-fields-wildcard
+    endpoint: management
+    compare: values
+    why: >
+      `fields` reads the same patterns.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20fields%20%2A&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic

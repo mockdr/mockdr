@@ -13,6 +13,7 @@ from repository.splunk.splunk_event_repo import splunk_event_repo
 from utils.splunk.spl_exec import (
     aggregation_aliases,
     execute_pipeline,
+    expand_fields,
     split_by,
 )
 from utils.splunk.spl_parser import (
@@ -302,7 +303,10 @@ def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
     if last_command is not None and last == "table":
         # `table` declares its columns, so splunkd lists every name it was
         # given — including one no row turned out to carry.
-        names = [f.strip() for f in re.split(r"[,\s]+", last_command.arg) if f.strip()]
+        names = expand_fields(
+            [f.strip() for f in re.split(r"[,\s]+", last_command.arg) if f.strip()],
+            results,
+        )
     else:
         # Every column any row carries, not only the ones the first row does:
         # `streamstats current=f sum(n)` leaves the first row without it.

@@ -10,9 +10,12 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import re
 from collections import Counter, OrderedDict
 from collections.abc import Callable
+from datetime import UTC, datetime
+from fnmatch import fnmatch
 from typing import Any
 
 from utils.splunk.spl_expr import (
@@ -22,6 +25,7 @@ from utils.splunk.spl_expr import (
     parse_search,
     parse_where,
 )
+from utils.splunk.spl_functions import json_path, one_or_many, values_of
 from utils.splunk.spl_parser import (
     SPLCommand,
     SPLQuery,
@@ -29,7 +33,12 @@ from utils.splunk.spl_parser import (
     parse_sort_keys,
 )
 
-__all__ = ["aggregation_aliases", "execute_pipeline", "split_by"]
+__all__ = [
+    "aggregation_aliases",
+    "execute_pipeline",
+    "expand_fields",
+    "split_by",
+]
 
 Rows = list[dict[str, Any]]
 
@@ -197,9 +206,9 @@ def _cmd_table(rows: Rows, command: SPLCommand) -> Rows:
     and when no row carries any of them it emits no rows at all. Inventing an
     empty column let a client believe the field exists and is blank.
     """
-    fields = _fields(command.arg)
+    fields = expand_fields(_fields(command.arg), rows)
     if not fields:
-        return rows
+        return rows if not command.arg.strip() else []
     if not any(field in row for row in rows for field in fields):
         return []
     return [{f: row[f] for f in fields if f in row} for row in rows]
@@ -208,15 +217,33 @@ def _cmd_table(rows: Rows, command: SPLCommand) -> Rows:
 def _cmd_fields(rows: Rows, command: SPLCommand) -> Rows:
     arg = command.arg.strip()
     remove = arg.startswith("-")
-    fields = _fields(arg.lstrip("+-"))
+    fields = expand_fields(_fields(arg.lstrip("+-")), rows)
     if not fields:
         return rows
     if remove:
         return [{k: v for k, v in row.items() if k not in fields} for row in rows]
-    return [
-        {k: v for k, v in row.items() if k in fields}
-        for row in rows
-    ]
+    # In the order given, the way `table` does it: `fields b, a` reads b
+    # before a, and `fields *` reads them by name.
+    return [{f: row[f] for f in fields if f in row} for row in rows]
+
+
+def expand_fields(patterns: list[str], rows: list[dict[str, Any]]) -> list[str]:
+    """Resolve ``*`` in a field list against the fields the rows carry.
+
+    `table *` and `fields host*` are ordinary SPL, and both commands read
+    the pattern as a field name — so `| table *` selected a field called
+    "*", found none, and returned nothing at all.
+    """
+    if not any("*" in p for p in patterns):
+        return patterns
+    known = list(dict.fromkeys(k for row in rows for k in row))
+    expanded: list[str] = []
+    for pattern in patterns:
+        # An expansion comes out in name order — `table *` reads its columns
+        # alphabetically where `table b, a` keeps the order it was given.
+        matches = sorted(k for k in known if fnmatch(k, pattern)) if "*" in pattern else [pattern]
+        expanded.extend(m for m in matches if m not in expanded)
+    return expanded
 
 
 def _cmd_rename(rows: Rows, command: SPLCommand) -> Rows:
@@ -231,6 +258,366 @@ def _cmd_rename(rows: Rows, command: SPLCommand) -> Rows:
         {mapping.get(key, key): value for key, value in row.items()}
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# The commands SOAR content uses that mockdr refused
+#
+# `eventstats`, `mvexpand`, `filldown`, `spath`, `convert` and `bin` were all
+# unknown commands here, so a search using any of them was refused outright.
+# Every rule below was measured against Splunk 10.4.2, including the wording
+# of each refusal — three of these commands word theirs differently again.
+# ---------------------------------------------------------------------------
+
+#: `eventstats` takes these beside its statistics; anything else it refuses.
+_EVENTSTATS_OPTIONS = frozenset({"allnum", "limit"})
+
+
+def _cmd_eventstats(rows: Rows, command: SPLCommand) -> Rows:
+    """``stats`` computed over the whole set and joined onto every row."""
+    aggs, by_fields, _options = _aggregation_plan(
+        command.arg, options=_EVENTSTATS_OPTIONS,
+    )
+    if not aggs:
+        aggs = [("count", "", "count")]
+
+    groups: dict[tuple, Rows] = {}
+    for row in rows:
+        if any(row.get(f) in (None, "") for f in by_fields):
+            continue
+        groups.setdefault(_group_key(row, by_fields), []).append(row)
+
+    out: Rows = []
+    for row in rows:
+        computed = dict(row)
+        if not any(row.get(f) in (None, "") for f in by_fields):
+            computed.update(_aggregated(aggs, groups[_group_key(row, by_fields)]))
+        out.append(computed)
+    return out
+
+
+def _group_key(row: dict[str, Any], by_fields: list[str]) -> tuple:
+    return tuple(str(row.get(f, "")) for f in by_fields)
+
+
+def _cmd_mvexpand(rows: Rows, command: SPLCommand) -> Rows:
+    """One row per value of a multivalue field.
+
+    Exactly one field, optionally with a ``limit``: a second field name is
+    "Invalid argument", none at all is "A field name is expected", and a
+    limit that is not a non-negative integer is refused by the search
+    processor rather than by the command.
+    """
+    field = ""
+    limit = 0
+    for token in re.split(r"[,\s]+", command.arg.strip()):
+        if not token:
+            continue
+        option = re.fullmatch(r"(?i)limit\s*=\s*(\S+)", token)
+        if option:
+            raw = option.group(1).strip('"')
+            if not _COUNT_RE.fullmatch(raw):
+                raise _option_error("limit", "non-negative integer", raw)
+            limit = int(raw)
+        elif "=" in token:
+            msg = f"Invalid argument: '{token}'"
+            raise ValueError(msg)
+        elif field:
+            msg = f"Invalid argument: '{token}'"
+            raise ValueError(msg)
+        else:
+            field = token
+    if not field:
+        msg = "A field name is expected."
+        raise ValueError(msg)
+
+    out: Rows = []
+    for row in rows:
+        if field not in row:
+            # A field the row does not have leaves it exactly as it was.
+            out.append(dict(row))
+            continue
+        values = values_of(row[field])
+        for value in values[:limit] if limit else values:
+            out.append({**row, field: value})
+    return out
+
+
+def _cmd_filldown(rows: Rows, command: SPLCommand) -> Rows:
+    """Carry the last value a field had down into the rows that lack it."""
+    named = _fields(command.arg)
+    remembered: dict[str, Any] = {}
+    out: Rows = []
+    for row in rows:
+        filled = dict(row)
+        for name in named or list({**remembered, **row}):
+            if filled.get(name) not in (None, ""):
+                remembered[name] = filled[name]
+            elif name in remembered:
+                filled[name] = remembered[name]
+        out.append(filled)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# spath
+# ---------------------------------------------------------------------------
+
+def _flatten_json(value: Any, prefix: str, into: dict[str, Any]) -> None:
+    """Write every path of a decoded document into *into*, splunkd's way.
+
+    A container is written twice: as its own compact JSON under its name, and
+    as the paths inside it. An array of scalars becomes ``name{}`` holding
+    every value; an array of objects becomes ``name{}.key`` holding every
+    key. Measured — `spath` on ``{"a":{"b":1},"c":[1,2]}`` writes ``a``,
+    ``a.b``, ``c`` and ``c{}``.
+    """
+    if isinstance(value, dict):
+        if prefix:
+            into[prefix] = json.dumps(value, separators=(",", ":"))
+        for key, child in value.items():
+            _flatten_json(child, f"{prefix}.{key}" if prefix else key, into)
+        return
+    if isinstance(value, list):
+        if prefix:
+            into[prefix] = json.dumps(value, separators=(",", ":"))
+        collected: dict[str, list[Any]] = {}
+        for item in value:
+            nested: dict[str, Any] = {}
+            _flatten_json(item, "", nested)
+            if nested:
+                for key, child in nested.items():
+                    collected.setdefault(f"{prefix}{{}}.{key}", []).append(child)
+            else:
+                collected.setdefault(f"{prefix}{{}}", []).append(_spath_scalar(item))
+        for key, members in collected.items():
+            into[key] = one_or_many(members)
+        return
+    if prefix:
+        into[prefix] = _spath_scalar(value)
+
+
+def _spath_scalar(value: Any) -> str:
+    """A leaf as spath writes it: `true` and `null` keep their JSON words."""
+    return value if isinstance(value, str) else json.dumps(value)
+
+
+def _cmd_spath(rows: Rows, command: SPLCommand) -> Rows:
+    """Read JSON out of a field into fields of its own.
+
+    Without arguments it reads ``_raw`` and writes every path it finds;
+    ``path=`` picks one, and ``output=`` names where it goes.
+    """
+    options = _options(command.arg)
+    source_field = options.get("input", "_raw")
+    path = options.get("path", "")
+    output = options.get("output", "")
+    if not path:
+        # `spath output=z` alone has nothing to select; the bare form of the
+        # command writes everything.
+        path = ""
+
+    out: Rows = []
+    for row in rows:
+        source = row.get(source_field)
+        if not isinstance(source, str):
+            out.append(dict(row))
+            continue
+        try:
+            document = json.loads(source)
+        except ValueError:
+            out.append(dict(row))
+            continue
+        flat: dict[str, Any] = {}
+        _flatten_json(document, "", flat)
+        if not path:
+            out.append({**row, **flat})
+            continue
+        value = flat.get(path)
+        if value is None:
+            found = json_path(document, path)
+            value = None if found is None else _spath_scalar(found)
+        out.append({**row, output or path: value} if value is not None else dict(row))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# convert
+# ---------------------------------------------------------------------------
+
+#: splunkd's default for `ctime`, and what `mktime` reads.
+_CTIME_FORMAT = "%m/%d/%Y %H:%M:%S"
+
+_MEMORY_UNITS = {"k": 1.0, "m": 1024.0, "g": 1024.0 * 1024.0}
+
+
+def _convert_value(kind: str, value: Any, timeformat: str) -> Any:
+    """One `convert` conversion, or None when it does not apply."""
+    text = "" if value is None else str(value)
+    if kind == "none":
+        return value
+    if kind in ("num", "auto"):
+        return _as_float_or_none(text)
+    if kind == "rmcomma":
+        return _as_float_or_none(text.replace(",", ""))
+    if kind == "rmunit":
+        match = re.match(r"\s*(-?\d+(?:\.\d+)?)", text)
+        return _shrink(float(match.group(1))) if match else None
+    if kind == "memk":
+        match = re.match(r"(?i)\s*(-?\d+(?:\.\d+)?)\s*([kmg])?", text)
+        if not match:
+            return None
+        unit = _MEMORY_UNITS[(match.group(2) or "k").lower()]
+        return _shrink(float(match.group(1)) * unit)
+    if kind == "dur2sec":
+        parts = text.split(":")
+        if not all(re.fullmatch(r"\d+(?:\.\d+)?", p) for p in parts):
+            return None
+        seconds = 0.0
+        for part in parts:
+            seconds = seconds * 60 + float(part)
+        return _shrink(seconds)
+    if kind == "ctime":
+        moment = _as_float(text)
+        if moment is None:
+            return None
+        return datetime.fromtimestamp(moment, tz=UTC).strftime(timeformat)
+    if kind == "mktime":
+        try:
+            parsed = datetime.strptime(text, timeformat).replace(tzinfo=UTC)
+        except ValueError:
+            return None
+        return _shrink(parsed.timestamp())
+    msg = f"The conversion type '{kind}' is invalid."
+    raise ValueError(msg)
+
+
+def _as_float_or_none(text: str) -> float | int | None:
+    number = _as_float(text)
+    return _shrink(number) if number is not None else None
+
+
+#: `num(bytes) as size`, `ctime(_time)`, `dur2sec(duration)`.
+_CONVERT_RE = re.compile(
+    r"(?P<kind>\w+)\s*\(\s*(?P<field>[^)]*)\s*\)(?:\s+as\s+(?P<alias>[^\s,]+))?",
+    re.IGNORECASE,
+)
+
+
+def _cmd_convert(rows: Rows, command: SPLCommand) -> Rows:
+    """Convert field values between the shapes splunkd knows.
+
+    A conversion that does not apply — `num` over text — leaves the field
+    unwritten, which for a conversion in place means the field disappears.
+    """
+    arg = command.arg
+    fmt_match = re.search(r'timeformat\s*=\s*("[^"]*"|\S+)', arg, re.IGNORECASE)
+    timeformat = fmt_match.group(1).strip('"') if fmt_match else _CTIME_FORMAT
+    if fmt_match:
+        arg = arg[: fmt_match.start()] + arg[fmt_match.end() :]
+
+    plan = [
+        (m.group("kind").lower(), m.group("field").strip(), m.group("alias"))
+        for m in _CONVERT_RE.finditer(arg)
+    ]
+    out: Rows = []
+    for row in rows:
+        converted = dict(row)
+        for kind, field, alias in plan:
+            names = list(row) if field == "*" else [field]
+            for name in names:
+                if name not in row:
+                    continue
+                value = _convert_value(kind, row[name], timeformat)
+                target = alias or name
+                if value is None:
+                    converted.pop(target, None)
+                else:
+                    converted[target] = value
+        out.append(converted)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# bin
+# ---------------------------------------------------------------------------
+
+#: What `bin` takes beside the field name.
+_BIN_OPTIONS = frozenset({"span", "bins", "minspan", "start", "end", "aligntime", "as"})
+
+
+def _cmd_bin(rows: Rows, command: SPLCommand) -> Rows:
+    """Group a field's values into buckets.
+
+    A numeric span writes the bucket as ``start-end``; a span with a time
+    unit writes the bucket's start on its own, which is what makes
+    ``| bin _time span=1h | stats count by _time`` an hourly count.
+    """
+    options: dict[str, str] = {}
+    field = ""
+    tokens = [t for t in re.split(r"[,\s]+", command.arg.strip()) if t]
+    while tokens:
+        token = tokens.pop(0)
+        option = re.fullmatch(r"(\w+)\s*=\s*(\S+)", token)
+        if option and option.group(1).lower() in _BIN_OPTIONS:
+            options[option.group(1).lower()] = option.group(2).strip('"')
+        elif token.lower() == "as" and tokens:
+            # `bin n span=2 as slot` names the bucket without touching `n`.
+            options["as"] = tokens.pop(0).strip('"')
+        elif "=" in token or field:
+            msg = f"Invalid argument: '{token}'"
+            raise ValueError(msg)
+        else:
+            field = token
+    if not field:
+        msg = "You must specify a field to discretize."
+        raise ValueError(msg)
+
+    numbers = [n for n in (_as_float(r.get(field)) for r in rows) if n is not None]
+    span, is_time, decimals = _bin_span(options, numbers)
+    target = options.get("as", field)
+
+    out: Rows = []
+    for row in rows:
+        value = _as_float(row.get(field))
+        if value is None:
+            out.append(dict(row))
+            continue
+        start = math.floor(value / span) * span
+        if is_time:
+            out.append({**row, target: _shrink(start)})
+        else:
+            edge = start + span
+            out.append({
+                **row,
+                target: f"{start:.{decimals}f}-{edge:.{decimals}f}",
+            })
+    return out
+
+
+def _bin_span(options: dict[str, str], numbers: list[float]) -> tuple[float, bool, int]:
+    """The span `bin` will use, whether it is a time span, and its decimals."""
+    raw = options.get("span", "")
+    if raw:
+        match = re.fullmatch(r"(?i)(\d+(?:\.\d+)?)\s*([smhdw]|mon)?", raw)
+        if match:
+            unit = (match.group(2) or "").lower()
+            width = float(match.group(1))
+            decimals = len(match.group(1).partition(".")[2])
+            if unit:
+                return width * _DURATION_UNITS.get(unit, 1), True, 0
+            return width, False, decimals
+    target = 0.0
+    if options.get("minspan"):
+        target = float(options["minspan"])
+    elif options.get("bins") and numbers:
+        divisions = max(int(options["bins"]), 1)
+        target = (max(numbers) - min(numbers)) / divisions
+    if target > 0:
+        # splunkd rounds the span it works out up to a power of ten: four
+        # values across a range of 3 in two bins are one bucket of 10.
+        return float(10 ** math.ceil(math.log10(target))), False, 0
+    return 1.0, False, 0
 
 
 # ---------------------------------------------------------------------------
@@ -1089,7 +1476,14 @@ _HANDLERS: dict[str, Callable[[Rows, SPLCommand], Rows]] = {
     "sort": _cmd_sort,
     "stats": _cmd_stats,
     "table": _cmd_table,
+    "bin": _cmd_bin,
+    "bucket": _cmd_bin,
+    "convert": _cmd_convert,
+    "eventstats": _cmd_eventstats,
+    "filldown": _cmd_filldown,
     "makeresults": _cmd_makeresults,
+    "mvexpand": _cmd_mvexpand,
+    "spath": _cmd_spath,
     "streamstats": _cmd_streamstats,
     "tail": _cmd_tail,
     "timechart": _cmd_timechart,
