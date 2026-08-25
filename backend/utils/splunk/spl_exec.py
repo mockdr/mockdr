@@ -7,6 +7,9 @@ text, so the two forms returned different rows than Splunk would.
 """
 from __future__ import annotations
 
+import csv
+import io
+import json
 import re
 from collections import Counter, OrderedDict
 from collections.abc import Callable
@@ -19,11 +22,20 @@ from utils.splunk.spl_expr import (
     parse_search,
     parse_where,
 )
-from utils.splunk.spl_parser import SPLCommand, SPLQuery, parse_sort_keys
+from utils.splunk.spl_parser import (
+    SPLCommand,
+    SPLQuery,
+    current_time,
+    parse_sort_keys,
+)
 
 __all__ = ["execute_pipeline", "split_by"]
 
 Rows = list[dict[str, Any]]
+
+#: The name this instance answers with, kept the same as the one
+#: ``/services/server/info`` reports; `makeresults annotate=true` shows it.
+SPLUNK_SERVER = "mockdr-splunk"
 
 
 #: How splunkd names each command in an error. `eval` is the odd one: it
@@ -39,8 +51,15 @@ def _command_label(name: str) -> str:
 
 def _failure_text(command: SPLCommand, exc: Exception) -> str:
     """Word a command failure the way splunkd words it."""
+    if isinstance(exc, OptionError):
+        return f"Error in '{exc.subject}': {exc}" if exc.subject else str(exc)
     subject = _command_label(command.name)
     if isinstance(exc, SPLExprError):
+        if exc.function and exc.invalid_arguments:
+            return (
+                f"Error in {subject}: The arguments to the '{exc.function}' "
+                f"function are invalid."
+            )
         if exc.function:
             return (
                 f"Error in {subject}: The '{exc.function}' function is "
@@ -80,7 +99,20 @@ def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, 
     if query.search_expr is not None:
         rows = [r for r in rows if evaluate(query.search_expr, r, mode="search")]
 
-    for command in query.commands:
+    for position, command in enumerate(query.commands):
+        if command.name == "makeresults" and (
+            position or query.search_expr is not None
+        ):
+            # A generating command produces the rows; it cannot follow rows
+            # that already exist.
+            messages.append({
+                "type": "FATAL",
+                "text": (
+                    "Error in 'makeresults' command: This command must be "
+                    "the first command of a search."
+                ),
+            })
+            return [], messages
         handler = _HANDLERS.get(command.name)
         if handler is None:  # pragma: no cover - parser filters these out
             messages.append({
@@ -201,6 +233,182 @@ def _cmd_rename(rows: Rows, command: SPLCommand) -> Rows:
     ]
 
 
+# ---------------------------------------------------------------------------
+# makeresults
+#
+# The command every Splunk example and every hand-written test starts with.
+# mockdr did not know it and refused the whole search, so the standard way to
+# try an expression could not be tried against the mock at all.
+#
+# splunkd words its refusals here under three different subjects — the option
+# values under `SearchProcessor`, the inline-data rules under
+# `MakeResultsProcessor`, and the placement rule under the command itself —
+# and one of them carries no subject at all. All measured against 10.4.2.
+# ---------------------------------------------------------------------------
+
+#: `key=value`, with a quoted value kept whole: `data="a,b\n1,2"`.
+_OPTION_RE = re.compile(r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|\S*)')
+
+#: splunkd takes these four words for true and these four for false, and
+#: refuses `on`, `y` and everything else (measured).
+_TRUE_WORDS = frozenset({"true", "t", "yes", "1"})
+_FALSE_WORDS = frozenset({"false", "f", "no", "0"})
+
+#: A non-negative integer as splunkd reads it: `+2` and `02` pass, `1.5`,
+#: `-1` and ` 2 ` do not.
+_COUNT_RE = re.compile(r"\+?\d+")
+
+_INLINE_PAIR = (
+    "You must specify both 'format' and 'data' arguments for 'makeresults' "
+    "to read inline data. If you are providing inline data, specify both "
+    "'format' and 'data'. If you are not providing inline data, do not "
+    "specify either argument."
+)
+_INLINE_ONLY = (
+    "When 'makeresults' generates events from inline data, it does not allow "
+    "arguments other than 'format' and 'data'. If you are providing inline "
+    "data for 'makeresults', specify only the 'format' and 'data' arguments."
+)
+_INLINE_JSON = (
+    "Incorrectly-formatted JSON data detected. Make sure your JSON-formatted "
+    "data starts with '[' and ends with ']' and consists of JSON objects."
+)
+
+
+class OptionError(ValueError):
+    """A failure splunkd words under a subject of its own.
+
+    Most command failures read "Error in '<command>' command: ...", but the
+    option checks are done by the search processor and say so, and one of the
+    inline-data messages carries no subject at all. A client keying on the
+    message reads the whole line, so the subject is part of the answer.
+    """
+
+    def __init__(self, message: str, *, subject: str = "SearchProcessor") -> None:
+        """Record the message and the subject splunkd blames for it."""
+        super().__init__(message)
+        self.subject = subject
+
+
+def _options(arg: str) -> dict[str, str]:
+    """The command's ``key=value`` options, refusing a repeated one."""
+    found: dict[str, str] = {}
+    for match in _OPTION_RE.finditer(arg):
+        name = match.group(1).lower()
+        if name in found:
+            msg = f"Option '{name}' should not be specified more than once."
+            raise OptionError(msg)
+        value = match.group(2)
+        if value.startswith('"') and value.endswith('"') and len(value) > 1:
+            value = value[1:-1].replace('\\"', '"')
+        found[name] = value
+    return found
+
+
+def _option_error(name: str, expected: str, raw: str) -> OptionError:
+    return OptionError(
+        f"Invalid option value. Expecting a '{expected}' for option "
+        f"'{name}'. Instead got '{raw}'.",
+    )
+
+
+def _boolean_option(name: str, raw: str) -> bool:
+    word = raw.lower()
+    if word in _TRUE_WORDS:
+        return True
+    if word in _FALSE_WORDS:
+        return False
+    raise _option_error(name, "boolean", raw)
+
+
+def _inline_rows(options: dict[str, str]) -> Rows:
+    """The rows ``format=`` and ``data=`` describe.
+
+    ``csv`` reads a header line and the rows under it, and carries no
+    ``_time`` at all; ``json`` takes an array of objects and gives each row
+    the object's text as ``_raw`` alongside its fields.
+    """
+    if set(options) - {"format", "data"}:
+        raise OptionError(_INLINE_ONLY, subject="MakeResultsProcessor")
+    fmt = options["format"].lower()
+    data = options["data"]
+    if fmt == "csv":
+        return _inline_csv(data)
+    if fmt == "json":
+        return _inline_json(data)
+    raise OptionError(
+        f"An invalid 'format' was specified: {options['format']}. "
+        "Valid 'format' options are 'csv' and 'json'.",
+        subject="MakeResultsProcessor",
+    )
+
+
+def _inline_csv(data: str) -> Rows:
+    """Inline CSV: the first line names the fields, the rest are rows."""
+    lines = list(csv.reader(io.StringIO(data)))
+    if len(lines) < 2:
+        return []
+    header = lines[0]
+    # A row with fewer cells than the header simply lacks those fields, and
+    # cells beyond the header are dropped (both measured).
+    return [
+        {name: cell for name, cell in zip(header, row, strict=False)}
+        for row in lines[1:]
+    ]
+
+
+def _inline_json(data: str) -> Rows:
+    """Inline JSON: an array of objects, each row keeping its own text."""
+    try:
+        document = json.loads(data)
+    except ValueError:
+        # Text that is not JSON at all produces no rows and no complaint.
+        return []
+    if not isinstance(document, list) or any(
+        not isinstance(item, dict) for item in document
+    ):
+        raise OptionError(_INLINE_JSON, subject="")
+    now = float(int(current_time()))
+    rows: Rows = []
+    for item in document:
+        row: dict[str, Any] = {
+            "_raw": json.dumps(item, separators=(",", ":")),
+            "_time": now,
+        }
+        for key, value in item.items():
+            row[key] = (
+                json.dumps(value, separators=(",", ":"))
+                if isinstance(value, (dict, list))
+                else value
+            )
+        rows.append(row)
+    return rows
+
+
+def _cmd_makeresults(_rows: Rows, command: SPLCommand) -> Rows:
+    """Generate rows out of nothing, the way ``| makeresults`` does.
+
+    Each row carries ``_time`` and nothing else; ``count`` asks for more of
+    them, ``annotate=true`` adds the server that made them, and ``format``
+    with ``data`` reads rows from inline text instead.
+    """
+    options = _options(command.arg)
+    if "format" in options or "data" in options:
+        if "format" not in options or "data" not in options:
+            raise OptionError(_INLINE_PAIR, subject="MakeResultsProcessor")
+        return _inline_rows(options)
+
+    raw_count = options.get("count", "1")
+    if not _COUNT_RE.fullmatch(raw_count):
+        raise _option_error("count", "non-negative integer", raw_count)
+    # Whole seconds: splunkd's own row reads `...:02.000+00:00`, never a
+    # fraction of a second.
+    row: dict[str, Any] = {"_time": float(int(current_time()))}
+    if "annotate" in options and _boolean_option("annotate", options["annotate"]):
+        row["splunk_server"] = SPLUNK_SERVER
+    return [dict(row) for _ in range(int(raw_count))]
+
+
 def _cmd_eval(rows: Rows, command: SPLCommand) -> Rows:
     assignments: list[tuple[str, Any]] = []
     for clause in _split_eval_clauses(command.arg):
@@ -214,9 +422,28 @@ def _cmd_eval(rows: Rows, command: SPLCommand) -> Rows:
     for row in rows:
         updated = dict(row)
         for name, node in assignments:
-            updated[name] = evaluate(node, updated, mode="eval")
+            value = evaluate(node, updated, mode="eval")
+            if isinstance(value, bool):
+                # splunkd refuses to store one, and says what to do instead.
+                raise SPLExprError(_BOOLEAN_ASSIGNMENT)
+            if value is None:
+                # An expression with no value leaves the field out of the row
+                # rather than setting it empty — `mvindex` past the end and a
+                # `strptime` that did not parse both land here.
+                updated.pop(name, None)
+                continue
+            updated[name] = value
         out.append(updated)
     return out
+
+
+#: What splunkd answers when an eval would store a boolean (measured on
+#: 10.4.2). mockdr stored it, so a client saw a field where production sees a
+#: failed search.
+_BOOLEAN_ASSIGNMENT = (
+    "Fields cannot be assigned a boolean result. "
+    "Instead, try if([bool expr], [expr], [expr])."
+)
 
 
 def _cmd_fillnull(rows: Rows, command: SPLCommand) -> Rows:
@@ -613,6 +840,7 @@ _HANDLERS: dict[str, Callable[[Rows, SPLCommand], Rows]] = {
     "sort": _cmd_sort,
     "stats": _cmd_stats,
     "table": _cmd_table,
+    "makeresults": _cmd_makeresults,
     "tail": _cmd_tail,
     "timechart": _cmd_timechart,
     "top": _cmd_top,

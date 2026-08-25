@@ -21,9 +21,15 @@ import operator
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
 from fnmatch import fnmatch
 from typing import Any
+
+from utils.splunk.spl_functions import (
+    FUNCTIONS,
+    ArgumentError,
+    one_or_many,
+    values_of,
+)
 
 __all__ = [
     "SPLExprError",
@@ -44,11 +50,18 @@ class SPLExprError(ValueError):
     here and another in production.
     """
 
-    def __init__(self, message: str, *, function: str = "", at: str = "") -> None:
+    def __init__(
+        self, message: str, *, function: str = "", at: str = "",
+        invalid_arguments: bool = False,
+    ) -> None:
         """Record the message and, where there is one, the offending token."""
         super().__init__(message)
         self.function = function
         self.at = at
+        #: splunkd words a function it does not have and a function given the
+        #: wrong types differently, and a client keying on the message reads
+        #: one or the other.
+        self.invalid_arguments = invalid_arguments
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +306,8 @@ class _Parser:
                 right = self._parse_additive()
             finally:
                 self._in_value = previous
+            if self._mode != "search":
+                _check_compare(token.text, left, right)
             return Compare(token.text, left, right)
         return left
 
@@ -303,7 +318,10 @@ class _Parser:
             if token is None or token.kind != "op" or token.text not in ("+", "-", "."):
                 return node
             self._next()
-            node = BinOp(token.text, node, self._parse_multiplicative())
+            right = self._parse_multiplicative()
+            if self._mode != "search":
+                _check_binop(token.text, node, right)
+            node = BinOp(token.text, node, right)
 
     def _parse_multiplicative(self) -> Node:
         node = self._parse_atom()
@@ -315,7 +333,9 @@ class _Parser:
             if self._mode != "eval":
                 return node
             self._next()
-            node = BinOp(token.text, node, self._parse_atom())
+            right = self._parse_atom()
+            _check_binop(token.text, node, right)
+            node = BinOp(token.text, node, right)
 
     def _parse_atom(self) -> Node:
         self._depth += 1
@@ -359,7 +379,9 @@ class _Parser:
                     while self._accept(","):
                         args.append(self._parse_or())
                     self._expect(")")
-                return FuncCall(token.text.lower(), tuple(args))
+                name = token.text.lower()
+                _check_arguments(name, args)
+                return FuncCall(name, tuple(args))
 
             if self._mode == "search":
                 if self._in_value:
@@ -378,6 +400,87 @@ class _Parser:
             return FieldRef(token.text)
 
         raise SPLExprError(f"unexpected token {token.text!r}", at=token.text)
+
+
+# ---------------------------------------------------------------------------
+# Static typing
+#
+# splunkd type-checks an expression before it runs it, on the types it can
+# see: a literal's, and the type an operator produces. `"1"+1` and `"x".null()`
+# are refused before a row is read, where `field+1` waits for the row and
+# yields null if the value is not a number. mockdr coerced both, so a search
+# splunkd refuses returned an answer here.
+#
+# All four messages measured against Splunk 10.4.2.
+# ---------------------------------------------------------------------------
+
+_STR, _NUM, _NULL, _UNKNOWN = "str", "num", "null", "unknown"
+
+_ARITHMETIC = ("-", "*", "/", "%")
+
+
+def _static_type(node: Node) -> str:
+    """The type splunkd can see for *node* without reading a row."""
+    if isinstance(node, Literal):
+        return _NUM if isinstance(node.value, (int, float)) else _STR
+    if isinstance(node, FuncCall):
+        # `null()` is a typed literal there — Invalid — not a missing value.
+        return _NULL if node.name == "null" else _UNKNOWN
+    if isinstance(node, BinOp):
+        if node.op == ".":
+            return _STR
+        if node.op == "+":
+            sides = (_static_type(node.left), _static_type(node.right))
+            return _STR if _STR in sides else _NUM
+        return _NUM
+    return _UNKNOWN
+
+
+def _check_binop(op: str, left: Node, right: Node) -> None:
+    """Refuse an operand pairing splunkd type-checks away."""
+    sides = (_static_type(left), _static_type(right))
+    if op == ".":
+        if _NULL in sides:
+            raise SPLExprError(
+                "Type checking failed. The '.' operator only takes strings "
+                "and numbers.",
+            )
+        return
+    if op == "+":
+        if _NULL in sides or (_STR in sides and _NUM in sides):
+            raise SPLExprError(
+                "Type checking failed. '+' only takes two strings or two "
+                "numbers.",
+            )
+        return
+    if op in _ARITHMETIC and (_STR in sides or _NULL in sides):
+        raise SPLExprError(f"Type checking failed. '{op}' only takes numbers.")
+
+
+def _check_arguments(name: str, args: list[Node]) -> None:
+    """Refuse ``null()`` where the function will not take a typed null.
+
+    A *missing field* is a runtime null and makes the call null; the literal
+    is refused before the search runs, so ``mvcount(null())`` is an argument
+    error where ``mvcount(nosuchfield)`` is not.
+    """
+    if name in _NULL_ARGUMENT_OK:
+        return
+    if any(_static_type(arg) == _NULL for arg in args):
+        raise SPLExprError(
+            f"The arguments to the '{name}' function are invalid.",
+            function=name, invalid_arguments=True,
+        )
+
+
+def _check_compare(op: str, left: Node, right: Node) -> None:
+    """Refuse a comparison against ``null()``, which splunkd will not order."""
+    sides = (_static_type(left), _static_type(right))
+    if _NULL in sides and {_STR, _NUM} & set(sides):
+        raise SPLExprError(
+            f"Type checking failed. The '{op}' operator received different "
+            "types.",
+        )
 
 
 def _unquote(text: str) -> str:
@@ -475,8 +578,66 @@ def _truthy(value: Any) -> bool:
     return str(value) not in ("", "0", "false", "False")
 
 
-def _func(name: str, args: list[Any]) -> Any:  # noqa: PLR0911, PLR0912
-    """Evaluate one of the eval functions mockdr supports."""
+#: Functions that answer *about* a value and so see a missing field
+#: themselves; everything else yields null when one of its arguments is
+#: missing. Measured: `typeof(nosuchfield)` is "Invalid",
+#: `tostring(nosuchfield)` and `printf("%s", nosuchfield)` are "Null".
+_NULL_TOLERANT = frozenset({
+    "typeof", "tostring", "printf", "null", "true", "false", "now", "time",
+    "pi", "random", "isnum", "isstr", "isbool", "isint", "in", "validate",
+})
+
+
+#: Functions that take ``null()`` itself as an argument rather than refusing
+#: it: the conditionals, which choose between their arguments, and the ones
+#: that answer about a value.
+_NULL_ARGUMENT_OK = _NULL_TOLERANT | {
+    "if", "case", "coalesce", "nullif", "isnull", "isnotnull", "min", "max",
+}
+
+
+def _sort_key(pair: tuple[Any, str]) -> tuple[int, float, str]:
+    """How splunkd orders one ``min``/``max`` argument.
+
+    Numbers order below strings, and among strings by their bytes. Which of
+    the two a value is depends on where it came from: a quoted literal is a
+    string even when it reads as a number — ``min("10", "9")`` is ``"10"`` —
+    while a field holding ``10`` is that number, so ``max(field, 9)`` is
+    ``10``. Ordering everything numerically got the first wrong, and ordering
+    everything as text the second.
+    """
+    value, static = pair
+    if static != _STR:
+        number = _numeric(value)
+        if number is not None:
+            return (0, number, "")
+    return (1, 0.0, str(value))
+
+
+def _extreme(name: str, args: list[tuple[Any, str]]) -> Any:
+    """``min``/``max`` over arguments of any type.
+
+    A null argument takes no part; no argument at all is an error.
+    """
+    values = [(v, s) for v, s in args if v is not None]
+    if not values:
+        if not args:
+            raise SPLExprError(
+                f"The arguments to the '{name}' function are invalid.",
+                function=name, invalid_arguments=True,
+            )
+        return None
+    chosen = min(values, key=_sort_key) if name == "min" else max(values, key=_sort_key)
+    return chosen[0]
+
+
+def _func(name: str, args: list[Any]) -> Any:
+    """Evaluate one of the eval functions mockdr supports.
+
+    The conditionals stay here because they choose *between* arguments; every
+    other function lives in :mod:`utils.splunk.spl_functions`, which also
+    holds the argument checking splunkd does.
+    """
     if name == "if":
         return args[1] if _truthy(args[0]) else args[2]
     if name == "case":
@@ -491,50 +652,34 @@ def _func(name: str, args: list[Any]) -> Any:  # noqa: PLR0911, PLR0912
     if name in ("isnull", "isnotnull"):
         is_null = args[0] is None or args[0] == ""
         return is_null if name == "isnull" else not is_null
-    if name == "upper":
-        return str(args[0]).upper()
-    if name == "lower":
-        return str(args[0]).lower()
-    if name == "trim":
-        return str(args[0]).strip()
-    if name == "len":
-        return len(str(args[0]))
-    if name == "tostring":
-        return str(args[0])
-    if name == "tonumber":
-        return _numeric(args[0])
-    if name == "abs":
-        num = _numeric(args[0])
-        return abs(num) if num is not None else None
-    if name == "round":
-        num = _numeric(args[0])
-        if num is None:
-            return None
-        digits = int(_numeric(args[1]) or 0) if len(args) > 1 else 0
-        # Splunk keeps the requested precision — `round(10, 2)` is `10.00`,
-        # not `10` — and rounds a half away from zero, where Python's own
-        # `round` rounds it to even: `round(10.5)` is 11 there and 10 here.
-        quantum = Decimal(1).scaleb(-digits)
-        value = Decimal(str(num)).quantize(quantum, rounding=ROUND_HALF_UP)
-        return str(value) if digits > 0 else int(value)
-    if name == "substr":
-        text = str(args[0])
-        start = int(_numeric(args[1]) or 1)
-        length = int(_numeric(args[2]) or 0) if len(args) > 2 else None
-        begin = max(start - 1, 0)
-        return text[begin : begin + length] if length else text[begin:]
     if name == "like":
         return fnmatch(str(args[0]).lower(), str(args[1]).lower().replace("%", "*"))
     if name in ("match", "searchmatch"):
         return bool(re.search(str(args[1]), str(args[0]))) if len(args) > 1 else False
-    if name == "replace":
-        return re.sub(str(args[1]), str(args[2]), str(args[0]))
     if name in ("min", "max"):
-        nums = [n for n in (_numeric(a) for a in args) if n is not None]
-        if not nums:
-            return None
-        return min(nums) if name == "min" else max(nums)
-    raise SPLExprError(f"unknown function {name!r}", function=name)
+        return _extreme(name, [(a, _UNKNOWN) for a in args])
+
+    handler = FUNCTIONS.get(name)
+    if handler is None:
+        raise SPLExprError(f"unknown function {name!r}", function=name)
+    if any(a is None for a in args) and name not in _NULL_TOLERANT:
+        # A missing field makes the call null rather than a type error:
+        # `upper(nosuchfield)` leaves the field unassigned, where
+        # `upper(null())` — a typed null — is refused by the parser above.
+        return None
+    try:
+        return handler(args)
+    except ArgumentError as exc:
+        raise SPLExprError(
+            str(exc), function=name, invalid_arguments=True,
+        ) from exc
+    except (IndexError, TypeError) as exc:
+        # Too few arguments, or one of a type the handler could not use at
+        # all: splunkd calls both invalid arguments.
+        raise SPLExprError(
+            f"The arguments to the '{name}' function are invalid.",
+            function=name, invalid_arguments=True,
+        ) from exc
 
 
 def evaluate(node: Node | None, row: dict, *, mode: str = "where") -> Any:  # noqa: PLR0911
@@ -579,6 +724,16 @@ def evaluate(node: Node | None, row: dict, *, mode: str = "where") -> Any:  # no
         return _binop(node, row)
 
     if isinstance(node, FuncCall):
+        if node.name in ("min", "max"):
+            # These two order their arguments, and where an argument came
+            # from decides whether it counts as text or as a number.
+            return _extreme(node.name, [
+                (evaluate(a, row, mode="eval"), _static_type(a)) for a in node.args
+            ])
+        if node.name in ("mvfilter", "mvmap"):
+            # These two evaluate their expression once per value of a
+            # multivalue field, so they need it unevaluated.
+            return _mv_lambda(node, row)
         # `if` must not evaluate both branches eagerly for side-effect-free
         # semantics, but all our functions are pure, so this is safe.
         return _func(node.name, [evaluate(a, row, mode="eval") for a in node.args])
@@ -586,11 +741,76 @@ def evaluate(node: Node | None, row: dict, *, mode: str = "where") -> Any:  # no
     raise SPLExprError(f"cannot evaluate {node!r}")
 
 
+def _field_names(node: Node) -> list[str]:
+    """Every field the expression reads, first-mentioned first."""
+    found: list[str] = []
+    stack: list[Node] = [node]
+    while stack:
+        current = stack.pop(0)
+        if isinstance(current, FieldRef):
+            if current.name not in found:
+                found.append(current.name)
+        elif isinstance(current, NotOp):
+            stack.append(current.child)
+        elif isinstance(current, BoolOp):
+            stack.extend(current.children)
+        elif isinstance(current, Compare):
+            stack.extend([current.left, current.right])
+        elif isinstance(current, BinOp):
+            stack.extend([current.left, current.right])
+        elif isinstance(current, FuncCall):
+            stack.extend(current.args)
+    return found
+
+
+def _mv_lambda(node: FuncCall, row: dict) -> Any:
+    """``mvfilter(expr)`` and ``mvmap(field, expr)``.
+
+    Both bind one field, value by value, and evaluate the expression against
+    each: `mvfilter(m!="b")` keeps the values it holds for, `mvmap(m, m."!")`
+    replaces each with what it produces. A field the row does not have makes
+    the result null; an expression that names no field is an argument error,
+    which is what splunkd calls it.
+    """
+    if node.name == "mvfilter":
+        expression = node.args[0] if len(node.args) == 1 else None
+        names = _field_names(expression) if expression is not None else []
+        field_name = names[0] if len(names) == 1 else ""
+    else:
+        expression = node.args[1] if len(node.args) == 2 else None
+        first = node.args[0] if node.args else None
+        field_name = first.name if isinstance(first, FieldRef) else ""
+    if expression is None or not field_name:
+        raise SPLExprError(
+            f"The arguments to the '{node.name}' function are invalid.",
+            function=node.name, invalid_arguments=True,
+        )
+
+    source = row.get(field_name)
+    if source is None:
+        return None
+    kept: list[Any] = []
+    for value in values_of(source):
+        scoped = {**row, field_name: value}
+        result = evaluate(expression, scoped, mode="eval")
+        if node.name == "mvfilter":
+            if _truthy(result):
+                kept.append(value)
+        elif result is not None:
+            kept.append(result)
+    return one_or_many(kept)
+
+
 def _binop(node: BinOp, row: dict) -> Any:
     left = evaluate(node.left, row, mode="eval")
     right = evaluate(node.right, row, mode="eval")
 
-    if node.op == ".":
+    # A missing field makes the whole expression null rather than an empty
+    # string: `nosuchfield."x"` leaves the field unassigned there.
+    if left is None or right is None:
+        return None
+
+    if node.op == "." or (node.op == "+" and _concatenates(node)):
         return f"{_render(left)}{_render(right)}"
 
     left_num, right_num = _numeric(left), _numeric(right)
@@ -608,6 +828,17 @@ def _binop(node: BinOp, row: dict) -> Any:
     if node.op == "/":
         return _shrink(left_num / right_num) if right_num else None
     raise SPLExprError(f"unknown operator {node.op!r}")
+
+
+def _concatenates(node: BinOp) -> bool:
+    """Whether this ``+`` joins text rather than adding.
+
+    splunkd decides by the types it can see: with a string on either side
+    ``+`` concatenates and the other operand is rendered, so ``a+"2"`` is
+    ``12`` whether ``a`` holds 1 or "1". With no string in sight it adds, and
+    a value that is not a number makes the result null.
+    """
+    return _STR in (_static_type(node.left), _static_type(node.right))
 
 
 def _shrink(value: float) -> float | int:

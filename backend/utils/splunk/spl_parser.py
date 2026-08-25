@@ -37,7 +37,8 @@ __all__ = [
 # Commands the executor implements. Anything outside this set is reported
 # rather than silently ignored.
 KNOWN_COMMANDS = frozenset({
-    "dedup", "eval", "fields", "fillnull", "head", "rare", "regex", "rename",
+    "dedup", "eval", "fields", "fillnull", "head", "makeresults", "rare",
+    "regex", "rename",
     "rex", "search", "sort", "stats", "table", "tail", "timechart", "top",
     "where",
 })

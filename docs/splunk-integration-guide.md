@@ -55,22 +55,51 @@ To connect XSOAR SplunkPy to MockDR:
 
 ## Supported SPL
 
-The mock SPL parser supports the following patterns:
+Commands run in the order they are written, so `| head 1 | sort _time` and
+`| sort _time | head 1` differ the way they do in Splunk. A command the mock
+does not implement is refused the way splunkd refuses an unknown one, rather
+than being ignored.
 
 ```spl
 search index=<index> sourcetype=<sourcetype> <field>=<value>
-| where <field>=<value>
-| head <N>
-| tail <N>
-| table <field1> <field2> ...
-| stats count by <field>
-| sort [-]<field>
-| rename <old> as <new>
-| eval <field>=<expr>
+| makeresults [count=<n>] [annotate=<bool>]
+| makeresults format=csv|json data="<inline rows>"
+| search <expr>            | where <expr>
+| eval <field>=<expr>      | fields [+|-] <field> ...
+| table <field> ...        | rename <old> as <new>
+| head <N>                 | tail <N>
+| sort [-]<field>, ...     | dedup <field> ...
+| stats <func>(<field>) [as <name>] [by <field>]
+| timechart span=<span> <func>(<field>) [by <field>]
+| top [<N>] <field>        | rare [<N>] <field>
+| rex field=<field> "<regex>"   | regex <field>="<regex>"
+| fillnull [value=<v>] [<field> ...]
 `notable`   (macro → search index=notable)
 ```
 
 Time modifiers: `earliest=-24h`, `latest=now`, `earliest=-7d@d`
+
+### eval functions
+
+Around fifty, measured one by one against Splunk 10.4.2: the multivalue
+family (`split`, `mvindex`, `mvjoin`, `mvfilter`, `mvmap`, …), text
+(`upper`, `substr`, `replace`, `printf`, `md5`, `sha256`, …), maths
+(`round`, `pow`, `sqrt`, `log`, …), time (`strftime`, `strptime`,
+`relative_time`), JSON (`spath`, `json_extract`, `json_object`, …),
+`cidrmatch`, and the conditionals (`if`, `case`, `coalesce`, `validate`).
+
+The strictness is measured too, because a client keys on it:
+
+* Argument *types* are checked. `len(123)`, `upper(1)` and `md5(1)` are
+  "The arguments to the '<name>' function are invalid" — not answers.
+* Types the expression can be seen to have are checked before the search
+  runs: `"1"+1` is refused, where `field+1` waits for the row and yields
+  null if the value is not a number.
+* `null()` is a typed null, and not the same thing as a field the row does
+  not have: `upper(null())` is an argument error, `upper(nosuchfield)` is
+  null and leaves the field unassigned.
+* A field cannot be assigned a boolean — `eval v=1==1` is refused with
+  splunkd's own suggestion to use `if()`.
 
 ## Notable Event Status Values
 

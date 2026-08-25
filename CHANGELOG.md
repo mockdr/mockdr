@@ -8,6 +8,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Fifty-three more `eval` functions, and the strictness around them.** The
+mock had nineteen; it has seventy-two. A search using `split`, `cidrmatch`,
+`strftime`, `spath`, `json_extract`, `printf`, `md5` or any of the multivalue
+family got a FATAL here and a value in production. Each was measured one
+expression at a time against Splunk 10.4.2, and in three runs against the
+real engine — 92, 45 and 141 expressions — the two now agree on every one.
+Among them `mvfilter` and `mvmap`, which evaluate their expression once per
+value of the field they bind.
+
+Three kinds of strictness came with them, each measured, each a difference a
+client can see:
+
+* **Argument types.** `len(123)`, `upper(1)` and `md5(1)` are "The arguments
+  to the '<name>' function are invalid" there, and were answers here.
+* **Static type checking.** splunkd checks the types it can see before it
+  reads a row: `"1"+1` and `"a"-"b"` are refused, in four distinct messages.
+  A *field* is typed when the row arrives instead — `field+1` adds if the
+  value is a number and yields null if it is not — and with a string on
+  either side the same `+` concatenates.
+* **A typed null is not a missing field.** `null()` is a literal of type
+  Invalid: `upper(null())` is an argument error, where `upper(nosuchfield)`
+  is null and simply leaves the field unassigned. The mock treated both as an
+  error, so an ordinary search over events missing an optional field failed
+  here and answered there.
+
+Also measured and now matched: a field cannot be assigned a boolean
+(`eval v=1==1` is refused with splunkd's own suggestion to use `if()`), an
+undefined result such as `sqrt(-1)` or `1/0` leaves the field unassigned
+rather than failing, and `min`/`max` order by where a value came from — a
+quoted literal is text even when it reads as a number, so `min("10", "9")` is
+`"10"`, while a field holding `10` is that number.
+
+**`| makeresults`.** The command every Splunk example and every hand-written
+test starts with, which the mock did not know — so it refused the whole
+search, and the standard way to try an expression could not be tried against
+the mock at all. `count`, `annotate`, and inline data through `format=csv|json`
+with `data=`, with the option checking measured down to the wording: a count
+that is not a non-negative integer and a word that is not a boolean are
+refused by the search processor, an option given twice is refused by name,
+inline data allows no other argument, and a generating command that is not
+first is refused by the command itself. splunkd words those under three
+different subjects, and one of them carries no subject at all.
+
 **`output_mode=csv`, where splunkd serves it.** 2.3.0 refused it everywhere,
 in splunkd's own words for a mode a handler will not serve — right for most
 endpoints and wrong for the four that do serve it: a job's `results` and

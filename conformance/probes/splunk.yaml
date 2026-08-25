@@ -1554,3 +1554,341 @@ probes:
       content: 'search=search index=main sourcetype=${sourcetype} | top action&output_mode=csv&exec_mode=oneshot&count=0'
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
+
+  # ── eval functions and makeresults ──────────────────────────────────────
+  #
+  # `| makeresults` generates its own rows, so these probes need no seeding
+  # and no index: both engines answer from the search text alone, and
+  # `| table v` drops the generated `_time`, the only part that could differ.
+  #
+  # The pairs are chosen for the distinctions a plausible implementation
+  # misses: a typed `null()` against a field the row does not have, a type
+  # checked before the search runs against one checked per row, and a quoted
+  # number against a field holding one.
+  #
+  # The search is percent-encoded because it is a form body: an unencoded
+  # `+` there is a space, and an unencoded `&` ends the parameter.
+
+  - id: spl-eval-split
+    endpoint: management
+    compare: values
+    why: >
+      split and the multivalue family.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dsplit%28%22a%3Bb%3Bc%22%2C%20%22%3B%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-split-no-separator
+    endpoint: management
+    compare: values
+    why: >
+      A split that finds no separator is the string, not a list of one.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dsplit%28%22abc%22%2C%20%22%3B%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-mvfilter
+    endpoint: management
+    compare: values
+    why: >
+      mvfilter evaluates its expression once per value of the bound field.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20m%3Dsplit%28%22a1%3Bb%3Bc2%22%2C%22%3B%22%29%20%7C%20eval%20v%3Dmvjoin%28mvfilter%28match%28m%2C%22%5Cd%22%29%29%2C%22-%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-mvmap
+    endpoint: management
+    compare: values
+    why: >
+      mvmap replaces each value with what the expression produces.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20m%3Dsplit%28%22a%3Bb%22%2C%22%3B%22%29%20%7C%20eval%20v%3Dmvjoin%28mvmap%28m%2Cupper%28m%29%29%2C%22-%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-missing-field-is-null
+    endpoint: management
+    compare: values
+    why: >
+      A function over a field the row lacks is null, not an error.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dupper%28nosuchfield%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-typed-null-refused
+    endpoint: management
+    compare: values
+    why: >
+      A typed null in the same place *is* an argument error - the distinction.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dupper%28null%28%29%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-type-check-plus
+    endpoint: management
+    compare: values
+    why: >
+      Two operands of different types are refused before a row is read.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3D%221%22%2B1%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-type-check-minus
+    endpoint: management
+    compare: values
+    why: >
+      Subtraction takes numbers, and says so in its own words.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3D%22a%22-%22b%22%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-type-check-concat-null
+    endpoint: management
+    compare: values
+    why: >
+      Concatenation will not take a typed null either.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3D%22x%22.null%28%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-field-typed-at-runtime
+    endpoint: management
+    compare: values
+    why: >
+      A field, by contrast, is typed when the row arrives: this adds.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20a%3D%221%22%20%7C%20eval%20v%3Da%2B1%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-plus-concatenates
+    endpoint: management
+    compare: values
+    why: >
+      And with a string on either side the same operator joins text.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20a%3D1%20%7C%20eval%20v%3Da%2B%222%22%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-min-max-ordering
+    endpoint: management
+    compare: values
+    why: >
+      A string ranks above every number, so max(1,"a",3) is the string.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dmax%281%2C%22a%22%2C3%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-min-quoted-numbers
+    endpoint: management
+    compare: values
+    why: >
+      Quoted numbers compare as text: min("10","9") is "10".
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dmin%28%2210%22%2C%229%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-json-extract
+    endpoint: management
+    compare: values
+    why: >
+      The json path grammar: dots descend into objects, {n} indexes an array.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Djson_extract%28%22%7B%5C%22a%5C%22%3A%7B%5C%22b%5C%22%3A%5B1%2C%7B%5C%22c%5C%22%3A3%7D%5D%7D%7D%22%2C%22a.b%7B1%7D.c%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-validate
+    endpoint: management
+    compare: values
+    why: >
+      validate answers with the first condition that is false.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dvalidate%281%3D%3D2%2C%22a%22%2C1%3D%3D2%2C%22b%22%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-undefined-maths
+    endpoint: management
+    compare: values
+    why: >
+      An undefined result leaves the field unassigned rather than failing.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3Dsqrt%28-1%29%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-eval-boolean-assignment
+    endpoint: management
+    compare: values
+    why: >
+      A field cannot be assigned a boolean, and splunkd suggests if().
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3D1%3D%3D1%20%7C%20table%20v&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-count
+    endpoint: management
+    compare: values
+    why: >
+      makeresults count, the way every Splunk example starts.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20count%3D3%20%7C%20eval%20n%3D1%20%7C%20table%20n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-count-invalid
+    endpoint: management
+    compare: values
+    why: >
+      A count that is not a non-negative integer, refused by the search processor.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20count%3D-1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-annotate-invalid
+    endpoint: management
+    compare: values
+    why: >
+      A word that is not a boolean, refused with the option named.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20annotate%3Dmaybe&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-duplicate-option
+    endpoint: management
+    compare: values
+    why: >
+      The same option twice.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20count%3D2%20count%3D3&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-not-first
+    endpoint: management
+    compare: values
+    why: >
+      A generating command cannot follow rows that already exist.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20%7C%20eval%20v%3D1%20%7C%20makeresults%20count%3D1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-inline-csv
+    endpoint: management
+    compare: values
+    why: >
+      Inline CSV data: the header names the fields, and no _time is added.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22a%2Cb%0A1%2C2%0A3%2C4%22&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-inline-json
+    endpoint: management
+    compare: values
+    why: >
+      Inline JSON keeps each object as _raw beside its fields.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Djson%20data%3D%22%5B%7B%5C%22a%5C%22%3A1%7D%5D%22%20%7C%20table%20a%2C%20_raw&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-inline-half
+    endpoint: management
+    compare: values
+    why: >
+      format without data, which splunkd explains at length.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-inline-extra-argument
+    endpoint: management
+    compare: values
+    why: >
+      Inline data allows no other argument.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22a%0A1%22%20count%3D5&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-makeresults-inline-bad-format
+    endpoint: management
+    compare: values
+    why: >
+      Only csv and json are formats.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=%7C%20makeresults%20format%3Dxml%20data%3D%22%3Ca%2F%3E%22&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
