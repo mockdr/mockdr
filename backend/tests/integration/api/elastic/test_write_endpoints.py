@@ -214,6 +214,15 @@ class TestAroundAWrite:
     def test_an_index_that_is_not_there_is_a_404(self, client: TestClient) -> None:
         assert client.post("/elastic/no-such-index/_refresh", headers=AUTH).status_code == 404
 
+    def test_the_source_of_a_document_in_an_index_that_is_not_there(
+        self, client: TestClient,
+    ) -> None:
+        # Found by the hostile probe as a plain-text 500: the index check
+        # raised out of the handler instead of answering 404.
+        response = client.get("/elastic/no-such-index/_source/abc", headers=AUTH)
+        assert response.status_code == 404
+        assert response.json()["error"]["type"] == "index_not_found_exception"
+
     def test_the_source_of_a_document_that_is_not_there(self, client: TestClient) -> None:
         response = client.get(f"/elastic/{INDEX}/_source/zz", headers=AUTH)
         assert response.status_code == 404

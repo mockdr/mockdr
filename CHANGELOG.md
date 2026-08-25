@@ -37,6 +37,13 @@ every one of them a 404 here and an answer there:
 An index's `number_of_replicas` now defaults to 1, which is a cluster's own
 default even on a single node.
 
+### Fixed
+
+**`GET /{index}/_source` answered a plain-text 500** for an index that is
+not there — found by the hostile probe on the day it was added: the index
+check raised out of the handler instead of being turned into the 404 every
+other route answers with.
+
 **Elasticsearch: the writes a client makes around a search.** `_update`,
 `_update_by_query`, `_delete_by_query`, `GET _source` and the maintenance
 calls (`_refresh`, `_flush`, `_forcemerge`, `_cache/clear`) were not served

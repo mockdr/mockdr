@@ -532,7 +532,10 @@ def get_source(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """A document's ``_source`` alone, which is what most clients want."""
-    source = search_queries.es_get_source(index, doc_id)
+    try:
+        source = search_queries.es_get_source(index, doc_id)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
     if source is None:
         raise HTTPException(status_code=404, detail=build_es_error_response(
             404, "resource_not_found_exception",
