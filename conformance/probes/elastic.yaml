@@ -1774,3 +1774,313 @@ probes:
       method: GET
       path: /api/endpoint/action_status
       auth: basic
+
+  # ── The query clauses a SIEM client sends (2.3.1) ───────────────────────
+  #
+  # Every one of these was "unknown query" in mockdr, so a detection rule or
+  # a Kibana search bar using one got a 400 here and hits from the cluster.
+  # Each is sorted by `name` and asks for that field alone, so the rows are
+  # comparable without depending on the scoring order Lucene returns them in.
+  #
+  # The seed carries a `message` text field and a `tags` keyword array for
+  # exactly these: a term-level query reads a keyword whole and a text field
+  # token by token, and that difference is what the pairs below pin.
+
+  - id: es-prefix-keyword
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A keyword prefix compares the whole value.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"prefix": {"host": "srv-"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-prefix-text
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A text prefix compares a token, so `log` finds `login`.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"prefix": {"message": "log"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-regexp-anchored
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Lucene anchors a regexp: `srv` alone matches nothing.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"regexp": {"host": "srv"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-regexp-keyword
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Anchored, it matches the whole value.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"regexp": {"host": "srv-[0-9]"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-regexp-text
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And on a text field it matches a token.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"regexp": {"message": "login"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-wildcard-case
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      wildcard is case-sensitive on a keyword.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"wildcard": {"host": "SRV-*"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-wildcard-case-insensitive
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Unless the clause asks for the other behaviour.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"wildcard": {"host": {"value": "SRV-*", "case_insensitive": true}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-fuzzy-auto
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      AUTO allows no edits below three characters.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"fuzzy": {"host": {"value": "srx"}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-fuzzy-one-edit
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      One edit away from the value matches.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"fuzzy": {"host": {"value": "srv-9", "fuzziness": 1}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-ids
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `ids` selects by _id, which the mock could not read at all.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"ids": {"values": ["a", "c"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-multi-match
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      One query over several fields.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"multi_match": {"query": "login", "fields": ["message", "host"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-multi-match-phrase
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The phrase form needs the words in order.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"multi_match": {"query": "failed login", "fields": ["message"], "type": "phrase"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-simple-query-string
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `|` is or, `-` excludes.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"simple_query_string": {"query": "login | malware", "fields": ["message"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-simple-query-string-exclude
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The exclusion on its own.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"simple_query_string": {"query": "login -alice", "fields": ["message"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-match-phrase-prefix
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A phrase whose last word is a prefix.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"match_phrase_prefix": {"message": "failed log"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-match-bool-prefix
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And the bool form, which takes the last word as one.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"match_bool_prefix": {"message": "log"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-minimum-should-match
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      How many of the terms have to match, which the mock ignored.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"match": {"message": {"query": "login failed malware", "minimum_should_match": "70%"}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-constant-score
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The wrapper that only fixes the score.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"constant_score": {"filter": {"term": {"host": "srv-1"}}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-dis-max
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The wrapper that matches any of its queries.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"dis_max": {"queries": [{"term": {"host": "srv-1"}}, {"term": {"host": "srv-2"}}]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-terms-set
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      terms_set counts how many of the terms a document holds.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"terms_set": {"tags": {"terms": ["auth", "linux"], "minimum_should_match_script": {"source": "2"}}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-exists-empty-array
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A field holding an empty array does not exist.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"query": {"exists": {"field": "tags"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-agg-missing
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The `missing` aggregation: the documents without the field.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"m": {"missing": {"field": "@timestamp"}, "aggs": {"s": {"sum": {"field": "sev"}}}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-agg-top-hits
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      top_hits carries the ids the documents were indexed with.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"t": {"top_hits": {"size": 2, "_source": ["name"], "sort": [{"sev": "desc"}]}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic

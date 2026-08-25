@@ -90,9 +90,10 @@ class Probe:
     #: Marks a probe that only means something once both targets hold the
     #: same data. Skipped unless the runner is given a seeded environment.
     needs_seed: bool = False
-    #: Compare the response *values*, not the shape around them. Only useful
-    #: alongside ``needs_seed``: with both targets holding the same events,
-    #: the rows themselves are the behaviour under test.
+    #: Compare the response *values*, not the shape around them. It needs
+    #: both targets to hold the same data — either ``needs_seed``, or a
+    #: search that generates its own rows (``| makeresults``), which needs
+    #: nothing from the index at all.
     compare_values: bool = False
     #: Drop this many lines from the top of a text body before comparing it.
     #: One case needs it: splunkd puts a line before a oneshot's CSV that is

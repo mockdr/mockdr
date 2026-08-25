@@ -4,13 +4,19 @@ Implements the subset of Elasticsearch query DSL used by the XSOAR
 Elasticsearch_v2 integration's ``es-search`` and ``es-eql-search`` commands.
 
 Supported query types:
-    - ``bool`` (must / should / must_not / filter)
-    - ``match``, ``match_phrase``, ``match_all``
-    - ``term``, ``terms``
-    - ``range``
-    - ``wildcard``
-    - ``exists``
-    - ``query_string`` (simple Lucene subset)
+    - ``bool`` (must / should / must_not / filter), ``constant_score``,
+      ``dis_max``, ``boosting``
+    - ``match`` (with ``operator`` and ``minimum_should_match``),
+      ``match_phrase``, ``match_phrase_prefix``, ``match_bool_prefix``,
+      ``match_all``, ``multi_match``
+    - ``term``, ``terms`` (including a lookup), ``terms_set``, ``ids``
+    - ``range``, ``exists``
+    - ``prefix``, ``wildcard``, ``regexp``, ``fuzzy``
+    - ``query_string`` (simple Lucene subset), ``simple_query_string``
+
+A ``nested`` query and a ``script`` query are refused the way Elasticsearch
+refuses an unknown one: mockdr models neither nested mappings nor Painless,
+and answering them approximately would be worse than saying so.
 
 Also handles ``sort``, ``from`` (offset), and ``size`` (limit) from the
 top-level search body.
@@ -18,6 +24,7 @@ top-level search body.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import re
 import uuid
@@ -192,12 +199,21 @@ def _compare_range(field_val: Any, target: Any, op: str) -> bool:
 # Predicate builders — one per query type
 # ---------------------------------------------------------------------------
 
-def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
+def build_predicate(
+    clause: dict,
+    _depth: int = 0,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
     """Recursively build a predicate function from an ES query clause.
 
     Args:
         clause: A single Elasticsearch query clause dict.
         _depth: Recursion guard for nested ``bool`` clauses.
+        ids:    Ids of documents a client wrote, by object identity, so an
+                ``ids`` clause can select the id each was indexed with.
+        lookup: Reads the values a ``terms`` lookup points at, given the
+                index, document id and path it names.
 
     Returns:
         A callable that accepts a record dict and returns ``True`` on match.
@@ -228,7 +244,9 @@ def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
         raise ESQueryError(msg)
 
     for query_type, body in clause.items():
-        builder = _BUILDERS.get(query_type)
+        builder = _BUILDERS.get(query_type) or _WRAPPERS.get(query_type)
+        if query_type == "ids":
+            builder = builder or _build_ids
         if builder is None:
             # Elasticsearch 8 says "unknown query"; "no [query] registered"
             # was the 6.x/7.x wording.
@@ -241,7 +259,14 @@ def build_predicate(clause: dict, _depth: int = 0) -> Callable[[dict], bool]:
             msg = f"[{query_type}] query malformed, expected an object"
             raise ESQueryError(msg)
         if query_type == "bool":
-            return _build_bool(body, _depth + 1)
+            return _build_bool(body, _depth + 1, ids, lookup)
+        wrapper = _WRAPPERS.get(query_type)
+        if wrapper is not None:
+            return wrapper(body, _depth + 1, ids, lookup)
+        if query_type == "ids":
+            return _build_ids(body, _id_resolver(ids))
+        if query_type in ("terms", "terms_set"):
+            return builder(body, lookup)
         return builder(body)
 
     # Empty dict → match all.
@@ -263,11 +288,14 @@ def _build_match(body: dict) -> Callable[[dict], bool]:
     if isinstance(spec, dict):
         query = str(spec.get("query", ""))
         operator = spec.get("operator", "or").lower()
+        minimum = spec.get("minimum_should_match")
     else:
         query = str(spec)
         operator = "or"
+        minimum = None
 
     terms = _analyze(query)
+    required = _minimum_should_match(minimum, len(terms))
 
     def predicate(rec: dict) -> bool:
         val = _get_nested(rec, field)
@@ -276,11 +304,38 @@ def _build_match(body: dict) -> Callable[[dict], bool]:
         # Match against analysed tokens, not raw substrings: `match: "SERV"`
         # used to hit "SERVER-KQEZSV", which no analyzer produces.
         tokens = set(_analyze_value(val))
+        hits = sum(1 for t in terms if t in tokens)
+        if required is not None:
+            return hits >= required
         if operator == "and":
-            return all(t in tokens for t in terms)
-        return any(t in tokens for t in terms)
+            return hits == len(terms)
+        return hits > 0
 
     return predicate
+
+
+def _minimum_should_match(spec: Any, total: int) -> int | None:
+    """How many of the terms have to match, from ``minimum_should_match``.
+
+    A number is that many, a percentage is that share of them rounded down,
+    and a negative of either is how many may be missing. Ignoring it made
+    ``match`` an OR whatever the client asked for — three hits where the
+    cluster returns one.
+    """
+    if spec is None or total == 0:
+        return None
+    text = str(spec).strip()
+    percent = text.endswith("%")
+    try:
+        number = float(text.rstrip("%"))
+    except ValueError:
+        return None
+    if percent:
+        share = total * abs(number) / 100
+        needed = total - int(share) if number < 0 else int(share)
+    else:
+        needed = total + int(number) if number < 0 else int(number)
+    return max(0, min(needed, total))
 
 
 def _build_match_phrase(body: dict) -> Callable[[dict], bool]:
@@ -333,17 +388,40 @@ def _build_term(body: dict) -> Callable[[dict], bool]:
                 return float(val) == float(target)
             except (ValueError, TypeError):
                 return False
+        if isinstance(target, str) and "/" in target:
+            # An `ip` field takes a network here: `term: {ip: "10.0.0.0/24"}`
+            # is every address inside it, not a string that never matches.
+            inside = _in_network(val, target)
+            if inside is not None:
+                return inside
         return str(val) == str(target)
 
     return predicate
 
 
-def _build_terms(body: dict) -> Callable[[dict], bool]:
+def _in_network(value: Any, network: str) -> bool | None:
+    """Whether *value* is an address inside *network*, or None if neither is."""
+    try:
+        block = ipaddress.ip_network(network, strict=False)
+        address = ipaddress.ip_address(str(value))
+    except ValueError:
+        return None
+    return address.version == block.version and address in block
+
+
+def _build_terms(
+    body: dict, lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
     """Build predicate for ``terms``.
 
-    Matches if the field value equals any of the listed values (case-sensitive).
+    Matches if the field value equals any of the listed values
+    (case-sensitive). The values can also be named indirectly — a document
+    elsewhere holds them — which mockdr read as an empty list, so a *terms
+    lookup* silently matched nothing where a cluster answers with hits.
     """
     field, values = next(iter(body.items()))
+    if isinstance(values, dict):
+        values = _terms_lookup(values, lookup)
     str_values = {str(v) for v in values}
 
     def predicate(rec: dict) -> bool:
@@ -353,6 +431,63 @@ def _build_terms(body: dict) -> Callable[[dict], bool]:
         return str(val) in str_values
 
     return predicate
+
+
+def _terms_lookup(
+    spec: dict, lookup: Callable[[str, str, str], list[Any]] | None,
+) -> list[Any]:
+    """Read the values a ``terms`` lookup points at.
+
+    A document that is not there, or a path it does not carry, is not an
+    error — the clause simply matches nothing. A missing *index* is, and the
+    resolver raises it so the search answers 404 the way a cluster does.
+    """
+    if lookup is None:
+        return []
+    return lookup(
+        str(spec.get("index", "")), str(spec.get("id", "")), str(spec.get("path", "")),
+    )
+
+
+def _build_terms_set(
+    body: dict, lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
+    """Build predicate for ``terms_set``: *how many* of the terms must match.
+
+    The count comes from a field of the document itself, or from a script —
+    which mockdr reads only when it is a constant, because it does not run
+    Painless.
+    """
+    field, spec = next(iter(body.items()))
+    wanted = [str(v) for v in spec.get("terms", [])]
+    count_field = spec.get("minimum_should_match_field")
+    script = (spec.get("minimum_should_match_script") or {}).get("source")
+    constant: float | None = None
+    if script is not None:
+        try:
+            constant = float(str(script).strip())
+        except ValueError:
+            constant = None
+
+    def predicate(rec: dict) -> bool:
+        held = {str(v) for v in _field_values(rec, field)}
+        matched = sum(1 for term in wanted if term in held)
+        if count_field is not None:
+            required = _as_number(_get_nested(rec, str(count_field)))
+        else:
+            required = constant
+        if required is None:
+            return False
+        return matched >= required
+
+    return predicate
+
+
+def _as_number(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _build_range(body: dict) -> Callable[[dict], bool]:
@@ -437,44 +572,388 @@ def _compare_moment(field_val: Any, bound: datetime, op: str) -> bool:
 def _build_wildcard(body: dict) -> Callable[[dict], bool]:
     """Build predicate for ``wildcard``.
 
-    Uses ``fnmatch``-style matching (case-insensitive).
+    Case-*sensitive* on a keyword value, the way Lucene is: `SRV-*` matches
+    nothing where `srv-*` matches three. It was folded to lower case here, so
+    the mock answered a pattern a cluster does not.
     """
-    field, spec = next(iter(body.items()))
-    if isinstance(spec, dict):
-        pattern = str(spec.get("value", ""))
-    else:
-        pattern = str(spec)
+    field, spec = _term_spec(body)
+    pattern = str(spec.get("value", ""))
     pattern_lower = pattern.lower()
+    insensitive = bool(spec.get("case_insensitive"))
 
     def predicate(rec: dict) -> bool:
-        val = _get_nested(rec, field)
-        if val is None:
-            return False
-        return fnmatch(str(val).lower(), pattern_lower)
+        for value in _field_values(rec, field):
+            terms, analysed = _match_terms(value)
+            wanted = pattern_lower if analysed or insensitive else pattern
+            subjects = (t.lower() for t in terms) if insensitive else terms
+            if any(fnmatch(term, wanted) for term in subjects):
+                return True
+        return False
 
     return predicate
 
 
 def _build_exists(body: dict) -> Callable[[dict], bool]:
-    """Build predicate for ``exists``."""
+    """Build predicate for ``exists``.
+
+    A field holding an empty array does not exist there — nothing was
+    indexed for it — and neither does one holding only nulls. The mock
+    counted both, so `exists` answered for a document a real cluster leaves
+    out.
+    """
     field = body["field"]
 
     def predicate(rec: dict) -> bool:
-        return _get_nested(rec, field) is not None
+        value = _get_nested(rec, field)
+        if isinstance(value, (list, tuple)):
+            return any(v is not None for v in value)
+        return value is not None
 
     return predicate
 
 
-def _build_bool(body: dict, depth: int = 0) -> Callable[[dict], bool]:
+# ---------------------------------------------------------------------------
+# The clauses a SIEM client sends
+#
+# `prefix`, `regexp`, `fuzzy`, `ids`, `multi_match`, `simple_query_string`,
+# `match_phrase_prefix`, `match_bool_prefix` and the three wrappers below were
+# all "unknown query" here, so a detection rule or a Kibana search bar that
+# used one got a 400 from the mock and hits from the cluster.
+#
+# mockdr does not hold the index mapping while it filters, so a term is tried
+# against the field's own value *and* against its analysed tokens: a `prefix`
+# on a keyword field compares the whole value, and on a text field a token.
+# Both were measured against Elasticsearch 8.15.
+# ---------------------------------------------------------------------------
+
+def _field_values(rec: dict, field: str) -> list[Any]:
+    """Every value the record holds for *field*, a list field included."""
+    value = _get_nested(rec, field)
+    if value is None:
+        return []
+    return list(value) if isinstance(value, (list, tuple)) else [value]
+
+
+def _match_terms(value: Any) -> tuple[list[str], bool]:
+    """The strings a term-level query compares against, and how.
+
+    A keyword field is compared whole and exactly as written; a text field is
+    compared token by token, lowercased. mockdr does not hold the mapping
+    while it filters, so whitespace is the signal: an analysed value has
+    some, a keyword value almost never does. It is what makes
+    ``regexp: {host: "srv"}`` miss ``srv-1`` — Lucene anchors the pattern —
+    while ``regexp: {message: "login"}`` matches a word inside the sentence.
+
+    Returns:
+        The strings to compare, and whether they came from the analyser.
+    """
+    text = str(value)
+    if any(char.isspace() for char in text):
+        return _analyze_value(value), True
+    return [text], False
+
+
+def _term_spec(body: dict) -> tuple[str, dict]:
+    """A `{field: value}` or `{field: {"value": ...}}` clause, normalised."""
+    field, spec = next(iter(body.items()))
+    return field, spec if isinstance(spec, dict) else {"value": spec}
+
+
+def _build_prefix(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``prefix``."""
+    field, spec = _term_spec(body)
+    prefix = str(spec.get("value", ""))
+    lowered = prefix.lower()
+
+    def predicate(rec: dict) -> bool:
+        for value in _field_values(rec, field):
+            terms, analysed = _match_terms(value)
+            wanted = lowered if analysed else prefix
+            if any(term.startswith(wanted) for term in terms):
+                return True
+        return False
+
+    return predicate
+
+
+def _build_regexp(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``regexp``.
+
+    Anchored, as Lucene's is: the pattern has to match the whole term. A
+    pattern that will not compile is a shard failure there rather than a
+    parsing error, because the shards are what try to run it.
+    """
+    field, spec = _term_spec(body)
+    pattern = str(spec.get("value", ""))
+    flags = re.IGNORECASE if spec.get("case_insensitive") else 0
+    try:
+        compiled = re.compile(pattern, flags)
+    except re.error as exc:
+        raise ESQueryError(
+            f"Can't parse regexp: {pattern}",
+            es_type="illegal_argument_exception",
+            shard_failure=True,
+        ) from exc
+
+    def predicate(rec: dict) -> bool:
+        for value in _field_values(rec, field):
+            terms, _analysed = _match_terms(value)
+            if any(compiled.fullmatch(term) for term in terms):
+                return True
+        return False
+
+    return predicate
+
+
+def _edit_distance(left: str, right: str, cap: int) -> int:
+    """Levenshtein distance, stopping once it is past *cap*."""
+    if abs(len(left) - len(right)) > cap:
+        return cap + 1
+    previous = list(range(len(right) + 1))
+    for i, lc in enumerate(left, start=1):
+        current = [i]
+        for j, rc in enumerate(right, start=1):
+            current.append(min(
+                previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (lc != rc),
+            ))
+        if min(current) > cap:
+            return cap + 1
+        previous = current
+    return previous[-1]
+
+
+def _auto_fuzziness(term: str) -> int:
+    """Elasticsearch's ``AUTO``: 0 below 3 characters, 1 below 6, else 2."""
+    if len(term) < 3:
+        return 0
+    return 1 if len(term) < 6 else 2
+
+
+def _build_fuzzy(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``fuzzy``."""
+    field, spec = _term_spec(body)
+    term = str(spec.get("value", ""))
+    raw = spec.get("fuzziness", "AUTO")
+    distance = _auto_fuzziness(term) if str(raw).upper().startswith("AUTO") else int(raw)
+    lowered = term.lower()
+
+    def predicate(rec: dict) -> bool:
+        for value in _field_values(rec, field):
+            terms, analysed = _match_terms(value)
+            wanted = lowered if analysed else term
+            if any(_edit_distance(t, wanted, distance) <= distance for t in terms):
+                return True
+        return False
+
+    return predicate
+
+
+def _id_resolver(ids: dict[int, str] | None) -> Callable[[dict], str]:
+    """How to read a record's ``_id`` while filtering.
+
+    A document a client wrote keeps the id it was indexed with — held by
+    object identity, because the id is not part of the source — and anything
+    else answers to the id :func:`hit_id` derives.
+    """
+    if not ids:
+        return hit_id
+    return lambda rec: ids.get(id(rec)) or hit_id(rec)
+
+
+def _build_ids(
+    body: dict, resolve: Callable[[dict], str] | None = None,
+) -> Callable[[dict], bool]:
+    """Build predicate for ``ids``, which selects by ``_id``."""
+    wanted = {str(v) for v in body.get("values", [])}
+    read = resolve or hit_id
+    return lambda rec: read(rec) in wanted
+
+
+def _match_fields(patterns: list[str], rec: dict) -> list[str]:
+    """The fields a ``multi_match`` pattern list names for this record."""
+    if not patterns:
+        return list(rec)
+    named: list[str] = []
+    for pattern in patterns:
+        name = pattern.split("^")[0]
+        if "*" in name:
+            named.extend(k for k in rec if fnmatch(k, name) and k not in named)
+        elif name not in named:
+            named.append(name)
+    return named
+
+
+def _build_multi_match(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``multi_match``: one query over several fields."""
+    query = str(body.get("query", ""))
+    patterns = [str(f) for f in body.get("fields", [])]
+    kind = str(body.get("type", "best_fields")).lower()
+    operator = str(body.get("operator", "or")).lower()
+    terms = _analyze(query)
+
+    def predicate(rec: dict) -> bool:
+        for field in _match_fields(patterns, rec):
+            for value in _field_values(rec, field):
+                tokens = _analyze_value(value)
+                if kind in ("phrase", "phrase_prefix"):
+                    if _phrase_hit(tokens, terms, prefix=kind == "phrase_prefix"):
+                        return True
+                elif kind == "bool_prefix":
+                    if _bool_prefix_hit(tokens, terms):
+                        return True
+                elif operator == "and":
+                    if all(term in tokens for term in terms):
+                        return True
+                elif any(term in tokens for term in terms):
+                    return True
+        return False
+
+    return predicate
+
+
+def _phrase_hit(tokens: list[str], phrase: list[str], *, prefix: bool = False) -> bool:
+    """Whether *tokens* contain *phrase* in order, the last term a prefix."""
+    if not phrase:
+        return False
+    span = len(phrase)
+    head, last = phrase[:-1], phrase[-1]
+    for start in range(len(tokens) - span + 1):
+        window = tokens[start : start + span]
+        if window[:-1] != head:
+            continue
+        if window[-1] == last or (prefix and window[-1].startswith(last)):
+            return True
+    return False
+
+
+def _bool_prefix_hit(tokens: list[str], terms: list[str]) -> bool:
+    """``match_bool_prefix``: any term, with the last one taken as a prefix."""
+    if not terms:
+        return False
+    if any(term in tokens for term in terms[:-1]):
+        return True
+    return any(token.startswith(terms[-1]) for token in tokens)
+
+
+def _build_match_phrase_prefix(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``match_phrase_prefix``."""
+    field, spec = _term_spec(body)
+    phrase = _analyze(str(spec.get("query", spec.get("value", ""))))
+
+    def predicate(rec: dict) -> bool:
+        return any(
+            _phrase_hit(_analyze_value(value), phrase, prefix=True)
+            for value in _field_values(rec, field)
+        )
+
+    return predicate
+
+
+def _build_match_bool_prefix(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``match_bool_prefix``."""
+    field, spec = _term_spec(body)
+    terms = _analyze(str(spec.get("query", spec.get("value", ""))))
+
+    def predicate(rec: dict) -> bool:
+        return any(
+            _bool_prefix_hit(_analyze_value(value), terms)
+            for value in _field_values(rec, field)
+        )
+
+    return predicate
+
+
+#: One clause of a `simple_query_string`: an operator, a negation, and the
+#: term itself — `login | -alice`, `+failed`, `"a phrase"`, `mal*`, `logn~1`.
+_SQS_TOKEN = re.compile(r'\s*(\||\+)?\s*(-)?(?:"([^"]*)"|([^\s|+]+))')
+
+
+def _build_simple_query_string(body: dict) -> Callable[[dict], bool]:
+    """Build predicate for ``simple_query_string``.
+
+    The forgiving sibling of ``query_string``: it never fails on syntax. `|`
+    is or, `+` is and, quotes make a phrase, a trailing `*` a prefix and
+    `~N` an edit distance — and `-` negates *its own clause* rather than
+    excluding the document, so under the default `or` operator
+    ``login -alice`` matches every document that either says login or does
+    not say alice. All measured against 8.15.
+    """
+    query = str(body.get("query", ""))
+    patterns = [str(f) for f in body.get("fields", [])]
+    default = "and" if str(body.get("default_operator", "or")).lower() == "and" else "or"
+
+    clauses: list[tuple[str, bool, str, bool]] = []
+    for match in _SQS_TOKEN.finditer(query):
+        operator, negated, phrase, word = match.groups()
+        text = phrase if phrase is not None else (word or "")
+        if not text:
+            continue
+        joiner = "or" if operator == "|" else ("and" if operator == "+" else default)
+        clauses.append((joiner, negated == "-", text, phrase is not None))
+
+    def hits(rec: dict, text: str, *, is_phrase: bool) -> bool:
+        fuzz = 0
+        fuzzy = re.search(r"~(\d*)$", text)
+        if fuzzy and not is_phrase:
+            text = text[: fuzzy.start()]
+            fuzz = int(fuzzy.group(1) or 2)
+        wants_prefix = text.endswith("*") and not is_phrase
+        terms = _analyze(text.rstrip("*"))
+        if not terms:
+            return False
+        for field in _match_fields(patterns, rec):
+            for value in _field_values(rec, field):
+                tokens = _analyze_value(value)
+                if is_phrase:
+                    if _phrase_hit(tokens, terms):
+                        return True
+                elif wants_prefix:
+                    if any(token.startswith(terms[-1]) for token in tokens):
+                        return True
+                elif fuzz:
+                    if any(
+                        _edit_distance(token, term, fuzz) <= fuzz
+                        for token in tokens for term in terms
+                    ):
+                        return True
+                elif any(term in tokens for term in terms):
+                    return True
+        return False
+
+    def predicate(rec: dict) -> bool:
+        if not clauses:
+            return False
+        result: bool | None = None
+        for joiner, negated, text, is_phrase in clauses:
+            value = hits(rec, text, is_phrase=is_phrase) != negated
+            if result is None:
+                result = value
+            elif joiner == "and":
+                result = result and value
+            else:
+                result = result or value
+        return bool(result)
+
+    return predicate
+
+
+def _build_bool(
+    body: dict,
+    depth: int = 0,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
     """Build predicate for ``bool`` query.
 
     Combines ``must``, ``filter``, ``should``, and ``must_not`` sub-clauses.
     The depth is threaded through so nesting stays bounded.
     """
-    must_preds = [build_predicate(c, depth) for c in body.get("must", [])]
-    filter_preds = [build_predicate(c, depth) for c in body.get("filter", [])]
-    should_preds = [build_predicate(c, depth) for c in body.get("should", [])]
-    must_not_preds = [build_predicate(c, depth) for c in body.get("must_not", [])]
+    must_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("must", [])]
+    filter_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("filter", [])]
+    should_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("should", [])]
+    must_not_preds = [
+        build_predicate(c, depth, ids, lookup) for c in body.get("must_not", [])
+    ]
     # Per ES: should clauses only carry a match requirement when there is no
     # must/filter to satisfy. Defaulting to 1 regardless meant adding a
     # non-matching should — which should affect scoring only — emptied the
@@ -530,6 +1009,42 @@ _QS_RANGE_RE = re.compile(r"^([\[{])\s*(\S+)\s+TO\s+(\S+)\s*([\]}])$")
 
 #: ``field:>=5`` — the shorthand Lucene allows for a one-sided range.
 _QS_CMP_RE = re.compile(r"^(>=|<=|>|<)(.+)$")
+
+
+def _build_constant_score(
+    body: dict,
+    depth: int = 0,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
+    """``constant_score`` runs its filter and gives every hit the same score."""
+    return build_predicate(body.get("filter", {}), depth, ids, lookup)
+
+
+def _build_dis_max(
+    body: dict,
+    depth: int = 0,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
+    """``dis_max`` matches a document any of its queries matches."""
+    preds = [build_predicate(c, depth, ids, lookup) for c in body.get("queries", [])]
+    return lambda rec: any(p(rec) for p in preds)
+
+
+def _build_boosting(
+    body: dict,
+    depth: int = 0,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> Callable[[dict], bool]:
+    """``boosting`` demotes the negative side rather than excluding it.
+
+    Only the positive clause decides *whether* a document matches, so that is
+    all mockdr reads; the demotion is a scoring effect, and this engine does
+    not score.
+    """
+    return build_predicate(body.get("positive", {}), depth, ids, lookup)
 
 
 def _build_query_string(body: dict) -> Callable[[dict], bool]:
@@ -731,7 +1246,7 @@ def _qs_parse_expr(
 # Builder registry
 # ---------------------------------------------------------------------------
 
-_BUILDERS: dict[str, Callable[[dict], Callable[[dict], bool]]] = {
+_BUILDERS: dict[str, Callable[..., Callable[[dict], bool]]] = {
     "match_all": _build_match_all,
     "match": _build_match,
     "match_phrase": _build_match_phrase,
@@ -742,6 +1257,21 @@ _BUILDERS: dict[str, Callable[[dict], Callable[[dict], bool]]] = {
     "exists": _build_exists,
     "bool": _build_bool,
     "query_string": _build_query_string,
+    "prefix": _build_prefix,
+    "regexp": _build_regexp,
+    "fuzzy": _build_fuzzy,
+    "multi_match": _build_multi_match,
+    "simple_query_string": _build_simple_query_string,
+    "match_phrase_prefix": _build_match_phrase_prefix,
+    "match_bool_prefix": _build_match_bool_prefix,
+    "terms_set": _build_terms_set,
+}
+
+#: Clauses that wrap another clause, and so need the recursion depth.
+_WRAPPERS: dict[str, Callable[..., Callable[[dict], bool]]] = {
+    "constant_score": _build_constant_score,
+    "dis_max": _build_dis_max,
+    "boosting": _build_boosting,
 }
 
 
@@ -1155,7 +1685,12 @@ def apply_source_filter(hits: list[dict], spec: object) -> list[dict]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
+def apply_es_query(
+    records: list[dict],
+    query_body: dict,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> list[dict]:
     """Apply an Elasticsearch query DSL body to a list of records.
 
     The *query_body* is the full ``_search`` request body dict.  Extracts
@@ -1165,6 +1700,9 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
     Args:
         records:    List of dicts to filter.
         query_body: Elasticsearch ``_search`` request body.
+        ids:        Ids of documents a client wrote, by object identity; an
+                    ``ids`` clause needs them to select what it was given.
+        lookup:     Reads the values a ``terms`` lookup points at.
 
     Returns:
         Filtered, sorted, and paginated records.
@@ -1174,7 +1712,7 @@ def apply_es_query(records: list[dict], query_body: dict) -> list[dict]:
     # Filter.
     query_clause = query_body.get("query")
     if query_clause:
-        predicate = build_predicate(query_clause)
+        predicate = build_predicate(query_clause, ids=ids, lookup=lookup)
         records = [r for r in records if predicate(r)]
 
     # Sort.

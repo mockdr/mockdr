@@ -396,10 +396,19 @@ class TestSeededProbesLoad:
         spec = load_spec(ROOT / "probes" / "splunk.yaml")
         seeded = [p for p in spec.probes if p.needs_seed]
         assert seeded, "the splunk probes should include seeded ones"
-        # `compare: values` without `needs_seed` would compare a seeded mock
-        # against an empty install and report every row as a difference.
+        # `compare: values` without data on both sides would compare a seeded
+        # mock against an empty install and report every row as a difference.
         assert all(p.compare_values for p in seeded)
-        assert all(p.needs_seed for p in spec.probes if p.compare_values)
+        for probe in spec.probes:
+            if not probe.compare_values or probe.needs_seed:
+                continue
+            # The exception: a search that generates its own rows. Both
+            # engines answer `| makeresults` from the search text alone, so
+            # there is nothing to seed.
+            content = probe.request.content or ""
+            assert "makeresults" in content, (
+                f"{probe.id} compares values without data on either side"
+            )
 
     def test_every_seeded_probe_uses_the_bootstrap_sourcetype(self) -> None:
         spec = load_spec(ROOT / "probes" / "splunk.yaml")

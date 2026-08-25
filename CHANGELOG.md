@@ -8,6 +8,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Elasticsearch: the query clauses a SIEM client sends.** `prefix`,
+`regexp`, `fuzzy`, `ids`, `multi_match`, `simple_query_string`,
+`match_phrase_prefix`, `match_bool_prefix`, `terms_set`, `constant_score`,
+`dis_max` and `boosting` were all "unknown query" here, so a detection rule
+or a Kibana search bar using one got a 400 from the mock and hits from the
+cluster. A `terms` *lookup* — the values named by another document — was
+worse: it matched nothing at all, silently, and a missing lookup index was
+not the 404 a cluster answers with. 63 searches measured against
+Elasticsearch 8.15.
+
+With them, four rules the mock had wrong:
+
+* **`minimum_should_match` was ignored**, so `match` was an OR whatever the
+  client asked for — three hits where the cluster returns one. A number, a
+  percentage rounded down, and the negative form ("how many may be missing")
+  all read now.
+* **`wildcard` was case-insensitive.** Lucene is not: `SRV-*` matches
+  nothing on a keyword field where `srv-*` matches three.
+* **A field holding an empty array `exists`ed.** Nothing is indexed for it,
+  so a real cluster leaves the document out.
+* **`term` on an `ip` field would not take a network.** `10.0.0.0/24` is
+  every address inside it, not a string that never matches.
+
+A term-level query has to know whether a field is analysed, and mockdr does
+not hold the mapping while it filters; whitespace decides, which is what
+makes `regexp: {host: "srv"}` miss `srv-1` — Lucene anchors the pattern —
+while `regexp: {message: "login"}` matches a word inside a sentence.
+
+`simple_query_string` follows the grammar rather than a guess at it: `-`
+negates its own clause rather than excluding the document, so under the
+default `or` operator `login -alice` matches every document that either says
+login or does not say alice; `+` is and, `|` is or, `~N` is an edit
+distance.
+
+**`top_hits` invented its ids.** It derived one from the contents instead of
+reporting the id each document was indexed with, so a client could not fetch
+back what it found; it also ignored `sort`, `from` and `_source`. And the
+`missing` aggregation — the other half of a `terms` aggregation — was not
+implemented.
+
+Three differences are left in place and named in the tests, each depending
+on something mockdr does not model: a `nested` query (no nested mappings), a
+`script` query (no Painless), and a `terms` aggregation over a text field,
+which a cluster refuses because fielddata is off.
+
 **Six commands SOAR content uses, which the mock refused outright.**
 `eventstats`, `mvexpand`, `filldown`, `spath`, `convert` and `bin`/`bucket`
 were unknown commands here, so any search containing one came back as a

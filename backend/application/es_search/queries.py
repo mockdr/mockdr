@@ -28,6 +28,7 @@ from utils.es_query import (
     wrap_as_hits,
 )
 from utils.es_response import build_es_index_not_found, build_es_search_response
+from utils.nested import get_nested
 from utils.serde import record_dict
 
 #: How far Elasticsearch counts before it reports ``relation: "gte"`` instead
@@ -208,6 +209,24 @@ def known_index_prefixes() -> tuple[str, ...]:
     return _KNOWN_PREFIXES
 
 
+def _terms_lookup(index: str, doc_id: str, path: str) -> list:
+    """The values a ``terms`` lookup points at, read from another document.
+
+    A document that is not there, or a path it does not carry, matches
+    nothing; a missing *index* is an error, the way it is on a cluster.
+    """
+    missing = _missing_target(index)
+    if missing is not None:
+        raise IndexNotFoundError(missing)
+    document = es_get_doc(index, doc_id)
+    if not document:
+        return []
+    value = get_nested(document.get("_source") or {}, path)
+    if value is None:
+        return []
+    return list(value) if isinstance(value, (list, tuple)) else [value]
+
+
 def _resolve_collection(
     index: str, *, ignore_unavailable: bool = False,
 ) -> tuple[list[dict], str, dict[int, str]]:
@@ -278,14 +297,16 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
 
     validate_search_body(body)
     # Apply query DSL (filter, sort, from/size).
-    filtered = apply_es_query(records, body)
+    filtered = apply_es_query(records, body, written_ids, _terms_lookup)
 
     # If a query clause was provided, the total is the filtered count
     # before from/size pagination; otherwise it's all records.
     query_clause = body.get("query")
     if query_clause:
         # Re-filter without pagination to get the true total.
-        predicate = build_predicate(query_clause)
+        predicate = build_predicate(
+            query_clause, ids=written_ids, lookup=_terms_lookup,
+        )
         total = sum(1 for r in records if predicate(r))
     else:
         total = total_before
@@ -316,7 +337,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
         else:
             matched = records
         response["aggregations"] = apply_aggregations(
-            matched, aggs, index=canonical_index,
+            matched, aggs, index=canonical_index, ids=written_ids,
         )
 
     _apply_total_hits_tracking(
@@ -359,10 +380,10 @@ def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dic
     Raises:
         IndexNotFoundError: If a concrete index name is unknown.
     """
-    records, _, _written = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
+    records, _, written = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
     query_clause = (body or {}).get("query")
     if query_clause:
-        predicate = build_predicate(query_clause)
+        predicate = build_predicate(query_clause, ids=written)
         records = [r for r in records if predicate(r)]
     return {
         "count": len(records),

@@ -39,9 +39,12 @@ class TestQueryParsingErrors:
     """Unparseable bodies raise, so the app can answer 400 rather than 500."""
 
     @pytest.mark.parametrize(
-        "query_type", ["prefix", "ids", "multi_match", "nested", "regexp", "fuzzy"],
+        "query_type", ["nested", "script", "span_near", "nosuchquery"],
     )
     def test_unsupported_query_type_raises(self, query_type: str) -> None:
+        # `prefix`, `ids`, `multi_match`, `regexp` and `fuzzy` used to be here
+        # too; they are implemented now, and a client that sends one gets the
+        # hits a cluster gives it rather than a 400.
         with pytest.raises(ESQueryError):
             apply_es_query([], {"query": {query_type: {"field": "value"}}})
 

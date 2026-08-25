@@ -58,6 +58,12 @@ ES_SEED_MAPPING: dict = {
         "host": {"type": "keyword"},
         "sev": {"type": "integer"},
         "name": {"type": "keyword"},
+        # A text field and a keyword array, so a probe can tell an analysed
+        # field from an exact one: `prefix`, `regexp`, `wildcard` and
+        # `fuzzy` behave differently on each, and that difference is a
+        # client-visible contract.
+        "message": {"type": "text"},
+        "tags": {"type": "keyword"},
     }},
 }
 
@@ -65,11 +71,16 @@ ES_SEED_MAPPING: dict = {
 #: on every run. Spread over ten days, with two documents sharing a day, so a
 #: date_histogram has both a populated gap and an empty one to draw.
 ES_SEED_DOCUMENTS: tuple[tuple[str, dict], ...] = (
-    ("a", {"@timestamp": "2026-08-01T04:00:00.000Z", "host": "srv-1", "sev": 10, "name": "a"}),
-    ("b", {"@timestamp": "2026-08-01T20:00:00.000Z", "host": "srv-1", "sev": 20, "name": "b"}),
-    ("c", {"@timestamp": "2026-08-03T09:00:00.000Z", "host": "srv-2", "sev": 30, "name": "c"}),
-    ("d", {"@timestamp": "2026-08-10T09:00:00.000Z", "host": "srv-3", "sev": 40, "name": "d"}),
-    ("e", {"@timestamp": "2026-08-10T09:00:00.000Z", "host": "srv-2", "sev": 50, "name": "e"}),
+    ("a", {"@timestamp": "2026-08-01T04:00:00.000Z", "host": "srv-1", "sev": 10,
+           "name": "a", "message": "failed login attempt", "tags": ["auth", "linux"]}),
+    ("b", {"@timestamp": "2026-08-01T20:00:00.000Z", "host": "srv-1", "sev": 20,
+           "name": "b", "message": "Login succeeded for alice", "tags": ["auth"]}),
+    ("c", {"@timestamp": "2026-08-03T09:00:00.000Z", "host": "srv-2", "sev": 30,
+           "name": "c", "message": "malware detected on host", "tags": ["edr", "linux"]}),
+    ("d", {"@timestamp": "2026-08-10T09:00:00.000Z", "host": "srv-3", "sev": 40,
+           "name": "d", "message": "process created cmd.exe", "tags": []}),
+    ("e", {"@timestamp": "2026-08-10T09:00:00.000Z", "host": "srv-2", "sev": 50,
+           "name": "e", "message": "no match here", "tags": ["edr"]}),
     ("f", {"host": "srv-4", "sev": 60, "name": "f"}),
 )
 

@@ -8,26 +8,52 @@ than an error, which is the failure mode a mock is supposed to expose.
 Implements the aggregations a SIEM client actually sends: ``terms``,
 ``date_histogram``, ``histogram``, ``range``, ``filter``, ``filters``,
 ``cardinality``, ``value_count``, ``min``, ``max``, ``sum``, ``avg``,
-``stats``, and ``top_hits`` — with sub-aggregations nested underneath.
+``stats``, ``missing`` and ``top_hits`` — with sub-aggregations nested
+underneath.
 """
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from utils.es_datemath import _add_months, _next_unit, _round_down
 from utils.es_datemath import _zone as _datemath_zone
-from utils.es_query import build_predicate, wrap_as_hits
+from utils.es_query import (
+    apply_es_sort,
+    apply_source_filter,
+    build_predicate,
+    doc_positions,
+    emits_sort_values,
+    parse_sort_keys,
+    sort_field_kinds,
+    wrap_as_hits,
+)
 from utils.nested import get_nested
 
 __all__ = ["ESAggregationError", "apply_aggregations"]
 
 _MAX_DEPTH = 10
 
+
+@dataclass(frozen=True)
+class _Context:
+    """What the bucket walk needs beside the documents.
+
+    Attributes:
+        index: The index name a ``top_hits`` document reports.
+        ids:   Ids of documents a client wrote, by object identity, so those
+               documents answer to the id they were indexed with.
+    """
+
+    index: str
+    ids: dict[int, str] | None = None
+
 # Bucket aggregations get sub-aggregations; metric aggregations do not.
 _BUCKET_TYPES = frozenset({
     "terms", "date_histogram", "histogram", "range", "filter", "filters",
+    "missing",
 })
 _METRIC_TYPES = frozenset({
     "avg", "cardinality", "max", "min", "stats", "sum", "top_hits",
@@ -63,6 +89,7 @@ def apply_aggregations(
     aggs: dict,
     *,
     index: str = "",
+    ids: dict[int, str] | None = None,
     _depth: int = 0,
 ) -> dict:
     """Evaluate an ``aggs`` block against *records*.
@@ -71,6 +98,8 @@ def apply_aggregations(
         records: The documents the query selected.
         aggs:    The ``aggs`` (or ``aggregations``) block.
         index:   Index name, used when ``top_hits`` wraps documents.
+        ids:     Ids of documents a client wrote, by object identity, so a
+                 ``top_hits`` hit answers to the id it was indexed with.
         _depth:  Recursion guard for nested sub-aggregations.
 
     Returns:
@@ -88,7 +117,8 @@ def apply_aggregations(
         if not isinstance(definition, dict):
             msg = f"[{name}] is not a valid aggregation definition"
             raise ESAggregationError(msg)
-        result[name] = _evaluate(name, definition, records, index, _depth)
+        context = _Context(index, ids)
+        result[name] = _evaluate(name, definition, records, context, _depth)
     return result
 
 
@@ -105,14 +135,14 @@ def _split_definition(name: str, definition: dict) -> tuple[str, dict, dict]:
 
 
 def _evaluate(
-    name: str, definition: dict, records: list[dict], index: str, depth: int,
+    name: str, definition: dict, records: list[dict], ctx: _Context, depth: int,
 ) -> dict:
     agg_type, body, sub = _split_definition(name, definition)
 
     if agg_type in _BUCKET_TYPES:
-        return _bucket(agg_type, body, sub, records, index, depth)
+        return _bucket(agg_type, body, sub, records, ctx, depth)
     if agg_type in _METRIC_TYPES:
-        return _metric(agg_type, body, records, index)
+        return _metric(agg_type, body, records, ctx)
 
     msg = f"Unknown aggregation type [{agg_type}]"
     raise ESAggregationError(msg, clause=agg_type)
@@ -127,26 +157,33 @@ def _bucket(
     body: dict,
     sub: dict,
     records: list[dict],
-    index: str,
+    ctx: _Context,
     depth: int,
 ) -> dict:
     if agg_type == "terms":
-        return _terms(body, sub, records, index, depth)
+        return _terms(body, sub, records, ctx, depth)
     if agg_type == "date_histogram":
-        return _date_histogram(body, sub, records, index, depth)
+        return _date_histogram(body, sub, records, ctx, depth)
     if agg_type == "histogram":
-        return _histogram(body, sub, records, index, depth)
+        return _histogram(body, sub, records, ctx, depth)
     if agg_type == "range":
-        return _range(body, sub, records, index, depth)
+        return _range(body, sub, records, ctx, depth)
+    if agg_type == "missing":
+        # The documents that have no value for the field at all — the other
+        # half of a `terms` aggregation, and how a client counts what it
+        # could not group.
+        field = body.get("field", "")
+        without = [r for r in records if get_nested(r, field) is None]
+        return _with_sub({"doc_count": len(without)}, sub, without, ctx, depth)
     if agg_type == "filter":
         matches = build_predicate(body)  # compiled once, not once per document
         matched = [r for r in records if matches(r)]
-        return _with_sub({"doc_count": len(matched)}, sub, matched, index, depth)
+        return _with_sub({"doc_count": len(matched)}, sub, matched, ctx, depth)
     # filters
-    return _filters(body, sub, records, index, depth)
+    return _filters(body, sub, records, ctx, depth)
 
 
-def _terms(body: dict, sub: dict, records: list[dict], index: str, depth: int) -> dict:
+def _terms(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int) -> dict:
     field = body.get("field", "")
     size = int(body.get("size", 10))
     min_doc_count = int(body.get("min_doc_count", 1))
@@ -164,7 +201,7 @@ def _terms(body: dict, sub: dict, records: list[dict], index: str, depth: int) -
     ordered = sorted(groups.items(), key=lambda kv: (-len(kv[1]), str(kv[0])))
     kept = [(k, v) for k, v in ordered if len(v) >= min_doc_count]
     buckets = [
-        _with_sub({"key": key, "doc_count": len(members)}, sub, members, index, depth)
+        _with_sub({"key": key, "doc_count": len(members)}, sub, members, ctx, depth)
         for key, members in kept[:size]
     ]
     return {
@@ -175,7 +212,7 @@ def _terms(body: dict, sub: dict, records: list[dict], index: str, depth: int) -
 
 
 def _date_histogram(
-    body: dict, sub: dict, records: list[dict], index: str, depth: int,
+    body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int,
 ) -> dict:
     """Bucket by time, filling the gaps the way Elasticsearch does.
 
@@ -209,7 +246,7 @@ def _date_histogram(
             "key_as_string": _es_timestamp(start),
             "doc_count": len(members),
         }
-        buckets.append(_with_sub(bucket, sub, members, index, depth))
+        buckets.append(_with_sub(bucket, sub, members, ctx, depth))
     return {"buckets": buckets}
 
 
@@ -240,7 +277,7 @@ _MAX_BUCKETS = 65_536
 
 
 def _histogram(
-    body: dict, sub: dict, records: list[dict], index: str, depth: int,
+    body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int,
 ) -> dict:
     field = body.get("field", "")
     interval = float(body.get("interval", 1) or 1)
@@ -255,14 +292,14 @@ def _histogram(
     buckets = [
         _with_sub(
             {"key": float(start), "doc_count": len(groups[start])},
-            sub, groups[start], index, depth,
+            sub, groups[start], ctx, depth,
         )
         for start in sorted(groups)
     ]
     return {"buckets": buckets}
 
 
-def _range(body: dict, sub: dict, records: list[dict], index: str, depth: int) -> dict:
+def _range(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int) -> dict:
     field = body.get("field", "")
     buckets = []
     for spec in body.get("ranges", []):
@@ -280,11 +317,11 @@ def _range(body: dict, sub: dict, records: list[dict], index: str, depth: int) -
             bucket["from"] = lower
         if upper is not None:
             bucket["to"] = upper
-        buckets.append(_with_sub(bucket, sub, members, index, depth))
+        buckets.append(_with_sub(bucket, sub, members, ctx, depth))
     return {"buckets": buckets}
 
 
-def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int) -> dict:
+def _filters(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int) -> dict:
     named = body.get("filters", {})
     # The predicate is compiled once per clause, not once per document: it sat
     # inside the comprehension's condition, so a bucket over ten thousand
@@ -295,7 +332,7 @@ def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int)
             matches = build_predicate(clause)
             members = [r for r in records if matches(r)]
             buckets[key] = _with_sub(
-                {"doc_count": len(members)}, sub, members, index, depth,
+                {"doc_count": len(members)}, sub, members, ctx, depth,
             )
         return {"buckets": buckets}
 
@@ -304,25 +341,30 @@ def _filters(body: dict, sub: dict, records: list[dict], index: str, depth: int)
         matches = build_predicate(clause)
         members = [r for r in records if matches(r)]
         anonymous.append(
-            _with_sub({"doc_count": len(members)}, sub, members, index, depth),
+            _with_sub({"doc_count": len(members)}, sub, members, ctx, depth),
         )
     return {"buckets": anonymous}
 
 
 def _with_sub(
-    bucket: dict, sub: dict, members: list[dict], index: str, depth: int,
+    bucket: dict, sub: dict, members: list[dict], ctx: _Context, depth: int,
 ) -> dict:
     """Attach sub-aggregation results to a bucket."""
     if not sub:
         return bucket
-    return {**bucket, **apply_aggregations(members, sub, index=index, _depth=depth + 1)}
+    return {
+        **bucket,
+        **apply_aggregations(
+            members, sub, index=ctx.index, ids=ctx.ids, _depth=depth + 1,
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
 # Metric aggregations
 # ---------------------------------------------------------------------------
 
-def _metric(agg_type: str, body: dict, records: list[dict], index: str) -> dict:
+def _metric(agg_type: str, body: dict, records: list[dict], ctx: _Context) -> dict:
     field = body.get("field", "")
 
     if agg_type == "value_count":
@@ -335,15 +377,7 @@ def _metric(agg_type: str, body: dict, records: list[dict], index: str) -> dict:
         }
         return {"value": len(seen)}
     if agg_type == "top_hits":
-        size = int(body.get("size", 3))
-        hits = wrap_as_hits(records[:size], index=index or ".siem-signals-default")
-        return {
-            "hits": {
-                "total": {"value": len(records), "relation": "eq"},
-                "max_score": 1.0 if hits else None,
-                "hits": hits,
-            },
-        }
+        return _top_hits(body, records, ctx)
 
     numbers = [
         n for n in (_as_float(get_nested(r, field)) for r in records) if n is not None
@@ -481,6 +515,43 @@ def _es_timestamp(moment: datetime) -> str:
     total = int(offset.total_seconds())
     sign = "+" if total >= 0 else "-"
     return f"{base}{sign}{abs(total) // 3600:02d}:{abs(total) % 3600 // 60:02d}"
+
+
+def _top_hits(body: dict, records: list[dict], ctx: _Context) -> dict:
+    """``top_hits``: the documents themselves, inside a bucket.
+
+    It takes the same `sort`, `from`, `size` and `_source` a search does, and
+    each hit answers to the id it was indexed with — mockdr derived one from
+    the contents instead, so a client could not fetch back what it found.
+    """
+    spec = body.get("sort")
+    selected = apply_es_sort(records, spec) if spec else records
+    start = int(body.get("from", 0))
+    size = int(body.get("size", 3))
+    page = selected[start : start + size]
+    # A sorted top_hits carries each document's sort values and no score, the
+    # same way a sorted search does.
+    sort_keys = parse_sort_keys(spec or [])
+    if not emits_sort_values(sort_keys):
+        sort_keys = []
+    hits = apply_source_filter(
+        wrap_as_hits(
+            page,
+            index=ctx.index or ".siem-signals-default",
+            sort_keys=sort_keys,
+            positions=doc_positions(records),
+            ids=ctx.ids,
+            kinds=sort_field_kinds(records, sort_keys),
+        ),
+        body.get("_source"),
+    )
+    return {
+        "hits": {
+            "total": {"value": len(records), "relation": "eq"},
+            "max_score": None if sort_keys or not hits else 1.0,
+            "hits": hits,
+        },
+    }
 
 
 def _as_float(value: Any) -> float | None:
