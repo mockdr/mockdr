@@ -11,6 +11,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `param_drift.py` | Compare the *query parameters* each route takes with the ones the swagger declares — a filter the vendor documents and the mock drops answers 200 with the whole collection. |
 | `fuzz_parsers.py` | Fuzz the hand-written parsers (SPL, KQL, OData, FQL, ES DSL, HEC) for unintended exceptions. |
 | `hostile_probe.py` | Hostile bodies and parameters against every mounted route; flags any plain-text 500 or crash. |
+| `param_effect.py` | Asks every route whether its parameters do anything: a limiter that does not limit, a filter that cannot match and returns everything, a `$select` that projects nothing. Exit 1 on any. |
 
 ## Run before a release
 

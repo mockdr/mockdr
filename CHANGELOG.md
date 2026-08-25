@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Twelve parameters the routes declared and ignored.** A new audit —
+`scripts/param_effect.py` — asks every route, for every parameter it
+declares, whether the answer changes when the parameter cannot match: a
+limiter set to 1 must not answer with two, a filter nothing can match must
+answer with none, `$select=id` must not answer with every field. It needs no
+running vendor, which is the point: the six platforms that cannot be started
+locally had never been checked for behaviour at all, only for shape.
+
+What it found, all now fixed and pinned by tests:
+
+* **Graph took `$select` on eleven routes and did nothing with it** —
+  alerts, incidents, detected apps, conditional access policies, the
+  registration report, a managed device, a group, a user and a user's
+  memberships. A client asking for two fields got the whole resource.
+* **`$filter` was dropped on three routes** (detected apps, conditional
+  access policies, memberships) and **`$orderby` on two** (alerts,
+  incidents), so "newest first" answered in insertion order.
+* **SentinelOne declared two filters it never applied**:
+  `installed-applications?ids=` and `device-control?accountIds=`.
+* **Sentinel's threat-intelligence query read three of the eight documented
+  criteria.** The threat types, the confidence bounds, the ids, the sort
+  order and the page size were all taken and dropped, so a hunt narrowed to
+  two indicators came back as the whole feed.
+* **Falcon ignored a filter that is not FQL at all.** `filter=zzz` returned
+  every record where the API answers 400; a client that mistyped its filter
+  read the whole collection as its matches.
+
 **Kibana: the rest of the platform surface, and the console proxy.** What a
 client calls *around* the work, all of it 404 before: `saved_objects/_find`
 (whose `type` is required, in the words its config schema uses),
@@ -283,6 +310,13 @@ newlines. A field a row has no value for is empty rather than `""`. Measured
 against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
+
+**The KV store's delete ignored its query and emptied the collection.**
+`DELETE …/storage/collections/data/{name}?query={…}` cleared every record
+whatever it was asked, and answered 200 — so a client deleting the three
+records it had selected lost the lot and was told the delete succeeded. It
+now deletes what the query selects, using the same engine the read path
+filters with, and was verified against Splunk 10.4.2.
 
 **`_cat` answered JSON.** Every `_cat` endpoint answers a *table* unless the
 caller asks for `format=json` — that is what `_cat` is for — and mockdr

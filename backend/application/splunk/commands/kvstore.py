@@ -5,6 +5,7 @@ import uuid
 
 from domain.splunk.kv_collection import KVCollection
 from repository.splunk.kv_collection_repo import kv_collection_repo
+from utils.splunk.kvstore_query import apply_query
 
 
 class DuplicateKeyError(ValueError):
@@ -142,12 +143,17 @@ def delete_record(name: str, key: str, app: str = "search") -> bool:
 
 
 def delete_all_records(name: str, app: str = "search", query: str = "") -> bool:
-    """Delete all records (optionally matching a query) from a KV collection.
+    """Delete the records a query selects, or all of them without one.
+
+    The query was taken and *ignored*: a client deleting the three records it
+    had selected emptied the whole collection instead, and was told the
+    delete succeeded. It is the same engine the read path filters with, so
+    the two cannot disagree about what a query means.
 
     Args:
         name:  Collection name.
         app:   Splunk app context.
-        query: Optional JSON query filter (not fully implemented).
+        query: Optional JSON query filter.
 
     Returns:
         True if collection found.
@@ -156,7 +162,16 @@ def delete_all_records(name: str, app: str = "search", query: str = "") -> bool:
     if not coll:
         return False
 
-    coll.records.clear()
+    if query:
+        doomed = {
+            str(record.get("_key"))
+            for record in apply_query(list(coll.records), query)
+        }
+        coll.records[:] = [
+            record for record in coll.records if str(record.get("_key")) not in doomed
+        ]
+    else:
+        coll.records.clear()
     kv_collection_repo.save(coll)
     return True
 

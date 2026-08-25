@@ -9,6 +9,7 @@ from utils.graph_odata import (
     apply_odata_orderby,
     apply_odata_search,
     apply_odata_select,
+    select_fields,
 )
 from utils.graph_response import build_graph_list_response
 from utils.serde import record_dict
@@ -61,11 +62,12 @@ def list_groups(
     )
 
 
-def get_group(group_id: str) -> dict | None:
+def get_group(group_id: str, select: str | None = None) -> dict | None:
     """Return a single group by ID.
 
     Args:
         group_id: The group's ``id``.
+        select:   OData ``$select`` expression.
 
     Returns:
         Group dict or ``None`` if not found.
@@ -73,7 +75,7 @@ def get_group(group_id: str) -> dict | None:
     group = graph_group_repo.get(group_id)
     if group is None:
         return None
-    return record_dict(group)
+    return select_fields(record_dict(group), select)
 
 
 def get_group_members(group_id: str) -> dict:

@@ -198,10 +198,20 @@ async def query_indicators(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    keywords = body.get("keywords") or []
     return ti_queries.query_indicators(
-        keywords=body.get("keywords") or "",
+        # The spec spells keywords as a list; a client sending one string is
+        # taken to mean that one keyword.
+        keywords=" ".join(keywords) if isinstance(keywords, list) else str(keywords),
         pattern_types=body.get("patternTypes"),
+        threat_types=body.get("threatTypes"),
         sources=body.get("sources"),
+        ids=body.get("ids"),
+        min_confidence=int(body.get("minConfidence") or 0),
+        max_confidence=int(body.get("maxConfidence") or 100),
+        include_disabled=bool(body.get("includeDisabled", True)),
+        sort_by=body.get("sortBy"),
+        page_size=int(body.get("pageSize") or 50),
     )
 
 

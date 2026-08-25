@@ -19,5 +19,5 @@ async def list_user_registration_details(
 ) -> dict:
     """List MFA registration details for all users."""
     return auth_methods_queries.list_registration_details(
-        filter_str, top, skip,
+        filter_str, top, skip, select,
     )

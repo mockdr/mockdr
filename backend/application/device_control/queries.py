@@ -15,6 +15,10 @@ FILTER_SPECS = [
     FilterSpec("deviceClasses", "deviceClass", "in"),
     # S1 spells the interface class "deviceTypes" on the query string.
     FilterSpec("deviceTypes", "interface", "in"),
+    # A rule is scoped to an account, a site or a group; `accountIds` was
+    # declared on the route and matched against nothing, so a client asking
+    # for one account's rules got every account's.
+    FilterSpec("accountIds", "scopeId", "in"),
 ]
 
 

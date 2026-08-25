@@ -7,7 +7,11 @@ from repository.graph.security_alert_repo import graph_security_alert_repo
 from repository.graph.security_incident_repo import graph_security_incident_repo
 from repository.graph.ti_indicator_repo import graph_ti_indicator_repo
 from utils.dt import utc_now
-from utils.graph_odata import apply_graph_filter
+from utils.graph_odata import (
+    apply_graph_filter,
+    apply_odata_orderby,
+    apply_odata_select,
+)
 from utils.graph_response import build_graph_list_response
 from utils.serde import record_dict
 
@@ -36,9 +40,13 @@ def list_alerts_v2(
 
     if filter_str:
         records = apply_graph_filter(records, filter_str)
+    # `$orderby` and `$select` were taken and dropped: a client that asked for
+    # newest-first got insertion order, and one that asked for two fields got
+    # the whole alert — believing both times that the query had been applied.
+    records = apply_odata_orderby(records, orderby)
 
     total = len(records)
-    page = records[skip : skip + top]
+    page = apply_odata_select(records[skip : skip + top], select)
     next_link = (
         f"https://graph.microsoft.com/v1.0/security/alerts_v2?$skip={skip + top}"
         if skip + top < total
@@ -123,8 +131,9 @@ def list_incidents(
             rec["alerts"] = _expand_alerts(rec.get("alert_ids", []))
         rec.pop("alert_ids", None)
 
+    records = apply_odata_orderby(records, orderby)
     total = len(records)
-    page = records[skip : skip + top]
+    page = apply_odata_select(records[skip : skip + top], select)
     next_link = (
         f"https://graph.microsoft.com/v1.0/security/incidents?$skip={skip + top}"
         if skip + top < total

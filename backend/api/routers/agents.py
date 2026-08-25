@@ -121,6 +121,11 @@ def list_installed_applications(
             },
         },
     ).get("data", [])
+    if ids:
+        # The application-level ids. Declared on the route and matched
+        # against nothing, so asking for one application listed them all.
+        wanted = {i.strip() for i in ids.split(",") if i.strip()}
+        apps = [app for app in apps if str(app.get("id")) in wanted]
     # ApplicationViewSchema_many: the declared fields only, with a pagination block.
     return build_list_response(
         apps,

@@ -4,7 +4,11 @@ from __future__ import annotations
 from repository.graph.user_registration_detail_repo import (
     graph_user_registration_detail_repo,
 )
-from utils.graph_odata import apply_graph_filter, apply_odata_orderby
+from utils.graph_odata import (
+    apply_graph_filter,
+    apply_odata_orderby,
+    apply_odata_select,
+)
 from utils.graph_response import build_graph_list_response
 from utils.serde import record_dict
 
@@ -13,6 +17,7 @@ def list_registration_details(
     filter_str: str | None = None,
     top: int = 100,
     skip: int = 0,
+    select: str | None = None,
 ) -> dict:
     """Return user registration details with OData query support.
 
@@ -20,6 +25,7 @@ def list_registration_details(
         filter_str: OData ``$filter`` expression.
         top:        Page size (``$top``).
         skip:       Number of records to skip (``$skip``).
+        select:     OData ``$select`` expression.
 
     Returns:
         OData list response dict.
@@ -31,7 +37,7 @@ def list_registration_details(
 
     records = apply_odata_orderby(records, None)
     total = len(records)
-    page = records[skip : skip + top]
+    page = apply_odata_select(records[skip : skip + top], select)
     next_link = (
         "https://graph.microsoft.com/v1.0/reports/"
         "authenticationMethods/"

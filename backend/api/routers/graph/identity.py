@@ -18,7 +18,7 @@ async def list_conditional_access_policies(
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List Conditional Access policies."""
-    return identity_queries.list_ca_policies()
+    return identity_queries.list_ca_policies(filter_str=filter_str, select=select)
 
 
 @router.get("/v1.0/identity/conditionalAccess/policies/{policy_id}")
@@ -28,7 +28,7 @@ async def get_conditional_access_policy(
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """Get a single Conditional Access policy by ID."""
-    result = identity_queries.get_ca_policy(policy_id)
+    result = identity_queries.get_ca_policy(policy_id, select=select)
     if result is None:
         from fastapi import HTTPException
 

@@ -37,7 +37,7 @@ async def get_managed_device(
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
     """Get a single managed device by ID."""
-    result = device_queries.get_managed_device(device_id)
+    result = device_queries.get_managed_device(device_id, select=select)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -58,7 +58,9 @@ async def list_detected_apps(
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
     """List detected applications across managed devices."""
-    return device_queries.list_detected_apps(top=top, skip=skip)
+    return device_queries.list_detected_apps(
+        top=top, skip=skip, filter_str=filter_str, select=select,
+    )
 
 
 @router.get("/v1.0/deviceManagement/detectedApps/{app_id}/managedDevices")

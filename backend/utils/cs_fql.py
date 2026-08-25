@@ -201,6 +201,21 @@ def _smart_split(text: str, delimiter: str) -> list[str]:
     return parts
 
 
+class FqlError(ValueError):
+    """Raised when a filter is not FQL at all.
+
+    The Falcon API refuses such a filter with a 400; mockdr used to return
+    every record instead, so a client that mistyped its filter — or built one
+    for a different API — was handed the whole collection and read it as the
+    matches.
+    """
+
+    def __init__(self, fql: str) -> None:
+        """Record the expression, which the message quotes."""
+        self.fql = fql
+        super().__init__(f"invalid filter expression: {fql}")
+
+
 def parse_fql(fql: str) -> list[FqlClause]:
     """Parse an FQL string into structured clauses.
 
@@ -212,6 +227,9 @@ def parse_fql(fql: str) -> list[FqlClause]:
 
     Returns:
         Ordered list of ``FqlClause`` objects representing the filter.
+
+    Raises:
+        FqlError: If the expression carries no readable clause at all.
     """
     if not fql or not fql.strip():
         return []
@@ -238,6 +256,9 @@ def parse_fql(fql: str) -> list[FqlClause]:
                     clause.conjunction = "or" if i > 0 else "and"
                     clauses.append(clause)
 
+    if not clauses:
+        # Something was sent and none of it was a `field:value` term.
+        raise FqlError(fql)
     return clauses
 
 
@@ -351,6 +372,9 @@ def apply_fql(records: list, fql: str) -> list:
 
     Returns:
         Filtered subset matching all FQL conditions.
+
+    Raises:
+        FqlError: If the expression carries no readable clause at all.
     """
     clauses = parse_fql(fql)
     if not clauses:

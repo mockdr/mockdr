@@ -1,6 +1,8 @@
 """Sentinel threat intelligence query handlers (read-only)."""
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from domain.sentinel.threat_indicator import SentinelThreatIndicator
 from repository.sentinel.threat_indicator_repo import sentinel_threat_indicator_repo
 from utils.sentinel.pagination import build_next_link, parse_skip_token
@@ -65,20 +67,27 @@ def query_indicators(
     pattern_types: list[str] | None = None,
     threat_types: list[str] | None = None,
     sources: list[str] | None = None,
+    ids: list[str] | None = None,
     min_confidence: int = 0,
     max_confidence: int = 100,
-    sort_by: str = "",
+    include_disabled: bool = True,
+    sort_by: list[dict] | None = None,
     page_size: int = 50,
 ) -> dict:
-    """Query indicators with filters."""
-    all_inds = sentinel_threat_indicator_repo.list_all()
+    """Query indicators with the criteria the ARM body carries.
 
-    filtered = all_inds
+    Every member of ``ThreatIntelligenceFilteringCriteria`` the spec
+    documents is read here. Five of them — the threat types, the confidence
+    bounds, the ids, the sort and the page size — were taken by the query
+    and never used, so a client narrowing a hunt to two indicators got the
+    whole feed back in whatever order the repository held it.
+    """
+    filtered = list(sentinel_threat_indicator_repo.list_all())
     if keywords:
-        kw = keywords.lower()
+        keyword = keywords.lower()
         filtered = [
             i for i in filtered
-            if kw in i.display_name.lower() or kw in i.description.lower()
+            if keyword in i.display_name.lower() or keyword in i.description.lower()
         ]
     if pattern_types:
         filtered = [i for i in filtered if i.pattern_type in pattern_types]
@@ -86,10 +95,38 @@ def query_indicators(
         filtered = [i for i in filtered if any(t in i.threat_types for t in threat_types)]
     if sources:
         filtered = [i for i in filtered if i.source in sources]
+    if ids:
+        wanted = set(ids)
+        filtered = [i for i in filtered if i.name in wanted]
+    if not include_disabled:
+        filtered = [i for i in filtered if not getattr(i, "disabled", False)]
     filtered = [i for i in filtered if min_confidence <= i.confidence <= max_confidence]
+
+    for criterion in reversed(sort_by or []):
+        order = str(criterion.get("sortOrder", "")).lower()
+        if order not in ("ascending", "descending"):
+            # `unsorted` — and anything else — leaves the order alone.
+            continue
+        key = str(criterion.get("itemKey", ""))
+        filtered.sort(key=_sorter(key), reverse=order == "descending")
 
     items = [_indicator_to_arm(i) for i in filtered[:page_size]]
     return build_arm_list(items)
+
+
+def _sorter(key: str) -> Callable[[object], tuple[int, float, str]]:
+    """A sort key that reads one attribute off an indicator."""
+    return lambda indicator: _sort_value(getattr(indicator, key, None))
+
+
+def _sort_value(value: object) -> tuple[int, float, str]:
+    """Order numbers numerically, text lexically, and absent values last."""
+    if value is None or value == "":
+        return (2, 0.0, "")
+    try:
+        return (0, float(value), "")  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return (1, 0.0, str(value))
 
 
 def get_metrics() -> dict:

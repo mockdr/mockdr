@@ -24,6 +24,7 @@ from utils.mde_odata import (
 
 # Re-export so callers can import everything from one place
 __all__ = [
+    "select_fields",
     "apply_odata_filter",
     "apply_odata_orderby",
     "apply_odata_select",
@@ -31,6 +32,22 @@ __all__ = [
     "apply_odata_count",
     "apply_odata_search",
 ]
+
+def select_fields(record: dict | None, select: str | None) -> dict | None:
+    """Project one resource through ``$select``.
+
+    The collection form of this is :func:`apply_odata_select`; a single
+    resource needs the same projection, and the ``@odata`` annotations
+    survive it because they describe the answer rather than the resource.
+    """
+    if record is None or not select or not select.strip():
+        return record
+    fields = {f.strip() for f in select.split(",") if f.strip()}
+    return {
+        key: value for key, value in record.items()
+        if key in fields or key.startswith("@")
+    }
+
 
 # ---------------------------------------------------------------------------
 # Lambda pre-processor

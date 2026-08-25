@@ -320,6 +320,7 @@ from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
 from infrastructure import seed
+from utils.cs_fql import FqlError
 from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
 from utils.es_aggs import ESAggregationError
 from utils.es_query import ESQueryError
@@ -529,6 +530,22 @@ async def odata_filter_exception_handler(
         status_code=400,
         content=build_vendor_error(
             vendor_for_path(request.url.path), 400, f"Invalid $filter: {exc}",
+        ),
+    )
+
+
+@app.exception_handler(FqlError)
+async def fql_exception_handler(request: Request, exc: FqlError) -> JSONResponse:
+    """Answer a filter that is not FQL with the 400 the Falcon API sends.
+
+    mockdr used to ignore it and return every record — so a client that
+    mistyped its filter, or wrote one for a different API, was handed the
+    whole collection and read it as the matches.
+    """
+    return JSONResponse(
+        status_code=400,
+        content=build_vendor_error(
+            vendor_for_path(request.url.path), 400, str(exc),
         ),
     )
 

@@ -78,7 +78,7 @@ async def get_user(
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """Get a single user by ID or userPrincipalName."""
-    result = user_queries.get_user(user_id)
+    result = user_queries.get_user(user_id, select=select)
     if result is None:
         from fastapi import HTTPException
 
@@ -103,7 +103,9 @@ async def list_user_member_of(
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List groups and directory roles a user is a member of."""
-    return user_queries.get_user_member_of(user_id)
+    return user_queries.get_user_member_of(
+        user_id, filter_str=filter_str, top=top, skip=skip, select=select,
+    )
 
 
 @router.get("/v1.0/users/{user_id}/mailFolders/inbox/messageRules")

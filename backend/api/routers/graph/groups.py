@@ -34,7 +34,7 @@ async def get_group(
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """Get a single group by ID."""
-    result = group_queries.get_group(group_id)
+    result = group_queries.get_group(group_id, select=select)
     if result is None:
         raise HTTPException(
             404,

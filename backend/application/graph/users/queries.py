@@ -9,6 +9,7 @@ from utils.graph_odata import (
     apply_odata_orderby,
     apply_odata_search,
     apply_odata_select,
+    select_fields,
 )
 from utils.graph_response import build_graph_list_response
 from utils.serde import record_dict
@@ -66,11 +67,12 @@ def list_users(
     )
 
 
-def get_user(user_id: str) -> dict | None:
+def get_user(user_id: str, select: str | None = None) -> dict | None:
     """Return a single user by ID.
 
     Args:
         user_id: The user's ``id`` or ``userPrincipalName``.
+        select:  OData ``$select`` expression.
 
     Returns:
         User dict or ``None`` if not found.
@@ -78,17 +80,27 @@ def get_user(user_id: str) -> dict | None:
     user = graph_user_repo.get(user_id)
     if user is None:
         return None
-    return record_dict(user)
+    return select_fields(record_dict(user), select)
 
 
-def get_user_member_of(user_id: str) -> dict:
+def get_user_member_of(
+    user_id: str,
+    filter_str: str | None = None,
+    top: int = 100,
+    skip: int = 0,
+    select: str | None = None,
+) -> dict:
     """Return groups the user belongs to.
 
     Reads from the ``graph_group_members`` collection and finds groups
     whose member list includes the given user.
 
     Args:
-        user_id: The user's ``id``.
+        user_id:    The user's ``id``.
+        filter_str: OData ``$filter`` expression.
+        top:        Page size (``$top``).
+        skip:       Number of records to skip (``$skip``).
+        select:     OData ``$select`` expression.
 
     Returns:
         OData list response containing group membership dicts.
@@ -104,8 +116,13 @@ def get_user_member_of(user_id: str) -> dict:
                     memberships.append({"@odata.type": "#microsoft.graph.group", "id": group_id})
                     break
 
+    if filter_str:
+        # Every one of these was taken and dropped: a client narrowing a
+        # membership list, or paging one, got the whole list back.
+        memberships = apply_graph_filter(memberships, filter_str)
+    page = apply_odata_select(memberships[skip : skip + top], select)
     return build_graph_list_response(
-        value=memberships,
+        value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#directoryObjects",
     )
 

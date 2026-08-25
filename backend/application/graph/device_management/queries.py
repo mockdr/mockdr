@@ -9,6 +9,7 @@ from utils.graph_odata import (
     apply_odata_count,
     apply_odata_orderby,
     apply_odata_select,
+    select_fields,
 )
 from utils.graph_response import build_graph_list_response
 from utils.serde import record_dict
@@ -60,11 +61,12 @@ def list_managed_devices(
     )
 
 
-def get_managed_device(device_id: str) -> dict | None:
+def get_managed_device(device_id: str, select: str | None = None) -> dict | None:
     """Return a single managed device by ID.
 
     Args:
         device_id: The managed device's ``id``.
+        select:    OData ``$select`` expression.
 
     Returns:
         Device dict or ``None`` if not found.
@@ -72,25 +74,33 @@ def get_managed_device(device_id: str) -> dict | None:
     device = graph_managed_device_repo.get(device_id)
     if device is None:
         return None
-    return record_dict(device)
+    return select_fields(record_dict(device), select)
 
 
 def list_detected_apps(
     top: int = 100,
     skip: int = 0,
+    filter_str: str | None = None,
+    select: str | None = None,
 ) -> dict:
     """Return detected apps with pagination.
 
     Args:
-        top:  Page size (``$top``).
-        skip: Number of records to skip (``$skip``).
+        top:        Page size (``$top``).
+        skip:       Number of records to skip (``$skip``).
+        filter_str: OData ``$filter`` expression.
+        select:     OData ``$select`` expression.
 
     Returns:
         OData list response dict.
     """
     records = [record_dict(a) for a in graph_detected_app_repo.list_all()]
+    if filter_str:
+        # Both were taken and dropped here: a client filtering for one app
+        # got every app, and read the first as though it were the match.
+        records = apply_graph_filter(records, filter_str)
     total = len(records)
-    page = records[skip : skip + top]
+    page = apply_odata_select(records[skip : skip + top], select)
     next_link = (
         f"https://graph.microsoft.com/v1.0/deviceManagement/detectedApps?$skip={skip + top}"
         if skip + top < total
