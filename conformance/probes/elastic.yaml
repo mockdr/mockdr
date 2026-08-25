@@ -2245,3 +2245,193 @@ probes:
       content: '{"size": 3, "sort": [{"nosuchfield": {"order": "asc", "unmapped_type": "long"}}, {"name": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
+
+  # ── Writes (2.3.1) ──────────────────────────────────────────────────────
+  #
+  # Last in the file on purpose: these change the seeded documents, so every
+  # probe that reads them runs first. Both engines start from the same six
+  # documents and get the same requests in the same order, so the answers
+  # stay comparable.
+  #
+  # `_update`, `_update_by_query`, `_delete_by_query`, `_source` and the
+  # maintenance calls were not served at all — a client closing a signal or
+  # refreshing after a write got a 404 here and a write from the cluster.
+
+  - id: es-update-doc
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A partial document is merged into the one that is there.
+    request:
+      method: POST
+      path: /${seed_index}/_update/a
+      query: {refresh: 'true'}
+      content: '{"doc": {"sev": 99}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-source-after
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And the document reads back changed.
+    request:
+      method: GET
+      path: /${seed_index}/_source/a
+      auth: basic
+
+  - id: es-update-noop
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Writing the same value again is a noop, and no shard works.
+    request:
+      method: POST
+      path: /${seed_index}/_update/a
+      query: {refresh: 'true'}
+      content: '{"doc": {"sev": 99}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-missing
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A document that is not there is a 404 that names it.
+    request:
+      method: POST
+      path: /${seed_index}/_update/zz
+      content: '{"doc": {"sev": 1}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-upsert
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      doc_as_upsert creates it instead.
+    request:
+      method: POST
+      path: /${seed_index}/_update/upserted
+      query: {refresh: 'true'}
+      content: '{"doc": {"sev": 1}, "doc_as_upsert": true}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-script
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The assignment a SIEM writes.
+    request:
+      method: POST
+      path: /${seed_index}/_update/b
+      query: {refresh: 'true'}
+      content: '{"script": {"source": "ctx._source.name = ''renamed''"}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-script-params
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      With a parameter, and a compound assignment.
+    request:
+      method: POST
+      path: /${seed_index}/_update/b
+      query: {refresh: 'true'}
+      content: '{"script": {"source": "ctx._source.sev = params.v", "params": {"v": 42}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-by-query
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Every document a query matches.
+    request:
+      method: POST
+      path: /${seed_index}/_update_by_query
+      query: {refresh: 'true'}
+      content: '{"query": {"term": {"host": "srv-2"}}, "script": {"source": "ctx._source.name = ''grouped''"}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-update-by-query-no-match
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And one that matches nothing.
+    request:
+      method: POST
+      path: /${seed_index}/_update_by_query
+      content: '{"query": {"term": {"host": "nope"}}, "script": {"source": "ctx._source.name = ''x''"}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-source
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The _source alone, which is what most clients want.
+    request:
+      method: GET
+      path: /${seed_index}/_source/c
+      auth: basic
+
+  - id: es-source-missing
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A document that is not there.
+    request:
+      method: GET
+      path: /${seed_index}/_source/zz
+      auth: basic
+
+  - id: es-refresh
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The call an ingest script makes after writing.
+    request:
+      method: POST
+      path: /${seed_index}/_refresh
+      auth: basic
+
+  - id: es-delete-by-query
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Deleting everything a query matches.
+    request:
+      method: POST
+      path: /${seed_index}/_delete_by_query
+      query: {refresh: 'true'}
+      content: '{"query": {"term": {"host": "srv-3"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-count-after-delete
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The count that proves it happened.
+    request:
+      method: GET
+      path: /${seed_index}/_count
+      auth: basic

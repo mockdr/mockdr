@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Elasticsearch: the writes a client makes around a search.** `_update`,
+`_update_by_query`, `_delete_by_query`, `GET _source` and the maintenance
+calls (`_refresh`, `_flush`, `_forcemerge`, `_cache/clear`) were not served
+at all, so closing a signal, stamping a field or refreshing after an ingest
+got a 404 from the mock and a write from the cluster. 28 calls measured
+against 8.15, down to the `noop` a change-free update reports (with no shard
+doing any work), the `[id]: document missing` a 404 carries, and which of
+`updated`/`deleted` each by-query body has — `_update_by_query` reports
+both, `_delete_by_query` only its own.
+
+mockdr does not run Painless, and says so rather than guessing: it reads the
+shape a SIEM actually sends — `ctx._source.signal.status = 'closed'`,
+`ctx._source['kibana.alert.workflow_status'] = params.status`,
+`ctx._source.count += 1`, `remove()`, a write to `ctx.op` — and refuses
+anything else. A wrong answer to a status update is worse than a refusal,
+because the client believes the alert was closed.
+
+A by-query write reaches mockdr's own alerts where it can: a status
+assignment goes through the repository that owns them, and a write it cannot
+make is reported in `failures[]` with the reason rather than counted as
+written.
+
 **Elasticsearch: the index mapping a client sends, and what it is for.**
 mockdr took the `mappings` on `PUT /{index}` and threw them away, so
 `GET /{index}` answered `"mappings": {}` where a cluster echoes back what it

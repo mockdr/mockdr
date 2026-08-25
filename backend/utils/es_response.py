@@ -138,6 +138,22 @@ def build_es_error_response(
     }
 
 
+def build_es_document_missing(index: str, index_uuid: str, doc_id: str) -> dict:
+    """The 404 an update names a missing document with.
+
+    It reads like a shard failure — the shard is what looked for the
+    document — and carries the index, its uuid and the shard number.
+    """
+    cause = {
+        "type": "document_missing_exception",
+        "reason": f"[{doc_id}]: document missing",
+        "index_uuid": index_uuid,
+        "shard": "0",
+        "index": index,
+    }
+    return {"error": {"root_cause": [dict(cause)], **cause}, "status": 404}
+
+
 def build_es_index_not_found(index: str) -> dict:
     """Build Elasticsearch's ``index_not_found_exception`` body.
 

@@ -17,8 +17,10 @@ from api.spa import spa_response, wants_html
 from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
 from utils.es_mapping import MappingConflictError, flatten_properties
+from utils.es_painless import PainlessError
 from utils.es_query import ESQueryError
 from utils.es_response import (
+    build_es_document_missing,
     build_es_error_response,
     build_es_index_not_found,
     build_es_invalid_index_name,
@@ -388,6 +390,99 @@ def field_caps(
         return search_queries.es_field_caps(index, wanted)
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
+
+
+@router.post("/{index}/_update/{doc_id}", operation_id="es_update_doc")
+def update_doc(
+    index: str,
+    doc_id: str,
+    body: dict = Body(...),
+    refresh: str | None = Query(default=None),
+    _: dict = Depends(require_es_write),
+) -> JSONResponse:
+    """Apply a partial document or a script to one document."""
+    forced = _forced_refresh(refresh)
+    try:
+        result = search_queries.es_update_doc(index, doc_id, body)
+    except search_queries.DocumentMissingError as exc:
+        raise HTTPException(status_code=404, detail=build_es_document_missing(
+            exc.index, search_queries.es_index_uuid(exc.index), exc.doc_id,
+        )) from exc
+    except PainlessError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "illegal_argument_exception", str(exc),
+        )) from exc
+    if forced and result["result"] != "noop":
+        result["forced_refresh"] = True
+    created = result.get("result") == "created"
+    return JSONResponse(status_code=201 if created else 200, content=result)
+
+
+@router.post("/{index}/_update_by_query", operation_id="es_update_by_query")
+def update_by_query(
+    index: str,
+    body: dict | None = Body(default=None),
+    _refresh: str | None = Query(default=None),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Apply a script to every document a query matches."""
+    try:
+        return search_queries.es_update_by_query(index, body or {})
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+    except PainlessError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "illegal_argument_exception", str(exc),
+        )) from exc
+
+
+@router.post("/{index}/_delete_by_query", operation_id="es_delete_by_query")
+def delete_by_query(
+    index: str,
+    body: dict | None = Body(default=None),
+    _refresh: str | None = Query(default=None),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Delete every document a query matches."""
+    try:
+        return search_queries.es_delete_by_query(index, body or {})
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+
+
+@router.get("/{index}/_source/{doc_id}", operation_id="es_get_source")
+def get_source(
+    index: str,
+    doc_id: str,
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """A document's ``_source`` alone, which is what most clients want."""
+    source = search_queries.es_get_source(index, doc_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail=build_es_error_response(
+            404, "resource_not_found_exception",
+            f"Document not found [{index}]/[{doc_id}]",
+        ))
+    return source
+
+
+#: The maintenance calls a client makes around a write. mockdr holds its
+#: documents in memory, so each is a no-op — but answering 404 made an
+#: ingest script that refreshes after writing look like it had failed.
+_SHARD_ACK = {"_shards": {"total": 2, "successful": 1, "failed": 0}}
+
+
+@router.post("/{index}/_refresh", operation_id="es_refresh")
+@router.post("/{index}/_flush", operation_id="es_flush")
+@router.post("/{index}/_forcemerge", operation_id="es_forcemerge")
+@router.post("/{index}/_cache/clear", operation_id="es_cache_clear")
+def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
+    """Answer the maintenance calls that follow a write."""
+    try:
+        search_queries.es_get_stats(index)
+    except IndexNotFoundError as exc:
+        raise _missing_index(exc) from exc
+    return dict(_SHARD_ACK)
 
 
 @router.get("/{index}/_stats")

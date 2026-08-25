@@ -10,6 +10,7 @@ import hashlib
 import time
 from fnmatch import fnmatch
 
+from application.es_alerts.commands import update_alert_status
 from repository.es_alert_repo import es_alert_repo
 from repository.es_endpoint_repo import es_endpoint_repo
 from repository.store import store
@@ -22,6 +23,7 @@ from utils.es_mapping import (
     infer_properties,
     merge_properties,
 )
+from utils.es_painless import PainlessError, run_script
 from utils.es_query import (
     ESQueryError,
     apply_es_query,
@@ -690,6 +692,243 @@ def refresh_forced(value: str | None) -> bool:
         msg = f"Unknown value for refresh: [{value}]."
         raise ValueError(msg)
     return forced
+
+
+# ---------------------------------------------------------------------------
+# Writes: update, update_by_query, delete_by_query
+#
+# `_update` and the two by-query endpoints were not served at all, so a
+# client closing a signal or stamping a field got a 404 from the mock and a
+# write from the cluster. All three shapes measured against 8.15, down to
+# the `noop` result a change-free update reports and the "[id]: document
+# missing" a 404 carries.
+# ---------------------------------------------------------------------------
+
+def es_update_doc(index: str, doc_id: str, body: dict) -> dict:
+    """Apply a partial document or a script to one document.
+
+    Raises:
+        DocumentMissingError: If there is nothing to update and no upsert.
+        PainlessError:        If the script is not a form mockdr reads.
+    """
+    key = f"{index}:{doc_id}"
+    existing = store.get("es_documents", key)
+    if existing is None:
+        upsert = _upsert_source(body)
+        if upsert is None:
+            raise DocumentMissingError(index, doc_id)
+        store.save("es_documents", key, {"_version": 1, "_source": upsert})
+        _count_document(index, 1)
+        return _write_result(index, doc_id, 1, "created")
+
+    source = dict(existing.get("_source") or {})
+    updated = dict(source)
+    operation = "index"
+    if "script" in body:
+        script = body["script"]
+        script = {"source": script} if isinstance(script, str) else script
+        operation = run_script(
+            str(script.get("source", "")), dict(script.get("params") or {}), updated,
+        )
+    if isinstance(body.get("doc"), dict):
+        updated = _deep_merge(updated, body["doc"])
+
+    version = int(existing.get("_version", 1))
+    if operation == "delete":
+        store.delete("es_documents", key)
+        _count_document(index, -1)
+        return _write_result(index, doc_id, version + 1, "deleted")
+    if operation == "noop" or updated == source:
+        # Nothing changed, so nothing was written: no shard did any work.
+        return {**_write_result(index, doc_id, version, "noop"),
+                "_shards": {"total": 0, "successful": 0, "failed": 0}}
+    store.save("es_documents", key, {"_version": version + 1, "_source": updated})
+    return _write_result(index, doc_id, version + 1, "updated")
+
+
+def _upsert_source(body: dict) -> dict | None:
+    """The document an update should create, if it asked to create one."""
+    if isinstance(body.get("upsert"), dict):
+        return dict(body["upsert"])
+    if body.get("doc_as_upsert") and isinstance(body.get("doc"), dict):
+        return dict(body["doc"])
+    if body.get("scripted_upsert"):
+        return {}
+    return None
+
+
+def _deep_merge(base: dict, incoming: dict) -> dict:
+    """Merge a partial document the way `_update`'s `doc` merges.
+
+    An object is merged field by field rather than replaced: writing
+    ``{"nested": {"b": 2}}`` over ``{"nested": {"a": 1}}`` leaves both.
+    """
+    merged = dict(base)
+    for name, value in incoming.items():
+        current = merged.get(name)
+        if isinstance(current, dict) and isinstance(value, dict):
+            merged[name] = _deep_merge(current, value)
+        else:
+            merged[name] = value
+    return merged
+
+
+def _write_result(index: str, doc_id: str, version: int, result: str) -> dict:
+    """The envelope every single-document write answers with."""
+    return {
+        "_index": index,
+        "_id": doc_id,
+        "_version": version,
+        "result": result,
+        "_shards": {"total": 2, "successful": 1, "failed": 0},
+        "_seq_no": version - 1,
+        "_primary_term": 1,
+    }
+
+
+class DocumentMissingError(LookupError):
+    """Raised when an update names a document that is not there."""
+
+    def __init__(self, index: str, doc_id: str) -> None:
+        """Record the index and the id, which the 404 names."""
+        self.index = index
+        self.doc_id = doc_id
+        super().__init__(f"[{doc_id}]: document missing")
+
+
+def es_get_source(index: str, doc_id: str) -> dict | None:
+    """A document's ``_source`` alone, or None if it is not there."""
+    document = es_get_doc(index, doc_id)
+    if not document or not document.get("found", True):
+        return None
+    source = document.get("_source")
+    return dict(source) if isinstance(source, dict) else None
+
+
+def es_update_by_query(index: str, body: dict) -> dict:
+    """Apply a script to every document a query matches."""
+    return _by_query(index, body, delete=False)
+
+
+def es_delete_by_query(index: str, body: dict) -> dict:
+    """Delete every document a query matches."""
+    return _by_query(index, body, delete=True)
+
+
+def _by_query(index: str, body: dict, *, delete: bool) -> dict:
+    """The shared walk behind ``_update_by_query`` and ``_delete_by_query``.
+
+    mockdr can write the documents a client indexed, and the workflow status
+    of its own alerts — the write a SIEM actually makes. Anything else in its
+    own collections is a projection of a repository with its own API, and is
+    reported as a failure rather than silently counted as written.
+    """
+    records, canonical, written = _resolve_collection(index)
+    clause = body.get("query")
+    if clause:
+        predicate = build_predicate(clause, ids=written, lookup=_terms_lookup)
+        records = [r for r in records if predicate(r)]
+
+    script = body.get("script")
+    script = {"source": script} if isinstance(script, str) else (script or {})
+    source_text = str(script.get("source", ""))
+    params = dict(script.get("params") or {})
+
+    changed = 0
+    noops = 0
+    failures: list[dict] = []
+    for record in records:
+        doc_id = written.get(id(record))
+        if doc_id is None:
+            outcome = _by_query_owned(canonical, record, source_text, params, delete=delete)
+            if outcome is None:
+                failures.append({
+                    "index": canonical,
+                    "id": _document_id(record),
+                    "cause": {
+                        "type": "illegal_argument_exception",
+                        "reason": (
+                            "mockdr serves this collection from its own API; "
+                            "only a workflow status can be written through a query"
+                        ),
+                    },
+                    "status": 400,
+                })
+                continue
+            changed += outcome
+            noops += 1 - outcome
+            continue
+        if delete:
+            store.delete("es_documents", f"{canonical}:{doc_id}")
+            _count_document(canonical, -1)
+            changed += 1
+            continue
+        result = es_update_doc(canonical, doc_id, {"script": script} if source_text else {})
+        changed += result["result"] == "updated"
+        noops += result["result"] == "noop"
+
+    return _by_query_response(len(records), changed, noops, failures, delete=delete)
+
+
+def _by_query_owned(
+    index: str, record: dict, source: str, params: dict, *, delete: bool,
+) -> int | None:
+    """Apply a by-query write to one of mockdr's own records.
+
+    Returns:
+        1 if it was written, 0 if the script asked for nothing, or None if
+        this is not a write mockdr can make.
+    """
+    if delete or not source:
+        return None
+    projected = dict(record)
+    try:
+        run_script(source, params, projected)
+    except PainlessError:
+        return None
+    status = _written_status(record, projected)
+    if status is None:
+        return None
+    alert_id = _document_id(record)
+    return 1 if update_alert_status([alert_id], status)["updated"] else 0
+
+
+#: Where a signal's workflow status lives, in both spellings a client uses.
+_STATUS_PATHS = ("kibana.alert.workflow_status", "signal.status")
+
+
+def _written_status(before: dict, after: dict) -> str | None:
+    """The status a script set, if that is all it set."""
+    for path in _STATUS_PATHS:
+        old, new = get_nested(before, path), get_nested(after, path)
+        if new is not None and new != old:
+            return str(new)
+    return None
+
+
+def _by_query_response(
+    total: int, changed: int, noops: int, failures: list[dict], *, delete: bool,
+) -> dict:
+    """The task-shaped body both by-query endpoints answer with."""
+    # `_delete_by_query` reports no `updated` member at all;
+    # `_update_by_query` reports both, with `deleted` at zero (measured).
+    counts = (
+        {"deleted": changed} if delete else {"updated": changed, "deleted": 0}
+    )
+    return {
+        "took": 5,
+        "timed_out": False,
+        "total": total,
+        **counts,
+        "batches": 1 if total else 0,
+        "version_conflicts": 0,
+        "noops": noops,
+        "retries": {"bulk": 0, "search": 0},
+        "throttled_millis": 0,
+        "requests_per_second": -1.0,
+        "throttled_until_millis": 0,
+        "failures": failures,
+    }
 
 
 def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
