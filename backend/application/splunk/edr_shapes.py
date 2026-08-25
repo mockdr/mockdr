@@ -32,6 +32,7 @@ from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.s1_fixtures import complete_item
 from utils.strip import strip_fields
 from utils.xdr_fixtures import complete_xdr_item
+from utils.xdr_response import serialise_endpoint
 
 S1_INDEX = "sentinelone"
 S1_SOURCE = "sentinelone:api"
@@ -97,7 +98,9 @@ def xdr_alert(record: dict) -> dict:
 
 def xdr_endpoint(record: dict) -> dict:
     """An endpoint as ``endpoints/get_endpoint`` lists it."""
-    return complete_xdr_item(record, "endpoints_get_endpoint", "endpoints")
+    return complete_xdr_item(
+        serialise_endpoint(record), "endpoints_get_endpoint", "endpoints",
+    )
 
 
 # ── CrowdStrike: the Falcon Event Streams shapes ───────────────────────────

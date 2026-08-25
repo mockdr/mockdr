@@ -239,32 +239,59 @@ class TestIocs:
 class TestTags:
     """Tests for XDR tag assignment endpoints."""
 
+    def _first_endpoint(self, client: TestClient) -> str:
+        listed = client.post(
+            f"{XDR_PREFIX}/endpoints/get_endpoint/",
+            json={"request_data": {"search_from": 0, "search_to": 1}},
+            headers=_xdr_headers(),
+        )
+        return str(listed.json()["reply"]["endpoints"][0]["endpoint_id"])
+
     def test_assign_tag(self, client: TestClient) -> None:
+        """The tag lands on the endpoint, and the reply is empty as Cortex's is."""
+        endpoint_id = self._first_endpoint(client)
         resp = client.post(
             f"{XDR_PREFIX}/tags/agents/assign/",
-            json={"request_data": {
-                "endpoint_ids": ["mock-endpoint-001"],
-                "tag": "VIP",
-            }},
+            json={
+                "context": {"lcaas_id": [endpoint_id]},
+                "request_data": {"filters": [], "tag": "VIP"},
+            },
             headers=_xdr_headers(),
         )
         assert resp.status_code == 200
-        reply = resp.json()["reply"]
-        assert reply["assigned_count"] == 1
-        assert reply["tag"] == "VIP"
+        assert resp.json()["reply"] == {}
+
+        after = client.post(
+            f"{XDR_PREFIX}/endpoints/get_endpoint/",
+            json={"request_data": {"filters": [
+                {"field": "endpoint_id_list", "operator": "in", "value": [endpoint_id]},
+            ]}},
+            headers=_xdr_headers(),
+        )
+        assert after.json()["reply"]["endpoints"][0]["endpointTags"] == "VIP"
 
     def test_remove_tag(self, client: TestClient) -> None:
-        resp = client.post(
-            f"{XDR_PREFIX}/tags/agents/remove/",
-            json={"request_data": {
-                "endpoint_ids": ["mock-endpoint-001"],
-                "tag": "VIP",
-            }},
+        """And removing it takes it off again."""
+        endpoint_id = self._first_endpoint(client)
+        body = {
+            "context": {"lcaas_id": [endpoint_id]},
+            "request_data": {"filters": [], "tag": "VIP"},
+        }
+        client.post(f"{XDR_PREFIX}/tags/agents/assign/", json=body,
+                    headers=_xdr_headers())
+        resp = client.post(f"{XDR_PREFIX}/tags/agents/remove/", json=body,
+                           headers=_xdr_headers())
+        assert resp.status_code == 200
+        assert resp.json()["reply"] == {}
+
+        after = client.post(
+            f"{XDR_PREFIX}/endpoints/get_endpoint/",
+            json={"request_data": {"filters": [
+                {"field": "endpoint_id_list", "operator": "in", "value": [endpoint_id]},
+            ]}},
             headers=_xdr_headers(),
         )
-        assert resp.status_code == 200
-        reply = resp.json()["reply"]
-        assert reply["removed_count"] == 1
+        assert after.json()["reply"]["endpoints"][0]["endpointTags"] == ""
 
 
 class TestAlertExclusions:

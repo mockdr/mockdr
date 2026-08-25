@@ -13,6 +13,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `hostile_probe.py` | Hostile bodies and parameters against every mounted route; flags any plain-text 500 or crash. |
 | `param_effect.py` | Asks every route whether its parameters do anything: a limiter that does not limit, a filter that cannot match and returns everything, a `$select` that projects nothing. Exit 1 on any. |
 | `paging_audit.py` | Walks every collection a page at a time: flags a record that comes back twice, one that never appears, a total that disagrees with the pages, and paging that will not terminate. Exit 1 on any. |
+| `roundtrip_audit.py` | Writes something, then asks for it back: a create that drops the body, an update that answers 200 and changes nothing, a delete that leaves the record in the listing. Every other audit here only reads. Exit 1 on any. |
 
 ## Run before a release
 
@@ -29,7 +30,8 @@ into `data/vendor-specs/` (sources and licences: `data/vendor-specs/NOTICE.md`).
 
 | Script | Reads | Writes |
 |---|---|---|
-| `gofalcon_spec.py` | `CrowdStrike/gofalcon` clone | `crowdstrike_gofalcon_reduced.json` |
+| `gofalcon_spec.py` | `CrowdStrike/gofalcon` clone | `crowdstrike_gofalcon_reduced.json` (200 payloads *and* request bodies) |
+| `graph_csdl_spec.py` | a Microsoft Graph CSDL (`microsoftgraph/msgraph-metadata`) | `graph_<version>_csdl_types.json` (type → properties) |
 | `cs_event_streams_spec.py` | `elastic/integrations` clone (pipeline test logs) | `cs_event_streams_reduced.json` (key names only) |
 | `mde_docs_spec.py` | `MicrosoftDocs/defender-docs` clone | `mde_docs_reduced.json` |
 | `xsoar_samples_spec.py` | `data/vendor-specs/xsoar-samples/` | `xdr_samples_reduced.json`, `xdr_core_samples_reduced.json`, `mde_samples_reduced.json` |

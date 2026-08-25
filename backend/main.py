@@ -23,6 +23,7 @@ from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.request_logging import RequestLoggingMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
+from api.middleware.splunk_field_filter import SplunkFieldFilterMiddleware
 from api.middleware.splunk_namespace import SplunkNamespaceMiddleware
 from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
 from api.middleware.splunk_paging import SplunkPagingMiddleware
@@ -395,6 +396,7 @@ app.add_middleware(
 # Middleware registration order: last added = outermost wrapper.
 # RequestLoggingMiddleware runs first (outermost), then RateLimit, Security, Audit, Proxy innermost.
 # Paging runs inside XML rendering, so the sliced entries are what gets rendered.
+app.add_middleware(SplunkFieldFilterMiddleware)  # f= on Atom entry content
 app.add_middleware(SplunkPagingMiddleware)     # count/offset on Atom collections
 app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the routers
 # Path rewriting must happen before routing, so this is added last (outermost).

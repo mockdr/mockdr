@@ -291,7 +291,12 @@ class TestCaseComments:
         assert len(comments) >= 2
 
     def test_add_comment(self, client: TestClient) -> None:
-        """Adding a comment should return the new comment with an ID."""
+        """Adding a comment is answered with the case, comments and all.
+
+        Measured against Kibana 8.15: the answer to a comment write is the
+        case object — the comment is inside its ``comments`` array, and the
+        case's own ``updated_at`` and ``updated_by`` have moved.
+        """
         case_id = _get_first_case_id(client)
         resp = client.post(
             f"/kibana/api/cases/{case_id}/comments",
@@ -300,11 +305,16 @@ class TestCaseComments:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert "id" in body
-        assert body["comment"] == "New investigation note."
+        assert body["id"] == case_id
+        added = [c for c in body["comments"] if c["comment"] == "New investigation note."]
+        assert len(added) == 1
         # No real comment object carries case_id — the case is in the path.
-        assert "case_id" not in body
-        assert body["owner"] == "securitySolution"
+        assert "case_id" not in added[0]
+        assert added[0]["owner"] == "securitySolution"
+        # A comment nobody has edited carries neither an update time nor an editor.
+        assert added[0]["updated_at"] is None
+        assert added[0]["updated_by"] is None
+        assert body["updated_by"] == {"email": None, "full_name": None, "username": "elastic"}
 
     def test_add_comment_increases_count(self, client: TestClient) -> None:
         """Adding a comment should increase the comment count on the case."""

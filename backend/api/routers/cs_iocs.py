@@ -51,10 +51,11 @@ def update_ioc(
     body: dict = Body(...),
     _: dict = Depends(require_cs_write),
 ) -> dict:
-    """Update an existing custom IOC indicator.
+    """Update the custom IOC indicators in ``indicators``.
 
-    Body contains ``indicators`` list with a single entry that must include
-    the ``id`` field identifying which IOC to update.
+    ``APIIndicatorUpdateReqsV1`` carries a *list*, each member identified by
+    its ``id``; a caller updating three indicators in one call had two of
+    them silently ignored while the answer said 200.
     """
     indicators: list[dict] = body.get("indicators", [])
     if not indicators:
@@ -65,9 +66,7 @@ def update_ioc(
                 400, "indicators list is required and must not be empty",
             ),
         )
-    indicator = indicators[0]
-    ioc_id: str = indicator.get("id", "")
-    return ioc_commands.update_ioc(ioc_id, indicator)
+    return ioc_commands.update_iocs(indicators)
 
 
 @router.delete("/iocs/entities/indicators/v1")

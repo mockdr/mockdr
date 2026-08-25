@@ -12,6 +12,7 @@ import time
 from fastapi import APIRouter, Body, Depends
 
 from api.xdr_auth import require_xdr_auth, require_xdr_write
+from application.xdr_endpoints import commands as endpoint_commands
 from application.xdr_rbac import queries as rbac_queries
 from application.xdr_system import queries as system_queries
 from utils.xdr_fixtures import xdr_shape
@@ -87,14 +88,15 @@ def assign_tag(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
 ) -> dict:
-    """Assign a tag to agents (stub)."""
-    request_data = require_request_data(body)
-    return build_xdr_reply(
-        {
-            "assigned_count": len(request_data.get("endpoint_ids", [])),
-            "tag": request_data.get("tag", ""),
-        }
-    )
+    """Assign a tag to the agents the request names.
+
+    The body carries the endpoints twice over: ``context.lcaas_id`` lists
+    them, and ``request_data.filters`` narrows them. The route used to read
+    ``endpoint_ids`` — a key the documented body has never had — count it,
+    and answer with the count. Nothing was tagged, and the answer carried
+    two members Cortex's own reply does not.
+    """
+    return endpoint_commands.tag_endpoints(body, assign=True)
 
 
 @router.post("/tags/agents/remove/")
@@ -103,14 +105,8 @@ def remove_tag(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
 ) -> dict:
-    """Remove a tag from agents (stub)."""
-    request_data = require_request_data(body)
-    return build_xdr_reply(
-        {
-            "removed_count": len(request_data.get("endpoint_ids", [])),
-            "tag": request_data.get("tag", ""),
-        }
-    )
+    """Remove a tag from the agents the request names."""
+    return endpoint_commands.tag_endpoints(body, assign=False)
 
 
 # ── Alert Exclusions ─────────────────────────────────────────────────────────

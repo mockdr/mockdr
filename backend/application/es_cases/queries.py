@@ -91,7 +91,12 @@ def find_cases(
 
 
 def get_case(case_id: str) -> dict | None:
-    """Get a single case by its ID.
+    """Get a single case by its ID, comments and all.
+
+    Kibana fills ``comments`` when a case is fetched by its id and leaves it
+    empty in ``_find`` — where only ``totalComment`` says how many there are.
+    The mock left it empty in both, so a client that read the case it had
+    just commented on saw no comment.
 
     Args:
         case_id: The UUID of the case to retrieve.
@@ -102,7 +107,12 @@ def get_case(case_id: str) -> dict | None:
     case = es_case_repo.get(case_id)
     if not case:
         return None
-    return serialise_case(record_dict(case))
+    rendered = serialise_case(record_dict(case))
+    rendered["comments"] = [
+        serialise_comment(record_dict(comment))
+        for comment in es_case_comment_repo.get_by_case_id(case_id)
+    ]
+    return rendered
 
 
 def get_case_comments(case_id: str) -> list[dict] | None:

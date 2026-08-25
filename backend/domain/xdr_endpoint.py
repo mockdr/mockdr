@@ -35,6 +35,12 @@ class XdrEndpoint:
 
     users: list[str] = field(default_factory=list)
 
+    #: The tags assigned through ``/tags/agents/assign/``. Cortex serves them
+    #: in ``endpointTags``, which its reference example types as a string, so
+    #: the read side joins these with commas. Kept as a list here because the
+    #: assign and remove routes work one tag at a time.
+    endpoint_tags: list[str] = field(default_factory=list)
+
     @property
     def id(self) -> str:
         """Return the primary identifier expected by ``Repository[T]``."""

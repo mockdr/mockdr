@@ -146,15 +146,16 @@ class TestCreateHostGroup:
     """Tests for POST /cs/devices/entities/host-groups/v1."""
 
     def test_create_group_returns_200(self, client: TestClient) -> None:
+        """The documented body is a `resources` collection, not a flat group."""
         headers = _cs_auth(client)
         resp = client.post(
             "/cs/devices/entities/host-groups/v1",
             headers=headers,
-            json={
+            json={"resources": [{
                 "name": "Test Group",
                 "description": "A test host group",
                 "group_type": "static",
-            },
+            }]},
         )
         assert resp.status_code == 200
         resources = resp.json()["resources"]
@@ -170,7 +171,8 @@ class TestCreateHostGroup:
         create_resp = client.post(
             "/cs/devices/entities/host-groups/v1",
             headers=headers,
-            json={"name": "New Group", "description": "Newly created"},
+            json={"resources": [{"name": "New Group", "description": "Newly created",
+                                 "group_type": "static"}]},
         )
         created_id = create_resp.json()["resources"][0]["id"]
 
@@ -195,7 +197,7 @@ class TestCreateHostGroup:
         resp = client.post(
             "/cs/devices/entities/host-groups/v1",
             headers=headers,
-            json={"name": "Envelope Test Group"},
+            json={"resources": [{"name": "Envelope Test Group", "group_type": "static"}]},
         )
         body = resp.json()
         assert body["meta"]["powered_by"] == "crowdstrike-api"
@@ -273,7 +275,7 @@ class TestGroupMemberActions:
         create_resp = client.post(
             "/cs/devices/entities/host-groups/v1",
             headers=headers,
-            json={"name": "Member Test Group", "group_type": "static"},
+            json={"resources": [{"name": "Member Test Group", "group_type": "static"}]},
         )
         group_id = create_resp.json()["resources"][0]["id"]
 
@@ -307,7 +309,7 @@ class TestGroupMemberActions:
         create_resp = client.post(
             "/cs/devices/entities/host-groups/v1",
             headers=headers,
-            json={"name": "Remove Test Group", "group_type": "static"},
+            json={"resources": [{"name": "Remove Test Group", "group_type": "static"}]},
         )
         group_id = create_resp.json()["resources"][0]["id"]
 

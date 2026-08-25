@@ -10,7 +10,7 @@ from domain.es_case_comment import EsCaseComment
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
 from utils.dt import utc_now
-from utils.es_case_serde import serialise_case, serialise_comment
+from utils.es_case_serde import KIBANA_USER, serialise_case
 from utils.serde import record_dict
 
 
@@ -38,9 +38,7 @@ def create_case(data: dict) -> dict:
         owner=data.get("owner", "securitySolution"),
         assignees=data.get("assignees", []),
         created_at=now,
-        created_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
-        updated_at=now,
-        updated_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
+        created_by=data.get("created_by", dict(KIBANA_USER)),
     )
     es_case_repo.save(case)
     return serialise_case(record_dict(case))
@@ -83,7 +81,7 @@ def update_case(case_id: str, data: dict) -> dict | None:
             setattr(case, field, data[field])
 
     case.updated_at = now
-    case.updated_by = data.get("updated_by", {"username": "elastic", "full_name": "Elastic Admin"})
+    case.updated_by = data.get("updated_by", dict(KIBANA_USER))
     # The version is an opaque optimistic-concurrency token; Kibana issues a
     # new one on every write, which is what makes a stale version a conflict.
     case.version = _next_version(case.version)
@@ -126,7 +124,7 @@ def add_comment(case_id: str, data: dict) -> dict | None:
         data:    Request body with comment text and type.
 
     Returns:
-        The newly created comment dict, or None if the case does not exist.
+        The case the comment was added to, or None if it does not exist.
     """
     case = es_case_repo.get(case_id)
     if not case:
@@ -139,18 +137,23 @@ def add_comment(case_id: str, data: dict) -> dict | None:
         comment=data.get("comment", ""),
         type=data.get("type", "user"),
         created_at=now,
-        created_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
-        updated_at=now,
-        updated_by=data.get("created_by", {"username": "elastic", "full_name": "Elastic Admin"}),
+        created_by=data.get("created_by", dict(KIBANA_USER)),
     )
     es_case_comment_repo.save(comment)
 
     # Update case comment count and timestamp.
+    # Commenting is a change to the case, and Kibana stamps it as one: the
+    # case's own updated_at and updated_by move.
     case.total_comment = len(es_case_comment_repo.get_by_case_id(case_id))
     case.updated_at = now
+    case.updated_by = data.get("created_by", dict(KIBANA_USER))
     es_case_repo.save(case)
 
-    return serialise_comment(record_dict(comment))
+    # Kibana answers a comment write with the *case*, comments and all — not
+    # with the comment. A client that read the answer as a comment found an
+    # object with a different shape and no case to update from it.
+    from application.es_cases.queries import get_case
+    return get_case(case_id)
 
 
 def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
@@ -176,12 +179,12 @@ def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
     if "comment" in data:
         comment.comment = data["comment"]
     comment.updated_at = now
-    comment.updated_by = data.get(
-        "updated_by", {"username": "elastic", "full_name": "Elastic Admin"},
-    )
+    comment.updated_by = data.get("updated_by", dict(KIBANA_USER))
 
     es_case_comment_repo.save(comment)
-    return serialise_comment(record_dict(comment))
+    # As with the add: the answer is the case, not the comment.
+    from application.es_cases.queries import get_case
+    return get_case(case_id)
 
 
 def delete_comment(case_id: str, comment_id: str) -> bool:
@@ -204,10 +207,10 @@ def delete_comment(case_id: str, comment_id: str) -> bool:
 
     es_case_comment_repo.delete(comment_id)
 
-    # Update case comment count.
-    now = utc_now()
+    # Removing a comment is a change to the case, as adding one is.
     case.total_comment = len(es_case_comment_repo.get_by_case_id(case_id))
-    case.updated_at = now
+    case.updated_at = utc_now()
+    case.updated_by = dict(KIBANA_USER)
     es_case_repo.save(case)
 
     return True

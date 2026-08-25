@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends
 from api.xdr_auth import require_xdr_write
 from application.xdr_hash_exceptions import commands as hash_commands
 from utils.xdr_fixtures import xdr_shape
-from utils.xdr_response import require_request_data
+from utils.xdr_response import require_request_data, require_str_list
 
 router = APIRouter(tags=["XDR Hash Exceptions"])
 
@@ -23,8 +23,11 @@ def add_to_blocklist(
 ) -> dict:
     """Add hashes to the blocklist."""
     request_data = require_request_data(body)
-    hashes = request_data.get("hash_list", [])
-    return hash_commands.add_to_blocklist(hashes)
+    return hash_commands.add_to_blocklist(
+        require_str_list(request_data, "hash_list"),
+        str(request_data.get("comment") or ""),
+        request_data.get("incident_id"),
+    )
 
 
 @router.post("/hash_exceptions/blocklist/remove/")
@@ -34,8 +37,7 @@ def remove_from_blocklist(
 ) -> dict:
     """Remove hashes from the blocklist."""
     request_data = require_request_data(body)
-    hashes = request_data.get("hash_list", [])
-    return hash_commands.remove_from_blocklist(hashes)
+    return hash_commands.remove_from_blocklist(require_str_list(request_data, "hash_list"))
 
 
 @router.post("/hash_exceptions/allowlist/")
@@ -46,8 +48,11 @@ def add_to_allowlist(
 ) -> dict:
     """Add hashes to the allowlist."""
     request_data = require_request_data(body)
-    hashes = request_data.get("hash_list", [])
-    return hash_commands.add_to_allowlist(hashes)
+    return hash_commands.add_to_allowlist(
+        require_str_list(request_data, "hash_list"),
+        str(request_data.get("comment") or ""),
+        request_data.get("incident_id"),
+    )
 
 
 @router.post("/hash_exceptions/allowlist/remove/")
@@ -57,5 +62,4 @@ def remove_from_allowlist(
 ) -> dict:
     """Remove hashes from the allowlist."""
     request_data = require_request_data(body)
-    hashes = request_data.get("hash_list", [])
-    return hash_commands.remove_from_allowlist(hashes)
+    return hash_commands.remove_from_allowlist(require_str_list(request_data, "hash_list"))

@@ -34,6 +34,13 @@ _CASE_DEFAULTS: dict[str, Any] = {
 }
 
 
+#: The user object Kibana serves, measured against 8.15: a username, and two
+#: members that are null unless a real user profile fills them. mockdr wrote
+#: an invented "Elastic Admin" into `full_name` and left `email` out
+#: altogether, so a client reading either found something no Kibana serves.
+KIBANA_USER: dict[str, Any] = {"email": None, "full_name": None, "username": "elastic"}
+
+
 def serialise_case(record: dict[str, Any]) -> dict[str, Any]:
     """Render a case the way Kibana's ``CaseRt`` does.
 

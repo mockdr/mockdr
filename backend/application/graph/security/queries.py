@@ -1,6 +1,8 @@
 """Read-side handlers for Microsoft Graph Security API."""
 from __future__ import annotations
 
+import dataclasses
+
 from domain.graph.ti_indicator import GraphTiIndicator
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
@@ -337,32 +339,45 @@ def list_ti_indicators(
     )
 
 
+#: The members ``tiIndicator`` declares, minus ``id``, which the service
+#: assigns. Taken from ``data/vendor-specs/graph_beta_csdl_types.json``.
+_TI_INDICATOR_FIELDS = frozenset(
+    f.name for f in dataclasses.fields(GraphTiIndicator) if f.name != "id"
+)
+
+
 def create_ti_indicator(body: dict) -> dict:
-    """Create a new TI indicator.
+    """Create a TI indicator from the properties the body carries.
+
+    Every declared property is taken from the body — an observable named by
+    its own property (``domainName``, ``url``, ``fileHashValue`` …), the
+    scoring in ``confidence`` and ``severity``, the context in ``killChain``,
+    ``malwareFamilyNames`` and ``tags``. The service fills in what it owns:
+    the ``id``, the tenant, and ``ingestedDateTime``.
 
     Args:
-        body: Dict with indicator fields.
+        body: The ``tiIndicator`` to create.
 
     Returns:
         Created indicator dict.
     """
-    from infrastructure.seeders.graph.graph_shared import graph_uuid
+    from infrastructure.seeders.graph.graph_shared import GRAPH_TENANT_ID, graph_uuid
 
-    indicator_id = graph_uuid()
     now = utc_now()
-
+    sent = {k: v for k, v in body.items() if k in _TI_INDICATOR_FIELDS}
     ti = GraphTiIndicator(
-        id=indicator_id,
-        action=body.get("action", "alert"),
-        description=body.get("description", ""),
-        expirationDateTime=body.get("expirationDateTime", ""),
-        targetProduct=body.get("targetProduct", "Microsoft Defender ATP"),
-        threatType=body.get("threatType", "Malware"),
-        tlpLevel=body.get("tlpLevel", "green"),
-        indicatorValue=body.get("indicatorValue", ""),
-        indicatorType=body.get("indicatorType", ""),
-        createdDateTime=now,
-        lastReportedDateTime=now,
+        id=graph_uuid(),
+        **{
+            "action": "alert",
+            "azureTenantId": GRAPH_TENANT_ID,
+            "isActive": True,
+            "ingestedDateTime": now,
+            "lastReportedDateTime": now,
+            "targetProduct": "Microsoft Defender ATP",
+            "threatType": "Malware",
+            "tlpLevel": "green",
+            **sent,
+        },
     )
     graph_ti_indicator_repo.save(ti)
     return record_dict(ti)

@@ -34,12 +34,19 @@ class TestAddToBlocklist:
     """Tests for POST /hash_exceptions/blocklist/."""
 
     def test_add_hash_to_blocklist(self, client: TestClient) -> None:
-        """Adding a hash to blocklist returns success."""
+        """Adding a hash to blocklist returns success.
+
+        ``hash_list`` is a flat list of SHA256 strings and ``comment`` its
+        sibling — the shape Cortex's own client builds.
+        """
         resp = client.post(
             f"{XDR_PREFIX}/hash_exceptions/blocklist/",
-            json={"request_data": {"hash_list": [
-                {"hash": "abc123def456", "comment": "Test blocklist entry"},
-            ]}},
+            json={"request_data": {
+                "hash_list": [
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b851",
+                ],
+                "comment": "Test blocklist entry",
+            }},
             headers=_xdr_headers(),
         )
         assert resp.status_code == 200
@@ -68,12 +75,17 @@ class TestAddToAllowlist:
     """Tests for POST /hash_exceptions/allowlist/."""
 
     def test_add_hash_to_allowlist(self, client: TestClient) -> None:
-        """Adding a hash to allowlist returns success."""
+        """Adding a hash to allowlist returns success.
+
+        ``hash_list`` is a flat list of SHA256 strings and ``comment`` its
+        sibling — the shape Cortex's own client builds.
+        """
         resp = client.post(
             f"{XDR_PREFIX}/hash_exceptions/allowlist/",
-            json={"request_data": {"hash_list": [
-                {"hash": "allowme123", "comment": "Safe application"},
-            ]}},
+            json={"request_data": {
+                "hash_list": ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b8552"],
+                "comment": "Safe application",
+            }},
             headers=_xdr_headers(),
         )
         assert resp.status_code == 200

@@ -402,10 +402,15 @@ class TestSeededProbesLoad:
         for probe in spec.probes:
             if not probe.compare_values or probe.needs_seed:
                 continue
-            # The exception: a search that generates its own rows. Both
-            # engines answer `| makeresults` from the search text alone, so
-            # there is nothing to seed.
+            # Two exceptions, both of which read no indexed data. A search
+            # that generates its own rows — both engines answer
+            # `| makeresults` from the search text alone. And a request that
+            # never reaches the data: a refusal, or a read of something every
+            # install has, such as the `main` index's own settings.
             content = probe.request.content or ""
+            path = probe.request.path
+            if path.startswith("/services/data/indexes"):
+                continue
             assert "makeresults" in content, (
                 f"{probe.id} compares values without data on either side"
             )

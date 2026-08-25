@@ -128,3 +128,36 @@ def list_group_members(
         members = apply_fql(members, filter_fql)
     page, total = paginate_cs(members, offset, limit)
     return build_cs_list_response(page, total, offset, limit)
+
+
+def query_group_member_ids(
+    group_id: str,
+    filter_fql: str | None,
+    offset: int,
+    limit: int,
+    sort: str | None,
+) -> dict:
+    """Query the device IDs of a group's members.
+
+    The ``queries`` half of the pair the ``combined`` route already served:
+    Falcon publishes both, and a client that only wants the IDs asks this
+    one. ``MsaQueryResponse`` carries the IDs in ``resources``.
+
+    Args:
+        group_id:   ID of the host group.
+        filter_fql: FQL filter string to further filter group members.
+        offset:     Zero-based pagination offset.
+        limit:      Maximum number of IDs to return.
+        sort:       Sort string (``field.asc`` or ``field.desc``).
+
+    Returns:
+        CS ID response envelope.
+    """
+    all_hosts = [record_dict(h) for h in cs_host_repo.list_all()]
+    members = [h for h in all_hosts if group_id in h.get("groups", [])]
+    if filter_fql:
+        members = apply_fql(members, filter_fql)
+    field_name, desc = _parse_sort(sort)
+    members.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    page, total = paginate_cs(members, offset, limit)
+    return build_cs_id_response([h["device_id"] for h in page], total, offset, limit)

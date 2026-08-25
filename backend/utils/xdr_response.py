@@ -119,3 +119,43 @@ def require_request_data(body: object) -> dict:
             ),
         )
     return request_data
+
+
+def require_str_list(request_data: dict, key: str) -> list[str]:
+    """Return ``request_data[key]`` as a list of strings, or refuse the request.
+
+    ``hash_list`` and its kind are flat lists of strings. Handed a list of
+    objects — the shape a reader might guess from the ``comment`` that sits
+    beside it — the handler used to reach for ``.get`` on a string and answer
+    a plain-text 500. A malformed value is the caller's mistake, and XDR
+    reports it as a 400.
+    """
+    from fastapi import HTTPException  # local: utils must not import the API layer at module load
+
+    value = request_data.get(key, [])
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(v, (str, int)) for v in value):
+        raise HTTPException(
+            status_code=400,
+            detail=build_xdr_error(
+                400, "Bad Request", f"{key} must be an array of strings",
+            ),
+        )
+    return [str(v) for v in value]
+
+
+def serialise_endpoint(record: dict) -> dict:
+    """One endpoint as Cortex serves it, wherever it is served.
+
+    The tags assigned through ``/tags/agents/assign/`` are held as a list and
+    served in ``endpointTags``, which the reference example types as a
+    string — so they are joined, and the internal spelling does not leak.
+    Both the API and the Splunk bridge render endpoints through here, because
+    the bridge's whole point is that the event and the API object are the
+    same record.
+    """
+    rendered = dict(record)
+    tags = rendered.pop("endpoint_tags", []) or []
+    rendered["endpointTags"] = ",".join(tags) if isinstance(tags, list) else str(tags)
+    return rendered

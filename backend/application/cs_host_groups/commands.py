@@ -11,58 +11,67 @@ from utils.dt import utc_now
 from utils.serde import record_dict
 
 
-def create_host_group(body: dict) -> dict:
-    """Create a new host group.
+def create_host_groups(resources: list[dict]) -> dict:
+    """Create every group in ``resources``.
+
+    ``HostGroupsCreateGroupsReqV1`` is a *collection*: one call creates as
+    many groups as it carries, and the answer lists them all. Reading the
+    body one level flatter than that is not a shape quibble — a client
+    sending the documented body got a group named ``""``.
 
     Args:
-        body: Dict containing group properties. Required: ``name``.
-              Optional: ``description``, ``group_type``, ``assignment_rule``.
+        resources: The ``resources`` members, each ``{name, group_type,
+              description?, assignment_rule?}``.
 
     Returns:
-        CS entity response containing the newly created host group.
+        CS entity response containing every newly created host group.
     """
-    now = utc_now()
-    group = CsHostGroup(
-        id=str(_uuid.uuid4()),
-        name=body.get("name", ""),
-        description=body.get("description", ""),
-        group_type=body.get("group_type", "static"),
-        assignment_rule=body.get("assignment_rule", ""),
-        created_by=body.get("created_by", "api-client"),
-        created_timestamp=now,
-        modified_by=body.get("modified_by", "api-client"),
-        modified_timestamp=now,
-    )
-    cs_host_group_repo.save(group)
-    return build_cs_entity_response([record_dict(group)])
+    created = []
+    for body in resources:
+        now = utc_now()
+        group = CsHostGroup(
+            id=str(_uuid.uuid4()),
+            name=body.get("name", ""),
+            description=body.get("description", ""),
+            group_type=body.get("group_type", "static"),
+            assignment_rule=body.get("assignment_rule", ""),
+            created_by=body.get("created_by", "api-client"),
+            created_timestamp=now,
+            modified_by=body.get("modified_by", "api-client"),
+            modified_timestamp=now,
+        )
+        cs_host_group_repo.save(group)
+        created.append(record_dict(group))
+    return build_cs_entity_response(created)
 
 
-def update_host_group(body: dict) -> dict:
-    """Update an existing host group.
+def update_host_groups(resources: list[dict]) -> dict:
+    """Update every group named in ``resources``.
 
-    The ``id`` field in the body is required to identify the group.
-    Only provided fields are overwritten.
+    ``id`` identifies each group; only the members present are overwritten.
+    A group that does not exist is skipped, which is how Falcon answers a
+    partially resolvable list — the resources it did update, and no error.
 
     Args:
-        body: Dict with ``id`` (required) and fields to update.
+        resources: The ``resources`` members, each ``{id, name?,
+              description?, assignment_rule?}``.
 
     Returns:
-        CS entity response with the updated group, or empty resources if not found.
+        CS entity response with every group that was updated.
     """
-    group_id = body.get("id", "")
-    group = cs_host_group_repo.get(group_id)
-    if not group:
-        return build_cs_entity_response([])
-
-    updatable = ("name", "description", "assignment_rule")
-    for field_name in updatable:
-        if field_name in body:
-            setattr(group, field_name, body[field_name])
-
-    group.modified_by = body.get("modified_by", "api-client")
-    group.modified_timestamp = utc_now()
-    cs_host_group_repo.save(group)
-    return build_cs_entity_response([record_dict(group)])
+    updated = []
+    for body in resources:
+        group = cs_host_group_repo.get(body.get("id", ""))
+        if not group:
+            continue
+        for field_name in ("name", "description", "assignment_rule"):
+            if field_name in body:
+                setattr(group, field_name, body[field_name])
+        group.modified_by = body.get("modified_by", "api-client")
+        group.modified_timestamp = utc_now()
+        cs_host_group_repo.save(group)
+        updated.append(record_dict(group))
+    return build_cs_entity_response(updated)
 
 
 def delete_host_groups(ids: list[str]) -> dict:

@@ -112,22 +112,30 @@ def delete_endpoints(endpoint_ids: list[str]) -> dict:
     return build_xdr_reply(True)
 
 
-def update_agent_name(endpoint_id: str, alias: str) -> dict | None:
-    """Update the alias (display name) of an endpoint.
+def update_agent_name(request_data: dict, alias: str) -> dict | None:
+    """Set the alias of every endpoint the request's ``filters`` select.
+
+    Cortex names the target of this call with a ``filters`` block, the same
+    one the read routes take — not with an ``endpoint_id``. Reading an id
+    that the documented body never carries meant the call answered 500
+    ``Endpoint  not found`` to every well-formed request.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        request_data: The ``request_data`` dict from the POST body.
         alias: New alias string.
 
     Returns:
-        XDR reply confirming success, or None if endpoint not found.
+        XDR reply confirming success, or None if the filters select nothing.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    from application.xdr_endpoints.queries import select_endpoints
+
+    matched = select_endpoints(request_data)
+    if not matched:
         return None
 
-    endpoint.alias = alias
-    xdr_endpoint_repo.save(endpoint)
+    for endpoint in matched:
+        endpoint.alias = alias
+        xdr_endpoint_repo.save(endpoint)
     return build_xdr_reply(True)
 
 
@@ -209,3 +217,37 @@ def file_retrieval(endpoint_id: str, params: dict) -> dict | None:
     action.result = {"file_path": params.get("file_path")}
     xdr_action_repo.save(action)
     return build_xdr_reply({"action_id": action.action_id})
+
+
+def tag_endpoints(body: dict, *, assign: bool) -> dict:
+    """Add or remove one tag on every endpoint the body names.
+
+    Cortex's client sends the endpoints in ``context.lcaas_id`` and narrows
+    them with ``request_data.filters``; either may be absent, and what both
+    name is intersected. The reply is empty, as the vendor's own sample is.
+
+    Args:
+        body: The whole POST body, ``context`` included.
+        assign: ``True`` to add the tag, ``False`` to remove it.
+
+    Returns:
+        XDR reply with an empty body.
+    """
+    from application.xdr_endpoints.queries import select_endpoints
+
+    request_data = body.get("request_data") or {}
+    matched = select_endpoints(request_data)
+    lcaas = (body.get("context") or {}).get("lcaas_id")
+    if lcaas:
+        matched = [e for e in matched if e.endpoint_id in lcaas]
+
+    tag = str(request_data.get("tag") or "")
+    for endpoint in matched:
+        tags = list(endpoint.endpoint_tags)
+        if assign and tag and tag not in tags:
+            tags.append(tag)
+        elif not assign and tag in tags:
+            tags.remove(tag)
+        endpoint.endpoint_tags = tags
+        xdr_endpoint_repo.save(endpoint)
+    return build_xdr_reply({})

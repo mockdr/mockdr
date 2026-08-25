@@ -2712,3 +2712,88 @@ probes:
       path: /services/data/inputs/monitor
       query: {count: '2'}
       auth: basic
+
+  # ── `f`, the field filter (2.3.1) ────────────────────────────────────────
+  #
+  # Creating an index is deliberately *not* probed here: splunkd disables an
+  # index on delete rather than removing it, so a create/delete pair cannot
+  # repeat against a persistent install — the second run finds a disabled
+  # index and refuses. What creation keeps is pinned by unit tests taken from
+  # 10.4.2 directly. Reading is safe, and `f` is read-only.
+
+  # Not yet imitated, and visible here: splunkd renders an entry's `id` and
+  # its links in the namespaced form — `/servicesNS/{owner}/{app}/…` for the
+  # collections that have an owner and an app (indexes, saved searches),
+  # `/services/…` only for the global ones (authentication/users). mockdr
+  # renders every id in the `/services` form. Both are reachable — the
+  # namespace middleware rewrites one to the other — so a client following
+  # the link works either way; one parsing owner and app out of the id does
+  # not. Fixing it means measuring the owner and app of some thirty
+  # collections, which is its own piece of work, so this probe compares the
+  # shape rather than pretending the difference is not there.
+  - id: spl-index-field-filter
+    endpoint: management
+    why: >
+      `f` narrows an entry's content to the fields it names, and mockdr
+      declared it nowhere — a client asking for two settings of an index was
+      handed all 113.
+    request:
+      method: GET
+      path: /services/data/indexes/main
+      query:
+        output_mode: json
+        f: maxTotalDataSizeMB
+      auth: basic
+
+  - id: spl-index-field-filter-wildcard
+    endpoint: management
+    why: >
+      `f` takes wildcards: one pattern selects every `max…` setting.
+    request:
+      method: GET
+      path: /services/data/indexes/main
+      query:
+        output_mode: json
+        f: max*
+      auth: basic
+
+  - id: spl-index-field-filter-unknown
+    endpoint: management
+    why: >
+      A field that matches nothing leaves eai:acl alone, rather than erroring
+      or falling back to the whole content block.
+    request:
+      method: GET
+      path: /services/data/indexes/main
+      query:
+        output_mode: json
+        f: zzzNoSuchField
+      auth: basic
+
+  - id: spl-saved-search-field-filter
+    endpoint: management
+    why: >
+      And it is the framework's parameter, not one collection's: the same
+      narrowing on saved searches.
+    request:
+      method: GET
+      path: /services/saved/searches
+      query:
+        output_mode: json
+        count: '2'
+        f: search
+      auth: basic
+
+  - id: spl-index-unknown-argument
+    endpoint: management
+    compare: values
+    why: >
+      splunkd refuses an argument it does not know rather than ignoring it,
+      and names the argument. Nothing is created, so this leaves no trace.
+    request:
+      method: POST
+      path: /services/data/indexes
+      query: {output_mode: json}
+      content: name=zzz_conformance_reject&zzzNotAThing=1
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic

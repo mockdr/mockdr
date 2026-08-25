@@ -191,3 +191,58 @@ def seed_elastic(target: str, clients: Clients, auth: object) -> str:
                 f"{written.status_code} {written.text[:200]}",
             )
     return ES_SEED_INDEX
+
+
+#: The case both targets start a seeded run from. Kibana assigns the id, so a
+#: probe cannot name one — the seeder makes the case and reports back what it
+#: was called.
+KBN_SEED_CASE = {
+    "title": "conformance-probe-case",
+    "description": "Created by the conformance harness.",
+    "tags": ["conformance"],
+    "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+    "settings": {"syncAlerts": False},
+    "owner": "securitySolution",
+}
+
+
+def seed_kibana_case(target: str, clients: Clients, auth: object) -> dict[str, str]:
+    """Create a case with one comment on one target.
+
+    A comment write is the one Kibana route whose *answer* is a different
+    resource from the one addressed — it hands back the case, not the
+    comment — and a probe can only see that against a case that exists. Both
+    targets get the same case and the same first comment, so the shapes are
+    comparable even though the ids are not.
+
+    Returns:
+        ``{"seed_case": id, "seed_comment": id}``.
+
+    Raises:
+        SeedError: If the target would not take the case or the comment.
+    """
+    client = clients.get("kibana", target)
+    headers = {"kbn-xsrf": "true"}
+    made = client.post("/api/cases", json=KBN_SEED_CASE, headers=headers, auth=auth)
+    if made.status_code not in (200, 201):
+        raise SeedError(
+            f"{target} would not create the seed case: HTTP "
+            f"{made.status_code} {made.text[:200]}",
+        )
+    case_id = str(made.json().get("id", ""))
+    commented = client.post(
+        f"/api/cases/{case_id}/comments",
+        json={"type": "user", "comment": "conformance-probe-comment",
+              "owner": "securitySolution"},
+        headers=headers, auth=auth,
+    )
+    if commented.status_code not in (200, 201):
+        raise SeedError(
+            f"{target} refused the seed comment: HTTP "
+            f"{commented.status_code} {commented.text[:200]}",
+        )
+    comments = commented.json().get("comments") or []
+    return {
+        "seed_case": case_id,
+        "seed_comment": str(comments[-1]["id"]) if comments else "",
+    }

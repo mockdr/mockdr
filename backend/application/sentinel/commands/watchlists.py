@@ -76,18 +76,23 @@ def create_or_update_watchlist_item(
     item_data = properties.get("itemsKeyValue", properties)
     if isinstance(item_data, str):
         item_data = {"value": item_data}
-    item_data["_key"] = item_id
+    # `_key` is how the item is found again in the list the watchlist holds.
+    # It is the mock's bookkeeping, not a column the caller wrote: the read
+    # routes strip it, and so must the answer to the write — a client that
+    # sent two columns was handed back three.
+    stored = {**item_data, "_key": item_id}
+    answer = {k: v for k, v in stored.items() if k != "_key"}
 
     # Upsert
     for i, existing in enumerate(wl.items):
         if existing.get("_key") == item_id:
-            wl.items[i] = cast(dict[str, object], item_data)
+            wl.items[i] = cast(dict[str, object], stored)
             sentinel_watchlist_repo.save(wl)
-            return cast(dict[str, Any], item_data)
+            return cast(dict[str, Any], answer)
 
-    wl.items.append(cast(dict[str, object], item_data))
+    wl.items.append(cast(dict[str, object], stored))
     sentinel_watchlist_repo.save(wl)
-    return cast(dict[str, Any], item_data)
+    return cast(dict[str, Any], answer)
 
 
 def delete_watchlist_item(alias: str, item_id: str) -> bool:

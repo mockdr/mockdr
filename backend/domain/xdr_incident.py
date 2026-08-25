@@ -37,6 +37,13 @@ class XdrIncident:
     starred: bool = False
     manual_score: int = 0
 
+    #: The analyst's overrides, set through ``update_incident``. They were
+    #: only ever fixture defaults, so the call reported success and changed
+    #: nothing that could be read back.
+    manual_severity: str = ""
+    manual_description: str = ""
+    resolve_comment: str = ""
+
     @property
     def id(self) -> str:
         """Return the primary identifier expected by ``Repository[T]``."""

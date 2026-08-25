@@ -116,15 +116,14 @@ def update_agent_name(
     body: dict = Body(...),
     _: object = Depends(require_xdr_write),
 ) -> dict:
-    """Update the alias (display name) of an endpoint."""
+    """Set the alias of the endpoints the request's ``filters`` select."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
     alias = request_data.get("alias", "")
-    result = endpoint_commands.update_agent_name(endpoint_id, alias)
+    result = endpoint_commands.update_agent_name(request_data, alias)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(500, XDR_ERR_INTERNAL, "Endpoint not found"),
         )
     return result
 

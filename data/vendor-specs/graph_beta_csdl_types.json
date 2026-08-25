@@ -1,0 +1,118 @@
+{
+ "microsoft.graph.diamondModel": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "adversary",
+   "capability",
+   "infrastructure",
+   "victim",
+   "unknownFutureValue"
+  ]
+ },
+ "microsoft.graph.entity": {
+  "kind": "EntityType",
+  "properties": {
+   "id": "Edm.String"
+  }
+ },
+ "microsoft.graph.fileHashType": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "sha1",
+   "sha256",
+   "md5",
+   "authenticodeHash256",
+   "lsHash",
+   "ctph",
+   "unknownFutureValue"
+  ]
+ },
+ "microsoft.graph.tiAction": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "allow",
+   "block",
+   "alert",
+   "unknownFutureValue"
+  ]
+ },
+ "microsoft.graph.tiIndicator": {
+  "base": "graph.entity",
+  "kind": "EntityType",
+  "open": true,
+  "properties": {
+   "action": "graph.tiAction",
+   "activityGroupNames": "Collection(Edm.String)",
+   "additionalInformation": "Edm.String",
+   "azureTenantId": "Edm.String",
+   "confidence": "Edm.Int32",
+   "description": "Edm.String",
+   "diamondModel": "graph.diamondModel",
+   "domainName": "Edm.String",
+   "emailEncoding": "Edm.String",
+   "emailLanguage": "Edm.String",
+   "emailRecipient": "Edm.String",
+   "emailSenderAddress": "Edm.String",
+   "emailSenderName": "Edm.String",
+   "emailSourceDomain": "Edm.String",
+   "emailSourceIpAddress": "Edm.String",
+   "emailSubject": "Edm.String",
+   "emailXMailer": "Edm.String",
+   "expirationDateTime": "Edm.DateTimeOffset",
+   "externalId": "Edm.String",
+   "fileCompileDateTime": "Edm.DateTimeOffset",
+   "fileCreatedDateTime": "Edm.DateTimeOffset",
+   "fileHashType": "graph.fileHashType",
+   "fileHashValue": "Edm.String",
+   "fileMutexName": "Edm.String",
+   "fileName": "Edm.String",
+   "filePacker": "Edm.String",
+   "filePath": "Edm.String",
+   "fileSize": "Edm.Int64",
+   "fileType": "Edm.String",
+   "ingestedDateTime": "Edm.DateTimeOffset",
+   "isActive": "Edm.Boolean",
+   "killChain": "Collection(Edm.String)",
+   "knownFalsePositives": "Edm.String",
+   "lastReportedDateTime": "Edm.DateTimeOffset",
+   "malwareFamilyNames": "Collection(Edm.String)",
+   "networkCidrBlock": "Edm.String",
+   "networkDestinationAsn": "Edm.Int64",
+   "networkDestinationCidrBlock": "Edm.String",
+   "networkDestinationIPv4": "Edm.String",
+   "networkDestinationIPv6": "Edm.String",
+   "networkDestinationPort": "Edm.Int32",
+   "networkIPv4": "Edm.String",
+   "networkIPv6": "Edm.String",
+   "networkPort": "Edm.Int32",
+   "networkProtocol": "Edm.Int32",
+   "networkSourceAsn": "Edm.Int64",
+   "networkSourceCidrBlock": "Edm.String",
+   "networkSourceIPv4": "Edm.String",
+   "networkSourceIPv6": "Edm.String",
+   "networkSourcePort": "Edm.Int32",
+   "passiveOnly": "Edm.Boolean",
+   "severity": "Edm.Int32",
+   "tags": "Collection(Edm.String)",
+   "targetProduct": "Edm.String",
+   "threatType": "Edm.String",
+   "tlpLevel": "graph.tlpLevel",
+   "url": "Edm.String",
+   "userAgent": "Edm.String"
+  }
+ },
+ "microsoft.graph.tlpLevel": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "white",
+   "green",
+   "amber",
+   "red",
+   "unknownFutureValue"
+  ]
+ }
+}

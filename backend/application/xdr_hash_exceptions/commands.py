@@ -7,23 +7,30 @@ from repository.xdr_hash_exception_repo import xdr_hash_exception_repo
 from utils.xdr_response import build_xdr_reply
 
 
-def add_to_blocklist(hashes: list[dict]) -> dict:
+def add_to_blocklist(hashes: list[str], comment: str = "", incident_id: object = None) -> dict:
     """Add hashes to the blocklist.
 
+    ``hash_list`` is a list of SHA256 *strings*, and the comment is its
+    sibling in ``request_data`` — not a member of each entry. Reading it the
+    other way round turned the documented body into an ``AttributeError``
+    and a plain-text 500.
+
     Args:
-        hashes: List of dicts with ``hash`` and optional ``comment``.
+        hashes: SHA256 hashes to add.
+        comment: The comment recorded against all of them.
+        incident_id: The incident the change is attributed to, if any.
 
     Returns:
         XDR reply confirming success.
     """
-    for h in hashes:
-        hash_value = h.get("hash", "")
+    for hash_value in hashes:
         xdr_hash_exception_repo.save(XdrHashException(
             exception_id=xdr_id("HEX"),
-            hash=hash_value,
+            hash=str(hash_value),
             list_type="blocklist",
-            comment=h.get("comment", ""),
+            comment=comment,
             created_at=rand_epoch_ms(0),
+            incident_id=incident_id,
         ))
 
     return build_xdr_reply(True)
@@ -47,23 +54,30 @@ def remove_from_blocklist(hashes: list[str]) -> dict:
     return build_xdr_reply(True)
 
 
-def add_to_allowlist(hashes: list[dict]) -> dict:
+def add_to_allowlist(hashes: list[str], comment: str = "", incident_id: object = None) -> dict:
     """Add hashes to the allowlist.
 
+    ``hash_list`` is a list of SHA256 *strings*, and the comment is its
+    sibling in ``request_data`` — not a member of each entry. Reading it the
+    other way round turned the documented body into an ``AttributeError``
+    and a plain-text 500.
+
     Args:
-        hashes: List of dicts with ``hash`` and optional ``comment``.
+        hashes: SHA256 hashes to add.
+        comment: The comment recorded against all of them.
+        incident_id: The incident the change is attributed to, if any.
 
     Returns:
         XDR reply confirming success.
     """
-    for h in hashes:
-        hash_value = h.get("hash", "")
+    for hash_value in hashes:
         xdr_hash_exception_repo.save(XdrHashException(
             exception_id=xdr_id("HEX"),
-            hash=hash_value,
+            hash=str(hash_value),
             list_type="allowlist",
-            comment=h.get("comment", ""),
+            comment=comment,
             created_at=rand_epoch_ms(0),
+            incident_id=incident_id,
         ))
 
     return build_xdr_reply(True)

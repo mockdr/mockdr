@@ -49,35 +49,37 @@ def create_iocs(indicators: list[dict]) -> dict:
     return build_cs_entity_response(created)
 
 
-def update_ioc(ioc_id: str, body: dict) -> dict:
-    """Update an existing IOC.
+def update_iocs(indicators: list[dict]) -> dict:
+    """Update every IOC named in ``indicators``.
 
-    Only provided fields are overwritten; absent keys are left unchanged.
+    Each member carries the ``id`` of the indicator to change; only the
+    fields present are overwritten, and one that does not resolve is left
+    out of the answer rather than failing the call.
 
     Args:
-        ioc_id: ID of the IOC to update.
-        body:   Dict of fields to update.
+        indicators: ``APIIndicatorUpdateReqsV1.indicators``.
 
     Returns:
-        CS entity response with the updated IOC, or empty resources if not found.
+        CS entity response with every IOC that was updated.
     """
-    ioc = cs_ioc_repo.get(ioc_id)
-    if not ioc:
-        return build_cs_entity_response([])
-
     updatable = (
         "action", "severity", "description", "platforms", "tags",
         "applied_globally", "host_groups", "expiration", "mobile_action",
         "source",
     )
-    for field_name in updatable:
-        if field_name in body:
-            setattr(ioc, field_name, body[field_name])
-
-    ioc.modified_on = utc_now()
-    ioc.modified_by = body.get("modified_by", "api-client")
-    cs_ioc_repo.save(ioc)
-    return build_cs_entity_response([record_dict(ioc)])
+    updated = []
+    for body in indicators:
+        ioc = cs_ioc_repo.get(body.get("id", ""))
+        if not ioc:
+            continue
+        for field_name in updatable:
+            if field_name in body:
+                setattr(ioc, field_name, body[field_name])
+        ioc.modified_on = utc_now()
+        ioc.modified_by = body.get("modified_by", "api-client")
+        cs_ioc_repo.save(ioc)
+        updated.append(record_dict(ioc))
+    return build_cs_entity_response(updated)
 
 
 def delete_iocs(ids: list[str]) -> dict:

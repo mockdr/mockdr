@@ -19,6 +19,7 @@ from harness.seed import (
     SeedError,
     await_indexed,
     seed_elastic,
+    seed_kibana_case,
     seed_sourcetype,
     seed_splunk,
 )
@@ -224,9 +225,12 @@ def _with_elastic_seed(
         else httpx.USE_CLIENT_DEFAULT
     )
     try:
-        return {**context, "seed_index": seed_elastic(target, clients, auth)}
+        context = {**context, "seed_index": seed_elastic(target, clients, auth)}
+        if "kibana" in spec.endpoints:
+            context = {**context, **seed_kibana_case(target, clients, auth)}
     except SeedError as exc:
         raise BootstrapError(str(exc)) from exc
+    return context
 
 
 _ES_PROBE_INDEX = "conformance-probe"

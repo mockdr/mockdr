@@ -12,6 +12,12 @@ carry ``json:"name"`` tags). This walks the three and writes
       "model": "DeviceapiDeviceDetailsResponseSwagger",
       "paths": ["errors", "errors[*].code", ..., "resources[*].agent_version"]}}
 
+A write route also carries what it *accepts*, taken from the ``Body *models.X``
+field of its ``*_parameters.go``, under ``request`` / ``request_paths`` — the
+half of the contract no other comparator here holds. A mock that reads a
+create body one level flatter than the vendor documents answers 200 and
+stores nothing.
+
     git clone --depth 1 https://github.com/CrowdStrike/gofalcon /tmp/gofalcon
     backend/.venv/bin/python scripts/gofalcon_spec.py /tmp/gofalcon
 """
@@ -37,6 +43,11 @@ _OP = re.compile(
 _PAYLOAD = re.compile(
     r"type (\w+)(?:OK|Created|Accepted) struct \{.*?Payload \*?models\.(\w+)", re.S
 )
+#: `Body *models.X` in a `<operation>_parameters.go`, whose file name is the
+#: snake_case of the operation the `_client.go` names.
+_BODY = re.compile(r"^\tBody \*?models\.(\w+)$", re.M)
+#: `Required: true` sits in the doc comment directly above the field.
+_REQUIRED = re.compile(r"// Required: true\n\s*\w+\s+[\w\[\]\*\.]+\s+`json:\"([^\",]+)")
 
 
 def models(repo: Path) -> dict[str, list[tuple[str, str]]]:
@@ -81,15 +92,38 @@ def flatten(name: str, defs: dict, prefix: str = "", depth: int = 0, seen=()) ->
     return out
 
 
+def snake(name: str) -> str:
+    """``QueryCombinedHostGroups`` and ``indicator.create.v1`` → file stem."""
+    name = name.replace(".", "_").replace("-", "_")
+    name = re.sub(r"(?<=[a-z0-9])([A-Z])", r"_\1", name)
+    return re.sub(r"(?<=[A-Z])([A-Z][a-z])", r"_\1", name).lower()
+
+
+def required(repo: Path, model: str) -> list[str]:
+    """The members a model marks ``Required: true``, in JSON spelling."""
+    stem = snake(model).replace("_ap_i_", "_api_")
+    for candidate in (stem, stem.replace("_v_", "_v")):
+        f = repo / "falcon" / "models" / f"{candidate}.go"
+        if f.exists():
+            body = _STRUCT.search(f.read_text(encoding="utf-8", errors="replace"))
+            return sorted(set(_REQUIRED.findall(body.group(2)))) if body else []
+    return []
+
+
 def main(repo: Path) -> int:
     defs = models(repo)
     payloads: dict[str, str] = {}
+    bodies: dict[str, str] = {}
     ops: dict[str, tuple[str, str]] = {}
     for f in (repo / "falcon" / "client").rglob("*.go"):
         text = f.read_text(encoding="utf-8", errors="replace")
         if f.name.endswith("_responses.go"):
             for op, model in _PAYLOAD.findall(text):
                 payloads[op] = model
+        elif f.name.endswith("_parameters.go"):
+            found = _BODY.search(text)
+            if found:
+                bodies[f.name[: -len("_parameters.go")]] = found.group(1)
         elif f.name.endswith("_client.go"):
             for method, path, op in _OP.findall(text):
                 ops[op] = (method, path)
@@ -98,11 +132,18 @@ def main(repo: Path) -> int:
         model = payloads.get(op)
         if not model:
             continue
-        reduced[f"{method} {path}"] = {"id": op, "model": model, "paths": flatten(model, defs)}
+        entry = {"id": op, "model": model, "paths": flatten(model, defs)}
+        request = bodies.get(snake(op))
+        if request:
+            entry["request"] = request
+            entry["request_paths"] = flatten(request, defs)
+            entry["request_required"] = required(repo, request)
+        reduced[f"{method} {path}"] = entry
     OUT.write_text(json.dumps(reduced, indent=1) + "\n")
     print(
         f"models: {len(defs)}  operations: {len(ops)}  "
-        f"with 200 payload: {len(reduced)} → {OUT.relative_to(ROOT)}"
+        f"with 200 payload: {len(reduced)}  with a request body: "
+        f"{sum('request' in e for e in reduced.values())} → {OUT.relative_to(ROOT)}"
     )
     return 0
 

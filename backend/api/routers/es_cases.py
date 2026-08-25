@@ -299,8 +299,12 @@ def delete_comment(
     case_id: str,
     comment_id: str,
     _: dict = Depends(require_es_write),
-) -> None:
-    """Delete a comment from a case."""
+) -> Response:
+    """Delete a comment from a case.
+
+    Kibana answers 204 with an empty body; the route answered 200 and the
+    JSON literal ``null``, which a client testing for 204 reads as a failure.
+    """
     deleted = case_commands.delete_comment(case_id, comment_id)
     if not deleted:
         raise HTTPException(
@@ -310,6 +314,7 @@ def delete_comment(
                 f"Comment {comment_id} not found on case {case_id}",
             ),
         )
+    return Response(status_code=204)
 
 
 def _require_iots(body: dict, fields: tuple[str, ...]) -> None:

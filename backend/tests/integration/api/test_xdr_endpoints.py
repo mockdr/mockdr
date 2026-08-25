@@ -256,11 +256,13 @@ class TestUpdateAgentName:
     """Tests for POST /endpoints/update_agent_name/."""
 
     def test_update_agent_name(self, client: TestClient) -> None:
+        """The target is named by a ``filters`` block, as Cortex documents."""
         endpoint_id = _get_first_endpoint_id(client)
         resp = client.post(
             f"{XDR_PREFIX}/endpoints/update_agent_name/",
             json={"request_data": {
-                "endpoint_id": endpoint_id,
+                "filters": [{"field": "endpoint_id_list", "operator": "in",
+                             "value": [endpoint_id]}],
                 "alias": "My Custom Name",
             }},
             headers=_xdr_headers(),

@@ -15,6 +15,9 @@ class XdrHashException:
     list_type: str = "blocklist"  # blocklist / allowlist
     comment: str = ""
     created_at: int = 0  # epoch ms
+    #: The incident the change was attributed to, which the request may carry
+    #: beside ``hash_list``.
+    incident_id: object | None = None
 
     @property
     def id(self) -> str:

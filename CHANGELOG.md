@@ -8,6 +8,113 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**What Splunk and Kibana actually answer to a write, measured.**
+The round-trip audit reached the two products `conformance/` can run, so
+the answers were compared rather than reasoned about.
+
+* **Creating a Splunk index kept the name and dropped every setting beside
+  it.** An index made with `maxTotalDataSizeMB=12345` read back as the
+  default 500000. It now keeps what it was given, typed as splunkd types it
+  (a number here, a string for `maxHotBuckets`), derives `homePath`,
+  `coldPath` and `thawedPath` from the name, and **refuses an argument it
+  does not know** — `Argument "x" is not supported by this handler.` — from
+  the 89 the handler accepts, recorded from `data/indexes/_new`. There was
+  also no way to *edit* an index: `POST` to a member's own URL, which is how
+  splunkd edits anything, answered 405. Deleting one answers with the
+  collection as it now stands, as splunkd does, not with a message.
+* **Every index looked the same, whether splunkd owned it or a client made
+  it.** `main` and the `_`-prefixed indexes are `system`-owned and not
+  removable, and splunkd offers no `remove` link for them; one created
+  through the API is app-level and removable. The mock reported all of them
+  as removable, and offered a link splunkd would refuse. The entry's
+  `fields` block was three empty lists, where splunkd lists the 80 settings
+  the index takes.
+* **`f`, the parameter that narrows an entry to the fields you asked for,
+  did nothing on any Splunk route.** It is the REST framework's, not one
+  collection's: repeatable, wildcarded (`f=max*` selects the eighteen
+  `max…` settings of an index), and a name matching nothing leaves `eai:acl`
+  alone. A new middleware applies it wherever the paging middleware applies
+  `count` — which is what made comparing an index's *values* across two
+  installs possible at all.
+* **Kibana answers a case-comment write with the case, not the comment.**
+  The mock answered with the comment, so a client reading the answer as a
+  case found none of its fields. Deleting a comment is 204 with no body, and
+  answered 200 with the JSON literal `null`. `GET /api/cases/{id}` fills
+  `comments`, which the mock always left empty even for a case it had just
+  had a comment added to — while `_find` leaves it empty and reports
+  `totalComment`, which is the distinction the mock had collapsed.
+* **Every case and comment claimed to have been edited the moment it was
+  made.** `updated_at` and `updated_by` are null until something changes
+  them. The user object is `{email, full_name, username}`, all three
+  present; the mock wrote an invented `"Elastic Admin"` into `full_name` and
+  left `email` out.
+
+The harness now seeds a case with a comment on both targets, so a comment
+write is comparable at all: three probes on the elastic side, five on the
+Splunk side, and one difference deliberately left standing and documented
+in `probes/splunk.yaml` — splunkd renders entry ids in the namespaced
+`/servicesNS/{owner}/{app}/…` form, and imitating that means measuring the
+owner and app of some thirty collections.
+
+**Writing something, and asking for it back.**
+`scripts/roundtrip_audit.py` is the first audit here that writes. Every
+other one reads, and a mock that only ever answers reads can look right in
+each single answer while forgetting what it was told: a create that drops
+half the body and returns defaults, an update that answers 200 and changes
+nothing, a delete that answers 200 and leaves the record in the listing.
+All three are 200s, and a client that never re-reads never sees them.
+Twenty-five cycles now write, read back, list, change, delete and check the
+record is gone — across all nine mounts.
+
+What it found, and what was fixed:
+
+* **CrowdStrike read two write bodies one level flatter than Falcon
+  documents them.** `HostGroupsCreateGroupsReqV1` is a *collection* —
+  `{"resources": [{name, group_type, …}]}` — and the route read the group
+  from the top level, so the documented body created a group named `""` and
+  answered 200. The same for the update. Both now take the collection,
+  create or change every member of it, and refuse a body without
+  `resources` or a member without its required fields. The evidence is now
+  in the repository: `scripts/gofalcon_spec.py` records what each write
+  route *accepts* (`request`, `request_paths`, `request_required`), which no
+  comparator here held before — `param_drift` covers query parameters and
+  nothing covered bodies.
+* **`iocs/entities/indicators/v1` updated only the first indicator** of the
+  list it was sent, and answered 200 for all of them.
+* **`GET /devices/queries/host-groups/v1` and
+  `/devices/queries/host-group-members/v1` were missing.** The query
+  function for the first already existed; only the route to it did not.
+* **Graph's `tiIndicator` carried two properties Microsoft has never had.**
+  The observable was stored as `indicatorValue`/`indicatorType`, so a client
+  sending the documented `domainName` got a 201 and lost it, and one reading
+  `fileHashValue` found nothing. The type now carries the 58 properties
+  Graph declares. The reference took some finding: Microsoft retired
+  `tiIndicator` from v1.0 and removed the type from the v1.0 metadata with
+  it, while the route stays reachable and playbooks written against it keep
+  calling — so `scripts/graph_csdl_spec.py` reduces the beta CSDL, and takes
+  a root set so that vendoring one type does not vendor six thousand.
+* **Cortex XDR ignored nine of the thirteen endpoint filter fields it
+  publishes.** `endpoint_id_list`, `group_name`, `alias`, `username`,
+  `dist_name`, `public_ip_list`, `isolate`, `first_seen` and `last_seen` all
+  fell through a hand-written loop, so a client narrowing to one endpoint
+  was handed the whole estate — the quietest failure a mock has. Endpoints
+  now use the same filter engine as alerts and incidents, which refuses a
+  field it does not know rather than ignoring it.
+* **Three Cortex writes named their target with a key the API does not
+  have.** `update_agent_name` read `endpoint_id` where Cortex sends
+  `filters`, and answered 500 to every documented request. The tag routes
+  read `endpoint_ids` where Cortex sends `context.lcaas_id`, tagged nothing,
+  and answered with two members Cortex's own reply does not carry; the tag
+  now lands on the endpoint and reads back in `endpointTags`.
+  `update_incident` dropped `manual_severity` and `resolve_comment` —
+  the analyst's overrides — while answering `true`.
+* **`hash_exceptions` read `hash_list` as a list of objects.** It is a flat
+  list of SHA256 strings with `comment` beside it, so the documented body
+  reached `"…".get("hash")` and became a plain-text 500. A malformed value
+  is now the 400 it should be.
+* **Sentinel's watchlist item write handed back its own bookkeeping key.**
+  A client that sent two columns got three, `_key` among them.
+
 **A paging audit, and the two collections that could not be walked.**
 `scripts/paging_audit.py` walks every collection a page at a time and asks
 whether the whole of it came back exactly once — no duplicate, no gap, a

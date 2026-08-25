@@ -22,8 +22,12 @@ class EsCaseComment:
     # ── Audit ─────────────────────────────────────────────────────────────────
     created_at: str = ""
     created_by: dict = field(default_factory=dict)
-    updated_at: str = ""
-    updated_by: dict = field(default_factory=dict)
+    #: Both stay unset until something actually changes. Kibana serves them
+    #: as null on a record that has never been updated, and mockdr stamped
+    #: them at creation — so every record looked as though it had been edited
+    #: the moment it was made.
+    updated_at: str | None = None
+    updated_by: dict | None = None
 
     # ── Versioning ────────────────────────────────────────────────────────────
     version: str = "WzEsMV0="

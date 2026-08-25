@@ -232,14 +232,21 @@ class TestGraphTiIndicators:
     def test_create_ti_indicator(
         self, client: TestClient, graph_admin_headers: dict,
     ) -> None:
-        """POST /v1.0/security/tiIndicators should create a new indicator."""
+        """POST /v1.0/security/tiIndicators should create a new indicator.
+
+        The observable is named by its own property — Graph declares
+        ``domainName``, ``url``, ``fileHashValue`` and the rest, and has
+        never had an ``indicatorValue``.
+        """
         resp = client.post(
             "/graph/v1.0/security/tiIndicators",
             json={
                 "action": "block",
                 "description": "Test indicator",
-                "indicatorValue": "evil.example.com",
-                "indicatorType": "domainName",
+                "domainName": "evil.example.com",
+                "confidence": 80,
+                "severity": 3,
+                "killChain": ["Delivery"],
                 "targetProduct": "Microsoft Defender ATP",
                 "threatType": "Malware",
                 "tlpLevel": "amber",
@@ -249,7 +256,14 @@ class TestGraphTiIndicators:
         assert resp.status_code == 200
         body = resp.json()
         assert body["action"] == "block"
-        assert body["indicatorValue"] == "evil.example.com"
+        assert body["domainName"] == "evil.example.com"
+        assert body["confidence"] == 80
+        assert body["severity"] == 3
+        assert body["killChain"] == ["Delivery"]
+        # The service fills in what it owns.
+        assert body["isActive"] is True
+        assert body["ingestedDateTime"]
+        assert "indicatorValue" not in body
         assert "id" in body
 
     def test_delete_ti_indicator(

@@ -2815,3 +2815,40 @@ probes:
       path: /api/exception_lists/items/_find
       query: {list_id: 'no-such-list', namespace_type: 'single'}
       auth: basic
+
+  - id: kbn-case-comment-add
+    endpoint: kibana
+    needs_seed: true
+    why: >
+      A comment write is answered with the *case*, comments and all — not
+      with the comment. mockdr answered with the comment, so a client that
+      read the answer as a case found none of its fields.
+    request:
+      method: POST
+      path: /api/cases/${seed_case}/comments
+      json: {type: user, comment: conformance-probe-second, owner: securitySolution}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-comment-delete
+    endpoint: kibana
+    needs_seed: true
+    why: >
+      And a comment is deleted with 204 and no body at all, not with a 200
+      carrying `null`.
+    request:
+      method: DELETE
+      path: /api/cases/${seed_case}/comments/${seed_comment}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-case-comment-delete-again
+    endpoint: kibana
+    needs_seed: true
+    why: >
+      The same comment a second time is a 404 that names it.
+    request:
+      method: DELETE
+      path: /api/cases/${seed_case}/comments/${seed_comment}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
