@@ -40,7 +40,8 @@ async def rewrite_json_body(
     A body that is not claimed streams through chunk by chunk, exactly as if
     this middleware were not installed. A claimed one is collected, decoded
     and handed to ``rewrite``; a body that is not JSON, or a rewrite that
-    returns ``None``, is forwarded unchanged.
+    returns ``None``, is forwarded unchanged. A rewrite that returns an empty
+    content *type* is answered as ``204 No Content``.
     """
     start: Message | None = None
     chunks: list[bytes] = []
@@ -91,6 +92,13 @@ async def _finish(send: Send, start: Message, body: bytes, rewrite: Rewrite) -> 
         for name, value in start.get("headers", [])
         if name.lower() not in (b"content-length", b"content-type")
     ]
+    if not content_type:
+        # A rewrite that names no type is saying there is nothing to send:
+        # splunkd answers 204 with no body and no content type at all, which
+        # is not the same as an empty body of a declared type.
+        await send({**start, "status": 204, "headers": headers})
+        await send({"type": "http.response.body", "body": b""})
+        return
     headers.append((b"content-type", content_type.encode()))
     headers.append((b"content-length", str(len(new_body)).encode()))
     await send({**start, "headers": headers})

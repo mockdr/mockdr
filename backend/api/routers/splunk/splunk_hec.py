@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import itertools
 
-from fastapi import APIRouter, Body, Depends, Header, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from api.splunk_auth import require_hec_auth
+from api.splunk_auth import require_hec_auth, require_splunk_auth
 from application.splunk.commands.hec import submit_event, submit_events_batch, submit_raw
+from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.hec_validation import (
     ACK_DISABLED,
     INCORRECT_INDEX,
@@ -162,3 +163,66 @@ def hec_ack(
     # used to come back True, including ones never issued.
     return {"acks": {str(ack_id): ack_id in issued for ack_id in acks}}
 
+
+# ── The simple receiver ──────────────────────────────────────────────────────
+#
+# The other way in. HEC is the modern one, but `/services/receivers/simple`
+# takes a raw body over the management port and every ad-hoc script and
+# integration that predates HEC still uses it. mockdr answered 404, so an
+# ingest that works against splunkd wrote nothing here and said so with a
+# status a client reads as "wrong URL" rather than "not stored".
+#
+# splunkd answers with what it did rather than with "Success": the index it
+# wrote to, how many bytes it took, and the host, source and sourcetype it
+# stamped. All measured on 10.4.2, refusals included.
+
+def _index_exists(name: str) -> bool:
+    """Whether this instance holds the index a receiver was pointed at."""
+    return any(idx.name == name for idx in splunk_index_repo.list_all())
+
+
+#: What splunkd calls a body it was given no `source` for.
+_SIMPLE_SOURCE = "http-simple"
+
+#: How it names a sourcetype it could not work out. The suffix is its own
+#: verdict on the payload — too small to guess from.
+_SIMPLE_SOURCETYPE = "unknown-too_small"
+
+
+@router.post("/services/receivers/simple", response_model=None)
+async def receivers_simple(
+    request: Request,
+    index: str = Query(default="default"),
+    sourcetype: str = Query(default=""),
+    source: str = Query(default=""),
+    host: str = Query(default=""),
+    _user: dict = Depends(require_splunk_auth),
+) -> JSONResponse:
+    """Take a raw event body, the way splunkd's simple receiver does."""
+    body = await request.body()
+    if not body.strip():
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "WARN", "text": "empty body"},
+        ]})
+    if index != "default" and not _index_exists(index):
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "WARN", "text": f"supplied index '{index}' missing"},
+        ]})
+
+    text = body.decode("utf-8", errors="replace")
+    stamped_host = host or (request.client.host if request.client else "127.0.0.1")
+    stamped_source = source or _SIMPLE_SOURCE
+    stamped_sourcetype = sourcetype or _SIMPLE_SOURCETYPE
+    submit_event(
+        {"event": text, "index": index, "sourcetype": stamped_sourcetype,
+         "source": stamped_source, "host": stamped_host},
+        index,
+        stamped_sourcetype,
+    )
+    return JSONResponse(status_code=200, content={
+        "index": index,
+        "bytes": len(body),
+        "host": stamped_host,
+        "source": stamped_source,
+        "sourcetype": stamped_sourcetype,
+    })

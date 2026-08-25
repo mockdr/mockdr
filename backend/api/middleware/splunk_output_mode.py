@@ -38,16 +38,31 @@ _FORM_TYPE = b"application/x-www-form-urlencoded"
 #: not serve is a WARN naming it. Both always render as XML, because the mode
 #: it was asked to answer in is the thing it could not use (measured on
 #: 10.4.2).
-_KNOWN_OUTPUT_MODES = frozenset({"json", "xml", "csv", "atom", "raw"})
+_KNOWN_OUTPUT_MODES = frozenset({
+    "json", "xml", "csv", "atom", "raw", "json_rows", "json_cols",
+})
 
 #: What this mock renders.
-_OUTPUT_MODES = frozenset({"json", "xml", "csv"})
+_OUTPUT_MODES = frozenset({"json", "xml", "csv", "json_rows", "json_cols"})
+
+#: `json_rows` and `json_cols` are narrower than csv: a job's results and
+#: events answer them, and the job itself and the collection call them an
+#: *invalid* output mode rather than an unsupported one — a third wording
+#: for the same kind of refusal (measured on 10.4.2).
+_ROW_MODES = frozenset({"json_rows", "json_cols"})
+_ROW_MODE_SUFFIXES = ("/results", "/events", "/export")
+_INVALID_OUTPUT_MODE = "Invalid output_mode."
 
 #: Where `output_mode=csv` is answered rather than refused: a job's results
 #: and events, the job itself, and the job collection. Every other endpoint
 #: refuses it, in splunkd's own words for a mode it knows but will not serve
 #: there (all measured on 10.4.2).
 _CSV_COLLECTION = "/splunk/services/search/jobs"
+
+#: The one endpoint whose *default* is csv rather than Atom XML: typeahead
+#: answers a search bar, and a search bar reads rows. An empty answer there
+#: is `204 No Content` with no body and no content type at all (measured).
+_CSV_DEFAULT_PATH = "/splunk/services/search/typeahead"
 
 #: The `events` endpoint sorts its columns by name; `results` keeps the order
 #: the search produced, and a job entry keeps splunkd's own key order — which
@@ -124,6 +139,8 @@ class SplunkOutputModeMiddleware:
             await _send_refusal(send, *refusal)
             return
         mode = _values(query, "output_mode").lower()
+        if not mode and path.rstrip("/") == _CSV_DEFAULT_PATH:
+            mode = "csv"
         wants_json = mode == "json"
         if not wants_json and _is_form_post(scope):
             # splunklib's post() puts every parameter, output_mode included,
@@ -136,6 +153,14 @@ class SplunkOutputModeMiddleware:
 
         if wants_json:
             await self.app(scope, receive, send)
+            return
+
+        if mode in _ROW_MODES:
+            await rewrite_json_body(
+                self.app, scope, receive, send,
+                claims=lambda status, _headers: status < 400,
+                rewrite=lambda payload: _rows_body(payload, columns=mode == "json_cols"),
+            )
             return
 
         if mode == "csv":
@@ -157,7 +182,7 @@ class SplunkOutputModeMiddleware:
             self.app, scope, receive, send,
             claims=claims,
             rewrite=lambda payload: (
-                render_splunk_xml(payload).encode(),
+                _xml_body(payload, path).encode(),
                 "text/xml; charset=UTF-8",
             ),
         )
@@ -174,6 +199,20 @@ def _refusal(
     collection raises and ERROR for the rest.
     """
     modes = query.get("output_mode")
+    if modes is not None and modes[0].lower() in _ROW_MODES:
+        if _serves_rows(path):
+            return None
+        if _serves_csv(path):
+            # The job itself and the job collection: a *different* refusal
+            # again, FATAL and in JSON.
+            return _INVALID_OUTPUT_MODE, True, "FATAL"
+        # A refusal renders in the family the mode belongs to: json_rows is
+        # a JSON mode, so its refusal is JSON, where `atom` and `raw` are
+        # refused in XML (measured).
+        return (
+            f"Output mode '{modes[0]}' is not supported for this endpoint.",
+            True, "WARN",
+        )
     if modes is not None and (
         modes[0].lower() not in _OUTPUT_MODES
         or (modes[0].lower() == "csv" and not _serves_csv(path))
@@ -212,7 +251,9 @@ async def _send_refusal(
 ) -> None:
     """Answer with splunkd's refusal, in the shape the caller asked for."""
     if as_json:
-        body = json.dumps({"messages": [{"type": level, "text": message}]}).encode()
+        body = json.dumps(
+            {"messages": [{"type": level, "text": message}]}, separators=(",", ":"),
+        ).encode()
         content_type = b"application/json; charset=UTF-8"
     else:
         body = (
@@ -243,13 +284,76 @@ def _csv_body(payload: object, path: str, *, oneshot: bool) -> tuple[bytes, str]
         messages = bool((payload or {}).get("messages")) if isinstance(payload, dict) else False
         return (_CSV_MESSAGE_LINE[messages] + document).encode(), "text/csv; charset=UTF-8"
     if not document:
+        if path.rstrip("/") == _CSV_DEFAULT_PATH:
+            # Nothing to complete: `204 No Content`, with no body and no
+            # content type (measured).
+            return b"", ""
         return b"", "text/plain; charset=UTF-8"
     return document.encode(), "text/csv; charset=UTF-8"
 
 
+def _xml_body(payload: object, path: str) -> str:
+    """The XML document for this response.
+
+    A job's results carry a blank line under the declaration; the same
+    document served anywhere else does not (both measured).
+    """
+    document = render_splunk_xml(payload)
+    if not path.rstrip("/").startswith(_CSV_COLLECTION):
+        return document.replace("?>\n\n", "?>\n", 1)
+    return document
+
+
+def _rows_body(payload: object, *, columns: bool) -> tuple[bytes, str]:
+    """Re-shape a results envelope as `json_rows` or `json_cols`.
+
+    The same rows, named once and then listed: by row, or by column. splunkd
+    serves both on a job's results and events, and mockdr served neither —
+    a client asking for either got a refusal for a mode splunkd knows.
+    """
+    body = payload if isinstance(payload, dict) else {}
+    if "rows" in body or "columns" in body:
+        # The handler rendered it already — `/export` does, because it has to
+        # choose between a stream and a document before the body exists.
+        return json.dumps(body, separators=(",", ":")).encode(), (
+            "application/json; charset=UTF-8"
+        )
+    rows = [row for row in (body.get("results") or []) if isinstance(row, dict)]
+    names = [
+        str(field.get("name")) for field in body.get("fields") or []
+        if isinstance(field, dict) and field.get("name")
+    ] or list(dict.fromkeys(key for row in rows for key in row))
+
+    reshaped: dict[str, object] = {
+        "preview": body.get("preview", False),
+        "init_offset": body.get("init_offset", 0),
+    }
+    if "post_process_count" in body:
+        reshaped["post_process_count"] = body["post_process_count"]
+    reshaped["messages"] = body.get("messages") or []
+    reshaped["fields"] = names
+    if columns:
+        reshaped["columns"] = [[row.get(name) for row in rows] for name in names]
+    else:
+        reshaped["rows"] = [[row.get(name) for name in names] for row in rows]
+    return json.dumps(reshaped, separators=(",", ":")).encode(), (
+        "application/json; charset=UTF-8"
+    )
+
+
 def _serves_csv(path: str) -> bool:
     """Whether this endpoint answers `output_mode=csv` at all."""
-    return path.rstrip("/").startswith(_CSV_COLLECTION)
+    return (
+        path.rstrip("/").startswith(_CSV_COLLECTION)
+        or path.rstrip("/") == _CSV_DEFAULT_PATH
+    )
+
+
+def _serves_rows(path: str) -> bool:
+    """Whether this endpoint answers `json_rows` and `json_cols`."""
+    return path.rstrip("/").startswith(_CSV_COLLECTION) and path.rstrip("/").endswith(
+        _ROW_MODE_SUFFIXES,
+    )
 
 
 def _values(query: dict[str, list[str]], name: str) -> str:

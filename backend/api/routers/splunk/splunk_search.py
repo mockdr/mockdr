@@ -5,7 +5,9 @@ Implements the full async search job lifecycle used by XSOAR SplunkPy.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Iterator
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -27,6 +29,11 @@ from application.splunk.queries.search import (
     get_timeline,
     list_jobs,
 )
+from repository.splunk.splunk_event_repo import splunk_event_repo
+from repository.splunk.splunk_index_repo import splunk_index_repo
+from utils.splunk.csv_output import render_splunk_csv
+from utils.splunk.spl_parser import resolve_relative_time
+from utils.splunk.xml_output import render_splunk_xml
 
 #: splunkd's exact wording, measured against Splunk 10.4.2. A client that
 #: string-matches the refusal — and some do, to distinguish "no query" from
@@ -157,6 +164,11 @@ async def export_search(
         search = search or str(form.get("search", ""))
         earliest_time = earliest_time or str(form.get("earliest_time", ""))
         latest_time = latest_time or str(form.get("latest_time", ""))
+        # splunklib posts every parameter as a form, `output_mode` included;
+        # reading it from the query string alone streamed json whatever the
+        # client asked for.
+        if "output_mode" not in request.query_params:
+            output_mode = str(form.get("output_mode", output_mode))
     if not search:
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "FATAL", "text": _SEARCH_REQUIRED},
@@ -182,16 +194,54 @@ async def export_search(
         ) from exc
     delete_search_job(sid)
 
-    if output_mode.lower() == "json":
-        # Real /export streams one JSON object per line, each carrying
-        # `preview` and `offset`; splunklib.results.JSONResultsReader is built
-        # around that and asserts `is_preview is False`. A single envelope with
-        # no `preview` key left is_preview as None.
-        return StreamingResponse(
-            _export_lines(result),
-            media_type="application/json",
+    mode = output_mode.lower()
+    if mode == "json_rows":
+        # One document rather than a stream: the fields once, then the rows.
+        rows = result.get("results") or []
+        names = _field_names(result, rows)
+        # splunkd writes this one compactly, and a client comparing bytes
+        # against a recorded answer sees the difference.
+        return Response(
+            content=json.dumps({
+                "preview": False,
+                "init_offset": 0,
+                "messages": result.get("messages") or [],
+                "fields": names,
+                "rows": [[_cell(row.get(name)) for name in names] for row in rows],
+            }, separators=(",", ":")),
+            media_type="application/json; charset=UTF-8",
         )
-    return JSONResponse(status_code=200, content=result)
+    if mode == "csv":
+        return Response(
+            content=render_splunk_csv(result),
+            media_type="text/csv; charset=UTF-8",
+        )
+    if mode == "xml":
+        # The export document has no blank line under its declaration, where
+        # a job's results do (both measured).
+        return Response(
+            content=render_splunk_xml(result).replace("?>\n\n", "?>\n", 1),
+            media_type="text/xml; charset=UTF-8",
+        )
+    # Real /export streams one JSON object per line, each carrying `preview`
+    # and `offset`; splunklib.results.JSONResultsReader is built around that
+    # and asserts `is_preview is False`. A single envelope with no `preview`
+    # key left is_preview as None.
+    return StreamingResponse(_export_lines(result), media_type="application/json")
+
+
+def _field_names(result: dict, rows: list) -> list[str]:
+    """The columns an export names, declared order first."""
+    declared = [
+        str(field.get("name")) for field in result.get("fields") or []
+        if isinstance(field, dict) and field.get("name")
+    ]
+    return declared or list(dict.fromkeys(key for row in rows for key in row))
+
+
+def _cell(value: object) -> object:
+    """One cell of a `json_rows` export: a multivalue field keeps its list."""
+    return value if isinstance(value, (list, str, type(None))) else str(value)
 
 
 #: The envelope splunkd sends when a search produced no rows: no `fields`
@@ -207,9 +257,23 @@ _EMPTY_RESULTS: dict = {
 
 
 def _export_lines(result: dict) -> Iterator[str]:
-    """Yield the newline-delimited objects real ``/export`` streams."""
-    for offset, row in enumerate(result.get("results", [])):
-        yield json.dumps({"preview": False, "offset": offset, "result": row}) + "\n"
+    """Yield the newline-delimited objects real ``/export`` streams.
+
+    The last row says so, and a search with no rows at all is one line
+    saying only that — which is how a client knows the stream ended rather
+    than broke. mockdr sent nothing for an empty search, and never marked
+    the end of a full one.
+    """
+    rows = result.get("results") or []
+    if not rows:
+        yield json.dumps({"preview": False, "lastrow": True}, separators=(",", ":")) + "\n"
+        return
+    for offset, row in enumerate(rows):
+        line: dict = {"preview": False, "offset": offset}
+        if offset == len(rows) - 1:
+            line["lastrow"] = True
+        line["result"] = row
+        yield json.dumps(line, separators=(",", ":")) + "\n"
 
 
 @router.get("/services/search/v2/jobs/{sid}")
@@ -373,3 +437,78 @@ def delete_job(
             {"type": "FATAL", "text": "Unknown sid."},
         ]})
     return {"messages": [{"type": "INFO", "text": f"Search job '{sid}' deleted"}]}
+
+
+# ── Time and typeahead ───────────────────────────────────────────────────────
+#
+# Two small endpoints a dashboard and a search bar lean on, both 404 here:
+# `timeparser` resolves a time modifier so a client can show the window it is
+# about to search, and `typeahead` completes a term from what the index
+# actually holds. Measured on 10.4.2, refusals included.
+
+@router.get("/services/search/timeparser")
+def timeparser(
+    request: Request,
+    time: str = Query(default="now"),
+    _user: dict = Depends(require_splunk_auth),
+) -> JSONResponse:
+    """Resolve a time modifier to the instant it stands for.
+
+    The answer is keyed by the modifier itself, so a client that asked about
+    several gets them back by name. splunkd takes one at a time: a repeated
+    parameter, or a modifier it cannot read, is `Invalid time.`
+    """
+    modifiers = request.query_params.getlist("time") or [time]
+    if len(modifiers) != 1:
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "FATAL", "text": _INVALID_TIME},
+        ]})
+    resolved = resolve_relative_time(modifiers[0])
+    if not resolved:
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "FATAL", "text": _INVALID_TIME},
+        ]})
+    moment = datetime.fromtimestamp(resolved, tz=UTC)
+    return JSONResponse(status_code=200, content={
+        modifiers[0]: moment.strftime("%Y-%m-%dT%H:%M:%S.") +
+        f"{moment.microsecond // 1000:03d}+00:00",
+    })
+
+
+_INVALID_TIME = "Invalid time."
+
+#: The four fields typeahead completes from the events themselves. splunkd
+#: marks an index as an `operator` and the rest not — the flag a search bar
+#: uses to decide how to render the suggestion.
+_TYPEAHEAD_FIELDS = ("index", "sourcetype", "source", "host")
+
+
+@router.get("/services/search/typeahead")
+def typeahead(
+    prefix: str = Query(default=""),
+    count: int = Query(default=50, ge=0),
+    _user: dict = Depends(require_splunk_auth),
+) -> JSONResponse:
+    """Complete a search term from what the events actually carry."""
+    field, _, written = prefix.partition("=")
+    if not _ or field not in _TYPEAHEAD_FIELDS:
+        # splunkd completes a `field=` term and nothing else: a bare word or
+        # a pipe gets an empty list rather than a guess.
+        return JSONResponse(status_code=200, content={"results": []})
+
+    wanted = written.strip('"')
+    counts: Counter[str] = Counter()
+    for event in splunk_event_repo.list_all():
+        value = str(getattr(event, field, "") or "")
+        if value and value.startswith(wanted):
+            counts[value] += 1
+    if field == "index":
+        # Every index is offered, even one nothing has been written to.
+        for index in splunk_index_repo.list_all():
+            if index.name.startswith(wanted):
+                counts.setdefault(index.name, 0)
+    return JSONResponse(status_code=200, content={"results": [
+        {"content": f'{field}="{value}"', "count": counts[value] if field != "index" else 0,
+         "operator": field == "index"}
+        for value in sorted(counts)[:count]
+    ]})

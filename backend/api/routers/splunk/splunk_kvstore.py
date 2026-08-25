@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -24,6 +25,7 @@ from application.splunk.queries.kvstore import (
     get_records,
     list_collections,
 )
+from utils.splunk.response import build_splunk_entry, build_splunk_envelope
 
 router = APIRouter(tags=["Splunk KV Store"])
 
@@ -272,3 +274,79 @@ async def _parse_body(request: Request) -> dict:
     # A JSON `null` or array is not a parameter set; treating it as an empty
     # one lets the route report the parameter it needed, instead of 500.
     return cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}
+
+
+# ── Status ───────────────────────────────────────────────────────────────────
+#
+# What a client checks before it trusts the KV store with anything — and what
+# the conformance harness itself waits for on a real instance. mockdr
+# answered 404, so a client that checks first concluded there was no KV store
+# and went no further.
+
+@router.get("/services/kvstore/status")
+def kvstore_status(_user: dict = Depends(require_splunk_auth)) -> dict:
+    """Report the KV store as ready, in the shape splunkd reports it.
+
+    A single member — mockdr is one instance, so it is its own captain — and
+    a `current` block a client reads `status` out of. The oplog timestamps
+    and the guid are this instance's own; the fields around them are the
+    ones splunkd fills (measured on 10.4.2).
+    """
+    started = int(_STARTED)
+    now = int(time.time())
+    current = {
+        "backupRestoreStatus": "Ready",
+        "date": 0,
+        "dateSec": float(now),
+        "disabled": False,
+        "guid": KVSTORE_GUID,
+        "migrationStatus": "NotStarted",
+        "oplogEndTimestamp": 0,
+        "oplogEndTimestampSec": now,
+        "oplogStartTimestamp": 0,
+        "oplogStartTimestampSec": started,
+        "port": 8191,
+        "replicaSet": "splunkrs",
+        "replicationStatus": "KV store captain",
+        "standalone": True,
+        "status": "ready",
+        "storageEngine": "wiredTiger",
+        "versionUpgradeInProgress": "0",
+    }
+    member = {
+        "configVersion": 1,
+        "electionDate": 0,
+        "electionDateSec": started,
+        "hostAndPort": "127.0.0.1:8191",
+        "lastHeartbeat": None,
+        "lastHeartbeatRecv": None,
+        "lastHeartbeatRecvSec": None,
+        "lastHeartbeatSec": None,
+        "optimeDate": 0,
+        "optimeDateSec": now,
+        "pingMs": None,
+        "replicationStatus": "KV store captain",
+        "uptime": now - started,
+    }
+    entry = build_splunk_entry(
+        "status",
+        {"current": current, "members": {"0": member}, "eai:acl": None},
+        collection="kvstore/status",
+        links=("alternate", "list"),
+        fields=False,
+    )
+    # The status collection offers no links of its own: nothing to create
+    # and nothing to reload.
+    return {
+        **build_splunk_envelope([entry], origin="/services/kvstore/status"),
+        "links": {},
+    }
+
+
+#: When this instance's KV store came up, so `uptime` grows the way a real
+#: one's does rather than being a constant.
+_STARTED = time.time()
+
+#: The identity this KV store answers with. A real one's is per install; a
+#: client that stores it and compares later needs it to stay put.
+KVSTORE_GUID = "6D8C4A2E-0F31-4A6B-9C77-1B2E5A9D3F44"

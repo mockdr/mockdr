@@ -40,7 +40,7 @@ def render_splunk_xml(payload: object) -> str:
         # messages first matched it here and rendered an empty <messages/> —
         # discarding every row in XML, which is splunkd's default output mode.
         if "results" in payload:
-            return _render_results(payload["results"])
+            return _render_results(payload)
         if "messages" in payload:
             return _render_messages(payload["messages"])
     return _HEADER + f"<response>{_render_value(payload)}</response>"
@@ -112,19 +112,50 @@ def _render_entry(entry: object) -> str:
     )
 
 
-def _render_results(results: object) -> str:
-    """Render search results in the ``<results>`` shape splunkd uses."""
-    rows = []
-    for row in results if isinstance(results, list) else []:
-        if not isinstance(row, dict):
-            continue
-        fields = "".join(
-            f"    <field k={quoteattr(str(key))}><value><text>{escape(str(value))}"
-            f"</text></value></field>\n"
-            for key, value in row.items()
-        )
-        rows.append(f"  <result>\n{fields}  </result>\n")
-    return _HEADER + f'<results preview="0">\n{"".join(rows)}</results>'
+#: The results document has a declaration of its own: single-quoted, with a
+#: blank line under it. splunkd writes it that way, and a client comparing
+#: bytes — or a test fixture recorded from the real thing — sees the
+#: difference.
+_RESULTS_HEADER = "<?xml version='1.0' encoding='UTF-8'?>\n\n"
+
+
+def _render_results(payload: dict) -> str:
+    """Render search results in the ``<results>`` shape splunkd uses.
+
+    The document names its fields once in a ``<meta>`` block, numbers each
+    result with the offset a client pages by, and repeats ``<value>`` for a
+    multivalue field. mockdr wrote none of that — no meta, no offsets — so a
+    reader built on the real document found no fields at all.
+    """
+    results = payload.get("results")
+    rows = [row for row in (results if isinstance(results, list) else []) if isinstance(row, dict)]
+    if not rows:
+        # Nothing to show is an empty element, not an empty document.
+        return _RESULTS_HEADER + "<results preview='0'/>"
+
+    names = [
+        str(field.get("name")) for field in payload.get("fields") or []
+        if isinstance(field, dict) and field.get("name")
+    ] or list(dict.fromkeys(key for row in rows for key in row))
+
+    parts = [_RESULTS_HEADER, "<results preview='0'>\n<meta>\n<fieldOrder>\n"]
+    parts += [f"<field>{escape(name)}</field>\n" for name in names]
+    parts.append("</fieldOrder>\n</meta>\n")
+    for offset, row in enumerate(rows):
+        parts.append(f"\t<result offset='{offset}'>\n")
+        for key, value in row.items():
+            parts.append(f"\t\t<field k={_single_quoted(str(key))}>\n")
+            for one in value if isinstance(value, list) else [value]:
+                parts.append(f"\t\t\t<value><text>{escape(str(one))}</text></value>\n")
+            parts.append("\t\t</field>\n")
+        parts.append("\t</result>\n")
+    parts.append("</results>\n")
+    return "".join(parts)
+
+
+def _single_quoted(text: str) -> str:
+    """An attribute value in single quotes, which is how splunkd writes them."""
+    return "'" + escape(text, {"'": "&apos;"}) + "'"
 
 
 # ---------------------------------------------------------------------------

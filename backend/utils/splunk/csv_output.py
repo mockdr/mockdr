@@ -100,9 +100,13 @@ def _cell(value: Any) -> str:
 
 
 def _scalar(value: Any) -> str:
-    """A value as its text, the way the JSON body already carries it."""
+    """A value as its text, the way the JSON body already carries it.
+
+    A boolean keeps its JSON spelling — `typeahead` writes `true` in the
+    `operator` column, not `1` (measured).
+    """
     if isinstance(value, bool):
-        return "1" if value else "0"
+        return "true" if value else "false"
     return str(value)
 
 

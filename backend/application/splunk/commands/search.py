@@ -246,6 +246,17 @@ def delete_search_job(sid: str) -> bool:
     return search_job_repo.delete(sid)
 
 
+#: Commands that produce their own rows rather than reading events. A search
+#: that starts with one matches nothing, however many events the index holds.
+_GENERATING_COMMANDS = frozenset({"makeresults"})
+
+
+def _generates_its_own_rows(parsed: SPLQuery) -> bool:
+    """Whether the search begins with a generating command."""
+    first = parsed.commands[0].name if parsed.commands else ""
+    return first in _GENERATING_COMMANDS and parsed.search_expr is None
+
+
 def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]]:
     """Execute a parsed SPL query against the event store.
 
@@ -263,7 +274,13 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
         # none in production, which is the worst way for the two to differ.
         return [], [], time_messages
 
-    if parsed.is_notable or parsed.index == "notable":
+    if _generates_its_own_rows(parsed):
+        # A generating search reads no index at all: `| makeresults` and the
+        # rest make their rows out of nothing, so the job matched no events.
+        # Handing it the whole event store made `/events` answer with
+        # documents the search never touched.
+        events = []
+    elif parsed.is_notable or parsed.index == "notable":
         events = _query_notables(parsed)
     else:
         events = _query_events(parsed)

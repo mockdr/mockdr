@@ -267,7 +267,10 @@ def get_events(sid: str, count: int = 100, offset: int = 0) -> dict | None:
         return None
     _refuse_if_failed(job)
 
-    events = job.events or job.results
+    # No fallback to the results: a generating search matched no events, and
+    # answering with the rows it produced put documents in `/events` that the
+    # search never touched.
+    events = job.events
     fields = list(events[0].keys()) if events else []
     return build_search_results(
         _page(events, count, offset),

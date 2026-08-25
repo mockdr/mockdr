@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Splunk: the endpoints a client checks first, and `/export` in every mode.**
+An endpoint sweep against splunkd 10.4.2 found each of these answering 404
+here: the **simple receiver** (`/services/receivers/simple`) — the pre-HEC
+way in, still in every ad-hoc script, which now writes a searchable event
+and reports what it stamped — the **time parser** a dashboard shows its
+window with, the **typeahead** a search bar completes from, and the **KV
+store status** a client checks before trusting it with anything. Each
+refusal is splunkd's own: an index that is not there is a WARN naming it,
+an empty body is "empty body", a time it cannot read is "Invalid time."
+
+`/export` answered its json stream whatever was asked for, because it read
+`output_mode` from the query string and splunklib puts it in the form body.
+It serves `json_rows`, `csv` and `xml` now, and its json stream marks the
+last row and answers an empty search with the single line that says the
+stream ended rather than broke.
+
+**`json_rows` and `json_cols`.** Two output modes splunkd knows and mockdr
+called invalid. A job's results and events answer them; the job itself and
+the collection call them an *invalid* output mode — a third wording for the
+same kind of refusal — and everywhere else they are unsupported, refused in
+JSON because they are JSON modes, where `atom` and `raw` are refused in XML.
+
 **Kibana: alerting, actions, and the identity behind them.** An endpoint
 sweep against a running Kibana 8.15 found these answering 404 here and 200
 there: the alerting framework's health and rule catalogue
@@ -230,6 +252,21 @@ newlines. A field a row has no value for is empty rather than `""`. Measured
 against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
+
+**The XML results document had no fields at all.** splunkd names them once
+in a `<meta><fieldOrder>` block, numbers each result with the offset a
+client pages by, repeats `<value>` for a multivalue field, and quotes its
+attributes with single quotes — mockdr wrote none of that, so a reader
+built on the real document found nothing in it.
+
+**A generating search matched every event in the index.** `| makeresults`
+reads no index at all, but the job recorded the whole event store as what
+it matched, so `/events` answered with documents the search never touched —
+and `/results` was used as a fallback when a job legitimately matched
+nothing.
+
+**A boolean in a CSV was `1`.** splunkd writes `true`, which is what
+`typeahead`'s `operator` column shows.
 
 **An exception-item search against a list that does not exist answered
 `200`** with an empty page, where Kibana answers `404` with

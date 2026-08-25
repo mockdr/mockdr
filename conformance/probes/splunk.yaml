@@ -2470,3 +2470,139 @@ probes:
       content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22n%2Cg%0A1%2Ca%0A2%2Cb%0A3%2Ca%0A4%2Cb%22%20%7C%20fields%20%2A&output_mode=json&exec_mode=oneshot&count=0'
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
+
+  # ── The endpoints a client checks first (2.3.1) ─────────────────────────
+  #
+  # An endpoint sweep against the real instance found each of these
+  # answering 404 here: the simple receiver — the pre-HEC way in, still in
+  # every ad-hoc script — the time parser a dashboard shows its window with,
+  # the typeahead a search bar completes from, and the KV store status a
+  # client checks before trusting it with anything.
+
+  - id: spl-kvstore-status
+    endpoint: management
+    why: >
+      Whether the KV store is ready, which a client checks first.
+    request:
+      method: GET
+      path: /services/kvstore/status
+      auth: basic
+
+  - id: spl-timeparser
+    endpoint: management
+    why: >
+      What a time modifier resolves to.
+    request:
+      method: GET
+      path: /services/search/timeparser
+      query: {time: '-1d@d'}
+      auth: basic
+
+  - id: spl-timeparser-invalid
+    endpoint: management
+    why: >
+      And one splunkd cannot read.
+    request:
+      method: GET
+      path: /services/search/timeparser
+      query: {time: '-1x'}
+      auth: basic
+
+  - id: spl-typeahead-word
+    endpoint: management
+    why: >
+      A bare word completes nothing, rather than guessing.
+    request:
+      method: GET
+      path: /services/search/typeahead
+      query: {prefix: 'sear', count: '3'}
+      auth: basic
+
+  - id: spl-receivers-simple-missing-index
+    endpoint: management
+    why: >
+      The simple receiver refuses an index that is not there, by name.
+    request:
+      method: POST
+      path: /services/receivers/simple
+      query: {index: 'no-such-index-xyz'}
+      content: 'an event'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-receivers-simple-empty
+    endpoint: management
+    why: >
+      And an empty body, in its own words.
+    request:
+      method: POST
+      path: /services/receivers/simple
+      query: {index: 'main'}
+      content: ''
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-export-json
+    endpoint: management
+    why: >
+      The export stream: a line per row, the last one saying so.
+    request:
+      method: POST
+      path: /services/search/jobs/export
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22host%2Csev%0Asrv-3%2C50%0Asrv-2%2C40%22&output_mode=json'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-export-json-empty
+    endpoint: management
+    why: >
+      A search with no rows is one line saying only that.
+    request:
+      method: POST
+      path: /services/search/jobs/export
+      content: 'search=%7C%20makeresults%20count%3D0&output_mode=json'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-export-json-rows
+    endpoint: management
+    why: >
+      The same rows, named once and listed.
+    request:
+      method: POST
+      path: /services/search/jobs/export
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22host%2Csev%0Asrv-3%2C50%0Asrv-2%2C40%22&output_mode=json_rows'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-export-csv
+    endpoint: management
+    why: >
+      And as CSV, quoted the way splunkd quotes.
+    request:
+      method: POST
+      path: /services/search/jobs/export
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22host%2Csev%0Asrv-3%2C50%0Asrv-2%2C40%22&output_mode=csv'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-export-xml
+    endpoint: management
+    why: >
+      And as the results document, fields and offsets included.
+    request:
+      method: POST
+      path: /services/search/jobs/export
+      content: 'search=%7C%20makeresults%20format%3Dcsv%20data%3D%22host%2Csev%0Asrv-3%2C50%22&output_mode=xml'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-row-mode-unsupported
+    endpoint: management
+    why: >
+      json_rows is refused away from a job's results — in JSON, because it is a JSON mode, where atom and raw are refused in XML.
+    request:
+      method: GET
+      path: /services/apps/local
+      query: {output_mode: 'json_rows', count: '1'}
+      auth: basic

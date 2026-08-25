@@ -24,8 +24,10 @@ class TestResultsRendering:
     """A results envelope renders as a results document, not as messages."""
 
     def test_rows_are_not_discarded(self) -> None:
+        # Each result is numbered with the offset a client pages by, which is
+        # how splunkd writes them.
         xml = render_splunk_xml(_RESULTS_PAYLOAD)
-        assert xml.count("<result>") == 2
+        assert xml.count("<result offset=") == 2
 
     def test_uses_the_results_document_shape(self) -> None:
         xml = render_splunk_xml(_RESULTS_PAYLOAD)
@@ -34,13 +36,18 @@ class TestResultsRendering:
 
     def test_field_values_are_present(self) -> None:
         xml = render_splunk_xml(_RESULTS_PAYLOAD)
-        assert 'k="host"' in xml
+        # Single quotes, as splunkd writes its attributes.
+        assert "k='host'" in xml
         assert "sentinelone" in xml
+
+    def test_the_fields_are_named_once_at_the_top(self) -> None:
+        xml = render_splunk_xml(_RESULTS_PAYLOAD)
+        assert "<meta>\n<fieldOrder>\n<field>host</field>" in xml
 
     def test_empty_result_set_still_renders_a_results_document(self) -> None:
         xml = render_splunk_xml({**_RESULTS_PAYLOAD, "results": []})
-        assert "<results" in xml
-        assert "<result>" not in xml
+        # Nothing to show is an empty element, which is what splunkd sends.
+        assert xml.endswith("<results preview='0'/>")
 
 
 class TestOtherPayloadsUnaffected:
