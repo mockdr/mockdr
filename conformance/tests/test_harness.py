@@ -439,6 +439,10 @@ class TestSeededProbesLoad:
             path = probe.request.path
             if path.startswith("/services/data/indexes"):
                 continue
+            # A refusal reads no data either: what a wrong verb answers is
+            # the same on an empty install and a seeded one.
+            if probe.request.method not in ("POST", "GET") or "takes-no-get" in probe.id:
+                continue
             assert "makeresults" in content, (
                 f"{probe.id} compares values without data on either side"
             )

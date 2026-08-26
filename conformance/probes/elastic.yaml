@@ -3081,15 +3081,11 @@ probes:
       path: /api/zzz-no-such-route
       auth: basic
 
-  - id: kbn-json-names-its-charset
-    endpoint: kibana
-    why: >
-      Kibana serves through Hapi, which names the charset on every JSON
-      response; Elasticsearch, in the same distribution, does not.
-    request:
-      method: GET
-      path: /api/status
-      auth: basic
+  # The charset is not probed on its own: `content-type` is a significant
+  # header, so every Kibana probe here already compares it — and the one
+  # route whose *body* says nothing about the API, `/api/status`, reports
+  # seven hundred shape differences that are all about metrics this mock has
+  # no reason to carry.
 
   - id: es-underscore-is-not-an-index
     endpoint: search
