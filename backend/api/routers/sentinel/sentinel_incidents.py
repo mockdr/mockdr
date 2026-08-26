@@ -9,6 +9,9 @@ from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import comments as comment_cmds
 from application.sentinel.commands import incidents as incident_cmds
 from application.sentinel.queries import incidents as incident_queries
+from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
+from repository.sentinel.incident_repo import sentinel_incident_repo
+from utils.sentinel.preconditions import check_if_match
 from utils.sentinel.response import build_arm_error, build_arm_resource
 from utils.vendor_errors import build_vendor_error
 
@@ -84,6 +87,9 @@ async def create_or_update_incident(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    existing = sentinel_incident_repo.get(incident_id)
+    if existing is not None:
+        check_if_match(request.headers.get("if-match"), existing.etag)
     properties = body.get("properties", {})
     incident_cmds.create_or_update_incident(incident_id, properties)
     return incident_queries.get_incident(incident_id) or {}
@@ -206,6 +212,9 @@ async def create_or_update_comment(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    known = sentinel_incident_comment_repo.get(comment_id)
+    if known is not None:
+        check_if_match(request.headers.get("if-match"), known.etag)
     message = body.get("properties", {}).get("message", "")
     comment = comment_cmds.create_or_update_comment(
         incident_id, comment_id, message, str(_auth.get("client_id", "")),

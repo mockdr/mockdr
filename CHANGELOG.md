@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A conditional write that was not conditional.**
+ARM's common types declare `If-Match` — "the If-Match header that makes a
+request conditional" — and point at the normal entity-tag convention, which
+is RFC 9110 §13.1.1: a failed condition is `412` and the write does not
+happen. The Sentinel mount ignored the header and wrote anyway, answering
+`200`. That is the lost update the header exists to prevent: two clients read
+the same incident, both write, and the second overwrites the first while
+being told its condition held. Incidents and their comments honour it now —
+a stale tag is refused and changes nothing, `*` holds for a resource that
+exists, and a request without the header behaves as it always did.
+
 **Every Kibana rule written by `elastic`, whoever wrote it.**
 `created_by` and `updated_by` were the string `elastic` on create, replace,
 patch, duplicate and both bulk toggles — the same failure `/privileges` had

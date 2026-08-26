@@ -270,3 +270,99 @@ class TestWhoCommentedAndWhen:
         assert edited["message"] == "after"
         assert edited["createdTimeUtc"] == first["createdTimeUtc"]
         assert edited["lastModifiedTimeUtc"] == later
+
+
+class TestAConditionalWriteIsConditional:
+    """`If-Match` on an incident and on a comment.
+
+    ARM's common types declare the header — "the If-Match header that makes a
+    request conditional" — and point at the normal entity-tag convention,
+    which is RFC 9110 §13.1.1: a failed condition is `412` and the write does
+    not happen. mockdr answered `200` and wrote anyway, which is the lost
+    update the header exists to prevent: two clients read the same incident,
+    both write, and the second overwrites the first while being told its
+    condition held.
+    """
+
+    BODY = {"properties": {"title": "changed", "severity": "High", "status": "Active"}}
+
+    def _incident(self, client: TestClient) -> dict:
+        listing = client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents", headers=_auth(client),
+            params={"api-version": "2024-03-01"},
+        ).json()
+        return dict(listing["value"][0])
+
+    def test_a_stale_tag_is_refused(self, client: TestClient) -> None:
+        incident = self._incident(client)
+        before = incident["properties"]["title"]
+        resp = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}",
+            headers={**_auth(client), "If-Match": '"stale"'},
+            params={"api-version": "2024-03-01"}, json=self.BODY,
+        )
+        assert resp.status_code == 412
+        assert resp.json()["error"]["code"] == "PreconditionFailed"
+
+        # And the write did not happen.
+        after = client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}",
+            headers=_auth(client), params={"api-version": "2024-03-01"},
+        ).json()
+        assert after["properties"]["title"] == before
+
+    def test_the_current_tag_writes_and_then_goes_stale(
+        self, client: TestClient,
+    ) -> None:
+        incident = self._incident(client)
+        path = f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}"
+        first = client.put(
+            path, headers={**_auth(client), "If-Match": incident["etag"]},
+            params={"api-version": "2024-03-01"}, json=self.BODY,
+        )
+        assert first.status_code == 200
+        assert first.json()["etag"] != incident["etag"]
+
+        # The second client still holds the tag it read before the first wrote.
+        second = client.put(
+            path, headers={**_auth(client), "If-Match": incident["etag"]},
+            params={"api-version": "2024-03-01"}, json=self.BODY,
+        )
+        assert second.status_code == 412
+
+    def test_a_wildcard_holds_for_a_resource_that_exists(
+        self, client: TestClient,
+    ) -> None:
+        incident = self._incident(client)
+        resp = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}",
+            headers={**_auth(client), "If-Match": "*"},
+            params={"api-version": "2024-03-01"}, json=self.BODY,
+        )
+        assert resp.status_code == 200
+
+    def test_an_unconditional_write_is_untouched(self, client: TestClient) -> None:
+        incident = self._incident(client)
+        resp = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}",
+            headers=_auth(client), params={"api-version": "2024-03-01"}, json=self.BODY,
+        )
+        assert resp.status_code == 200
+
+    def test_a_comment_is_conditional_too(self, client: TestClient) -> None:
+        incident = self._incident(client)
+        path = f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}/comments/conditional"
+        created = client.put(
+            path, headers=_auth(client), params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "one"}},
+        ).json()
+        assert client.put(
+            path, headers={**_auth(client), "If-Match": '"nope"'},
+            params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "two"}},
+        ).status_code == 412
+        assert client.put(
+            path, headers={**_auth(client), "If-Match": created["etag"]},
+            params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "two"}},
+        ).status_code == 200
