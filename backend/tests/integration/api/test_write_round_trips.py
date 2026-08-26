@@ -1290,13 +1290,36 @@ class TestKibanaAndElasticsearchDifferBelowTheJson:
         answer = client.get("/kibana/api/zzz-no-such-route", headers=self.KBN)
         assert answer.json()["message"] == "Not Found"
 
-    def test_kibana_names_the_charset_and_elasticsearch_does_not(
+    def test_each_product_names_the_charset_its_own_way(
         self, client: TestClient,
     ) -> None:
+        """Kibana lower-case, splunkd upper-case, Elasticsearch not at all."""
         kibana = client.get("/kibana/api/cases/_find", headers=self.KBN)
         assert kibana.headers["content-type"] == "application/json; charset=utf-8"
+
+        splunk = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                            params=JSON_OUT)
+        assert splunk.headers["content-type"] == "application/json; charset=UTF-8"
+
         elastic = client.get("/elastic/_cluster/health", headers=self.ES)
         assert elastic.headers["content-type"] == "application/json"
+
+    def test_splunks_xml_and_hec_carry_it_too(self, client: TestClient) -> None:
+        xml = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH)
+        assert xml.headers["content-type"] == "text/xml; charset=UTF-8"
+
+        hec = client.post(
+            "/splunk/services/collector/event",
+            headers={"Authorization": "Splunk 11111111-1111-1111-1111-111111111111"},
+            json={"event": "x"},
+        )
+        assert hec.headers["content-type"] == "application/json; charset=UTF-8"
+
+    def test_a_refusal_carries_it_as_well(self, client: TestClient) -> None:
+        """Where a client is most likely reading headers rather than a body."""
+        answer = client.get("/splunk/services/data/indexes", params=JSON_OUT)
+        assert answer.status_code == 401
+        assert answer.headers["content-type"] == "application/json; charset=UTF-8"
 
     def test_the_charset_is_added_to_kibanas_errors_too(
         self, client: TestClient,

@@ -2948,3 +2948,26 @@ probes:
   # installs to hold the same records, and what an alpha sort *does* to a
   # numeric column depends entirely on which numbers are in it. The three
   # modes are measured and pinned by unit tests instead.
+
+  - id: spl-json-names-its-charset
+    endpoint: management
+    why: >
+      splunkd names the charset on its JSON as well as on its XML, and
+      spells it upper-case where Kibana spells it lower — the same parameter,
+      two products, and mockdr wrote neither.
+    request:
+      method: GET
+      path: /services/server/info
+      query: {output_mode: json, f: version}
+      auth: basic
+
+  - id: spl-json-charset-on-a-refusal
+    endpoint: management
+    compare: values
+    why: >
+      Including on the 401, which is where a client is most likely to be
+      reading headers rather than a body.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json}

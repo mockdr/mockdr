@@ -18,7 +18,7 @@ from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import HeadMethodMiddleware
-from api.middleware.kibana_charset import KibanaCharsetMiddleware
+from api.middleware.json_charset import JsonCharsetMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
@@ -407,12 +407,14 @@ app.add_middleware(
 # Paging runs inside XML rendering, so the sliced entries are what gets rendered.
 # Searching runs innermost of the four, so what is ordered, narrowed, sliced
 # and counted is what the search selected.
-app.add_middleware(KibanaCharsetMiddleware)    # Hapi names the charset; ES does not
 app.add_middleware(SplunkSearchMiddleware)     # search= on Atom collections
 app.add_middleware(SplunkSortMiddleware)       # sort_key/sort_dir, name asc by default
 app.add_middleware(SplunkFieldFilterMiddleware)  # f= on Atom entry content
 app.add_middleware(SplunkPagingMiddleware)     # count/offset on Atom collections
 app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the routers
+# Outside the renderer, so it has the last word: the renderer writes its own
+# content type for the JSON form and would overwrite a charset set beneath it.
+app.add_middleware(JsonCharsetMiddleware)      # each product names the charset its own way
 # Path rewriting must happen before routing, so this is added last (outermost).
 app.add_middleware(SplunkNamespaceMiddleware)  # /servicesNS/{owner}/{app} -> /services
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last
