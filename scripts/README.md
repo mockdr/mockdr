@@ -52,6 +52,7 @@ completed against (`backend/infrastructure/fixtures/`):
 | `gen_arm_fixtures.py` | Sentinel (from the ARM spec) |
 | `gen_mde_fixtures.py` | Defender for Endpoint (from the reduced docs) |
 | `gen_xdr_fixtures.py` | Cortex XDR (from the recordings) |
+| `gen_documented_bodies.py` | SentinelOne — what each write body must carry (`backend/application/documented_bodies.py`); the guard that reads it refuses a body carrying nothing the route knows. |
 
 Run them from the repository root with the backend's interpreter:
 `backend/.venv/bin/python scripts/<name>.py`.

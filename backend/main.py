@@ -14,6 +14,7 @@ from starlette.types import Scope
 
 from api import spa
 from api.auth import require_admin, require_auth
+from api.documented_body import require_documented_body
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
@@ -802,7 +803,11 @@ app.include_router(system.public_router, prefix=API_PREFIX)
 app.include_router(webhook_sink.public_router, prefix=API_PREFIX)
 
 # ── Authenticated (read-only is fine) ─────────────────────────────────────────
-_AUTH = [Depends(require_auth)]
+# `require_documented_body` sits beside the auth check on every SentinelOne
+# router: a write body carrying none of the members the vendor's swagger
+# documents for that route is refused before the handler defaults it into
+# something it was never sent.
+_AUTH = [Depends(require_auth), Depends(require_documented_body)]
 
 # Read-only endpoints — any authenticated role
 for module in [system, agents, threats, alerts, activities, accounts, sites,

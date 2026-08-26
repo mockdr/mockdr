@@ -2439,3 +2439,73 @@ class TestAWriteRouteReadsTheBodyItDeclares:
                                json={"field": "host.os.name", "query": ""})
         assert response.status_code == 200
         assert isinstance(response.json(), list)
+
+
+class TestASentinelOneWriteBodyIsRecognisable:
+    """From the 2.1 swagger, which says what each write body is made of.
+
+    Twenty-five write routes answered 200 to `{}` — a threat marked as an
+    incident with no verdict, an exclusion created out of nothing, a policy
+    replaced by an empty document. Each reported success, which leaves the
+    client believing the write happened the way it asked.
+
+    The guard refuses a body carrying *nothing the route knows*. It does not
+    decide which combination is enough: the swagger says `data` is required
+    for `/threats/analyst-verdict`, and whether real S1 also takes the flat
+    form is not something the reference states, so both are let through.
+    """
+
+    S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+
+    def test_an_empty_body_is_refused(self, client: TestClient) -> None:
+        response = client.post("/web/api/v2.1/threats/analyst-verdict",
+                               headers=self.S1, json={})
+        assert response.status_code == 400
+        error = response.json()["errors"][0]
+        assert error["title"] == "Validation Error"
+        assert error["code"] == 4000010
+        assert "analystVerdict" in error["detail"]
+
+    def test_a_body_of_undeclared_members_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        assert client.post("/web/api/v2.1/threats/analyst-verdict",
+                           headers=self.S1,
+                           json={"zzz_undeclared_member": 1}).status_code == 400
+
+    def test_the_documented_body_is_taken(self, client: TestClient) -> None:
+        response = client.post(
+            "/web/api/v2.1/threats/analyst-verdict", headers=self.S1,
+            json={"data": {"analystVerdict": "true_positive"},
+                  "filter": {"ids": ["1"]}})
+        assert response.status_code == 200
+
+    def test_the_flat_form_this_mock_also_takes_is_still_a_body(
+        self, client: TestClient,
+    ) -> None:
+        assert client.post("/web/api/v2.1/threats/analyst-verdict",
+                           headers=self.S1,
+                           json={"analystVerdict": "true_positive"}
+                           ).status_code == 200
+
+    def test_a_route_that_takes_no_body_is_left_alone(
+        self, client: TestClient,
+    ) -> None:
+        """The swagger marks `data` required on routes with no document —
+        reactivating a site, for one — and requiring a body there would
+        invent a rule rather than enforce a documented one."""
+        site_id = client.get("/web/api/v2.1/sites", headers=self.S1
+                             ).json()["data"]["sites"][0]["id"]
+        assert client.put(f"/web/api/v2.1/sites/{site_id}/reactivate",
+                          headers=self.S1).status_code == 200
+
+    def test_authorisation_is_decided_before_the_body(
+        self, client: TestClient,
+    ) -> None:
+        """A caller without the right to write must not learn what the body
+        should have looked like."""
+        viewer = {"Authorization": "ApiToken viewer-token-0000-0000-000000000002"}
+        response = client.post("/web/api/v2.1/threat-intelligence/iocs",
+                               headers=viewer,
+                               json={"type": "IPV4", "value": "1.2.3.4"})
+        assert response.status_code == 403

@@ -696,6 +696,24 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Twenty-five SentinelOne write routes that answered 200 to an empty body.**
+A threat marked as an incident with no verdict in the body, an exclusion
+created out of nothing, a policy replaced by an empty document — each
+reported success, which leaves a client believing the write happened the way
+it asked. The 2.1 swagger says what those bodies are made of: every one of
+these routes declares `data`, `filter` or both as required, and declares the
+members each holds. `scripts/gen_documented_bodies.py` derives that table,
+and a body carrying none of those names is refused in SentinelOne's own
+envelope.
+
+What the guard deliberately does not do is decide which combination is
+enough. The reference says `data` is required for `/threats/analyst-verdict`
+and says nothing about the flat form this mock also takes, so a body
+carrying either is let through — the check is that something was sent. A
+route the mock declares no body for is left alone for the same reason: the
+swagger marks `data` required on some of those, and requiring one there
+would invent a rule rather than enforce a documented one.
+
 **Five routes that read nothing of the body they declare.**
 Found by a new audit that asks every such route what it does with a body
 that cannot be what it meant — an empty object, and one carrying a single
