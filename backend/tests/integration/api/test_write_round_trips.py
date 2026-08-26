@@ -3949,3 +3949,74 @@ class TestTheConnectorsOwnQueryFindsSomething:
         s1 = self._query(client, "SentinelOne_CL | take 5")
         column = [c["name"] for c in s1["columns"]].index("SourceSystem")
         assert all(str(row[column]).startswith("sentinelone:") for row in s1["rows"])
+
+
+class TestGraphHuntsTheSameDataDefenderDoes:
+    """Graph's advanced hunting *is* Defender's, and this mount had the
+    implementation Defender's own route was given up.
+
+    The query was accepted and never evaluated: three synthetic rows came
+    back whatever was asked, so a `where` that excludes everything returned
+    results and a table this install does not have returned results too. The
+    device ids in those rows belonged to no machine here, so a hunter who
+    followed one got a 404 for a device the hunt had just reported.
+    """
+
+    def _headers(self, client: TestClient, mount: str) -> dict:
+        clients = {
+            "graph": ("graph-mock-admin-client", "graph-mock-admin-secret",
+                      "https://graph.microsoft.com/.default"),
+            "mde": ("mde-mock-admin-client", "mde-mock-admin-secret",
+                    "https://api.securitycenter.microsoft.com/.default"),
+        }
+        client_id, secret, scope = clients[mount]
+        token = client.post(f"/{mount}/oauth2/v2.0/token", data={
+            "client_id": client_id, "client_secret": secret,
+            "grant_type": "client_credentials", "scope": scope,
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _hunt(self, client: TestClient, mount: str, kql: str):
+        path = ("/graph/v1.0/security/runHuntingQuery" if mount == "graph"
+                else "/mde/api/advancedqueries/run")
+        return client.post(path, headers=self._headers(client, mount),
+                           json={"Query": kql})
+
+    @pytest.mark.parametrize("kql", [
+        "DeviceInfo | take 2",
+        "AlertInfo | where Severity == 'High' | take 3",
+        "AlertInfo | where Severity == 'zzz-nothing' | take 3",
+    ])
+    def test_both_mounts_answer_the_same_query_alike(
+        self, client: TestClient, kql: str,
+    ) -> None:
+        graph = self._hunt(client, "graph", kql)
+        mde = self._hunt(client, "mde", kql)
+        assert graph.status_code == mde.status_code == 200
+        assert len(graph.json()["Results"]) == len(mde.json()["Results"])
+
+    def test_a_where_that_excludes_everything_returns_nothing(
+        self, client: TestClient,
+    ) -> None:
+        """It used to return three rows."""
+        body = self._hunt(
+            client, "graph", "AlertInfo | where Severity == 'zzz-nothing'").json()
+        assert body["Results"] == []
+        assert body["Schema"], "a filtered-out query still has a schema"
+
+    def test_a_table_this_install_does_not_have(
+        self, client: TestClient,
+    ) -> None:
+        response = self._hunt(client, "graph", "ZzzNoSuchTable | take 1")
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "badRequest"
+
+    def test_a_hunted_device_is_one_this_install_has(
+        self, client: TestClient,
+    ) -> None:
+        """The canned rows named devices no machine here matched."""
+        row = self._hunt(client, "graph", "DeviceInfo | take 1").json()["Results"][0]
+        machine = client.get(f"/mde/api/machines/{row['DeviceId']}",
+                             headers=self._headers(client, "mde"))
+        assert machine.status_code == 200
+        assert machine.json()["id"] == row["DeviceId"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 
+from application.mde_advanced_hunting.queries import run_query as run_hunt
 from domain.graph.ti_indicator import GraphTiIndicator
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
@@ -187,90 +188,27 @@ def _expand_alerts(alert_ids: list[str]) -> list[dict]:
 # ── Advanced Hunting ──────────────────────────────────────────────────────────
 
 def run_hunting_query(body: dict) -> dict:
-    """Execute a hunting query and return canned results.
+    """Execute a hunting query against the seeded hunting tables.
 
-    The real Graph Security Advanced Hunting API accepts a KQL query and
-    returns a schema + results structure.  This mock returns synthetic data
-    regardless of the query content.
+    Graph's advanced hunting is Defender's, and this mount had the
+    implementation Defender's own route was given up: the query accepted and
+    never evaluated, three synthetic rows returned whatever was asked, and
+    device ids in them that this install does not have — so a hunter who
+    followed a result to `managedDevices/{id}` got a 404 for a device the
+    hunt had just reported. It runs the same evaluator over the same tables
+    now, and answers in the envelope this mount already answered in.
 
     Args:
-        body: Request body containing ``Query`` (KQL string).
+        body: Request body containing ``Query`` (a KQL string).
 
     Returns:
-        Hunting query response with ``schema`` and ``results`` arrays.
+        Hunting response with ``Schema``, ``Results`` and ``Stats``.
+
+    Raises:
+        KqlError: If the query cannot be parsed or names an unknown table.
     """
-    _query = body.get("Query", "")  # accepted but not evaluated
-    now = utc_now()
+    return run_hunt(body)
 
-    schema = [
-        {"Name": "Timestamp", "Type": "DateTime"},
-        {"Name": "DeviceId", "Type": "String"},
-        {"Name": "DeviceName", "Type": "String"},
-        {"Name": "ActionType", "Type": "String"},
-        {"Name": "FileName", "Type": "String"},
-        {"Name": "FolderPath", "Type": "String"},
-        {"Name": "SHA256", "Type": "String"},
-        {"Name": "InitiatingProcessFileName", "Type": "String"},
-        {"Name": "InitiatingProcessCommandLine", "Type": "String"},
-        {"Name": "AccountName", "Type": "String"},
-    ]
-
-    results = [
-        {
-            "Timestamp": now,
-            "DeviceId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "DeviceName": "ws-fin-001.acmecorp.internal",
-            "ActionType": "ProcessCreated",
-            "FileName": "powershell.exe",
-            "FolderPath": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
-            "SHA256": "de96a6e69944335375dc1ac238336066889d9ffc7d73628ef4fe1b1b160ab32c",
-            "InitiatingProcessFileName": "cmd.exe",
-            "InitiatingProcessCommandLine": "cmd.exe /c powershell.exe -ep bypass",
-            "AccountName": "jsmith",
-        },
-        {
-            "Timestamp": now,
-            "DeviceId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-            "DeviceName": "srv-dc-01.acmecorp.internal",
-            "ActionType": "ConnectionSuccess",
-            "FileName": "",
-            "FolderPath": "",
-            "SHA256": "",
-            "InitiatingProcessFileName": "svchost.exe",
-            "InitiatingProcessCommandLine": "svchost.exe -k netsvcs",
-            "AccountName": "SYSTEM",
-        },
-        {
-            "Timestamp": now,
-            "DeviceId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-            "DeviceName": "ws-hr-042.acmecorp.internal",
-            "ActionType": "FileCreated",
-            "FileName": "suspicious_payload.exe",
-            "FolderPath": "C:\\Users\\ajones\\Downloads",
-            "SHA256": "abc123def456789012345678901234567890123456789012345678901234abcd",
-            "InitiatingProcessFileName": "chrome.exe",
-            "InitiatingProcessCommandLine": "chrome.exe --no-sandbox",
-            "AccountName": "ajones",
-        },
-    ]
-
-    return {
-        "Schema": schema,
-        "Results": results,
-        "Stats": {
-            "ExecutionTime": 0.031,
-            "resource_usage": {
-                "cache": {"memory": {"hits": 0, "misses": 1, "total": 1}},
-                "cpu": {
-                    "user": "00:00:00.0156250",
-                    "kernel": "00:00:00",
-                    "total cpu": "00:00:00.0156250",
-                },
-                "memory": {"peak_per_node": 1048576},
-            },
-            "dataset_statistics": [{"table_row_count": len(results), "table_size": 1024}],
-        },
-    }
 
 
 # ── Secure Scores ─────────────────────────────────────────────────────────────

@@ -714,6 +714,20 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Graph's advanced hunting is Defender's, and had the implementation
+Defender's own route was given up.** `POST /security/runHuntingQuery`
+accepted the query and never evaluated it: the same three synthetic rows
+came back whatever was asked, so a `where` that excludes everything returned
+results and a table this install does not have returned results too. The
+device ids in those rows belonged to no machine here, so a hunter who
+followed one to `/api/machines/{id}` got a 404 for a device the hunt had
+just reported.
+
+It runs the same evaluator over the same seeded tables as
+`/api/advancedqueries/run` now — one engine for one product's data — and the
+two mounts answer the same query alike, down to the 400 for a table neither
+holds.
+
 **Four data connectors that said they were ingesting, into four empty
 tables.** This workspace's `dataConnectors` advertise `SentinelOne_CL`,
 `CrowdStrikeFalcon_CL`, `ElasticSecurity_CL` and `PaloAltoCortexXDR_CL` —

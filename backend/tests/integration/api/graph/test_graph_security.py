@@ -141,10 +141,15 @@ class TestGraphHunting:
     def test_hunting_returns_schema_and_results(
         self, client: TestClient, graph_admin_headers: dict,
     ) -> None:
-        """Hunting query should return Schema, Results, and Stats."""
+        """Hunting query should return Schema, Results, and Stats.
+
+        `DeviceProcessEvents` is not one of the tables this install holds,
+        and naming a table it does not have is a 400 now rather than three
+        canned rows.
+        """
         resp = client.post(
             "/graph/v1.0/security/runHuntingQuery",
-            json={"Query": "DeviceProcessEvents | take 10"},
+            json={"Query": "DeviceInfo | take 10"},
             headers=graph_admin_headers,
         )
         assert resp.status_code == 200
