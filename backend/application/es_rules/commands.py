@@ -18,12 +18,16 @@ class UnknownBulkActionError(ValueError):
     """
 
 
-def create_rule(data: dict) -> dict:
+def create_rule(data: dict, author: str = "elastic") -> dict:
     """Create a new detection rule.
 
     Args:
-        data: Rule creation payload with at least ``name``, ``description``,
-              ``type``, ``risk_score``, and ``severity``.
+        data:   Rule creation payload with at least ``name``, ``description``,
+                ``type``, ``risk_score``, and ``severity``.
+        author: The caller. Kibana records who wrote a rule, and every write
+                here used to say `elastic` — the superuser — whoever had
+                called, which is the same failure `/privileges` had when it
+                reported the caller as `elastic` too.
 
     Returns:
         The newly created rule as a dict.
@@ -32,15 +36,15 @@ def create_rule(data: dict) -> dict:
     rule = replace(
         _from_body(data, str(uuid.uuid4()), str(uuid.uuid4())),
         created_at=now,
-        created_by="elastic",
+        created_by=author,
         updated_at=now,
-        updated_by="elastic",
+        updated_by=author,
     )
     es_rule_repo.save(rule)
     return _rule_to_dict(rule)
 
 
-def update_rule(rule: EsRule, data: dict) -> dict:
+def update_rule(rule: EsRule, data: dict, author: str = "elastic") -> dict:
     """Replace a rule from a full ``RuleUpdateProps`` body.
 
     PUT replaces: a member the body leaves out is gone afterwards, which is
@@ -61,14 +65,14 @@ def update_rule(rule: EsRule, data: dict) -> dict:
         revision=rule.revision,
         last_execution=rule.last_execution,
         updated_at=utc_now(),
-        updated_by="elastic",
+        updated_by=author,
     )
     _count_revision(replaced, before)
     es_rule_repo.save(replaced)
     return _rule_to_dict(replaced)
 
 
-def patch_rule(rule: EsRule, data: dict) -> dict:
+def patch_rule(rule: EsRule, data: dict, author: str = "elastic") -> dict:
     """Apply a partial ``RulePatchProps`` body to a rule.
 
     PATCH touches only what the body names, and counts as a modification only
@@ -87,7 +91,7 @@ def patch_rule(rule: EsRule, data: dict) -> dict:
 
     _count_revision(rule, before)
     rule.updated_at = utc_now()
-    rule.updated_by = "elastic"
+    rule.updated_by = author
     es_rule_repo.save(rule)
     return _rule_to_dict(rule)
 
@@ -104,13 +108,19 @@ def delete_rule(rule_id: str) -> bool:
     return es_rule_repo.delete(rule_id)
 
 
-def bulk_action(action: str, rule_ids: list[str] | None = None, query: str | None = None) -> dict:
+def bulk_action(
+    action: str,
+    rule_ids: list[str] | None = None,
+    query: str | None = None,
+    author: str = "elastic",
+) -> dict:
     """Perform a bulk action on detection rules.
 
     Args:
         action:   One of ``"enable"``, ``"disable"``, ``"delete"``, ``"export"``.
         rule_ids: List of rule IDs to act on.  If None, ``query`` is used.
         query:    Filter query string (used if ``rule_ids`` is None).
+        author:   The caller, recorded on every rule the action touches.
 
     Returns:
         Summary dict with counts and affected rules.
@@ -121,7 +131,7 @@ def bulk_action(action: str, rule_ids: list[str] | None = None, query: str | Non
         for rule in rules:
             rule.enabled = True
             rule.updated_at = utc_now()
-            rule.updated_by = "elastic"
+            rule.updated_by = author
             es_rule_repo.save(rule)
         return _bulk_result(rules, action)
 
@@ -129,7 +139,7 @@ def bulk_action(action: str, rule_ids: list[str] | None = None, query: str | Non
         for rule in rules:
             rule.enabled = False
             rule.updated_at = utc_now()
-            rule.updated_by = "elastic"
+            rule.updated_by = author
             es_rule_repo.save(rule)
         return _bulk_result(rules, action)
 
@@ -147,7 +157,9 @@ def bulk_action(action: str, rule_ids: list[str] | None = None, query: str | Non
                 rule_id=str(uuid.uuid4()),
                 name=f"{rule.name} [Duplicate]",
                 created_at=utc_now(),
+                created_by=author,
                 updated_at=utc_now(),
+                updated_by=author,
             )
             es_rule_repo.save(clone)
             copies.append(clone)

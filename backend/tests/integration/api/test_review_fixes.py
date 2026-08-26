@@ -307,3 +307,50 @@ class TestRuleImportActuallyImports:
         ).json()
         assert body["success"] is False
         assert body["errors"][0]["error"]["status_code"] == 400
+
+
+class TestKibanaRecordsWhoWroteARule:
+    """`created_by` and `updated_by` name the caller, not the superuser.
+
+    Every rule write recorded `elastic` whoever had called — the same failure
+    `/privileges` had when it reported the caller as `elastic` too, and
+    invisible for exactly the same reason: `elastic` is a plausible answer.
+    """
+
+    RULE = {
+        "name": "Who wrote this", "description": "d", "type": "query",
+        "query": "*", "severity": "low", "risk_score": 5,
+    }
+
+    def test_a_created_rule_names_its_author(self, client: TestClient) -> None:
+        body = client.post(
+            "/kibana/api/detection_engine/rules", headers=ES_AUTH, json=self.RULE,
+        ).json()
+        assert body["created_by"] == "analyst"
+        assert body["updated_by"] == "analyst"
+
+    def test_a_patch_names_who_patched(self, client: TestClient) -> None:
+        created = client.post(
+            "/kibana/api/detection_engine/rules", headers=ES_AUTH,
+            json={**self.RULE, "rule_id": "authored-by-analyst"},
+        ).json()
+        patched = client.patch(
+            "/kibana/api/detection_engine/rules", headers=ES_AUTH,
+            json={"rule_id": created["rule_id"], "name": "renamed"},
+        ).json()
+        assert patched["updated_by"] == "analyst"
+
+    def test_a_bulk_enable_names_who_enabled(self, client: TestClient) -> None:
+        created = client.post(
+            "/kibana/api/detection_engine/rules", headers=ES_AUTH,
+            json={**self.RULE, "rule_id": "bulk-authored", "enabled": False},
+        ).json()
+        client.post(
+            "/kibana/api/detection_engine/rules/_bulk_action", headers=ES_AUTH,
+            json={"action": "enable", "ids": [created["id"]]},
+        )
+        read = client.get(
+            "/kibana/api/detection_engine/rules", headers=ES_AUTH,
+            params={"rule_id": created["rule_id"]},
+        ).json()
+        assert read["updated_by"] == "analyst"

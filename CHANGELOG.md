@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every Kibana rule written by `elastic`, whoever wrote it.**
+`created_by` and `updated_by` were the string `elastic` on create, replace,
+patch, duplicate and both bulk toggles — the same failure `/privileges` had
+when it named the caller `elastic` too, and invisible for the same reason:
+the superuser is a plausible author. The caller is recorded now, on every one
+of those paths.
+
 **A comment nobody wrote, at a time that was not there.**
 An incident comment named `MockDR` as its author whoever had called, and
 answered `lastModifiedTimeUtc` — a `date-time` the service fills in, per

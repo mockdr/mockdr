@@ -67,7 +67,7 @@ def get_rule(
 @router.post("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])
 def create_rule(
     body: dict = Body(...),
-    _: dict = Depends(require_es_write),
+    caller: dict = Depends(require_es_write),
 ) -> dict:
     """Create a new detection rule.
 
@@ -106,7 +106,7 @@ def create_rule(
                 409, f"rule_id: \"{body['rule_id']}\" already exists",
             ),
         )
-    return rule_commands.create_rule(body)
+    return rule_commands.create_rule(body, _caller(caller))
 
 
 #: Fields RuleCreateProps declares as required.
@@ -116,7 +116,7 @@ _REQUIRED_RULE_FIELDS = ("name", "description", "type", "severity", "risk_score"
 @router.put("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])
 def update_rule(
     body: dict = Body(...),
-    _: dict = Depends(require_es_write),
+    caller: dict = Depends(require_es_write),
 ) -> dict:
     """Replace an existing detection rule.
 
@@ -124,13 +124,13 @@ def update_rule(
     created knows its ``rule_id`` and not the internal ``id``, and demanding
     the latter answered 400 for a perfectly formed request.
     """
-    return rule_commands.update_rule(_addressed_rule(body), body)
+    return rule_commands.update_rule(_addressed_rule(body), body, _caller(caller))
 
 
 @router.patch("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])
 def patch_rule(
     body: dict = Body(...),
-    _: dict = Depends(require_es_write),
+    caller: dict = Depends(require_es_write),
 ) -> dict:
     """Update part of a detection rule.
 
@@ -138,7 +138,12 @@ def patch_rule(
     whole. With no route at all, a client doing that got 404 and could only
     fall back to a PUT that silently reset everything it left out.
     """
-    return rule_commands.patch_rule(_addressed_rule(body), body)
+    return rule_commands.patch_rule(_addressed_rule(body), body, _caller(caller))
+
+
+def _caller(auth: dict) -> str:
+    """Who is writing. The auth context spells the name `user`."""
+    return str(auth.get("user") or "elastic")
 
 
 def _addressed_rule(body: dict) -> EsRule:
@@ -246,7 +251,7 @@ def find_rules(
 @router.post("/api/detection_engine/rules/_bulk_action", dependencies=[Depends(require_kbn_xsrf)])
 def bulk_action(
     body: dict = Body(...),
-    _: dict = Depends(require_es_write),
+    caller: dict = Depends(require_es_write),
 ) -> dict:
     """Perform a bulk action on detection rules.
 
@@ -277,7 +282,7 @@ def bulk_action(
     rule_ids = body.get("ids")
     query = body.get("query")
     try:
-        return rule_commands.bulk_action(action, rule_ids, query)
+        return rule_commands.bulk_action(action, rule_ids, query, _caller(caller))
     except rule_commands.UnknownBulkActionError as exc:
         # An unknown action used to be 200 {"success": false}, so a typo read
         # as a successful call.
