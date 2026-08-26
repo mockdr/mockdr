@@ -556,6 +556,26 @@ probes:
       query: {status: exploded}
       auth: basic
 
+  - id: es-cat-bytes-raw
+    endpoint: search
+    why: >
+      `bytes=b` asks for the raw count; mockdr wrote a rendered `180kb`
+      whatever was asked, because the row carried a string and not a number.
+    request:
+      method: GET
+      path: /_cat/indices
+      query: {h: "store.size", bytes: b, format: json}
+      auth: basic
+
+  - id: es-cat-bytes-unit
+    endpoint: search
+    why: A unit divides and truncates — 77 kB in megabytes is 0.
+    request:
+      method: GET
+      path: /_cat/indices
+      query: {h: "store.size", bytes: mb, format: json}
+      auth: basic
+
   - id: es-filter-path-keeps-what-it-names
     endpoint: search
     why: A client asking for two members was handed the whole health document.

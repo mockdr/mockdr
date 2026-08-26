@@ -72,13 +72,16 @@ def cat_indices(
     v: str | None = Query(default=None),
     h: str = Query(default=""),
     s: str = Query(default=""),
+    bytes: str = Query(default=""),  # noqa: A002 - ES's own parameter name
     _: dict = Depends(require_es_auth),
 ) -> Response:
     """List indices, as a text table unless the caller asks for json."""
     rows = search_queries.es_cat_indices()
     if pattern and pattern not in ("*", "_all"):
         rows = [r for r in rows if fnmatch(str(r["index"]), pattern)]
-    return _cat_response(rows, format, headers=_flag(v), columns=h, order=s)
+    return _cat_response(
+        rows, format, headers=_flag(v), columns=h, order=s, byte_unit=bytes,
+    )
 
 
 @router.get("/_cat/health")
@@ -152,9 +155,52 @@ def _cat_key(value: object) -> tuple[int, float, str]:
         return (1, 0.0, text)
 
 
+#: The `_cat` columns whose value is a number of bytes, and which the
+#: `bytes` parameter therefore chooses the unit for.
+_BYTE_COLUMNS = frozenset({"store.size", "dataset.size", "pri.store.size"})
+
+#: What each `bytes` value divides by. No value at all means the
+#: human-readable form: `249b`, `77.6kb` (measured on 8.15).
+_BYTE_UNITS = {
+    "b": 1, "k": 1024, "kb": 1024, "m": 1024**2, "mb": 1024**2,
+    "g": 1024**3, "gb": 1024**3, "t": 1024**4, "tb": 1024**4,
+}
+
+
+def _bytes_as(value: object, unit: str) -> str:
+    """One byte count, in the unit the caller asked for.
+
+    Without `bytes`, Elasticsearch writes the human form it writes
+    everywhere — one decimal, lower-case unit, 1024 to the step. With it,
+    the count is divided and truncated, so `bytes=mb` on 77 kB is `0`.
+    """
+    if not isinstance(value, int):
+        return str(value)
+    if unit:
+        return str(value // _BYTE_UNITS.get(unit.lower(), 1))
+    size = float(value)
+    for suffix in ("b", "kb", "mb", "gb", "tb"):
+        if size < 1024 or suffix == "tb":
+            if suffix == "b":
+                return f"{int(size)}b"
+            return _one_decimal(size) + suffix
+        size /= 1024
+    return _one_decimal(size) + "tb"
+
+
+def _one_decimal(size: float) -> str:
+    """One decimal at most, truncated — 79515 bytes is `77.6kb`, not `77.7kb`.
+
+    Measured: Elasticsearch cuts the second decimal rather than rounding it,
+    and writes no decimal at all when it would be a zero.
+    """
+    cut = int(size * 10) / 10
+    return f"{cut:.1f}".removesuffix(".0")
+
+
 def _cat_response(
     rows: list[dict], format: str, *, headers: bool, columns: str,  # noqa: A002
-    order: str = "",
+    order: str = "", byte_unit: str = "",
 ) -> Response:
     """A `_cat` answer, as json or as the text table that is its default.
 
@@ -170,6 +216,13 @@ def _cat_response(
     )
     if order:
         rows = _cat_sorted(rows, order)
+    rows = [
+        {
+            name: _bytes_as(value, byte_unit) if name in _BYTE_COLUMNS else value
+            for name, value in row.items()
+        }
+        for row in rows
+    ]
     if format.lower() == "json":
         return JSONResponse(content=[
             {name: row.get(name, "") for name in names if name in row} for row in rows

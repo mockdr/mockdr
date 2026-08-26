@@ -729,9 +729,16 @@ took all three as decoration:
   `opaque_id` precisely so a request can be found again in a log, and mockdr
   dropped it.
 
-All measured on 8.15, and all three invisible to `param_effect.py`, which
-lists `pretty` and `format` among the parameters that are *structural* and
-exercises neither.
+And a fourth of the same kind: `_cat` takes a `bytes` parameter that chooses
+the unit, and mockdr's rows carried a rendered `180kb` — a string, which can
+only ever answer in one unit. A script reading `bytes=b` to add sizes up got
+text it could not add. The rows carry byte counts now and the unit is chosen
+at render time, in the product's own human form: one decimal at most,
+truncated rather than rounded, and none at all when it would be a zero.
+
+All measured on 8.15, and all four invisible to `param_effect.py`, which
+lists `pretty`, `format` and `bytes` among the parameters that are
+*structural* and exercises none of them.
 
 `?format=yaml` and `Accept: application/yaml` are the one member of the
 family left alone: Elasticsearch answers those in YAML, and rendering YAML

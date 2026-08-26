@@ -3509,3 +3509,52 @@ class TestTheThreeThingsElasticsearchLetsAClientDo:
             **self.ES, "kbn-xsrf": "true"},
             params={"filter_path": "name"}).json()
         assert set(body) != {"name"}
+
+
+class TestCatSizesInTheUnitAsked:
+    """Measured on 8.15.
+
+    `_cat` takes a `bytes` parameter that chooses the unit, and mockdr's rows
+    carried a rendered `180kb` — a string, which can only ever answer in one
+    unit. A script reading `bytes=b` to sum sizes got text it could not add
+    up.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def _size(self, client: TestClient, **params: str) -> str:
+        rows = client.get("/elastic/_cat/indices", headers=self.ES, params={
+            "format": "json", "h": "index,store.size", **params}).json()
+        return str(rows[0]["store.size"])
+
+    def test_without_a_unit_it_is_the_human_form(
+        self, client: TestClient,
+    ) -> None:
+        assert self._size(client).endswith(("b", "kb", "mb", "gb"))
+
+    def test_bytes_b_is_a_number(self, client: TestClient) -> None:
+        assert self._size(client, bytes="b").isdigit()
+
+    def test_a_unit_divides_and_truncates(self, client: TestClient) -> None:
+        raw = int(self._size(client, bytes="b"))
+        assert int(self._size(client, bytes="kb")) == raw // 1024
+        assert int(self._size(client, bytes="mb")) == raw // 1024**2
+
+    @pytest.mark.parametrize(("count", "expected"), [
+        (249, "249b"), (1024, "1kb"), (1536, "1.5kb"),
+        (79515, "77.6kb"), (184320, "180kb"), (1024**3, "1gb"),
+    ])
+    def test_the_human_form_is_the_products_own(
+        self, count: int, expected: str,
+    ) -> None:
+        """One decimal at most, truncated rather than rounded, and none at
+        all when it would be a zero."""
+        from api.routers.es_search import _bytes_as
+
+        assert _bytes_as(count, "") == expected
+
+    def test_the_text_table_uses_the_unit_too(self, client: TestClient) -> None:
+        text = client.get("/elastic/_cat/indices", headers=self.ES,
+                          params={"h": "store.size", "bytes": "b"}).text
+        assert all(line.strip().isdigit() for line in text.splitlines() if line.strip())

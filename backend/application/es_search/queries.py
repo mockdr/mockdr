@@ -872,10 +872,13 @@ def es_cat_indices() -> list[dict]:
             "rep": "1",
             "docs.count": str(len(records)),
             "docs.deleted": "0",
-            "store.size": f"{max(len(records), 1) * 4}kb",
+            # Byte counts, not rendered strings: `_cat` takes a `bytes`
+            # parameter that chooses the unit, and a row that already says
+            # "180kb" can only ever answer in one.
+            "store.size": max(len(records), 1) * 4096,
             # Present on 8.15 beside store.size (measured).
-            "dataset.size": f"{max(len(records), 1) * 4}kb",
-            "pri.store.size": f"{max(len(records), 1) * 4}kb",
+            "dataset.size": max(len(records), 1) * 4096,
+            "pri.store.size": max(len(records), 1) * 4096,
         })
     return rows
 
