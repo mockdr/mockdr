@@ -17,8 +17,10 @@ from __future__ import annotations
 from typing import Any, cast
 
 from fastapi import Depends, Header, HTTPException
+from starlette.requests import Request
 
 from repository.store import store
+from utils.bearer_challenge import bearer_challenge
 from utils.cs_response import build_cs_error_response
 from utils.token_expiry import is_token_expired
 
@@ -31,7 +33,13 @@ _WRITE_ROLES: frozenset[str] = frozenset({"admin", "analyst"})
 
 # ── Public dependencies ──────────────────────────────────────────────────────
 
-async def require_cs_auth(authorization: str = Header(None)) -> dict:
+#: Where this mount issues the tokens it asks for.
+_TOKEN_PATH = "/cs/oauth2/token"
+
+
+async def require_cs_auth(
+    request: Request, authorization: str = Header(None),
+) -> dict:
     """Validate CrowdStrike Bearer token and return the client record.
 
     Extracts the token from the ``Authorization: Bearer <token>`` header,
@@ -39,6 +47,7 @@ async def require_cs_auth(authorization: str = Header(None)) -> dict:
     not expired.
 
     Args:
+        request:       The refused request, for the challenge's own URL.
         authorization: Raw ``Authorization`` header value.
 
     Returns:
@@ -54,6 +63,7 @@ async def require_cs_auth(authorization: str = Header(None)) -> dict:
             detail=build_cs_error_response(
                 401, "access denied, invalid bearer token",
             ),
+            headers=bearer_challenge(request, _TOKEN_PATH),
         )
 
     token = authorization[7:]
@@ -64,6 +74,8 @@ async def require_cs_auth(authorization: str = Header(None)) -> dict:
             detail=build_cs_error_response(
                 401, "access denied, invalid bearer token",
             ),
+            headers=bearer_challenge(
+                request, _TOKEN_PATH, "access denied, invalid bearer token"),
         )
 
     if is_token_expired(record, key="expires_at"):

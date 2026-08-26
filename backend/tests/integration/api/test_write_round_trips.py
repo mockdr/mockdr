@@ -2969,3 +2969,52 @@ class TestSortingByWhatTheVendorDocuments:
         ascending, descending = self._both_ways(
             client, "/web/api/v2.1/threats", "zzz-no-such-field")
         assert ascending == descending
+
+
+class TestARefusedBearerRequestSaysWhereToGetOne:
+    """RFC 6750 §3, which every OAuth mount here ignored.
+
+    A resource server that refuses a Bearer-protected request answers with
+    `WWW-Authenticate`, and the challenge is where a client learns where to
+    get a token — it is how the Microsoft identity libraries discover the
+    authority. All four OAuth mounts answered 401 with a body and no
+    challenge, so a client written against mockdr would be written without
+    the step the real service requires.
+    """
+
+    MOUNTS = [
+        ("/cs/devices/queries/devices/v1", "/cs/oauth2/token"),
+        ("/mde/api/machines", "/mde/oauth2/v2.0/token"),
+        ("/graph/v1.0/users", "/graph/oauth2/v2.0/token"),
+    ]
+
+    @pytest.mark.parametrize(("path", "token_path"), MOUNTS)
+    def test_a_request_with_no_token_is_told_where_to_get_one(
+        self, client: TestClient, path: str, token_path: str,
+    ) -> None:
+        challenge = client.get(path).headers.get("www-authenticate", "")
+        assert challenge.startswith("Bearer ")
+        assert f'authorization_uri="http://testserver{token_path}"' in challenge
+
+    @pytest.mark.parametrize(("path", "token_path"), MOUNTS)
+    def test_nothing_was_wrong_with_a_token_never_sent(
+        self, client: TestClient, path: str, token_path: str,
+    ) -> None:
+        """§3.1: an error code belongs only on a token that was sent."""
+        assert "error=" not in client.get(path).headers.get("www-authenticate", "")
+
+    @pytest.mark.parametrize(("path", "token_path"), MOUNTS)
+    def test_a_token_that_was_refused_says_so(
+        self, client: TestClient, path: str, token_path: str,
+    ) -> None:
+        challenge = client.get(
+            path, headers={"Authorization": "Bearer zzz-no-such-token"},
+        ).headers.get("www-authenticate", "")
+        assert 'error="invalid_token"' in challenge
+        assert "error_description=" in challenge
+
+    def test_the_body_still_says_what_it_said(self, client: TestClient) -> None:
+        """The challenge is additional; a client reading the body is
+        unaffected."""
+        body = client.get("/graph/v1.0/users").json()
+        assert body["error"]["code"] == "InvalidAuthenticationToken"

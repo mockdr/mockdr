@@ -15,6 +15,9 @@ For each collection route the walk asks:
 * does the reported total match what the pages actually held?
 * does paging *terminate*, rather than handing back the same cursor for ever?
 * does the last page say it is the last, rather than pointing past the end?
+* and does all of that still hold when the collection is asked for in the
+  order it publishes — a cursor cut into one order and continued into
+  another loses records without saying so?
 
 Cursors, ``@odata.nextLink``, ``skip``/``offset`` and Splunk's
 ``count``/``offset`` are each walked the way that vendor's clients walk
@@ -191,7 +194,47 @@ _OFFSETS = {"limit": "skip", "$top": "$skip", "count": "offset",
             "page_size": "page"}
 
 
-def walk(url, headers, limiter, offsetter, declared, expected=None):
+#: How each vendor spells "order by this, in this direction". A collection
+#: that pages correctly unsorted can still page wrongly sorted: an offset
+#: cursor cut into one order and continued into another skips records and
+#: repeats others, and only a client that reads to the end finds out.
+_SORTERS = {
+    "sortBy": ("sortOrder", "asc"),
+    "sort_by": ("sort_order", "asc"),
+    "sortField": ("sortOrder", "asc"),
+    "sort_field": ("sort_order", "asc"),
+}
+
+
+def sort_params(declared, items):
+    """Ask this collection for an order, if it publishes one."""
+    name = next((n for n in _SORTERS if n in declared), None)
+    if name is None or not items:
+        return {}
+    partner, ascending = _SORTERS[name]
+    field = next(
+        (f for f in ("createdAt", "created_at", "name", "id")
+         if any(_anywhere(i, f) is not None for i in items)),
+        None,
+    )
+    if field is None:
+        return {}
+    return {name: field, partner: ascending} if partner in declared else {name: field}
+
+
+def _anywhere(item, name):
+    """A field's value on this record, top level or one level in."""
+    if not isinstance(item, dict):
+        return None
+    if name in item:
+        return item[name]
+    for value in item.values():
+        if isinstance(value, dict) and name in value:
+            return value[name]
+    return None
+
+
+def walk(url, headers, limiter, offsetter, declared, expected=None, extra=None):
     """Page through one collection; return the ids seen and any complaint."""
     seen, order = set(), []
     duplicates, pages = [], 0
@@ -204,7 +247,7 @@ def walk(url, headers, limiter, offsetter, declared, expected=None):
     total = None
 
     while pages < _MAX_PAGES:
-        params = {limiter: page_size}
+        params = {limiter: page_size, **(extra or {})}
         if cursor is not None:
             params["cursor"] = cursor
         elif offsetter and pages:
@@ -324,6 +367,28 @@ def main():
             flags.append((
                 mount, path, f"reported total {total}, collection holds {len(expected)}",
             ))
+            continue
+
+        # And again in the order the collection publishes: a cursor cut into
+        # one order and continued into another loses records silently.
+        ordered = sort_params(declared, whole)
+        if not ordered:
+            continue
+        walked += 1
+        order, total, complaint = walk(
+            url, headers, limiter, offsetter, declared,
+            expected=len(whole), extra=ordered,
+        )
+        if complaint in (None, "unpageable"):
+            missing = [key for key in expected if key not in set(order)]
+            if missing:
+                flags.append((
+                    mount, path,
+                    f"sorted by {ordered} paging returned {len(order)} of "
+                    f"{len(expected)}; {len(missing)} never appeared",
+                ))
+        elif complaint:
+            flags.append((mount, path, f"sorted by {ordered}: {complaint}"))
 
     print(f"=== PAGING AUDIT === {walked} collection(s) walked")
     if unpageable:

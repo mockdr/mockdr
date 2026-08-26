@@ -714,6 +714,17 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Four OAuth mounts that refused a request without saying where to get a
+token.** RFC 6750 §3: a resource server that turns down a Bearer-protected
+request answers with `WWW-Authenticate`, and the challenge is where a client
+learns which authority to go to — it is how the Microsoft identity libraries
+discover it at all. CrowdStrike, Defender, Graph and Sentinel each answered
+401 with a body and no challenge, so a client built against mockdr would be
+written without a step the real service requires. Each sends one now,
+pointing at its own token endpoint, and keeps the section's other
+distinction: a request that carried no credentials is not told its token was
+invalid, because nothing was wrong with a token that was never sent.
+
 **Fifteen documented sort fields that ordered nothing.**
 The vendor documents `sortBy=createdAt` for a threat whose record keeps that
 member inside `threatInfo`, and `sortBy=severity` for a cloud alert that

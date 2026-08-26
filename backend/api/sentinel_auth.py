@@ -18,8 +18,10 @@ from datetime import date
 from typing import cast
 
 from fastapi import Header, HTTPException, Query
+from starlette.requests import Request
 
 from repository.store import store
+from utils.bearer_challenge import bearer_challenge
 from utils.sentinel.response import build_arm_error
 
 _SENTINEL_TOKEN_COLLECTION = "sentinel_oauth_tokens"
@@ -61,12 +63,18 @@ def _resolve_token(token: str) -> str | None:
     return cast(str, record["client_id"])
 
 
+#: Where this mount issues the tokens it asks for.
+_TOKEN_PATH = "/sentinel/oauth2/v2.0/token"
+
+
 async def require_sentinel_auth(
+    request: Request,
     authorization: str | None = Header(None),
 ) -> dict:
     """Validate Azure AD Bearer token and return client info.
 
     Args:
+        request:       The refused request, for the challenge's own URL.
         authorization: The Authorization header value.
 
     Returns:
@@ -79,6 +87,7 @@ async def require_sentinel_auth(
         raise HTTPException(
             status_code=401,
             detail=build_arm_error("AuthenticationFailed", "Bearer token required"),
+            headers=bearer_challenge(request, _TOKEN_PATH),
         )
 
     token = authorization[7:]
@@ -87,6 +96,8 @@ async def require_sentinel_auth(
         raise HTTPException(
             status_code=401,
             detail=build_arm_error("AuthenticationFailed", "Invalid or expired token"),
+            headers=bearer_challenge(
+                request, _TOKEN_PATH, "Invalid or expired token"),
         )
 
     return {"client_id": client_id}

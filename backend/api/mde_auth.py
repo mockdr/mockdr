@@ -17,8 +17,10 @@ from __future__ import annotations
 from typing import Any, cast
 
 from fastapi import Depends, Header, HTTPException
+from starlette.requests import Request
 
 from repository.store import store
+from utils.bearer_challenge import bearer_challenge
 from utils.mde_response import build_mde_error_response
 from utils.token_expiry import is_token_expired
 
@@ -31,7 +33,13 @@ _WRITE_ROLES: frozenset[str] = frozenset({"admin", "analyst"})
 
 # ── Public dependencies ──────────────────────────────────────────────────────
 
-async def require_mde_auth(authorization: str = Header(None)) -> dict:
+#: Where this mount issues the tokens it asks for.
+_TOKEN_PATH = "/mde/oauth2/v2.0/token"
+
+
+async def require_mde_auth(
+    request: Request, authorization: str = Header(None),
+) -> dict:
     """Validate MDE Bearer token and return the client record.
 
     Extracts the token from the ``Authorization: Bearer <token>`` header,
@@ -39,6 +47,7 @@ async def require_mde_auth(authorization: str = Header(None)) -> dict:
     not expired.
 
     Args:
+        request:       The refused request, for the challenge's own URL.
         authorization: Raw ``Authorization`` header value.
 
     Returns:
@@ -54,6 +63,7 @@ async def require_mde_auth(authorization: str = Header(None)) -> dict:
             detail=build_mde_error_response(
                 "Unauthorized", "Access token is missing or malformed",
             ),
+            headers=bearer_challenge(request, _TOKEN_PATH),
         )
 
     token = authorization[7:]
@@ -64,6 +74,8 @@ async def require_mde_auth(authorization: str = Header(None)) -> dict:
             detail=build_mde_error_response(
                 "Unauthorized", "Access token is invalid or expired",
             ),
+            headers=bearer_challenge(
+                request, _TOKEN_PATH, "Access token is invalid or expired"),
         )
 
     if is_token_expired(record, key="expires_at"):
@@ -72,6 +84,8 @@ async def require_mde_auth(authorization: str = Header(None)) -> dict:
             detail=build_mde_error_response(
                 "Unauthorized", "Access token has expired",
             ),
+            headers=bearer_challenge(
+                request, _TOKEN_PATH, "Access token has expired"),
         )
 
     return cast(dict[str, Any], record)
