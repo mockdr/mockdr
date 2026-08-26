@@ -225,6 +225,73 @@ def s1_users(check):
 
 # ── CrowdStrike Falcon ──────────────────────────────────────────────────────
 
+@cycle("web", "exclusions")
+def s1_exclusions(check):
+    """The 2.1 API updates an exclusion by body, `data.id` naming it."""
+    existing = find(check.get("/web/api/v2.1/exclusions"), "data", 0)
+    if not existing:
+        return
+    sent = {"id": existing["id"], "osType": existing["osType"],
+            "type": existing["type"], "description": "zzz-audit-exclusion"}
+    answered = find(check.request("PUT", "/web/api/v2.1/exclusions", json={"data": sent}),
+                    "data", 0)
+    check.carries("PUT /exclusions", answered, "description", "zzz-audit-exclusion")
+    check.carries("GET /exclusions after PUT",
+                  find(check.get("/web/api/v2.1/exclusions",
+                                 params={"ids": existing["id"]}), "data", 0),
+                  "description", "zzz-audit-exclusion")
+
+
+@cycle("web", "restrictions")
+def s1_restrictions(check):
+    existing = find(check.get("/web/api/v2.1/restrictions"), "data", 0)
+    if not existing:
+        return
+    sent = {"id": existing["id"], "osType": existing["osType"],
+            "type": existing["type"], "description": "zzz-audit-restriction"}
+    answered = find(check.request("PUT", "/web/api/v2.1/restrictions", json={"data": sent}),
+                    "data", 0)
+    check.carries("PUT /restrictions", answered, "description", "zzz-audit-restriction")
+    entries = find(check.get("/web/api/v2.1/restrictions"), "data") or []
+    after = next((e for e in entries if e["id"] == existing["id"]), None)
+    check.carries("GET /restrictions after PUT", after, "description", "zzz-audit-restriction")
+
+
+@cycle("web", "system-configuration")
+def s1_system_configuration(check):
+    """A console setting is answered back, and read back."""
+    sent = {"advancedMode": True, "accessibleUrl": "https://zzz-audit.example.test"}
+    answered = find(check.request("PUT", "/web/api/v2.1/system/configuration",
+                                  json={"data": sent, "filter": {"tenant": True}}), "data")
+    check.echoes("PUT /system/configuration", sent, answered)
+    check.carries("GET /system/configuration after PUT",
+                  find(check.get("/web/api/v2.1/system/configuration"), "data"),
+                  "accessibleUrl", "https://zzz-audit.example.test")
+
+
+@cycle("web", "tag-manager")
+def s1_tag_manager(check):
+    """Tags are created by body and deleted by filter."""
+    sent = {"key": "zzz-audit", "value": "tag", "type": "agents",
+            "description": "zzz-audit-tag"}
+    created = find(check.request("POST", "/web/api/v2.1/tag-manager",
+                                 json={"data": sent, "filter": {"tenant": True}}), "data")
+    if not created:
+        return
+    check.echoes("POST /tag-manager", sent, created)
+    check.listed("GET /agents/tags", find(check.get("/web/api/v2.1/agents/tags",
+                                                    params={"limit": 1000}), "data"),
+                 "id", created["id"])
+    affected = find(check.request("DELETE", "/web/api/v2.1/tag-manager",
+                                  json={"filter": {"tagIds": [created["id"]]}}),
+                    "data", "affected")
+    if affected != 1:
+        check.fail("DELETE /tag-manager", f"affected {affected!r}, expected 1")
+    check.listed("GET /agents/tags after DELETE",
+                 find(check.get("/web/api/v2.1/agents/tags", params={"limit": 1000}), "data"),
+                 "id", created["id"], present=False)
+
+
 @cycle("cs", "host-groups")
 def cs_host_groups(check):
     sent = {"name": "zzz-audit-hostgroup", "description": "audit",
@@ -324,6 +391,20 @@ def mde_indicators(check):
     check.listed("GET /indicators after DELETE",
                  find(check.get("/mde/api/indicators"), "value"), "id", indicator,
                  present=False)
+
+
+@cycle("mde", "machines")
+def mde_machines(check):
+    """The Defender call that changes a machine, beside the GET that reads it."""
+    machine = find(check.get("/mde/api/machines"), "value", 0)
+    if not machine:
+        return
+    sent = {"machineTags": ["zzz-audit"], "deviceValue": "High"}
+    answered = check.request("PATCH", f"/mde/api/machines/{machine['id']}", json=sent)
+    check.echoes("PATCH /api/machines/{id}", sent, answered)
+    read = check.get(f"/mde/api/machines/{machine['id']}")
+    check.carries("GET /api/machines/{id} after PATCH", read, "deviceValue", "High")
+    check.carries("GET /api/machines/{id} after PATCH", read, "machineTags", ["zzz-audit"])
 
 
 @cycle("mde", "alerts")
