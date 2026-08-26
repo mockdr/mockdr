@@ -217,8 +217,17 @@ class TestDeviceActions:
         )
         return query_resp.json()["resources"][0]
 
-    def test_contain_host(self, client: TestClient) -> None:
-        """Containment action sets status to containment_pending."""
+    def test_contain_host(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Containment action sets status to containment_pending.
+
+        Containment settles a second after it is issued, and a loaded run
+        can spend that second between the two calls below. This test is
+        about what the pending state is called, not about when it ends —
+        `test_lift_containment` beside it holds the clock the same way.
+        """
+        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
         headers = _cs_auth(client)
         host_id = self._get_normal_host_id(client, headers)
 

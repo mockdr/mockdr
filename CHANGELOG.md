@@ -57,6 +57,16 @@ into it.
 
 ### Added
 
+**The same sweep across the other four references, and what Defender hid.**
+`scripts/method_drift.py` now asks the question above of every vendor
+reference this repo carries — SentinelOne, CrowdStrike, Defender, Graph and
+both Cortex documents — over the 209 documented operations whose path this
+mock serves. It found one more: `PATCH /api/machines/{id}`, the Defender call
+that changes a machine, on a path that already served a GET and six action
+routes. It sets `machineTags` and `deviceValue`, refuses a device value MDE
+does not have, and answers the machine back the way the GET beside it renders
+one.
+
 **Six documented calls that answered 405, and what implementing them found.**
 `param_drift.py` compared the parameters of operations both sides describe,
 which meant it could not see an operation only one side has: a method the

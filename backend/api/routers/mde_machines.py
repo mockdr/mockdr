@@ -66,6 +66,32 @@ def get_machine(
     return result
 
 
+@router.patch("/api/machines/{machine_id}")
+def update_machine(
+    machine_id: str,
+    body: dict,
+    _: dict = Depends(require_mde_write),
+) -> dict:
+    """Set a machine's tags or its device value.
+
+    MDE documents this call on the same path the GET above serves; mockdr
+    answered 405 to it while serving the six action routes below.
+    """
+    try:
+        result = machine_commands.update_machine(machine_id, body)
+    except machine_commands.InvalidMachineUpdateError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_mde_error_response("BadRequest", str(exc)),
+        ) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_mde_error_response("ResourceNotFound", f"Machine {machine_id} not found"),
+        )
+    return result
+
+
 # ── Sub-resources ────────────────────────────────────────────────────────────
 
 

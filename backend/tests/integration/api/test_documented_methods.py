@@ -267,3 +267,68 @@ class TestTheConsoleConfigurationIsSettable:
             json={"data": {"advancedMode": True}, "filter": {"tenant": True}},
         )
         assert resp.status_code == 403
+
+
+class TestAMachineIsChangedWhereItIsRead:
+    """`PATCH /api/machines/{id}`, the MDE call beside the GET and the actions.
+
+    The same sweep over the Defender documentation found one method answered
+    405 on a path this mock already serves: the one that changes the machine
+    itself. MDE documents `machineTags` and `deviceValue` on it and answers
+    the updated machine back.
+    """
+
+    @staticmethod
+    def _auth(client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _machine(self, client: TestClient, headers: dict) -> str:
+        return str(client.get("/mde/api/machines", headers=headers).json()["value"][0]["id"])
+
+    def test_the_change_is_there_on_the_next_read(self, client: TestClient) -> None:
+        headers = self._auth(client)
+        machine = self._machine(client, headers)
+        resp = client.patch(
+            f"/mde/api/machines/{machine}",
+            headers=headers,
+            json={"machineTags": ["crown-jewel"], "deviceValue": "High"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["machineTags"] == ["crown-jewel"]
+        assert resp.json()["deviceValue"] == "High"
+
+        after = client.get(f"/mde/api/machines/{machine}", headers=headers).json()
+        assert after["machineTags"] == ["crown-jewel"]
+        assert after["deviceValue"] == "High"
+
+    def test_a_device_value_mde_does_not_have_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        headers = self._auth(client)
+        machine = self._machine(client, headers)
+        resp = client.patch(
+            f"/mde/api/machines/{machine}", headers=headers, json={"deviceValue": "Critical"},
+        )
+        assert resp.status_code == 400
+
+    def test_tags_have_to_be_a_list(self, client: TestClient) -> None:
+        headers = self._auth(client)
+        machine = self._machine(client, headers)
+        resp = client.patch(
+            f"/mde/api/machines/{machine}", headers=headers, json={"machineTags": "one"},
+        )
+        assert resp.status_code == 400
+
+    def test_a_machine_nobody_has_is_a_404(self, client: TestClient) -> None:
+        headers = self._auth(client)
+        resp = client.patch(
+            "/mde/api/machines/00000000-0000-0000-0000-000000000000",
+            headers=headers, json={"deviceValue": "Low"},
+        )
+        assert resp.status_code == 404

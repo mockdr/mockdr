@@ -36,6 +36,9 @@ class MdeMachine:
 
     # ── Tags / Groups ─────────────────────────────────────────────────────────
     machineTags: list[str] = field(default_factory=list)  # noqa: N815
+    # What the device is worth to the organisation, which `PATCH
+    # /api/machines/{id}` sets. MDE has three values and defaults to Normal.
+    deviceValue: str = "Normal"  # noqa: N815 — Normal|Low|High
     rbacGroupId: int = 0  # noqa: N815
     rbacGroupName: str = ""  # noqa: N815
 

@@ -232,3 +232,56 @@ def run_live_response(machine_id: str, body: dict) -> dict | None:
             mde_machine_action_repo.save(stored)
             action["commands"] = commands
     return action
+
+
+class InvalidMachineUpdateError(ValueError):
+    """A machine change MDE would refuse."""
+
+
+#: What MDE says a device is worth. The API refuses anything else.
+DEVICE_VALUES = ("Normal", "Low", "High")
+
+
+def update_machine(machine_id: str, body: dict) -> dict | None:
+    """Set a machine's tags or its device value, and answer the machine back.
+
+    MDE documents `machineTags` and `deviceValue` on this call and answers
+    the updated machine. mockdr served the six action routes under this
+    machine and answered 405 to the one that changes the machine itself.
+
+    Args:
+        machine_id: The GUID of the machine.
+        body: The request body.
+
+    Returns:
+        The updated machine as MDE renders it, or None if there is no such
+        machine.
+
+    Raises:
+        InvalidMachineUpdateError: A member is of the wrong shape, or names a
+            device value MDE does not have.
+    """
+    machine = mde_machine_repo.get(machine_id)
+    if machine is None:
+        return None
+
+    if "machineTags" in body:
+        tags = body["machineTags"]
+        if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+            msg = "machineTags must be a list of strings"
+            raise InvalidMachineUpdateError(msg)
+        machine.machineTags = list(tags)
+
+    if "deviceValue" in body:
+        value = body["deviceValue"]
+        if value not in DEVICE_VALUES:
+            msg = f"deviceValue must be one of {', '.join(DEVICE_VALUES)}"
+            raise InvalidMachineUpdateError(msg)
+        machine.deviceValue = value
+
+    mde_machine_repo.save(machine)
+    _publish_machine_updated(machine)
+    # The same rendering the GET beside it uses, so the two agree.
+    from application.mde_machines.queries import resource  # noqa: PLC0415
+
+    return resource(record_dict(machine))
