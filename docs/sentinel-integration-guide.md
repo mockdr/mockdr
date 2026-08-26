@@ -85,7 +85,14 @@ SecurityIncident | where Status == "New" | take 50
 SecurityAlert | where Severity in ("High", "Medium")
 SecurityIncident | summarize count() by Severity
 SecurityIncident | project Title, Severity, Status | sort by CreatedTime desc
+SentinelOne_CL | summarize max(TimeGenerated)
 ```
+
+The four custom tables the workspace's data connectors advertise —
+`SentinelOne_CL`, `CrowdStrikeFalcon_CL`, `ElasticSecurity_CL`,
+`PaloAltoCortexXDR_CL` — answer the events the same install has ingested
+from those products, each row carrying the `TimeGenerated` a workspace
+orders custom logs by.
 
 ## Example curl Commands
 

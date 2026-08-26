@@ -32,6 +32,8 @@ class KQLQuery:
     take: int = 0
     summarize_func: str = ""
     summarize_by: str = ""
+    #: The field an aggregate without a `by` is taken over.
+    summarize_field: str = ""
     extend_fields: dict[str, str] = field(default_factory=dict)
     ago_filters: list[tuple[str, float]] = field(default_factory=list)  # (field, epoch_threshold)
     raw_query: str = ""
@@ -153,11 +155,24 @@ def _parse_sort(cmd: str, result: KQLQuery) -> None:
 
 
 def _parse_summarize(clause: str, result: KQLQuery) -> None:
-    """Parse summarize clause (only count() by field supported)."""
-    match = re.match(r'count\(\)\s+by\s+(\w+)', clause.strip(), re.IGNORECASE)
-    if match:
+    """Parse a summarize clause.
+
+    `count() by <field>` and `max(<field>)` — the second because every data
+    connector this workspace publishes hands the client
+    `<Table>_CL | summarize max(TimeGenerated)` as the query that tells it
+    when data last arrived, and an unparsed summarize answered the whole
+    table instead of one row.
+    """
+    counted = re.match(r'count\(\)\s+by\s+(\w+)', clause.strip(), re.IGNORECASE)
+    if counted:
         result.summarize_func = "count"
-        result.summarize_by = match.group(1)
+        result.summarize_by = counted.group(1)
+        return
+    aggregated = re.match(
+        r'(max|min)\(\s*(\w+)\s*\)\s*$', clause.strip(), re.IGNORECASE)
+    if aggregated:
+        result.summarize_func = aggregated.group(1).lower()
+        result.summarize_field = aggregated.group(2)
 
 
 def _parse_extend(clause: str, result: KQLQuery) -> None:

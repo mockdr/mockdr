@@ -3874,3 +3874,78 @@ class TestControllingASearchJob:
         assert response.status_code == 400
         assert response.json()["messages"] == [
             {"type": "FATAL", "text": "Unknown action."}]
+
+
+class TestTheConnectorsOwnQueryFindsSomething:
+    """This workspace's data connectors publish four custom tables — and the
+    query a client runs against each of them.
+
+    `dataConnectors` hands out `SentinelOne_CL | summarize max(TimeGenerated)`
+    as the way to ask when data last arrived, and every one of the four
+    tables answered an empty result with no columns at all. A client that
+    read the connector list and ran the query it was given learned that a
+    connector this workspace says is ingesting had ingested nothing. The
+    events were there the whole time: the same install's Splunk store holds
+    them, from the same four products.
+    """
+
+    def _headers(self, client: TestClient) -> dict:
+        token = client.post("/sentinel/oauth2/v2.0/token", data={
+            "client_id": "sentinel-mock-client-id",
+            "client_secret": "sentinel-mock-client-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://management.azure.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _query(self, client: TestClient, kql: str) -> dict:
+        return dict(client.post("/sentinel/v1/workspaces/mockdr-workspace/query",
+                                headers=self._headers(client),
+                                json={"query": kql}).json()["tables"][0])
+
+    def _connector_tables(self, client: TestClient) -> list[str]:
+        base = ("/sentinel/subscriptions/s/resourceGroups/g/providers"
+                "/Microsoft.OperationalInsights/workspaces/w/providers"
+                "/Microsoft.SecurityInsights/dataConnectors")
+        listing = client.get(base, headers=self._headers(client),
+                             params={"api-version": "2024-03-01"}).json()
+        return [
+            data["name"]
+            for connector in listing["value"]
+            for data in (connector["properties"]
+                         .get("connectorUiConfig", {})
+                         .get("dataTypes") or [])
+        ]
+
+    def test_every_table_a_connector_advertises_has_data(
+        self, client: TestClient,
+    ) -> None:
+        tables = self._connector_tables(client)
+        assert tables, "the connectors advertise custom tables"
+        for table in tables:
+            answer = self._query(client, f"{table} | take 3")
+            assert answer["rows"], f"{table} is empty"
+
+    def test_the_query_the_connector_hands_out(
+        self, client: TestClient,
+    ) -> None:
+        answer = self._query(
+            client, "SentinelOne_CL | summarize max(TimeGenerated)")
+        assert [c["name"] for c in answer["columns"]] == ["max_TimeGenerated"]
+        assert answer["rows"][0][0]
+
+    def test_a_row_carries_the_time_a_workspace_orders_by(
+        self, client: TestClient,
+    ) -> None:
+        answer = self._query(client, "CrowdStrikeFalcon_CL | take 1")
+        names = [c["name"] for c in answer["columns"]]
+        assert "TimeGenerated" in names
+        assert "SourceSystem" in names
+
+    def test_each_table_holds_its_own_product(
+        self, client: TestClient,
+    ) -> None:
+        """Not one pool of everything: a connector ingests what it connects."""
+        s1 = self._query(client, "SentinelOne_CL | take 5")
+        column = [c["name"] for c in s1["columns"]].index("SourceSystem")
+        assert all(str(row[column]).startswith("sentinelone:") for row in s1["rows"])

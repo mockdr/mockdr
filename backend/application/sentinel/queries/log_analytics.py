@@ -1,15 +1,32 @@
 """Sentinel Log Analytics KQL query handler."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from domain.sentinel.alert import SentinelAlert
 from domain.sentinel.incident import SentinelIncident
 from repository.sentinel.alert_repo import sentinel_alert_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
+from repository.splunk.splunk_event_repo import splunk_event_repo
 from utils.sentinel.kql_parser import parse_kql
 from utils.sentinel.response import build_log_analytics_response
 
 # Table name → (fetch_fn, column_mapping)
 _TABLE_REGISTRY: dict[str, tuple] = {}
+
+#: The custom tables this workspace's own data connectors advertise, and the
+#: events each one ingests. `dataConnectors` publishes the table name *and*
+#: the query a client runs against it — `SentinelOne_CL | summarize
+#: max(TimeGenerated)` — and every one of them answered an empty table, so a
+#: client that read the connector list and ran the query it was given
+#: learned that a connector this workspace says is ingesting has ingested
+#: nothing.
+_CUSTOM_TABLES: dict[str, tuple[str, ...]] = {
+    "sentinelone_cl": ("sentinelone:",),
+    "crowdstrikefalcon_cl": ("CrowdStrike:",),
+    "elasticsecurity_cl": ("elastic:",),
+    "paloaltocortexxdr_cl": ("pan:xdr:",),
+}
 
 
 def query_logs(kql: str) -> dict:
@@ -42,6 +59,9 @@ def query_logs(kql: str) -> dict:
     # Apply summarize
     if parsed.summarize_func == "count" and parsed.summarize_by:
         return _summarize_count(rows, parsed.summarize_by)
+    if parsed.summarize_func in ("max", "min") and parsed.summarize_field:
+        return _summarize_extreme(
+            rows, parsed.summarize_field, parsed.summarize_func)
 
     # Apply sort
     if parsed.sort_field:
@@ -79,9 +99,36 @@ def _get_table_data(table: str) -> list[dict]:
     if table_lower == "securityalert":
         return [_alert_to_row(a) for a in sentinel_alert_repo.list_all()]
 
-    # Custom log tables (SentinelOne_CL, CrowdStrike_CL, etc.)
-    # Return empty for now — these are populated by the Splunk event store
+    prefixes = _CUSTOM_TABLES.get(table_lower)
+    if prefixes is not None:
+        return [
+            _event_to_row(event)
+            for event in splunk_event_repo.list_all()
+            if event.sourcetype.startswith(prefixes)
+        ]
+
     return []
+
+
+def _event_to_row(event: object) -> dict:
+    """One ingested event as a custom-log row.
+
+    `TimeGenerated` is what every connector's own `lastDataReceivedQuery`
+    summarises, and what a workspace orders its custom logs by; the rest are
+    the fields the event carried in.
+    """
+    generated = datetime.fromtimestamp(
+        getattr(event, "time", 0.0) or 0.0, tz=UTC,
+    ).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    row: dict = {
+        "TimeGenerated": generated,
+        "Computer": str(getattr(event, "host", "")),
+        "SourceSystem": str(getattr(event, "sourcetype", "")),
+    }
+    for name, value in (getattr(event, "fields", {}) or {}).items():
+        if isinstance(value, (str, int, float, bool)):
+            row[str(name)] = value
+    return row
 
 
 def _incident_to_row(inc: SentinelIncident) -> dict:
@@ -163,3 +210,18 @@ def _parse_time(val: object) -> float:
         except (ValueError, TypeError):
             pass
     return 0.0
+
+
+
+def _summarize_extreme(rows: list[dict], field_name: str, func: str) -> dict:
+    """One row: the largest or smallest value of a field.
+
+    Log Analytics names the column after the aggregate — `max_TimeGenerated`
+    — which is what a client reading a connector's `lastDataReceivedQuery`
+    looks for.
+    """
+    values = [str(r.get(field_name, "")) for r in rows if r.get(field_name)]
+    best = (max(values) if func == "max" else min(values)) if values else None
+    return build_log_analytics_response(
+        [{"name": f"{func}_{field_name}", "type": "datetime"}], [[best]],
+    )

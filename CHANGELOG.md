@@ -714,6 +714,23 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Four data connectors that said they were ingesting, into four empty
+tables.** This workspace's `dataConnectors` advertise `SentinelOne_CL`,
+`CrowdStrikeFalcon_CL`, `ElasticSecurity_CL` and `PaloAltoCortexXDR_CL` —
+and hand the client the query to ask each one when data last arrived,
+`<Table> | summarize max(TimeGenerated)`. Every one of the four answered an
+empty result with no columns at all, and the summarize went unparsed, so the
+query a connector publishes about itself returned the whole table. A client
+that read the connector list and ran what it was given learned that a
+connector this install says is ingesting had ingested nothing.
+
+The events were there the whole time: the same install's Splunk store holds
+them, from the same four products, and the code said so — *"these are
+populated by the Splunk event store"* — beside a `return []`. Each table now
+answers the events its own connector ingests, with the `TimeGenerated` a
+workspace orders custom logs by, and `summarize max(...)`/`min(...)` answer
+one row named the way Log Analytics names it.
+
 **Every Splunk job control action answered the same sentence.**
 `Action 'pause' applied to job '<sid>'` — one generic line for all eleven,
 where splunkd says what it did: *Search job paused.*, *continued.*,
