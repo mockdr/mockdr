@@ -27,6 +27,15 @@ Two more differences the probes then showed, both measured:
 * ``count=0`` means "all", and splunkd reports ``perPage: 10000000``, its
   own maximum, not the number of entries that came back.
 
+**How a collection compares, as well as what it compares.**
+``sort_mode`` says whether a value is read as a number or as text: a
+descending *alpha* sort of the event counts 97716, 31270, 5907, 4483 is
+`97716, 5907, 4483, 31270`. mockdr ignored the parameter and always compared
+numerically, so a client asking for one order got the other. ``auto`` and
+``num`` are measured; ``alpha`` against ``alpha_case`` follows Splunk's
+documented meaning, because this install holds no two names differing only
+in case.
+
 **A collection that came back in no order at all.**
 splunkd sorts every ``/services`` collection by ``name`` ascending when the
 request says nothing, and by ``sort_key``/``sort_dir`` when it does. mockdr

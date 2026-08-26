@@ -982,3 +982,52 @@ class TestTheEnvelopeSaysWhereItCameFrom:
         body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
                           params={**JSON_OUT, "count": "3"}).json()
         assert body["paging"]["perPage"] == 3
+
+
+class TestHowACollectionCompares:
+    """``sort_mode``, measured on Splunk 10.4.2.
+
+    A descending *alpha* sort of the event counts 97716, 31270, 5907, 4483
+    is `97716, 5907, 4483, 31270` — the values compared as text. mockdr
+    ignored the parameter and always compared numerically, so a client
+    asking for one order got the other.
+    """
+
+    def _counts(self, client: TestClient, **params: str) -> list[int]:
+        body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "0",
+                                  "sort_key": "totalEventCount", **params}).json()
+        return [e["content"]["totalEventCount"] for e in body["entry"]]
+
+    def test_auto_compares_numbers_as_numbers(self, client: TestClient) -> None:
+        counts = self._counts(client, sort_dir="desc")
+        assert counts == sorted(counts, reverse=True)
+
+    def test_num_does_the_same(self, client: TestClient) -> None:
+        counts = self._counts(client, sort_dir="desc", sort_mode="num")
+        assert counts == sorted(counts, reverse=True)
+
+    def test_alpha_compares_them_as_text(self, client: TestClient) -> None:
+        counts = self._counts(client, sort_dir="desc", sort_mode="alpha")
+        assert counts == sorted(counts, key=str, reverse=True)
+        # And that is a different order, which is the whole point.
+        assert counts != sorted(counts, reverse=True)
+
+    def test_alpha_ignores_case_and_alpha_case_does_not(
+        self, client: TestClient,
+    ) -> None:
+        """Splunk's documented meaning; this install has no pair to measure."""
+        names = [
+            e["name"] for e in
+            client.get("/splunk/services/saved/searches", headers=SPLUNK_AUTH,
+                       params={**JSON_OUT, "count": "0", "sort_key": "name",
+                               "sort_mode": "alpha"}).json()["entry"]
+        ]
+        assert names == sorted(names, key=str.lower)
+        cased = [
+            e["name"] for e in
+            client.get("/splunk/services/saved/searches", headers=SPLUNK_AUTH,
+                       params={**JSON_OUT, "count": "0", "sort_key": "name",
+                               "sort_mode": "alpha_case"}).json()["entry"]
+        ]
+        assert cased == sorted(cased)

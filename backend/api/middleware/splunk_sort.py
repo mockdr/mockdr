@@ -8,9 +8,17 @@ order its store held, and ignored both parameters while declaring them:
 ``sort_dir=desc`` came back identical to ``sort_dir=asc``.
 
 ``sort_key`` names either the entry itself (``name``) or one of its content
-fields (``totalEventCount``), and a numeric field sorts numerically. A key
-nothing carries is not an error — splunkd answers 200 and leaves the order
-alone (measured on 10.4.2, along with everything else here).
+fields (``totalEventCount``). ``sort_mode`` says how to compare: ``auto``,
+the default, reads a value as a number where it is one and as text
+otherwise; ``num`` reads it as a number; ``alpha`` and ``alpha_case`` read
+it as text, so ``97716, 5907, 4483, 31270`` is a descending *alpha* sort of
+those event counts and only ``31270`` is out of numeric place. A key nothing
+carries is not an error — splunkd answers 200 and leaves the order alone.
+
+Measured on 10.4.2, except the difference between ``alpha`` and
+``alpha_case``: this install has no two names differing only in case, so
+that pair follows Splunk's documented meaning — ``alpha`` ignores case and
+``alpha_case`` does not — rather than a measurement.
 
 This runs *inside* the paging middleware, so the collection is ordered
 before it is sliced; sorting a page would order each page separately and
@@ -49,6 +57,7 @@ class SplunkSortMiddleware:
         query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
         key = _first(query, "sort_key") or _DEFAULT_KEY
         descending = (_first(query, "sort_dir") or "asc").lower() == "desc"
+        mode = (_first(query, "sort_mode") or "auto").lower()
 
         def rewrite(payload: object) -> tuple[bytes, str] | None:
             if not isinstance(payload, dict) or not isinstance(payload.get("entry"), list):
@@ -56,7 +65,7 @@ class SplunkSortMiddleware:
             entries = payload["entry"]
             if len(entries) < 2 or not _sortable(entries, key):
                 return None
-            entries.sort(key=_key(key), reverse=descending)
+            entries.sort(key=_key(key, mode), reverse=descending)
             return json.dumps(payload).encode(), "application/json"
 
         await rewrite_json_body(
@@ -90,17 +99,23 @@ def _sortable(entries: list, key: str) -> bool:
     return any(_value(entry, key) is not None for entry in entries)
 
 
-def _key(key: str) -> Callable[[object], tuple[int, float, str]]:
+def _key(key: str, mode: str = "auto") -> Callable[[object], tuple[int, float, str]]:
+    numeric = mode in ("auto", "num")
+    fold = mode != "alpha_case"
+
     def sort_key(entry: object) -> tuple[int, float, str]:
         value = _value(entry, key)
         if value is None:
             return (2, 0.0, "")
-        if isinstance(value, bool):
-            return (0, float(value), "")
-        if isinstance(value, (int, float)):
-            return (0, float(value), "")
-        try:
-            return (0, float(str(value)), "")
-        except ValueError:
-            return (1, 0.0, str(value).lower())
+        if numeric:
+            if isinstance(value, bool):
+                return (0, float(value), "")
+            if isinstance(value, (int, float)):
+                return (0, float(value), "")
+            try:
+                return (0, float(str(value)), "")
+            except ValueError:
+                pass
+        text = str(value)
+        return (1, 0.0, text.lower() if fold else text)
     return sort_key
