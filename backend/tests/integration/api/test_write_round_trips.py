@@ -2800,3 +2800,112 @@ class TestBothSpellingsOfACortexPath:
     def test_the_alias_still_wants_credentials(self, client: TestClient) -> None:
         assert client.post("/xdr/public_api/v1/rbac/get_roles",
                            json={"request_data": {}}).status_code == 401
+
+
+class TestAnActionThatSettles:
+    """Three products, one class of defect: a state that never left `pending`.
+
+    A playbook contains a host, isolates an endpoint, and then waits for the
+    action to finish. Falcon's host stayed `containment_pending` for ever,
+    Kibana's action stayed `pending` with no `completed_at`, and
+    `/api/endpoint/action_status` — which counts what is pending per agent —
+    only ever counted upwards. Each settles now once the sensor has had time
+    to answer, which is also what makes the pending state worth observing.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    def _falcon(self, client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _host_status(self, client: TestClient, headers: dict, host_id: str) -> str:
+        found = client.post("/cs/devices/entities/devices/v2", headers=headers,
+                            json={"ids": [host_id]}).json()
+        return str(found["resources"][0]["status"])
+
+    def _a_normal_host(self, client: TestClient, headers: dict) -> str:
+        ids = client.get("/cs/devices/queries/devices/v1", headers=headers,
+                         params={"limit": 50}).json()["resources"]
+        found = client.post("/cs/devices/entities/devices/v2", headers=headers,
+                            json={"ids": ids}).json()["resources"]
+        return str(next(h["device_id"] for h in found if h["status"] == "normal"))
+
+    def _act(self, client: TestClient, headers: dict, host_id: str, action: str) -> None:
+        client.post("/cs/devices/entities/devices-actions/v2", headers=headers,
+                    params={"action_name": action}, json={"ids": [host_id]})
+
+    def test_containment_settles(self, client: TestClient) -> None:
+        headers = self._falcon(client)
+        host_id = self._a_normal_host(client, headers)
+
+        self._act(client, headers, host_id, "contain")
+        assert self._host_status(client, headers, host_id) == "containment_pending"
+
+        time.sleep(1.2)
+        assert self._host_status(client, headers, host_id) == "contained"
+
+    def test_lifting_containment_settles_too(self, client: TestClient) -> None:
+        headers = self._falcon(client)
+        host_id = self._a_normal_host(client, headers)
+
+        self._act(client, headers, host_id, "contain")
+        self._act(client, headers, host_id, "lift_containment")
+        assert self._host_status(client, headers, host_id) == (
+            "lift_containment_pending")
+
+        time.sleep(1.2)
+        assert self._host_status(client, headers, host_id) == "normal"
+
+    def _agent(self, client: TestClient) -> str:
+        listing = client.get("/kibana/api/endpoint/metadata",
+                             headers=self.KBN).json()
+        return str(listing["data"][0]["metadata"]["agent"]["id"])
+
+    def test_an_isolation_finishes(self, client: TestClient) -> None:
+        agent = self._agent(client)
+        action = client.post("/kibana/api/endpoint/action/isolate",
+                             headers=self.KBN,
+                             json={"endpoint_ids": [agent], "comment": "x"}).json()
+        assert action["status"] == "pending"
+        assert action["completed_at"] is None
+
+        time.sleep(1.2)
+        settled = client.get(f"/kibana/api/endpoint/action/{action['id']}",
+                             headers=self.KBN).json()
+        assert settled["status"] == "successful"
+        assert settled["completed_at"]
+
+    def test_the_status_is_one_kibana_validates(self, client: TestClient) -> None:
+        """Measured on 8.15: `statuses` takes `failed`, `pending` and
+        `successful`, and refuses anything else."""
+        agent = self._agent(client)
+        client.post("/kibana/api/endpoint/action/isolate", headers=self.KBN,
+                    json={"endpoint_ids": [agent], "comment": "x"})
+        time.sleep(1.2)
+        listing = client.get("/kibana/api/endpoint/action", headers=self.KBN).json()
+        assert {a["status"] for a in listing["data"]} <= {
+            "failed", "pending", "successful"}
+
+    def test_what_is_pending_stops_being_pending(
+        self, client: TestClient,
+    ) -> None:
+        """`action_status` counted upwards for ever."""
+        agent = self._agent(client)
+        client.post("/kibana/api/endpoint/action/isolate", headers=self.KBN,
+                    json={"endpoint_ids": [agent], "comment": "x"})
+        pending = client.get("/kibana/api/endpoint/action_status",
+                             headers=self.KBN,
+                             params={"agent_ids": agent}).json()["data"][0]
+        assert pending["pending_actions"].get("isolate", 0) >= 1
+
+        time.sleep(1.2)
+        settled = client.get("/kibana/api/endpoint/action_status",
+                             headers=self.KBN,
+                             params={"agent_ids": agent}).json()["data"][0]
+        assert settled["pending_actions"] == {}

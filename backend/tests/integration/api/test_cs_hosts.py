@@ -237,7 +237,12 @@ class TestDeviceActions:
         assert host["status"] == "containment_pending"
 
     def test_lift_containment(self, client: TestClient) -> None:
-        """Lifting containment sets status back to normal."""
+        """Lifting containment goes through its own pending state.
+
+        Falcon's fleet is seeded with `lift_containment_pending`, and going
+        straight to `normal` skipped a state a client can observe. The state
+        settles once the sensor has acknowledged.
+        """
         headers = _cs_auth(client)
         host_id = self._get_normal_host_id(client, headers)
 
@@ -263,7 +268,8 @@ class TestDeviceActions:
             headers=headers,
             json={"ids": [host_id]},
         )
-        assert entity_resp.json()["resources"][0]["status"] == "normal"
+        assert entity_resp.json()["resources"][0]["status"] == (
+            "lift_containment_pending")
 
     def test_invalid_action_name_returns_400(self, client: TestClient) -> None:
         headers = _cs_auth(client)

@@ -13,6 +13,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from application.es_endpoints import commands as endpoint_commands
+
 SPLUNK_AUTH = {
     "Authorization": "Basic " + base64.b64encode(b"admin:mockdr-admin").decode(),
 }
@@ -165,8 +167,15 @@ class TestEndpointActions:
         listing = client.get("/kibana/api/endpoint/metadata", headers=ES_AUTH).json()
         return str(listing["data"][0]["metadata"]["agent"]["id"])
 
-    def test_pending_actions_name_the_action(self, client: TestClient) -> None:
+    def test_pending_actions_name_the_action(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Everything pending was filed under `isolate`, whatever it was."""
+        # An action settles a second after it is issued, and a loaded test
+        # run can spend that second between the two calls below. This test
+        # is about what a pending action is called, not about when it stops
+        # being one.
+        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
         agent = self._agent(client)
         client.post(
             "/kibana/api/endpoint/kill_process", headers=ES_AUTH,

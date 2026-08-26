@@ -35,7 +35,10 @@ def contain_host(ids: list[str]) -> dict:
 def lift_containment(ids: list[str]) -> dict:
     """Lift network containment from one or more hosts.
 
-    Sets ``status`` back to ``"normal"`` for each matched host.
+    Sets ``status`` to ``"lift_containment_pending"``, which settles to
+    ``"normal"`` once the sensor has acknowledged — the same way containment
+    settles, and the state the fleet is seeded with. Going straight to
+    ``normal`` skipped a state a client can legitimately observe.
 
     Args:
         ids: List of device IDs to lift containment from.
@@ -48,7 +51,7 @@ def lift_containment(ids: list[str]) -> dict:
         host = cs_host_repo.get(device_id)
         if not host:
             continue
-        host.status = "normal"
+        host.status = "lift_containment_pending"
         host.modified_timestamp = utc_now()
         cs_host_repo.save(host)
         affected.append({"id": host.device_id})

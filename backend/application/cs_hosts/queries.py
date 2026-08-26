@@ -9,6 +9,7 @@ from utils.cs_response import (
     build_cs_id_response,
     build_cs_list_response,
 )
+from utils.dt import seconds_since
 from utils.internal_fields import CS_HOST_INTERNAL_FIELDS
 from utils.nested import get_nested
 from utils.serde import record_dict
@@ -25,9 +26,37 @@ def _visible_hosts(*, hidden: bool = False) -> list:
     return [h for h in cs_host_repo.list_all() if bool(getattr(h, "hidden", False)) is hidden]
 
 
+#: What a pending state settles into once the sensor has acknowledged it.
+#: Without this a contained host stayed `containment_pending` for ever, so a
+#: playbook that contains a host and polls until `contained` never finished —
+#: and `lift_containment` skipped its own pending state entirely, which the
+#: fleet is seeded with.
+_SETTLES_INTO = {
+    "containment_pending": "contained",
+    "lift_containment_pending": "normal",
+}
+
+#: How long the sensor takes to acknowledge, so a client that polls twice
+#: sees the state move rather than finding it already done.
+_SETTLE_SECONDS = 1.0
+
+
+def _settled(host: object) -> object:
+    """Move a host out of a pending containment state once the wait is over."""
+    settled = _SETTLES_INTO.get(str(getattr(host, "status", "")))
+    if settled is None:
+        return host
+    waited = seconds_since(str(getattr(host, "modified_timestamp", "") or ""))
+    if waited is None or waited <= _SETTLE_SECONDS:
+        return host
+    host.status = settled  # type: ignore[attr-defined]
+    cs_host_repo.save(host)  # type: ignore[arg-type]
+    return host
+
+
 def _public(host: object) -> dict:
     """One host as Falcon serves it, without mockdr's own bookkeeping."""
-    return strip_fields(record_dict(host), CS_HOST_INTERNAL_FIELDS)
+    return strip_fields(record_dict(_settled(host)), CS_HOST_INTERNAL_FIELDS)
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:

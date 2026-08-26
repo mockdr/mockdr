@@ -6,7 +6,7 @@ import uuid
 from domain.es_action_response import EsActionResponse
 from repository.es_action_response_repo import es_action_response_repo
 from repository.es_endpoint_repo import es_endpoint_repo
-from utils.dt import utc_now
+from utils.dt import seconds_since, utc_now
 from utils.serde import record_dict
 
 
@@ -115,6 +115,35 @@ def scan_endpoint(agent_id: str, comment: str = "") -> dict | None:
     return _create_action(agent_id, "scan", comment)
 
 
+#: How long the endpoint takes to answer, so a client that polls twice sees
+#: the action move rather than finding it already done.
+_SETTLE_SECONDS = 1.0
+
+#: What a pending action settles into. `failed | pending | successful` is the
+#: vocabulary Kibana validates `statuses` against — measured on 8.15, which
+#: refuses anything else and lets these three through.
+_SETTLED_STATUS = "successful"
+
+
+def _settled(action: EsActionResponse) -> EsActionResponse:
+    """Complete an action once the endpoint has had time to answer.
+
+    Nothing ever left `pending`, so a playbook that isolated an endpoint and
+    waited for the action to finish waited for ever — and
+    `/api/endpoint/action_status`, which counts what is pending per agent,
+    only ever counted upwards.
+    """
+    if action.status != "pending":
+        return action
+    waited = seconds_since(action.started_at)
+    if waited is None or waited <= _SETTLE_SECONDS:
+        return action
+    action.status = _SETTLED_STATUS
+    action.completed_at = utc_now()
+    es_action_response_repo.save(action)
+    return action
+
+
 def list_actions(agent_id: str | None = None) -> list[dict]:
     """List action responses, optionally filtered by agent ID.
 
@@ -128,7 +157,7 @@ def list_actions(agent_id: str | None = None) -> list[dict]:
         actions = es_action_response_repo.get_by_agent_id(agent_id)
     else:
         actions = es_action_response_repo.list_all()
-    return [record_dict(a) for a in actions]
+    return [record_dict(_settled(a)) for a in actions]
 
 
 def get_action(action_id: str) -> dict | None:
@@ -143,4 +172,4 @@ def get_action(action_id: str) -> dict | None:
     action = es_action_response_repo.get(action_id)
     if not action:
         return None
-    return record_dict(action)
+    return record_dict(_settled(action))

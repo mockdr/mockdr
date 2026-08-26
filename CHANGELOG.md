@@ -714,6 +714,23 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Three states that never left `pending`.**
+A playbook contains a host, isolates an endpoint, and then waits for the
+action to finish. Falcon's host stayed `containment_pending` for ever,
+Kibana's endpoint action stayed `pending` with no `completed_at`, and
+`/api/endpoint/action_status` — which counts what is pending per agent —
+only ever counted upwards. Each settles a second after it is issued now,
+which is also what makes the pending state worth observing: a client that
+polls twice sees the state move rather than finding it already done.
+
+`lift_containment` went straight to `normal`, skipping the
+`lift_containment_pending` the fleet is seeded with; it goes through it now,
+the same way containment does. Kibana's settled status is `successful`,
+measured on 8.15: `statuses` there takes `failed`, `pending` and
+`successful`, and refuses anything else — which is how the vocabulary was
+established without the licence that would have let the actions themselves
+be called.
+
 **A Cortex action a playbook could poll for ever.**
 `get_action_status` answers `data` as a map from endpoint id to status —
 which is exactly what a playbook waits on: it isolates an endpoint and polls
