@@ -742,3 +742,76 @@ class TestGraphAlertEvidenceIsGraphsOwnShape:
             assert item["deviceDnsName"] == machine["computerDnsName"]
             assert item["osPlatform"] == machine["osPlatform"]
             assert item["lastIpAddress"] == machine["lastIpAddress"]
+
+
+class TestAnEnumSortsByItsDeclaredOrder:
+    """OData orders an enum by where the member sits, not by its spelling.
+
+    A triage client asks for the worst alerts first. Sorted as text, the mock
+    answered `medium` at the top of a descending severity sort where both
+    products answer `high` — and there is nothing in the reply to tell the
+    client it worked on the wrong ones.
+
+    The orders come from what is vendored: Graph's from the CSDL, Defender's
+    from its docs' properties tables.
+    """
+
+    def _graph(self, client: TestClient) -> dict:
+        token = client.post("/graph/oauth2/v2.0/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "scope": "https://graph.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _mde(self, client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _runs(values: list[str]) -> list[str]:
+        out: list[str] = []
+        for value in values:
+            if not out or out[-1] != value:
+                out.append(value)
+        return out
+
+    def test_graph_alerts_descend_from_high(self, client: TestClient) -> None:
+        values = [
+            a["severity"] for a in
+            client.get("/graph/v1.0/security/alerts_v2", headers=self._graph(client),
+                       params={"$top": 200, "$orderby": "severity desc"}).json()["value"]
+        ]
+        assert self._runs(values) == ["high", "medium", "low", "informational"]
+
+    def test_graph_alerts_ascend_to_high(self, client: TestClient) -> None:
+        values = [
+            a["severity"] for a in
+            client.get("/graph/v1.0/security/alerts_v2", headers=self._graph(client),
+                       params={"$top": 200, "$orderby": "severity asc"}).json()["value"]
+        ]
+        assert self._runs(values) == ["informational", "low", "medium", "high"]
+
+    def test_defender_alerts_descend_from_high(self, client: TestClient) -> None:
+        values = [
+            a["severity"] for a in
+            client.get("/mde/api/alerts", headers=self._mde(client),
+                       params={"$top": 200, "$orderby": "severity desc"}).json()["value"]
+        ]
+        assert self._runs(values) == ["High", "Medium", "Low", "Informational"]
+
+    def test_a_field_that_is_not_an_enum_still_sorts_as_before(
+        self, client: TestClient,
+    ) -> None:
+        values = [
+            m["computerDnsName"] for m in
+            client.get("/mde/api/machines", headers=self._mde(client),
+                       params={"$top": 50, "$orderby": "computerDnsName asc"}).json()["value"]
+        ]
+        assert values == sorted(values)

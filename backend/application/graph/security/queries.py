@@ -16,6 +16,7 @@ from utils.graph_odata import (
 )
 from utils.graph_response import build_graph_list_response
 from utils.serde import record_dict
+from utils.vendor_enums import graph_enum_order
 
 # ── Alerts v2 ─────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ def list_alerts_v2(
     # `$orderby` and `$select` were taken and dropped: a client that asked for
     # newest-first got insertion order, and one that asked for two fields got
     # the whole alert — believing both times that the query had been applied.
-    records = apply_odata_orderby(records, orderby)
+    records = apply_odata_orderby(records, orderby, graph_enum_order())
 
     total = len(records)
     page = apply_odata_select(records[skip : skip + top], select)
@@ -133,7 +134,7 @@ def list_incidents(
             rec["alerts"] = _expand_alerts(rec.get("alert_ids", []))
         rec.pop("alert_ids", None)
 
-    records = apply_odata_orderby(records, orderby)
+    records = apply_odata_orderby(records, orderby, graph_enum_order())
     total = len(records)
     page = apply_odata_select(records[skip : skip + top], select)
     next_link = (

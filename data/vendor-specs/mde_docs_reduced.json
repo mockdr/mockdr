@@ -1544,5 +1544,122 @@
    "CveSupportability",
    "EPSS"
   ]
+ },
+ "enums": {
+  "alerts": {
+   "investigationState": [
+    "Unknown",
+    "Terminated",
+    "SuccessfullyRemediated",
+    "Benign",
+    "Failed",
+    "PartiallyRemediated",
+    "Running",
+    "PendingApproval",
+    "PendingResource",
+    "PartiallyInvestigated",
+    "TerminatedByUser",
+    "TerminatedBySystem",
+    "Queued",
+    "InnerFailure",
+    "PreexistingAlert",
+    "UnsupportedOs",
+    "UnsupportedAlertType",
+    "SuppressedAlert"
+   ],
+   "severity": [
+    "UnSpecified",
+    "Informational",
+    "Low",
+    "Medium",
+    "High"
+   ],
+   "status": [
+    "Unknown",
+    "New",
+    "InProgress",
+    "Resolved"
+   ],
+   "classification": [
+    "TruePositive",
+    "Informational, expected activity",
+    "FalsePositive"
+   ]
+  },
+  "machine": {
+   "healthStatus": [
+    "Active",
+    "Inactive",
+    "ImpairedCommunication",
+    "NoSensorData",
+    "NoSensorDataImpairedCommunication",
+    "Unknown"
+   ],
+   "riskScore": [
+    "None",
+    "Informational",
+    "Low",
+    "Medium",
+    "High"
+   ],
+   "exposureLevel": [
+    "None",
+    "Low",
+    "Medium",
+    "High"
+   ],
+   "deviceValue": [
+    "Normal",
+    "Low",
+    "High"
+   ]
+  },
+  "machineaction": {
+   "type": [
+    "RunAntiVirusScan",
+    "Offboard",
+    "LiveResponse",
+    "CollectInvestigationPackage",
+    "Isolate",
+    "Unisolate",
+    "StopAndQuarantineFile",
+    "RestrictCodeExecution",
+    "UnrestrictCodeExecution"
+   ],
+   "status": [
+    "Pending",
+    "InProgress",
+    "Succeeded",
+    "Failed",
+    "TimeOut",
+    "Cancelled"
+   ]
+  },
+  "ti-indicator": {
+   "indicatorType": [
+    "FileSha1",
+    "FileSha256",
+    "FileMd5",
+    "CertificateThumbprint",
+    "IpAddress",
+    "DomainName",
+    "Url"
+   ],
+   "action": [
+    "Warn",
+    "Block",
+    "Audit",
+    "Alert",
+    "AlertAndBlock",
+    "BlockAndRemediate",
+    "Allowed"
+   ],
+   "severity": [
+    "Informational",
+    "Low",
+    "Medium",
+    "High"
+   ]
+  }
  }
 }

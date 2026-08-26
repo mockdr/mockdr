@@ -35,7 +35,7 @@ into `data/vendor-specs/` (sources and licences: `data/vendor-specs/NOTICE.md`).
 | `gofalcon_spec.py` | `CrowdStrike/gofalcon` clone | `crowdstrike_gofalcon_reduced.json` (200 payloads *and* request bodies) |
 | `graph_csdl_spec.py` | a Microsoft Graph CSDL (`microsoftgraph/msgraph-metadata`) | `graph_<version>_csdl_types.json` (type → properties) |
 | `cs_event_streams_spec.py` | `elastic/integrations` clone (pipeline test logs) | `cs_event_streams_reduced.json` (key names only) |
-| `mde_docs_spec.py` | `MicrosoftDocs/defender-docs` clone | `mde_docs_reduced.json` |
+| `mde_docs_spec.py` | `MicrosoftDocs/defender-docs` clone | `mde_docs_reduced.json` (route → key paths, entity properties, and each enum's members *in declared order*) |
 | `xsoar_samples_spec.py` | `data/vendor-specs/xsoar-samples/` | `xdr_samples_reduced.json`, `xdr_core_samples_reduced.json`, `mde_samples_reduced.json` |
 | `cortex_alerts_spec.py` | `elastic/integrations` (downloaded) | `xdr_alerts_multi_events_reduced.json` (key paths only) |
 | `cortex_openapi_spec.py` | community Cortex XDR OpenAPI clone | `xdr_openapi_reduced.json` (key paths only) |

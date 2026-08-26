@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Sorting by severity put the wrong alerts on top.**
+OData orders an enum-typed field by where the member sits in the declared
+list, not by how it is spelled. Sorted as text, `$orderby=severity desc`
+answered `medium` at the top where Graph and Defender both answer `high` —
+so a triage client asking for the worst alerts first worked on the wrong
+ones, with a 200 and nothing in the reply to say so. Ascending was wrong the
+same way, starting at `high`.
+
+The declared orders are read from what is vendored rather than written by
+hand: Graph's from the CSDL, and Defender's from its docs' properties
+tables, which spell the members out in order —
+`scripts/mde_docs_spec.py` now captures those. A value outside the declared
+list sorts after every declared one, which is where an unrecognised member
+belongs, and a field that is not an enum sorts exactly as before.
+
 **A comparator that stopped looking one level down.**
 The Graph evidence above was wrong for as long as it was, and
 `schema_drift.py graph` reported no drift the whole time, because the

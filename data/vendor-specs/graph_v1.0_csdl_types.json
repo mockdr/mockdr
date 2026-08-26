@@ -1,4 +1,95 @@
 {
+ "microsoft.graph.entity": {
+  "kind": "EntityType",
+  "namespace": "microsoft.graph",
+  "properties": {
+   "id": "Edm.String"
+  }
+ },
+ "microsoft.graph.security.alert": {
+  "base": "microsoft.graph.entity",
+  "kind": "EntityType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "actorDisplayName": "Edm.String",
+   "additionalData": "self.dictionary",
+   "alertPolicyId": "Edm.String",
+   "alertWebUrl": "Edm.String",
+   "assignedTo": "Edm.String",
+   "categories": "Collection(Edm.String)",
+   "category": "Edm.String",
+   "classification": "self.alertClassification",
+   "comments": "Collection(self.alertComment)",
+   "createdDateTime": "Edm.DateTimeOffset",
+   "customDetails": "self.dictionary",
+   "description": "Edm.String",
+   "detectionSource": "self.detectionSource",
+   "detectorId": "Edm.String",
+   "determination": "self.alertDetermination",
+   "evidence": "Collection(self.alertEvidence)",
+   "firstActivityDateTime": "Edm.DateTimeOffset",
+   "incidentId": "Edm.String",
+   "incidentWebUrl": "Edm.String",
+   "investigationState": "self.investigationState",
+   "lastActivityDateTime": "Edm.DateTimeOffset",
+   "lastUpdateDateTime": "Edm.DateTimeOffset",
+   "mitreTechniques": "Collection(Edm.String)",
+   "productName": "Edm.String",
+   "providerAlertId": "Edm.String",
+   "recommendedActions": "Edm.String",
+   "resolvedDateTime": "Edm.DateTimeOffset",
+   "serviceSource": "self.serviceSource",
+   "severity": "self.alertSeverity",
+   "status": "self.alertStatus",
+   "systemTags": "Collection(Edm.String)",
+   "tenantId": "Edm.String",
+   "threatDisplayName": "Edm.String",
+   "threatFamilyName": "Edm.String",
+   "title": "Edm.String"
+  }
+ },
+ "microsoft.graph.security.alertClassification": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "falsePositive",
+   "truePositive",
+   "informationalExpectedActivity",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.alertComment": {
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "comment": "Edm.String",
+   "createdByDisplayName": "Edm.String",
+   "createdDateTime": "Edm.DateTimeOffset"
+  }
+ },
+ "microsoft.graph.security.alertDetermination": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "apt",
+   "malware",
+   "securityPersonnel",
+   "securityTesting",
+   "unwantedSoftware",
+   "other",
+   "multiStagedAttack",
+   "compromisedAccount",
+   "phishing",
+   "maliciousUserActivity",
+   "notMalicious",
+   "notEnoughDataToValidate",
+   "confirmedActivity",
+   "lineOfBusinessApplication",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
  "microsoft.graph.security.alertEvidence": {
   "kind": "ComplexType",
   "namespace": "microsoft.graph.security",
@@ -12,6 +103,29 @@
    "verdict": "self.evidenceVerdict"
   }
  },
+ "microsoft.graph.security.alertSeverity": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "informational",
+   "low",
+   "medium",
+   "high",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.alertStatus": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "new",
+   "inProgress",
+   "resolved",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
  "microsoft.graph.security.defenderAvStatus": {
   "kind": "EnumType",
   "members": [
@@ -22,6 +136,51 @@
    "unknown",
    "notSupported",
    "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.detectionSource": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "microsoftDefenderForEndpoint",
+   "antivirus",
+   "smartScreen",
+   "customTi",
+   "microsoftDefenderForOffice365",
+   "automatedInvestigation",
+   "microsoftThreatExperts",
+   "customDetection",
+   "microsoftDefenderForIdentity",
+   "cloudAppSecurity",
+   "microsoft365Defender",
+   "azureAdIdentityProtection",
+   "manual",
+   "microsoftDataLossPrevention",
+   "appGovernancePolicy",
+   "appGovernanceDetection",
+   "unknownFutureValue",
+   "microsoftDefenderForCloud",
+   "microsoftDefenderForIoT",
+   "microsoftDefenderForServers",
+   "microsoftDefenderForStorage",
+   "microsoftDefenderForDNS",
+   "microsoftDefenderForDatabases",
+   "microsoftDefenderForContainers",
+   "microsoftDefenderForNetwork",
+   "microsoftDefenderForAppService",
+   "microsoftDefenderForKeyVault",
+   "microsoftDefenderForResourceManager",
+   "microsoftDefenderForApiManagement",
+   "nrtAlerts",
+   "scheduledAlerts",
+   "microsoftDefenderThreatIntelligenceAnalytics",
+   "builtInMl",
+   "microsoftInsiderRiskManagement",
+   "microsoftThreatIntelligence",
+   "microsoftDefenderForAIServices",
+   "securityCopilot",
+   "microsoftSentinel"
   ],
   "namespace": "microsoft.graph.security"
  },
@@ -79,6 +238,12 @@
   ],
   "namespace": "microsoft.graph.security"
  },
+ "microsoft.graph.security.dictionary": {
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "open": true,
+  "properties": {}
+ },
  "microsoft.graph.security.evidenceRemediationStatus": {
   "kind": "EnumType",
   "members": [
@@ -130,6 +295,70 @@
   ],
   "namespace": "microsoft.graph.security"
  },
+ "microsoft.graph.security.incident": {
+  "base": "microsoft.graph.entity",
+  "kind": "EntityType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "alerts": "Collection(self.alert)",
+   "assignedTo": "Edm.String",
+   "classification": "self.alertClassification",
+   "comments": "Collection(self.alertComment)",
+   "createdDateTime": "Edm.DateTimeOffset",
+   "customTags": "Collection(Edm.String)",
+   "description": "Edm.String",
+   "determination": "self.alertDetermination",
+   "displayName": "Edm.String",
+   "incidentWebUrl": "Edm.String",
+   "lastModifiedBy": "Edm.String",
+   "lastUpdateDateTime": "Edm.DateTimeOffset",
+   "priorityScore": "Edm.Int32",
+   "redirectIncidentId": "Edm.String",
+   "resolvingComment": "Edm.String",
+   "severity": "self.alertSeverity",
+   "status": "self.incidentStatus",
+   "summary": "Edm.String",
+   "systemTags": "Collection(Edm.String)",
+   "tenantId": "Edm.String"
+  }
+ },
+ "microsoft.graph.security.incidentStatus": {
+  "kind": "EnumType",
+  "members": [
+   "active",
+   "resolved",
+   "inProgress",
+   "redirected",
+   "unknownFutureValue",
+   "awaitingAction"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.investigationState": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "terminated",
+   "successfullyRemediated",
+   "benign",
+   "failed",
+   "partiallyRemediated",
+   "running",
+   "pendingApproval",
+   "pendingResource",
+   "queued",
+   "innerFailure",
+   "preexistingAlert",
+   "unsupportedOs",
+   "unsupportedAlertType",
+   "suppressedAlert",
+   "partiallyInvestigated",
+   "terminatedByUser",
+   "terminatedBySystem",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
  "microsoft.graph.security.loggedOnUser": {
   "kind": "ComplexType",
   "namespace": "microsoft.graph.security",
@@ -158,6 +387,27 @@
    "ipAddress": "Edm.String",
    "resourceIdentifier": "Edm.String"
   }
+ },
+ "microsoft.graph.security.serviceSource": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "microsoftDefenderForEndpoint",
+   "microsoftDefenderForIdentity",
+   "microsoftDefenderForCloudApps",
+   "microsoftDefenderForOffice365",
+   "microsoft365Defender",
+   "azureAdIdentityProtection",
+   "microsoftAppGovernance",
+   "dataLossPrevention",
+   "unknownFutureValue",
+   "microsoftDefenderForCloud",
+   "microsoftSentinel",
+   "microsoftInsiderRiskManagement",
+   "microsoftThreatIntelligence",
+   "microsoftSecurityForAI"
+  ],
+  "namespace": "microsoft.graph.security"
  },
  "microsoft.graph.security.vmCloudProvider": {
   "kind": "EnumType",

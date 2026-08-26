@@ -21,7 +21,7 @@ would widen the filter and hand back more records than were asked for.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -552,12 +552,22 @@ def apply_odata_filter(records: list[dict], filter_str: str) -> list[dict]:
     return [record for record in records if _match_node(record, root)]
 
 
-def apply_odata_orderby(records: list[dict], orderby: str | None) -> list[dict]:
+def apply_odata_orderby(
+    records: list[dict],
+    orderby: str | None,
+    enums: Mapping[str, Sequence[str]] | None = None,
+) -> list[dict]:
     """Sort records according to an OData ``$orderby`` expression.
 
     Args:
         records: List of dicts to sort.
         orderby: OData orderby string, e.g. ``"alertCreationTime desc"``.
+        enums:   Field name -> that field's members in the order the vendor
+                 declares them. OData orders an enum by its declared position
+                 and not alphabetically, so without this
+                 ``$orderby=severity desc`` answers `Medium` first where the
+                 product answers `High` — a triage client asking for the worst
+                 alerts got the wrong ones, with a 200.
 
     Returns:
         Sorted list.
@@ -573,16 +583,28 @@ def apply_odata_orderby(records: list[dict], orderby: str | None) -> list[dict]:
         parts = clause.split()
         field_name = parts[0]
         desc = len(parts) > 1 and parts[1].lower() == "desc"
-        ordered.sort(key=_orderby_key(field_name), reverse=desc)
+        members = (enums or {}).get(field_name.rsplit("/", 1)[-1])
+        ordered.sort(key=_orderby_key(field_name, members), reverse=desc)
     return ordered
 
 
-def _orderby_key(field_name: str) -> Callable[[dict], tuple[int, float, str]]:
-    """Build a sort key that reads dotted paths and orders numbers numerically."""
+def _orderby_key(
+    field_name: str, members: Sequence[str] | None = None,
+) -> Callable[[dict], tuple[int, float, str]]:
+    """Build a sort key that reads dotted paths and orders numbers numerically.
+
+    An enum-typed field is ordered by where its value sits in the declared
+    list; a value outside it sorts after every declared one, which is where
+    an unrecognised member belongs.
+    """
+    positions = {member: index for index, member in enumerate(members or [])}
+
     def key(record: dict) -> tuple[int, float, str]:
         value = _get_nested(record, field_name)
         if value is None or value == "":
             return (2, 0.0, "")
+        if positions:
+            return (0, float(positions.get(str(value), len(positions))), "")
         try:
             return (0, float(value), "")
         except (TypeError, ValueError):

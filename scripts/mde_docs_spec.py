@@ -9,7 +9,13 @@ This walks them and writes ``data/vendor-specs/mde_docs_reduced.json``:
 
     {"routes": {"GET /api/alerts": {"page": "get-alerts.md",
                  "paths": ["value", "value[*].id", ...]}},
-     "entities": {"alerts": ["id", "title", ...]}}
+     "entities": {"alerts": ["id", "title", ...]},
+     "enums": {"alerts": {"severity": ["UnSpecified", "Informational", ...]}}}
+
+The enums matter for more than validation: OData orders an enum-typed field
+by its *declared* position, not alphabetically, so `$orderby=severity desc`
+puts High first and not Medium. Reading the order out of the docs is what
+lets the mock sort the way the product does.
 
     git clone --depth 1 --filter=blob:none --sparse \\
         https://github.com/MicrosoftDocs/defender-docs /tmp/defender-docs
@@ -35,6 +41,10 @@ _VERB = re.compile(
 # Fences vary: ```json, ```JSON, or bare ``` in a response section.
 _JSON_BLOCK = re.compile(r"```(?:json|JSON|http|HTTP)?[^\n]*\n(.*?)```", re.S)
 _PROPS = re.compile(r"## Properties[^\n]*\n\s*(\|.*?)(?:\n\n|\n##|\Z)", re.S)
+#: "Possible values are: *UnSpecified*, *Informational*, … and *High*." The
+#: members are emphasised or code-quoted, and the order is the declared one.
+_POSSIBLE = re.compile(r"[Pp]ossible values are:?\s*(.+?)(?:\.\s*$|\.\||$)", re.S)
+_MEMBER = re.compile(r"[*`]([A-Za-z][\w ,]*?)[*`]")
 
 
 def observed(value, prefix: str = "", depth: int = 0) -> set[str]:
@@ -119,21 +129,39 @@ def _route(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "{id}", path)
 
 
+def _members(cell: str) -> list[str]:
+    """The enum members a properties-table cell lists, in declared order."""
+    found = _POSSIBLE.search(cell)
+    if not found:
+        return []
+    members = [m.strip() for m in _MEMBER.findall(found.group(1))]
+    # "and *High*" leaves an empty capture, and a member is never blank.
+    return [m for m in members if m]
+
+
 def main(repo: Path) -> int:
     pages = sorted((repo / "defender-endpoint" / "api").glob("*.md"))
     routes: dict[str, dict] = {}
     entities: dict[str, list[str]] = {}
+    enums: dict[str, dict[str, list[str]]] = {}
     for page in pages:
         text = page.read_text(encoding="utf-8", errors="replace")
         props = _PROPS.search(text)
         if props:
             names = []
+            page_enums: dict[str, list[str]] = {}
             for line in props.group(1).splitlines()[2:]:
                 cells = [c.strip() for c in line.strip("|").split("|")]
                 if cells and cells[0] and not cells[0].startswith("-"):
-                    names.append(cells[0].strip("`* "))
+                    name = cells[0].strip("`* ")
+                    names.append(name)
+                    members = _members(cells[2] if len(cells) > 2 else "")
+                    if members and "num" in (cells[1] if len(cells) > 1 else ""):
+                        page_enums[name] = members
             if names:
                 entities[page.stem] = names
+            if page_enums:
+                enums[page.stem] = page_enums
         req = _REQUEST.search(text)
         # A few pages (the assessment exports) have no "## HTTP request"
         # section: their request lines sit in fences under numbered headings.
@@ -169,6 +197,7 @@ def main(repo: Path) -> int:
             k: {"page": v["page"], "paths": sorted(v["paths"])} for k, v in sorted(routes.items())
         },
         "entities": entities,
+        "enums": enums,
     }
     OUT.write_text(json.dumps(reduced, indent=1) + "\n")
     with_shape = sum(1 for v in routes.values() if v["paths"])

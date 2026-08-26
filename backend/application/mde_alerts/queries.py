@@ -8,6 +8,7 @@ from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
 from utils.serde import record_dict
+from utils.vendor_enums import mde_enum_order
 
 
 def resource(record: dict) -> dict:
@@ -49,7 +50,7 @@ def list_alerts(
     records = [_renamed(record_dict(a)) for a in mde_alert_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
-    records = apply_odata_orderby(records, orderby)
+    records = apply_odata_orderby(records, orderby, mde_enum_order())
     total = len(records)
     page = [complete_mde(r, "alert") for r in records[skip : skip + top]]
     page = apply_odata_select(page, select)
