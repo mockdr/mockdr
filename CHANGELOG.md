@@ -696,6 +696,24 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Half the agent actions the vendor publishes answered 400.**
+SentinelOne publishes one path per agent action, and mockdr serves them
+through a single route that knew twenty-three of the thirty-eight — so
+`ranger-disable`, `start-profiling`, `update-software`,
+`approve-uninstall` and eleven others were refused, and the refusal said the
+request had been understood and rejected rather than never offered. The ones
+that leave a mark on the agent record now leave it: Network Discovery moves
+`rangerStatus`, profiling moves `remoteProfilingState`, an update leaves the
+agent up to date, an approved uninstall request stops being pending and the
+agent uninstalls. The rest count and log an activity, which is all the
+record shows for a broadcast either. Every effect is the one the vendor's
+own description states.
+
+And a name that is not an action at all now answers 404 in the envelope a
+missing path answers with, because that is what it is — one route standing
+in for thirty-eight must not turn a path the product does not have into a
+request it understood.
+
 **Twenty-five SentinelOne write routes that answered 200 to an empty body.**
 A threat marked as an incident with no verdict in the body, an exclusion
 created out of nothing, a policy replaced by an empty document — each

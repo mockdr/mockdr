@@ -12,6 +12,7 @@ from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from utils.documented_params import documented_openapi, documented_params
 from utils.pagination import build_list_response
 from utils.s1_fixtures import restrict_item
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Agents"])
 
@@ -224,7 +225,18 @@ def agent_action(
     body: BulkActionBody,
     current_user: dict = Depends(require_write),
 ) -> dict:
-    """Apply a named action to the specified agents."""
+    """Apply a named action to the specified agents.
+
+    One route stands in for the actions the vendor publishes as one path
+    each, so a name that is not one of them has to answer the way a missing
+    path does. It used to answer 400, which told a client its request was
+    understood and rejected rather than never offered.
+    """
+    if action_name not in agent_commands.KNOWN_ACTIONS:
+        raise HTTPException(status_code=404, detail=build_vendor_error(
+            "sentinelone", 404,
+            f"Resource not found: POST /web/api/v2.1/agents/actions/{action_name}",
+        ))
     try:
         return agent_commands.execute_action(
             action_name, body.model_dump(), current_user.get("userId")

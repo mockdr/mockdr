@@ -2509,3 +2509,74 @@ class TestASentinelOneWriteBodyIsRecognisable:
                                headers=viewer,
                                json={"type": "IPV4", "value": "1.2.3.4"})
         assert response.status_code == 403
+
+
+class TestTheAgentActionsFalconsRivalPublishes:
+    """From the 2.1 swagger, which publishes one path per agent action.
+
+    mockdr answered 400 to half of them — a client could not run the actions
+    its own console offers, and the 400 said the request had been understood
+    and rejected rather than never offered. The ones that leave a mark on the
+    agent record now leave it; the rest count and log, which is all the
+    record shows for a broadcast either.
+    """
+
+    S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+
+    def _agent_id(self, client: TestClient) -> str:
+        return str(client.get("/web/api/v2.1/agents", headers=self.S1,
+                              params={"limit": 1}).json()["data"][0]["id"])
+
+    def _act(self, client: TestClient, action: str, agent_id: str):
+        return client.post(f"/web/api/v2.1/agents/actions/{action}",
+                           headers=self.S1, json={"filter": {"ids": [agent_id]}})
+
+    def _agent(self, client: TestClient, agent_id: str) -> dict:
+        return dict(client.get("/web/api/v2.1/agents", headers=self.S1,
+                               params={"ids": agent_id}).json()["data"][0])
+
+    @pytest.mark.parametrize(("action", "field", "expected"), [
+        ("ranger-disable", "rangerStatus", "Disabled"),
+        ("ranger-enable", "rangerStatus", "Enabled"),
+        ("start-profiling", "remoteProfilingState", "enabled"),
+        ("stop-profiling", "remoteProfilingState", "disabled"),
+        ("update-software", "isUpToDate", True),
+        ("reject-uninstall", "isPendingUninstall", False),
+    ])
+    def test_the_action_moves_what_it_says(
+        self, client: TestClient, action: str, field: str, expected: object,
+    ) -> None:
+        agent_id = self._agent_id(client)
+        assert self._act(client, action, agent_id).status_code == 200
+        assert self._agent(client, agent_id)[field] == expected
+
+    def test_approving_an_uninstall_carries_it_out(
+        self, client: TestClient,
+    ) -> None:
+        agent_id = self._agent_id(client)
+        self._act(client, "uninstall", agent_id)
+        assert self._agent(client, agent_id)["isPendingUninstall"] is True
+
+        self._act(client, "approve-uninstall", agent_id)
+        after = self._agent(client, agent_id)
+        assert after["isPendingUninstall"] is False
+        assert after["isUninstalled"] is True
+
+    @pytest.mark.parametrize("action", [
+        "set-config", "start-remote-shell", "terminate-remote-shell",
+        "firewall-logging", "reset-passphrase", "approve-stateless-upgrade",
+    ])
+    def test_an_action_with_nothing_to_show_still_runs(
+        self, client: TestClient, action: str,
+    ) -> None:
+        response = self._act(client, action, self._agent_id(client))
+        assert response.status_code == 200
+        assert response.json()["data"]["affected"] == 1
+
+    def test_a_name_that_is_not_an_action_is_a_missing_path(
+        self, client: TestClient,
+    ) -> None:
+        response = self._act(client, "zzz-not-an-action", self._agent_id(client))
+        assert response.status_code == 404
+        assert response.json()["errors"][0]["detail"] == (
+            "Resource not found: POST /web/api/v2.1/agents/actions/zzz-not-an-action")

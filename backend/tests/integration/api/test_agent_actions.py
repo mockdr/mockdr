@@ -248,13 +248,16 @@ class TestNoOpActions:
 
 
 class TestUnknownAction:
-    def test_unknown_action_returns_400(
+    def test_unknown_action_is_a_missing_path(
         self, client: TestClient, auth_headers: dict
     ) -> None:
-        """Unrecognised action returns 400 Bad Request."""
+        """The vendor publishes one path per action, so a name that is not
+        one of them is a path that does not exist — not a request that was
+        understood and rejected."""
         aid = _agent_id(client, auth_headers)
         resp = _act(client, auth_headers, "totally-unknown-action", {"filter": {"ids": [aid]}})
-        assert resp.status_code == 400
+        assert resp.status_code == 404
+        assert resp.json()["errors"][0]["title"] == "Requested resource was not found"
 
 
 class TestFetchFiles:

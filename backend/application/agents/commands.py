@@ -77,15 +77,30 @@ def _resolve_ids(body: dict) -> list[str]:
     return [str(r["id"]) for r in matched]
 
 
-_KNOWN_ACTIONS = frozenset({
+#: Actions the swagger documents that leave no mark on the agent record —
+#: a shell session, a passphrase reset, a broadcast. S1 answers them the
+#: same way it answers the rest, with a count and an activity, and so does
+#: this: the client's next read has nothing new to find either way.
+_ACTIVITY_ONLY_ACTIONS = frozenset({
+    "restart-services", "fetch-logs", "broadcast", "restart-machine",
+    "set-external-id", "fetch-installed-apps", "fetch-firewall-rules",
+    "reset-local-config", "move-to-console",
+    "set-config", "start-remote-shell", "can-start-remote-shell",
+    "terminate-remote-shell", "clear-remote-shell-session", "firewall-logging",
+    "local-upgrade-authorization", "reset-passphrase", "capability",
+    "approve-stateless-upgrade",
+})
+
+KNOWN_ACTIONS = frozenset({
     "connect", "disconnect", "initiate-scan", "abort-scan", "shutdown",
     "enable-agent", "disable-agent", "uninstall", "decommission",
     "mark-up-to-date", "randomize-uuid", "move-to-site", "move-to-group",
     "manage-tags",
-    "restart-services", "fetch-logs", "broadcast", "restart-machine",
-    "set-external-id", "fetch-installed-apps", "fetch-firewall-rules",
-    "reset-local-config", "move-to-console",
-})
+    # Documented on `/agents/actions/<name>` and answered 400 here until now,
+    # so a client could not run half the actions its own console offers.
+    "approve-uninstall", "reject-uninstall", "update-software",
+    "ranger-enable", "ranger-disable", "start-profiling", "stop-profiling",
+}) | _ACTIVITY_ONLY_ACTIONS
 
 
 def execute_action(action: str, body: dict, actor_user_id: str | None = None) -> dict:
@@ -102,7 +117,7 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
     Raises:
         ValueError: If the action name is not recognised.
     """
-    if action not in _KNOWN_ACTIONS:
+    if action not in KNOWN_ACTIONS:
         raise ValueError(f"Unknown agent action: {action!r}")
 
     ids = _resolve_ids(body)
@@ -138,8 +153,26 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
         elif action == "decommission":
             agent.isDecommissioned = True
             agent.isActive = False
-        elif action == "mark-up-to-date":
+        elif action in ("mark-up-to-date", "update-software"):
+            # "Update the Agent version on endpoints that match the filter":
+            # what a client reads afterwards is an agent that is up to date.
             agent.isUpToDate = True
+        elif action == "approve-uninstall":
+            # The request the endpoint's user raised is granted, so the agent
+            # is no longer waiting on the console — it uninstalls.
+            agent.isPendingUninstall = False
+            agent.isUninstalled = True
+            agent.isActive = False
+        elif action == "reject-uninstall":
+            agent.isPendingUninstall = False
+        elif action == "ranger-enable":
+            agent.rangerStatus = "Enabled"
+        elif action == "ranger-disable":
+            agent.rangerStatus = "Disabled"
+        elif action == "start-profiling":
+            agent.remoteProfilingState = "enabled"
+        elif action == "stop-profiling":
+            agent.remoteProfilingState = "disabled"
         elif action == "randomize-uuid":
             agent.uuid = str(_uuid.uuid4())
         elif action == "move-to-site":
@@ -220,12 +253,8 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
             updated = dict(agent.tags) if agent.tags else {}
             updated["sentinelone"] = current
             agent.tags = updated
-        elif action in (
-            "restart-services", "fetch-logs", "broadcast", "restart-machine",
-            "set-external-id", "fetch-installed-apps", "fetch-firewall-rules",
-            "reset-local-config", "move-to-console",
-        ):
-            pass  # no-op; log activity only
+        elif action in _ACTIVITY_ONLY_ACTIONS:
+            pass  # nothing on the record changes; the activity is the answer
 
         agent_repo.save(agent)
         activity_repo.create(
