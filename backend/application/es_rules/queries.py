@@ -28,14 +28,14 @@ def find_rules(
     Returns:
         Kibana paginated list response.
     """
-    records = [_rule_to_dict(r) for r in es_rule_repo.list_all()]
+    records = [_rule_to_dict(r, listed=True) for r in es_rule_repo.list_all()]
 
     if filter_str:
         records = _apply_filter(records, filter_str)
 
     if sort_field:
         reverse = sort_order.lower() == "desc"
-        records.sort(key=lambda r: r.get(sort_field, ""), reverse=reverse)
+        records.sort(key=lambda r: _sort_key(r, sort_field), reverse=reverse)
 
     page_items, total = paginate_kibana(records, page, per_page)
     return build_kibana_rules_response(page_items, page, per_page, total)
@@ -86,14 +86,30 @@ def get_tags() -> list[str]:
     return sorted(tags)
 
 
-def _rule_to_dict(rule: EsRule) -> dict:
+def _sort_key(record: dict, sort_field: str) -> str | int | float | bool:
+    """Resolve a sort field that may name a nested member.
+
+    ``execution_summary.last_execution.date`` is one of the fields this
+    endpoint accepts, and a flat lookup found nothing under that name — so
+    every rule sorted equal and the list came back in insertion order while
+    reporting the sort it was asked for.
+    """
+    value: object = record
+    for part in sort_field.split("."):
+        if not isinstance(value, dict):
+            return ""
+        value = value.get(part, "")
+    return value if isinstance(value, (str, int, float, bool)) else ""
+
+
+def _rule_to_dict(rule: EsRule, *, listed: bool = False) -> dict:
     """Render a rule as Kibana's ``RuleResponse``.
 
     Delegates to the command module so reads and writes cannot describe the
     same rule differently. The domain dataclass uses ``from_field`` to avoid
     shadowing the Python keyword; the Elastic API expects ``from``.
     """
-    return _to_response(rule)
+    return _to_response(rule, listed=listed)
 
 
 def _apply_filter(records: list[dict], filter_str: str) -> list[dict]:

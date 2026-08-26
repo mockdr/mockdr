@@ -34,7 +34,13 @@ class EsRule:
     author: list[str] = field(default_factory=lambda: ["Elastic"])
 
     # ── Versioning ────────────────────────────────────────────────────────────
+    #: The author's version, which only ever changes because a client set it.
+    #: Counting updates here made every edit look like a new authored version.
     version: int = 1
+
+    #: Kibana's own modification counter: it goes up when a rule's parameters
+    #: change, and not when the rule is merely enabled or disabled.
+    revision: int = 0
 
     # ── Scheduling ────────────────────────────────────────────────────────────
     interval: str = "5m"
@@ -53,3 +59,14 @@ class EsRule:
     updated_at: str = ""
     updated_by: str = ""
     immutable: bool = False
+
+    # ── Execution ─────────────────────────────────────────────────────────────
+    #: What the rule's last run reported, or None for a rule that has never
+    #: run. Kibana renders this as `execution_summary`, and only ever shows it
+    #: for a rule the task manager has actually executed.
+    last_execution: dict | None = None
+
+    #: Members Kibana echoes only when the client set them. Emitting them
+    #: unconditionally told a client the rule had a `note` or a
+    #: `timeline_title` when the product would not have mentioned either.
+    optional_members: dict = field(default_factory=dict)

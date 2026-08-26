@@ -11,6 +11,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_rules import commands as rule_commands
 from application.es_rules import queries as rule_queries
+from domain.es_rule import EsRule
+from repository.es_rule_repo import es_rule_repo
 from utils.es_response import build_kbn_error_response, build_security_solution_error
 from utils.kibana_validation import RulesQueryError, validate_rules_find_query
 
@@ -116,23 +118,48 @@ def update_rule(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Update an existing detection rule."""
+    """Replace an existing detection rule.
+
+    Either identifier will do — a client that only ever saw the rule it
+    created knows its ``rule_id`` and not the internal ``id``, and demanding
+    the latter answered 400 for a perfectly formed request.
+    """
+    return rule_commands.update_rule(_addressed_rule(body), body)
+
+
+@router.patch("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])
+def patch_rule(
+    body: dict = Body(...),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Update part of a detection rule.
+
+    This is how a client toggles one member without sending the rule back
+    whole. With no route at all, a client doing that got 404 and could only
+    fall back to a PUT that silently reset everything it left out.
+    """
+    return rule_commands.patch_rule(_addressed_rule(body), body)
+
+
+def _addressed_rule(body: dict) -> EsRule:
+    """Resolve the rule a write body addresses, by either identifier."""
     rule_id = body.get("id")
-    if not rule_id:
-        raise HTTPException(
-            status_code=400,
-            detail=build_security_solution_error(
-                400,
-                "id is required in the request body",
-            ),
-        )
-    result = rule_commands.update_rule(rule_id, body)
-    if result is None:
+    public_id = body.get("rule_id")
+    if not rule_id and not public_id:
+        raise HTTPException(status_code=400, detail={
+            "message": ['either "id" or "rule_id" must be set'], "status_code": 400,
+        })
+    rule = (
+        es_rule_repo.get(str(rule_id)) if rule_id
+        else es_rule_repo.get_by_rule_id(str(public_id))
+    )
+    if rule is None:
+        which = f'id: "{rule_id}"' if rule_id else f'rule_id: "{public_id}"'
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(404, f'rule_id: "{rule_id}" not found'),
+            detail=build_security_solution_error(404, f"{which} not found"),
         )
-    return result
+    return rule
 
 
 @router.delete("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])

@@ -289,7 +289,7 @@ class TestCaseExtras:
 
     def test_bulk_get_separates_hits_from_misses(self, client: TestClient) -> None:
         body = client.post(
-            "/kibana/api/cases/_bulk_get",
+            "/kibana/internal/cases/_bulk_get",
             json={"ids": [self._case_id(client), "no-such-case"]},
             headers=ES_AUTH,
         ).json()

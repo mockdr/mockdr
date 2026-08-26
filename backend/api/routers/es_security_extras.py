@@ -20,6 +20,7 @@ from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
 from application.es_exception_lists import queries as exception_queries
 from application.es_rules import queries as rule_queries
+from repository.es_rule_repo import es_rule_repo
 from utils.es_response import build_kbn_error_response, build_security_solution_error
 from utils.kibana_validation import (
     ENDPOINT_ACTION_STATUS_QUERY,
@@ -224,7 +225,6 @@ async def import_rules(
     import json
 
     from application.es_rules import commands as rule_commands
-    from application.es_rules import queries as rule_queries
 
     payload = _import_payload(await request.body(), request.headers.get("content-type", ""))
 
@@ -254,7 +254,7 @@ async def import_rules(
 
         rules_count += 1
         rule_id = str(entry.get("rule_id") or "")
-        existing = rule_queries.get_rule_by_rule_id(rule_id) if rule_id else None
+        existing = es_rule_repo.get_by_rule_id(rule_id) if rule_id else None
 
         if existing and not overwrite:
             errors.append({
@@ -266,8 +266,8 @@ async def import_rules(
             })
             continue
 
-        if existing:
-            rule_commands.update_rule(str(existing["id"]), entry)
+        if existing is not None:
+            rule_commands.update_rule(existing, entry)
         else:
             rule_commands.create_rule(entry)
         success_count += 1
@@ -352,7 +352,7 @@ def case_reporters(
     return sorted(seen.values(), key=lambda r: str(r["username"]))
 
 
-@router.post("/api/cases/_bulk_get", dependencies=[Depends(require_kbn_xsrf)])
+@router.post("/internal/cases/_bulk_get", dependencies=[Depends(require_kbn_xsrf)])
 def bulk_get_cases(
     body: dict = Body(...),
     _: dict = Depends(require_es_auth),
@@ -360,25 +360,56 @@ def bulk_get_cases(
     """Fetch several cases by id.
 
     Kibana reports the ones it could not resolve in ``errors`` rather than
-    failing the request.
+    failing the request, and names them the way the saved-objects layer
+    underneath does — ``Saved object [cases/<id>] not found``, not the case
+    id on its own.
+
+    This is one of the routes Kibana keeps under ``/internal``: ``/api`` has
+    no ``_bulk_get`` and answers 404, so serving it there let a client
+    succeed against the mock on a path the product does not have.
     """
     ids = body.get("ids")
-    if not isinstance(ids, list):
+    if ids is None:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "ids: expected an array"),
+            detail=build_kbn_error_response(
+                400, 'Invalid value "undefined" supplied to "ids"'),
         )
+    if not isinstance(ids, list):
+        # Kibana joins `ids` before validating its type, so a string body
+        # crashes the route rather than being rejected. Measured on 8.15;
+        # a client that branches on 5xx must see the same thing here.
+        raise HTTPException(
+            status_code=500,
+            detail=build_kbn_error_response(500, "ids.join is not a function"),
+        )
+    if not ids:
+        raise HTTPException(
+            status_code=400,
+            detail=build_kbn_error_response(
+                400,
+                "The length of the field ids is too short. "
+                "Array must be of length >= 1.",
+            ),
+        )
+    for candidate in ids:
+        if not isinstance(candidate, str):
+            raise HTTPException(
+                status_code=400,
+                detail=build_kbn_error_response(
+                    400, f'Invalid value "{candidate}" supplied to "ids"'),
+            )
 
     cases: list[dict] = []
     errors: list[dict] = []
     for case_id in ids:
-        found = case_queries.get_case(str(case_id))
+        found = case_queries.get_case(case_id)
         if found is None:
             errors.append({
                 "error": "Not Found",
-                "message": f"Case [{case_id}] not found",
+                "message": f"Saved object [cases/{case_id}] not found",
                 "status": 404,
-                "caseId": str(case_id),
+                "caseId": case_id,
             })
         else:
             cases.append(found)

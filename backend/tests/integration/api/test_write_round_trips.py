@@ -1904,3 +1904,279 @@ class TestBulkCreateReportsTheClashItFound:
         found = client.get("/kibana/api/detection_engine/rules/_find",
                            headers=self.KBN, params={"per_page": 200}).json()["data"]
         assert [r["rule_id"] for r in found].count("zzz-bulk-d") == 1
+
+
+class TestBulkGetIsServedWhereKibanaServesIt:
+    """Measured on Kibana 8.15.
+
+    `_bulk_get` is one of the routes Kibana keeps under `/internal`. The mock
+    served it under `/api`, where the product answers 404 — so a client using
+    the real path got nothing from the mock, and one written against the mock
+    got a success the product would not give. The misses are named the way
+    the saved-objects layer names them, too.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    def _an_id(self, client: TestClient) -> str:
+        found = client.get("/kibana/api/cases/_find", headers=self.KBN,
+                           params={"perPage": 1}).json()
+        return str(found["cases"][0]["id"])
+
+    def _bulk_get(self, client: TestClient, body: object):
+        return client.post("/kibana/internal/cases/_bulk_get",
+                           headers=self.KBN, json=body)
+
+    def test_the_public_path_has_no_bulk_get(self, client: TestClient) -> None:
+        assert client.post("/kibana/api/cases/_bulk_get", headers=self.KBN,
+                           json={"ids": ["x"]}).status_code == 404
+
+    def test_a_miss_is_named_after_the_saved_object(
+        self, client: TestClient,
+    ) -> None:
+        body = self._bulk_get(
+            client, {"ids": [self._an_id(client), "no-such-case"]}).json()
+
+        assert len(body["cases"]) == 1
+        assert body["errors"] == [{
+            "error": "Not Found",
+            "message": "Saved object [cases/no-such-case] not found",
+            "status": 404,
+            "caseId": "no-such-case",
+        }]
+
+    def test_ids_must_be_there(self, client: TestClient) -> None:
+        response = self._bulk_get(client, {})
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            'Invalid value "undefined" supplied to "ids"')
+
+    def test_ids_must_not_be_empty(self, client: TestClient) -> None:
+        response = self._bulk_get(client, {"ids": []})
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            "The length of the field ids is too short. "
+            "Array must be of length >= 1.")
+
+    def test_ids_must_be_strings(self, client: TestClient) -> None:
+        response = self._bulk_get(client, {"ids": [1]})
+        assert response.status_code == 400
+        assert response.json()["message"] == 'Invalid value "1" supplied to "ids"'
+
+    def test_a_string_body_crashes_the_way_kibana_crashes(
+        self, client: TestClient,
+    ) -> None:
+        response = self._bulk_get(client, {"ids": "x"})
+        assert response.status_code == 500
+        assert response.json()["message"] == "ids.join is not a function"
+
+
+class TestARuleCarriesWhatKibanaGivesIt:
+    """Measured on Kibana 8.15.
+
+    A rule created with the required fields alone carries none of nine
+    optional members; the mock filled all nine in, so a client read a `note`,
+    a `throttle` and a timeline the product never mentioned. And the one
+    member the product does add — `execution_summary` — the mock never had,
+    while accepting a sort over a field inside it.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    #: Absent from a real rule that was created without them.
+    OPTIONAL = ["building_block_type", "filters", "investigation_fields",
+                "license", "meta", "note", "throttle", "timeline_id",
+                "timeline_title"]
+
+    @staticmethod
+    def _body(rule_id: str, **extra: object) -> dict:
+        return {"name": rule_id, "description": "d", "risk_score": 1,
+                "severity": "low", "type": "query", "query": "*:*",
+                "index": ["logs-*"], "from": "now-6m", "interval": "5m",
+                "rule_id": rule_id, **extra}
+
+    def _create(self, client: TestClient, rule_id: str, **extra: object) -> dict:
+        return client.post("/kibana/api/detection_engine/rules",
+                           headers=self.KBN,
+                           json=self._body(rule_id, **extra)).json()
+
+    def test_an_unset_member_is_not_mentioned(self, client: TestClient) -> None:
+        rule = self._create(client, "zzz-plain")
+        assert [k for k in self.OPTIONAL if k in rule] == []
+
+    def test_a_member_the_client_set_comes_back(self, client: TestClient) -> None:
+        rule = self._create(client, "zzz-noted", note="hi", timeline_id="t-1",
+                            timeline_title="T")
+        assert rule["note"] == "hi"
+        assert rule["timeline_id"] == "t-1"
+        assert rule["timeline_title"] == "T"
+
+    def test_an_update_can_add_one(self, client: TestClient) -> None:
+        created = self._create(client, "zzz-patched")
+        patched = client.patch("/kibana/api/detection_engine/rules",
+                               headers=self.KBN,
+                               json={"id": created["id"], "note": "later"}).json()
+        assert patched["note"] == "later"
+
+    def test_a_rule_that_never_ran_has_no_summary(
+        self, client: TestClient,
+    ) -> None:
+        created = self._create(client, "zzz-never-ran")
+        fetched = client.get("/kibana/api/detection_engine/rules",
+                             headers=self.KBN,
+                             params={"id": created["id"]}).json()
+        assert "execution_summary" not in fetched
+
+    def test_a_listing_carries_the_key_for_every_rule(
+        self, client: TestClient,
+    ) -> None:
+        created = self._create(client, "zzz-listed")
+        found = client.get("/kibana/api/detection_engine/rules/_find",
+                           headers=self.KBN, params={"per_page": 200}).json()
+
+        assert all("execution_summary" in r for r in found["data"])
+        mine = [r for r in found["data"] if r["id"] == created["id"]]
+        assert mine[0]["execution_summary"] is None
+
+    def test_a_seeded_rule_reports_a_run(self, client: TestClient) -> None:
+        found = client.get("/kibana/api/detection_engine/rules/_find",
+                           headers=self.KBN, params={"per_page": 200}).json()
+        summaries = [r["execution_summary"] for r in found["data"]
+                     if r["execution_summary"]]
+        assert summaries
+        last = summaries[0]["last_execution"]
+        assert set(last) == {"date", "status", "status_order", "message",
+                             "metrics"}
+
+    def test_sorting_by_the_nested_execution_date_orders_the_list(
+        self, client: TestClient,
+    ) -> None:
+        found = client.get(
+            "/kibana/api/detection_engine/rules/_find", headers=self.KBN,
+            params={"per_page": 200, "sort_field":
+                    "execution_summary.last_execution.date",
+                    "sort_order": "desc"}).json()["data"]
+        dates = [(r["execution_summary"] or {}).get("last_execution", {}).get("date", "")
+                 for r in found]
+        assert dates == sorted(dates, reverse=True)
+        assert any(dates)
+
+
+class TestWhatAWriteCountsAsAChange:
+    """Measured on Kibana 8.15.
+
+    Two counters, and the mock moved the wrong one. `version` is the author's
+    and only ever changes because a client set it; `revision` is Kibana's own
+    modification counter and stood still at 0. And PATCH — the call a client
+    makes to change one member — had no route at all, so the only way to
+    change anything was a PUT that reset everything left out.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    @staticmethod
+    def _body(rule_id: str, **extra: object) -> dict:
+        return {"name": rule_id, "description": "d", "risk_score": 1,
+                "severity": "low", "type": "query", "query": "*:*",
+                "index": ["logs-*"], "from": "now-6m", "interval": "5m",
+                "rule_id": rule_id, **extra}
+
+    def _create(self, client: TestClient, rule_id: str, **extra: object) -> dict:
+        return client.post("/kibana/api/detection_engine/rules",
+                           headers=self.KBN,
+                           json=self._body(rule_id, **extra)).json()
+
+    def _patch(self, client: TestClient, body: dict):
+        return client.patch("/kibana/api/detection_engine/rules",
+                            headers=self.KBN, json=body)
+
+    def test_a_new_rule_starts_at_revision_zero(self, client: TestClient) -> None:
+        created = self._create(client, "zzz-rev-new", version=9)
+        assert created["revision"] == 0
+        assert created["version"] == 9
+
+    def test_a_real_change_raises_the_revision(self, client: TestClient) -> None:
+        self._create(client, "zzz-rev-change")
+        patched = self._patch(
+            client, {"rule_id": "zzz-rev-change", "description": "other"}).json()
+        assert patched["revision"] == 1
+        assert patched["version"] == 1
+
+    def test_the_same_value_again_is_not_a_change(
+        self, client: TestClient,
+    ) -> None:
+        self._create(client, "zzz-rev-same")
+        self._patch(client, {"rule_id": "zzz-rev-same", "description": "other"})
+        again = self._patch(
+            client, {"rule_id": "zzz-rev-same", "description": "other"}).json()
+        assert again["revision"] == 1
+
+    def test_enabling_a_rule_is_not_a_change(self, client: TestClient) -> None:
+        self._create(client, "zzz-rev-toggle", enabled=False)
+        patched = self._patch(
+            client, {"rule_id": "zzz-rev-toggle", "enabled": True}).json()
+        assert patched["enabled"] is True
+        assert patched["revision"] == 0
+
+    def test_setting_the_version_is_a_change(self, client: TestClient) -> None:
+        self._create(client, "zzz-rev-version")
+        patched = self._patch(
+            client, {"rule_id": "zzz-rev-version", "version": 42}).json()
+        assert patched["version"] == 42
+        assert patched["revision"] == 1
+
+    def test_a_patch_leaves_everything_it_does_not_name(
+        self, client: TestClient,
+    ) -> None:
+        self._create(client, "zzz-patch-keeps", note="keep me", tags=["t"])
+        patched = self._patch(
+            client, {"rule_id": "zzz-patch-keeps", "severity": "high"}).json()
+        assert patched["severity"] == "high"
+        assert patched["note"] == "keep me"
+        assert patched["tags"] == ["t"]
+
+    def test_a_put_drops_what_the_body_leaves_out(
+        self, client: TestClient,
+    ) -> None:
+        self._create(client, "zzz-put-drops", note="gone soon", tags=["t"])
+        replaced = client.put("/kibana/api/detection_engine/rules",
+                              headers=self.KBN,
+                              json=self._body("zzz-put-drops")).json()
+        assert "note" not in replaced
+        assert replaced["tags"] == []
+
+    def test_a_put_keeps_the_authored_version_and_the_enabled_flag(
+        self, client: TestClient,
+    ) -> None:
+        self._create(client, "zzz-put-keeps", version=7, enabled=False)
+        replaced = client.put("/kibana/api/detection_engine/rules",
+                              headers=self.KBN,
+                              json=self._body("zzz-put-keeps")).json()
+        assert replaced["version"] == 7
+        assert replaced["enabled"] is False
+
+    def test_either_identifier_addresses_the_rule(
+        self, client: TestClient,
+    ) -> None:
+        created = self._create(client, "zzz-addressed")
+        by_id = self._patch(client, {"id": created["id"], "severity": "high"})
+        by_rule_id = self._patch(
+            client, {"rule_id": "zzz-addressed", "severity": "medium"})
+        assert by_id.status_code == 200
+        assert by_rule_id.json()["severity"] == "medium"
+
+    def test_neither_identifier_is_a_400(self, client: TestClient) -> None:
+        response = self._patch(client, {"severity": "high"})
+        assert response.status_code == 400
+        assert response.json()["message"] == ['either "id" or "rule_id" must be set']
+
+    def test_an_unknown_identifier_is_named_in_the_404(
+        self, client: TestClient,
+    ) -> None:
+        response = self._patch(client, {"rule_id": "no-such-rule"})
+        assert response.status_code == 404
+        assert response.json() == {
+            "message": 'rule_id: "no-such-rule" not found', "status_code": 404}

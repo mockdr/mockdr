@@ -232,22 +232,28 @@ class TestUpdateRule:
         assert resp.status_code == 200
         assert resp.json()["name"] == "Updated Rule Name"
 
-    def test_update_increments_version(self, client: TestClient) -> None:
-        """Each update should increment the rule version."""
+    def test_update_does_not_touch_the_authored_version(
+        self, client: TestClient,
+    ) -> None:
+        """`version` is the author's, and only a client changes it.
+
+        Counting updates in it made every edit look like a newly authored
+        version of the rule. Kibana counts modifications in `revision`.
+        """
         rule_id = _get_first_rule_id(client)
         original = client.get(
             "/kibana/api/detection_engine/rules",
             headers=ES_AUTH,
             params={"id": rule_id},
         ).json()
-        original_version = original["version"]
 
         updated = client.put(
             "/kibana/api/detection_engine/rules",
             headers=KBN_WRITE_HEADERS,
             json={"id": rule_id, "severity": "critical"},
         ).json()
-        assert updated["version"] == original_version + 1
+        assert updated["version"] == original["version"]
+        assert updated["revision"] == original["revision"] + 1
 
     def test_update_nonexistent_rule_returns_404(self, client: TestClient) -> None:
         """Updating a non-existent rule should return 404."""

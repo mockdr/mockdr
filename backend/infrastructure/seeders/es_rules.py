@@ -121,6 +121,30 @@ def seed_es_rules(fake: Faker) -> list[str]:
             updated_at=rand_ago(0),
             updated_by=created_by,
             immutable=False,
+            last_execution=_last_execution(enabled),
         ))
 
     return rule_ids
+
+
+def _last_execution(enabled: bool) -> dict | None:
+    """What this rule's last run reported, for a rule that has ever run.
+
+    A disabled rule in a fresh install has none, and Kibana leaves
+    `execution_summary` out for it entirely. An enabled one has run within
+    its interval, so a client reading rule health sees a rule that is alive
+    rather than one that has never started.
+    """
+    if not enabled:
+        return None
+    return {
+        "date": rand_ago(0),
+        "status": "succeeded",
+        "status_order": 0,
+        "message": "succeeded",
+        "metrics": {
+            "total_search_duration_ms": random.randint(20, 400),
+            "total_indexing_duration_ms": random.randint(5, 120),
+            "execution_gap_duration_s": 0,
+        },
+    }

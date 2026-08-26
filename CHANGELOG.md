@@ -696,6 +696,42 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Nine members a rule was told it had, and one it was not.**
+A rule created with the required fields alone carries none of
+`building_block_type`, `filters`, `investigation_fields`, `license`, `meta`,
+`note`, `throttle`, `timeline_id` or `timeline_title` — mockdr filled all
+nine in, so a client read a `note` and a timeline the product would not have
+mentioned. They are echoed now only when the client set one. The member
+Kibana does add, `execution_summary`, mockdr never had while accepting a
+sort over a field inside it; a listing carries it for every rule and leaves
+it `null` where nothing has run, a single rule that never ran does not carry
+it at all, and the sort now resolves the nested name instead of finding
+nothing under it and reporting a sort it had not performed.
+
+**A rule's two counters, and the wrong one moving.**
+`version` is the author's and only ever changes because a client set it;
+`revision` is Kibana's own modification counter. mockdr incremented
+`version` on every update and left `revision` at 0, so a client tracking
+either learned the opposite of what it asked. `revision` now counts what
+Kibana counts: a change to the rule's parameters, not enabling it and not
+re-sending a value it already had.
+
+**The call a client makes to change one member.**
+`PATCH /api/detection_engine/rules` had no route, so the only way to change
+a rule was a `PUT` that resets everything the body leaves out — and mockdr's
+`PUT` merged instead of replacing, which hid that. Both are right now, both
+take either identifier (a client that created a rule knows its `rule_id`,
+not the internal `id`, and demanding the latter answered 400 for a perfectly
+formed request), and both name the missing one the way Kibana does.
+
+**`_bulk_get` served where Kibana does not serve it.**
+Cases' `_bulk_get` lives under `/internal`, not `/api`; mockdr had it the
+other way round, so a client using the product's path got 404 and one
+written against mockdr got a success the product would not give. Its misses
+are named after the saved object rather than the case, and the four ways it
+rejects an `ids` argument — missing, empty, not an array, not strings — are
+each measured, including the one Kibana answers with a 500.
+
 **A conformance stack that could not be rebuilt.**
 Elasticsearch starts with a password for `elastic` and none for
 `kibana_system`, so Kibana could not authenticate and never left

@@ -167,6 +167,60 @@ probes:
       path: /api/detection_engine/rules/_find
       query: {per_page: 1}
       auth: basic
+    ignore_paths:
+      # Whether a rule carries these is a property of the rule, not of the
+      # endpoint: Kibana echoes `note` and the timeline pair only for a rule
+      # whose author set them, and fills `execution_summary` only once the
+      # rule has run. Both are pinned by measurement in the backend tests
+      # instead; comparing them here would compare which rule each install
+      # happens to hold first.
+      - $.data[*].note
+      - $.data[*].timeline_id
+      - $.data[*].timeline_title
+      - $.data[*].execution_summary
+
+  - id: kbn-rules-patch-no-identifier
+    endpoint: kibana
+    why: PATCH a rule without saying which rule.
+    request:
+      method: PATCH
+      path: /api/detection_engine/rules
+      json: {severity: high}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-rules-patch-unknown-rule-id
+    endpoint: kibana
+    why: PATCH a rule_id nothing resolves.
+    request:
+      method: PATCH
+      path: /api/detection_engine/rules
+      json: {rule_id: conformance-no-such-rule, severity: high}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-rules-put-no-identifier
+    endpoint: kibana
+    why: PUT a rule without either identifier.
+    request:
+      method: PUT
+      path: /api/detection_engine/rules
+      json: {name: c, description: d, risk_score: 1, severity: low, type: query,
+             query: "*:*", index: ["logs-*"], from: now-6m, interval: 5m}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-rules-put-unknown-rule-id
+    endpoint: kibana
+    why: PUT addressed by a rule_id alone, which is what a client that never saw the internal id has.
+    request:
+      method: PUT
+      path: /api/detection_engine/rules
+      json: {rule_id: conformance-no-such-rule, name: c, description: d,
+             risk_score: 1, severity: low, type: query, query: "*:*",
+             index: ["logs-*"], from: now-6m, interval: 5m}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
 
   - id: kbn-missing-xsrf
     endpoint: kibana
@@ -500,6 +554,66 @@ probes:
       method: GET
       path: /api/cases/_find
       query: {status: exploded}
+      auth: basic
+
+  - id: kbn-cases-bulk-get-public-path
+    endpoint: kibana
+    why: _bulk_get under /api, where Kibana keeps it only under /internal.
+    request:
+      method: POST
+      path: /api/cases/_bulk_get
+      json: {ids: ["00000000-0000-0000-0000-000000000000"]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-bulk-get-missing
+    endpoint: kibana
+    why: _bulk_get for a case id nothing resolves.
+    request:
+      method: POST
+      path: /internal/cases/_bulk_get
+      json: {ids: ["00000000-0000-0000-0000-000000000000"]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-bulk-get-no-ids
+    endpoint: kibana
+    why: _bulk_get without the ids it validates.
+    request:
+      method: POST
+      path: /internal/cases/_bulk_get
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-bulk-get-empty-ids
+    endpoint: kibana
+    why: _bulk_get with an empty ids array.
+    request:
+      method: POST
+      path: /internal/cases/_bulk_get
+      json: {ids: []}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-bulk-get-nonstring-id
+    endpoint: kibana
+    why: _bulk_get with an id that is not a string.
+    request:
+      method: POST
+      path: /internal/cases/_bulk_get
+      json: {ids: [1]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-cases-bulk-get-ids-not-an-array
+    endpoint: kibana
+    why: _bulk_get with a string where ids belongs — Kibana joins before validating.
+    request:
+      method: POST
+      path: /internal/cases/_bulk_get
+      json: {ids: "x"}
+      headers: {kbn-xsrf: "true"}
       auth: basic
 
   - id: kbn-case-comment-missing-case
