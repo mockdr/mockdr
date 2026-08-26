@@ -714,6 +714,25 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Every Splunk job control action answered the same sentence.**
+`Action 'pause' applied to job '<sid>'` — one generic line for all eleven,
+where splunkd says what it did: *Search job paused.*, *continued.*,
+*finalized.*, *touched.*, and for the two that change how long a job is kept,
+the ttl they set (`save` makes it a week). A client reading the message
+could not tell a pause from a finalize. An action splunkd does not have
+answers `FATAL` and *Unknown action.*, naming neither the action nor the
+job, where mockdr echoed both back as an `ERROR`.
+
+And `cancel` marked the job failed and *kept* it. splunkd removes a
+cancelled job: the sid stops resolving, which is exactly what a client
+cancelling a runaway search then waits for — and against mockdr it waited
+for ever. All measured on 10.4.2, action by action.
+
+Seven functions in the same module were unreachable, among them one whose
+comment — *"Simplified: just return the expression as-is"* — described an
+`eval if()` that has been evaluated properly for some time. Dead code that
+describes a defect the code does not have is worse than none.
+
 **Three routes that ignored the record their own URL names.**
 A path parameter is the strongest case of the kind above: it names what the
 answer is meant to be about, and ignoring it answers about something else.

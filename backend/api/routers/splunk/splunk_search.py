@@ -15,9 +15,11 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from api.reserved_names import register as _register_convertors
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.search import (
+    SAVED_TTL,
     InvalidTimeParameterError,
     UnknownSearchCommandError,
     apply_control_action,
+    control_message,
     create_search_job,
     delete_search_job,
 )
@@ -305,15 +307,17 @@ async def control_job(
     """Control a search job (pause, unpause, cancel, finalize)."""
     content_type = request.headers.get("content-type", "")
     action = ""
+    form_values: dict[str, str] = {}
     if "form" in content_type:
         form = await request.form()
-        action = str(form.get("action", ""))
+        form_values = {k: str(v) for k, v in form.items()}
     else:
         try:
             body = await request.json()
-            action = body.get("action", "")
+            form_values = {k: str(v) for k, v in body.items()} if isinstance(body, dict) else {}
         except Exception:
             pass
+    action = form_values.get("action", "")
 
     # Control on a job that does not exist is a 404, not a cheerful 200.
     if get_job(sid) is None:
@@ -323,17 +327,29 @@ async def control_job(
 
     if action not in _CONTROL_ACTIONS:
         # Every action, including outright garbage, used to return 200 — so a
-        # typo in a playbook looked like it had worked.
+        # typo in a playbook looked like it had worked. splunkd names neither
+        # the action nor the job: "Unknown action.", FATAL (measured).
         raise HTTPException(status_code=400, detail={"messages": [
-            {"type": "ERROR", "text": f"Unknown action '{action}'."},
+            {"type": "FATAL", "text": "Unknown action."},
         ]})
 
-    apply_control_action(sid, action)
+    ttl = _requested_ttl(form_values, action)
+    apply_control_action(sid, action, ttl)
     return {
         "messages": [
-            {"type": "INFO", "text": f"Action '{action}' applied to job '{sid}'"},
+            {"type": "INFO", "text": control_message(action, ttl)},
         ],
     }
+
+
+def _requested_ttl(values: dict[str, str], action: str) -> int:
+    """The ttl this control call sets, in the seconds splunkd reports back."""
+    if action == "save":
+        return SAVED_TTL
+    try:
+        return int(values.get("ttl", ""))
+    except ValueError:
+        return 0
 
 
 # The actions splunkd accepts on a search job.

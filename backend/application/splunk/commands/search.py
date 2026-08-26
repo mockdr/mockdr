@@ -155,27 +155,31 @@ def create_search_job(
     return sid
 
 
-def cancel_search_job(sid: str) -> bool:
-    """Cancel a running search job.
+#: What splunkd says it did, per action. Every one of them used to answer
+#: the same generic line, so a client reading the message could not tell a
+#: pause from a finalize — and `save` and `setttl` name the ttl they set.
+CONTROL_MESSAGES = {
+    "cancel": "Search job cancelled.",
+    "pause": "Search job paused.",
+    "unpause": "Search job continued.",
+    "finalize": "Search job finalized.",
+    "touch": "Search job touched.",
+    "enablepreview": "Search job results preview enabled.",
+    "disablepreview": "Search job results preview disabled.",
+}
 
-    Args:
-        sid: The search job SID.
-
-    Returns:
-        True if the job was found and cancelled.
-    """
-    job = search_job_repo.get(sid)
-    if not job:
-        return False
-    job.dispatch_state = "FAILED"
-    job.is_done = True
-    job.is_failed = True
-    job.settled = True
-    search_job_repo.save(job)
-    return True
+#: What `save` sets the ttl to, measured on 10.4.2: a week.
+SAVED_TTL = 604800
 
 
-def apply_control_action(sid: str, action: str) -> bool:
+def control_message(action: str, ttl: int) -> str:
+    """The sentence splunkd answers this action with."""
+    if action in ("save", "setttl"):
+        return f"The ttl of the search job was changed to {ttl}."
+    return CONTROL_MESSAGES.get(action, "Search job touched.")
+
+
+def apply_control_action(sid: str, action: str, ttl: int = 0) -> bool:
     """Apply a job control action, changing the job's observable state.
 
     Only ``cancel`` did anything; the rest were accepted and ignored, so a
@@ -185,6 +189,7 @@ def apply_control_action(sid: str, action: str) -> bool:
     Args:
         sid:    The search job SID.
         action: One of splunkd's job control actions.
+        ttl:    The seconds `setttl` was asked for, where it applies.
 
     Returns:
         True if the job existed and the action was applied.
@@ -195,10 +200,11 @@ def apply_control_action(sid: str, action: str) -> bool:
 
     now = time.time()
     if action == "cancel":
-        job.dispatch_state = "FAILED"
-        job.is_done = True
-        job.is_failed = True
-        job.settled = True
+        # splunkd *removes* a cancelled job: the sid stops resolving, and a
+        # client waiting for it to disappear used to wait for ever because
+        # this only marked it failed and kept it.
+        search_job_repo.delete(sid)
+        return True
     elif action == "pause":
         if not job.is_paused:
             job.paused_at = now
@@ -221,6 +227,9 @@ def apply_control_action(sid: str, action: str) -> bool:
         job.settled = True
     elif action == "save":
         job.is_saved = True
+        job.ttl = SAVED_TTL
+    elif action == "setttl":
+        job.ttl = ttl
     elif action == "unsave":
         job.is_saved = False
     elif action == "touch":
@@ -228,7 +237,7 @@ def apply_control_action(sid: str, action: str) -> bool:
         # alone: touching a job extends how long it is kept, it does not
         # re-dispatch the search.
         job.touched_at = now
-    # setttl / setpriority / (dis|en)ablepreview are accepted and have no
+    # setpriority and (dis|en)ablepreview are accepted and have no
     # observable effect on a mock that completes searches synchronously.
     search_job_repo.save(job)
     return True
@@ -503,50 +512,3 @@ def _query_notables(parsed: SPLQuery) -> list[dict]:
     # Sort by time descending
     results.sort(key=lambda r: float(str(r.get("_time", 0) or 0)), reverse=True)
     return results
-
-
-def _apply_stats(results: list[dict], count_by: str) -> list[dict]:
-    """Apply stats count by field aggregation."""
-    counts: dict[str, int] = {}
-    for r in results:
-        key = str(r.get(count_by, ""))
-        counts[key] = counts.get(key, 0) + 1
-    return [{count_by: k, "count": v} for k, v in counts.items()]
-
-
-def _apply_sort(results: list[dict], field_name: str, descending: bool) -> list[dict]:
-    """Sort results by field."""
-    return sorted(results, key=lambda r: str(r.get(field_name, "")), reverse=descending)
-
-
-def _apply_renames(results: list[dict], renames: dict[str, str]) -> list[dict]:
-    """Rename fields in results."""
-    for r in results:
-        for old, new in renames.items():
-            if old in r:
-                r[new] = r.pop(old)
-    return results
-
-
-def _apply_evals(results: list[dict], evals: dict[str, str]) -> list[dict]:
-    """Apply eval expressions (basic string concat and if/else)."""
-    for r in results:
-        for field_name, expr in evals.items():
-            # Basic: if(condition, true_val, false_val)
-            if expr.startswith("if("):
-                r[field_name] = _eval_if(expr, r)
-            else:
-                # Simple string concat with "." operator
-                r[field_name] = expr
-    return results
-
-
-def _apply_table(results: list[dict], fields: list[str]) -> list[dict]:
-    """Project results to only the specified fields."""
-    return [{f: r.get(f, "") for f in fields} for r in results]
-
-
-def _eval_if(expr: str, row: dict) -> object:
-    """Evaluate a basic if(condition, true, false) expression."""
-    # Simplified: just return the expression as-is
-    return expr

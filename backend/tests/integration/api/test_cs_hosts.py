@@ -3,7 +3,10 @@
 Verifies host queries, entity retrieval, FQL filtering, pagination,
 device actions, and response envelope structure.
 """
+import pytest
 from fastapi.testclient import TestClient
+
+from application.cs_hosts import queries as host_queries
 
 
 def _cs_auth(client: TestClient) -> dict[str, str]:
@@ -236,13 +239,19 @@ class TestDeviceActions:
         host = entity_resp.json()["resources"][0]
         assert host["status"] == "containment_pending"
 
-    def test_lift_containment(self, client: TestClient) -> None:
+    def test_lift_containment(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Lifting containment goes through its own pending state.
 
         Falcon's fleet is seeded with `lift_containment_pending`, and going
         straight to `normal` skipped a state a client can observe. The state
         settles once the sensor has acknowledged.
         """
+        # The state settles a second after the action, and a loaded test run
+        # can spend that second between the two calls below. This test is
+        # about which state it goes through, not about when it leaves it.
+        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
         headers = _cs_auth(client)
         host_id = self._get_normal_host_id(client, headers)
 

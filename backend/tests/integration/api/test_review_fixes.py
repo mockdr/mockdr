@@ -67,10 +67,17 @@ class TestDispatchClockRespectsControlActions:
         _control(client, sid, "finalize")
         assert _state(client, sid) == ("DONE", True)
 
-    def test_cancel_sticks(self, client: TestClient, dispatch_window: None) -> None:
+    def test_a_cancelled_job_is_gone(
+        self, client: TestClient, dispatch_window: None,
+    ) -> None:
+        """splunkd removes a cancelled job rather than marking it failed, so
+        the sid stops resolving — which is what a client waits for."""
         sid = _dispatch(client)
         _control(client, sid, "cancel")
-        assert _state(client, sid) == ("FAILED", True)
+        assert client.get(
+            f"/splunk/services/search/jobs/{sid}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).status_code == 404
 
     def test_touch_extends_the_ttl_without_rewinding_the_search(
         self, client: TestClient, dispatch_window: None,

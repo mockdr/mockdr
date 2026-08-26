@@ -3798,3 +3798,79 @@ class TestARouteAnswersAboutWhatTheUrlNames:
         assert response.json()["message"] == (
             "[request body.query]: expected value of type [string] "
             "but got [undefined]")
+
+
+class TestControllingASearchJob:
+    """Measured on 10.4.2, action by action.
+
+    Every control action answered the same generic line — `Action 'x'
+    applied to job '<sid>'` — so a client reading the message could not tell
+    a pause from a finalize, and the two that change the job's lifetime said
+    nothing about it. Worse, `cancel` marked the job failed and *kept* it:
+    splunkd removes it, so a client waiting for the sid to stop resolving
+    waited for ever.
+    """
+
+    SPLUNK = {"Authorization": "Basic " + base64.b64encode(
+        b"admin:mockdr-admin").decode()}
+
+    def _job(self, client: TestClient) -> str:
+        return str(client.post("/splunk/services/search/jobs",
+                               headers=self.SPLUNK,
+                               data={"search": "search index=main",
+                                     "output_mode": "json"}).json()["sid"])
+
+    def _control(self, client: TestClient, sid: str, action: str, **extra: str):
+        return client.post(f"/splunk/services/search/jobs/{sid}/control",
+                           headers=self.SPLUNK,
+                           data={"action": action, "output_mode": "json", **extra})
+
+    @pytest.mark.parametrize(("action", "said"), [
+        ("pause", "Search job paused."),
+        ("unpause", "Search job continued."),
+        ("finalize", "Search job finalized."),
+        ("touch", "Search job touched."),
+        ("enablepreview", "Search job results preview enabled."),
+        ("disablepreview", "Search job results preview disabled."),
+    ])
+    def test_each_action_says_what_it_did(
+        self, client: TestClient, action: str, said: str,
+    ) -> None:
+        response = self._control(client, self._job(client), action)
+        assert response.json()["messages"] == [{"type": "INFO", "text": said}]
+
+    def test_saving_a_job_names_the_week_it_keeps_it_for(
+        self, client: TestClient,
+    ) -> None:
+        sid = self._job(client)
+        response = self._control(client, sid, "save")
+        assert response.json()["messages"][0]["text"] == (
+            "The ttl of the search job was changed to 604800.")
+
+    def test_setting_a_ttl_names_it_and_sets_it(
+        self, client: TestClient,
+    ) -> None:
+        sid = self._job(client)
+        response = self._control(client, sid, "setttl", ttl="120")
+        assert response.json()["messages"][0]["text"] == (
+            "The ttl of the search job was changed to 120.")
+        content = client.get(f"/splunk/services/search/jobs/{sid}",
+                             headers=self.SPLUNK,
+                             params={"output_mode": "json"},
+                             ).json()["entry"][0]["content"]
+        assert content["ttl"] == 120
+
+    def test_a_cancelled_job_stops_resolving(self, client: TestClient) -> None:
+        sid = self._job(client)
+        assert self._control(client, sid, "cancel").json()["messages"] == [
+            {"type": "INFO", "text": "Search job cancelled."}]
+        assert client.get(f"/splunk/services/search/jobs/{sid}",
+                          headers=self.SPLUNK,
+                          params={"output_mode": "json"}).status_code == 404
+
+    def test_an_action_splunkd_does_not_have(self, client: TestClient) -> None:
+        """It names neither the action nor the job."""
+        response = self._control(client, self._job(client), "zzz-not-an-action")
+        assert response.status_code == 400
+        assert response.json()["messages"] == [
+            {"type": "FATAL", "text": "Unknown action."}]

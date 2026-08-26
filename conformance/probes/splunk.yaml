@@ -3011,6 +3011,19 @@ probes:
       query: {output_mode: json}
       auth: basic
 
+  - id: spl-job-control-unknown-action
+    endpoint: management
+    why: >
+      splunkd names neither the action nor the job it refused: "Unknown
+      action.", FATAL. mockdr echoed both back in an ERROR.
+    request:
+      method: POST
+      path: /services/search/jobs/1234567890.1/control
+      query: {output_mode: json}
+      content: 'action=zzz-not-an-action'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
   - id: spl-kvstore-batch-find-wrapper
     endpoint: management
     compare: values
