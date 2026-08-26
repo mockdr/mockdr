@@ -2861,3 +2861,84 @@ probes:
       path: /api/cases/${seed_case}/comments/${seed_comment}
       headers: {kbn-xsrf: "true"}
       auth: basic
+
+  # ── URI search (2.3.1) ───────────────────────────────────────────────────
+  #
+  # The form a client reaches for from a shell — `_search?q=…&size=…` —
+  # which mockdr read none of: the whole index came back, unfiltered,
+  # unsorted and unlimited, with a 200.
+
+  - id: es-uri-search-size
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `size` in the query string cuts the page.
+    request:
+      method: GET
+      path: /${seed_index}/_search
+      query: {size: '2', sort: '_doc'}
+      auth: basic
+
+  - id: es-uri-search-from
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And `from` skips into it.
+    request:
+      method: GET
+      path: /${seed_index}/_search
+      query: {from: '2', size: '2', sort: '_doc'}
+      auth: basic
+
+  - id: es-uri-search-q
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `q` is a query string over the whole document.
+    request:
+      method: GET
+      path: /${seed_index}/_search
+      query: {q: 'sev:99', sort: '_doc'}
+      auth: basic
+
+  - id: es-uri-search-source-includes
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `_source_includes` projects each hit.
+    request:
+      method: GET
+      path: /${seed_index}/_search
+      query: {_source_includes: sev, sort: '_doc', size: '2'}
+      auth: basic
+
+  - id: es-uri-search-no-total
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `track_total_hits=false` leaves the total out of the answer entirely,
+      rather than reporting zero.
+    request:
+      method: GET
+      path: /${seed_index}/_search
+      query: {track_total_hits: 'false', size: '1', sort: '_doc'}
+      auth: basic
+
+  - id: es-uri-search-beats-the-body
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      When both name `size`, the query string wins.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      query: {size: '1'}
+      content: '{"size": 3, "query": {"match_all": {}}, "sort": ["_doc"]}'
+      headers: {Content-Type: application/json}
+      auth: basic

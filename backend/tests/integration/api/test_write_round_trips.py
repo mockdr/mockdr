@@ -1031,3 +1031,74 @@ class TestHowACollectionCompares:
                                "sort_mode": "alpha_case"}).json()["entry"]
         ]
         assert cased == sorted(cased)
+
+
+class TestUriSearch:
+    """``_search?q=…&size=…``, measured against Elasticsearch 8.15.
+
+    It is the form a client reaches for from a shell, and mockdr read none
+    of it: the whole index came back, unfiltered, unsorted and unlimited,
+    with a 200.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    @pytest.fixture(autouse=True)
+    def _documents(self, client: TestClient) -> None:
+        for doc_id, name, number in ((1, "alpha", 1), (2, "beta", 2), (3, "gamma", 3)):
+            client.put(f"/elastic/zzz-uri/_doc/{doc_id}", headers=self.ES,
+                       params={"refresh": "true"}, json={"name": name, "n": number})
+
+    def _hits(self, client: TestClient, **params: str) -> dict:
+        return client.get("/elastic/zzz-uri/_search", headers=self.ES,
+                          params=params).json()["hits"]
+
+    def test_size_cuts_the_page(self, client: TestClient) -> None:
+        hits = self._hits(client, size="1")
+        assert len(hits["hits"]) == 1
+        # And the total still counts the whole match.
+        assert hits["total"]["value"] == 3
+
+    def test_from_skips_into_it(self, client: TestClient) -> None:
+        hits = self._hits(client, **{"from": "1", "size": "1", "sort": "n:asc"})
+        assert [h["_source"]["n"] for h in hits["hits"]] == [2]
+
+    def test_q_filters(self, client: TestClient) -> None:
+        hits = self._hits(client, q="name:beta")
+        assert [h["_source"]["name"] for h in hits["hits"]] == ["beta"]
+        assert hits["total"]["value"] == 1
+
+    def test_sort_orders(self, client: TestClient) -> None:
+        hits = self._hits(client, sort="n:desc")
+        assert [h["_source"]["n"] for h in hits["hits"]] == [3, 2, 1]
+
+    def test_source_includes_projects(self, client: TestClient) -> None:
+        hits = self._hits(client, _source_includes="name", sort="n:asc")
+        assert hits["hits"][0]["_source"] == {"name": "alpha"}
+
+    def test_source_false_drops_it(self, client: TestClient) -> None:
+        hits = self._hits(client, _source="false")
+        assert "_source" not in hits["hits"][0]
+
+    def test_size_zero_answers_the_count_and_no_hits(self, client: TestClient) -> None:
+        hits = self._hits(client, size="0")
+        assert hits["hits"] == []
+        assert hits["total"]["value"] == 3
+
+    def test_track_total_hits_false_leaves_the_total_out(
+        self, client: TestClient,
+    ) -> None:
+        """Not zero — absent."""
+        assert "total" not in self._hits(client, track_total_hits="false")
+
+    def test_the_query_string_wins_over_the_body(self, client: TestClient) -> None:
+        body = client.post("/elastic/zzz-uri/_search", headers=self.ES,
+                           params={"size": "1"},
+                           json={"size": 3, "query": {"match_all": {}}}).json()
+        assert len(body["hits"]["hits"]) == 1
+
+    def test_a_size_that_is_not_a_number_is_refused(self, client: TestClient) -> None:
+        answer = client.get("/elastic/zzz-uri/_search", headers=self.ES,
+                            params={"size": "zzz"})
+        assert answer.status_code == 400

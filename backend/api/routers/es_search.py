@@ -7,6 +7,7 @@ use when configured to talk directly to Elasticsearch.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from fnmatch import fnmatch
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
@@ -156,6 +157,7 @@ def authenticate(
 @router.get("/_search", operation_id="es_search_all_get")
 @router.post("/_search", operation_id="es_search_all_post")
 def es_search_all(
+    request: Request,
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
     source: str | None = Query(default=None),
@@ -171,7 +173,7 @@ def es_search_all(
     A body carrying a ``pit`` is addressed to a point in time instead: the
     index is the one it was opened on, and the answer names it back.
     """
-    search_body = _body_or_source(body, source)
+    search_body = _with_uri_params(_body_or_source(body, source), request.query_params)
     pit = search_body.get("pit")
     if isinstance(pit, dict):
         return _search_in_pit(str(pit.get("id", "")), search_body)
@@ -211,6 +213,66 @@ def _body_or_source(body: dict, source: str | None) -> dict:
     except ValueError as exc:
         raise ESQueryError(f"Failed to parse request body: {exc}") from exc
     return parsed if isinstance(parsed, dict) else {}
+
+
+#: The URI-search parameters, and what each becomes in the body. This is the
+#: form a client reaches for from a shell — ``_search?q=name:beta&size=5`` —
+#: and mockdr read none of them: the whole index came back, unfiltered,
+#: unsorted and unlimited, with a 200. Measured against Elasticsearch 8.15,
+#: including that the *URI* wins over the body when both name `size`.
+_URI_SEARCH_PARAMS = frozenset({
+    "q", "size", "from", "sort", "_source", "_source_includes",
+    "_source_excludes", "track_total_hits", "terminate_after", "default_operator",
+    "df", "analyzer", "lenient",
+})
+
+
+def _with_uri_params(body: dict, query: Mapping[str, str]) -> dict:
+    """Fold the URI-search parameters into the body they stand for."""
+    given = {k: v for k, v in query.items() if k in _URI_SEARCH_PARAMS}
+    if not given:
+        return body
+    merged = dict(body)
+
+    if "q" in given:
+        options = {
+            key: given[key] for key in ("default_operator", "df", "analyzer", "lenient")
+            if key in given
+        }
+        merged["query"] = {"query_string": {"query": given["q"], **options}}
+    for name in ("size", "from", "terminate_after"):
+        if name in given:
+            try:
+                merged[name] = int(given[name])
+            except ValueError as exc:
+                raise ESQueryError(
+                    f"Failed to parse int parameter [{name}] with value "
+                    f"[{given[name]}]",
+                ) from exc
+    if "sort" in given:
+        merged["sort"] = [
+            {field: {"order": order}} if order else field
+            for field, _, order in (part.partition(":")
+                                    for part in given["sort"].split(",") if part)
+        ]
+    if "track_total_hits" in given:
+        merged["track_total_hits"] = given["track_total_hits"].lower() not in (
+            "false", "0", "no")
+    includes = given.get("_source_includes")
+    excludes = given.get("_source_excludes")
+    raw_source = given.get("_source")
+    if raw_source is not None and raw_source.lower() in ("true", "false"):
+        merged["_source"] = raw_source.lower() == "true"
+    elif raw_source:
+        includes = raw_source if includes is None else includes
+    if includes is not None or excludes is not None:
+        projection: dict[str, list[str]] = {}
+        if includes:
+            projection["includes"] = [f for f in includes.split(",") if f]
+        if excludes:
+            projection["excludes"] = [f for f in excludes.split(",") if f]
+        merged["_source"] = projection
+    return merged
 
 
 @router.get("/_count", operation_id="es_count_all_get")
@@ -328,6 +390,7 @@ def _bulk_parse_error(line: str, exc: json.JSONDecodeError, line_no: int) -> dic
 @router.post("/{index}/_search", operation_id="es_search_post")
 def es_search(
     index: str,
+    request: Request,
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
     source: str | None = Query(default=None),
@@ -335,7 +398,7 @@ def es_search(
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Execute an Elasticsearch query DSL search against a mock index."""
-    search_body = _body_or_source(body, source)
+    search_body = _with_uri_params(_body_or_source(body, source), request.query_params)
     try:
         page = search_queries.es_search(
             index, search_body, ignore_unavailable=ignore_unavailable,
