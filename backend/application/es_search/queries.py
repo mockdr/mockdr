@@ -1053,9 +1053,12 @@ def es_update_doc(index: str, doc_id: str, body: dict) -> dict:
         upsert = _upsert_source(body)
         if upsert is None:
             raise DocumentMissingError(index, doc_id)
-        store.save("es_documents", key, {"_version": 1, "_source": upsert})
+        seq_no = _next_seq_no(index)
+        store.save("es_documents", key, {
+            "_version": 1, "_seq_no": seq_no, "_source": upsert,
+        })
         _count_document(index, 1)
-        return _write_result(index, doc_id, 1, "created")
+        return _write_result(index, doc_id, 1, "created", seq_no)
 
     source = dict(existing.get("_source") or {})
     updated = dict(source)
@@ -1075,11 +1078,16 @@ def es_update_doc(index: str, doc_id: str, body: dict) -> dict:
         _count_document(index, -1)
         return _write_result(index, doc_id, version + 1, "deleted")
     if operation == "noop" or updated == source:
-        # Nothing changed, so nothing was written: no shard did any work.
-        return {**_write_result(index, doc_id, version, "noop"),
+        # Nothing changed, so nothing was written: no shard did any work, and
+        # the sequence number does not move either.
+        return {**_write_result(index, doc_id, version, "noop",
+                                _seq_no_of(index, doc_id)),
                 "_shards": {"total": 0, "successful": 0, "failed": 0}}
-    store.save("es_documents", key, {"_version": version + 1, "_source": updated})
-    return _write_result(index, doc_id, version + 1, "updated")
+    seq_no = _next_seq_no(index)
+    store.save("es_documents", key, {
+        "_version": version + 1, "_seq_no": seq_no, "_source": updated,
+    })
+    return _write_result(index, doc_id, version + 1, "updated", seq_no)
 
 
 def _upsert_source(body: dict) -> dict | None:
@@ -1109,7 +1117,8 @@ def _deep_merge(base: dict, incoming: dict) -> dict:
     return merged
 
 
-def _write_result(index: str, doc_id: str, version: int, result: str) -> dict:
+def _write_result(index: str, doc_id: str, version: int, result: str,
+                  seq_no: int | None = None) -> dict:
     """The envelope every single-document write answers with."""
     return {
         "_index": index,
@@ -1117,7 +1126,7 @@ def _write_result(index: str, doc_id: str, version: int, result: str) -> dict:
         "_version": version,
         "result": result,
         "_shards": {"total": 2, "successful": 1, "failed": 0},
-        "_seq_no": version - 1,
+        "_seq_no": _next_seq_no(index) if seq_no is None else seq_no,
         "_primary_term": 1,
     }
 
@@ -1267,6 +1276,60 @@ def _by_query_response(
     }
 
 
+class VersionConflictError(Exception):
+    """A write whose `if_seq_no`/`if_primary_term` no longer match.
+
+    Two clients read the same document and both write it: without the
+    precondition both succeed and one write is lost, silently, with a 200
+    each. Elasticsearch answers the second a 409 so it can re-read and
+    retry — which is the whole point of handing out `_seq_no` in the first
+    place, and mockdr handed it out and never checked it.
+    """
+
+    def __init__(self, index: str, doc_id: str, wanted: int,
+                 wanted_term: int, seq_no: int, primary_term: int) -> None:
+        """Record what was required and what the document actually holds."""
+        self.index, self.doc_id = index, doc_id
+        # Elasticsearch's own wording, measured on 8.15.
+        self.reason = (
+            f"[{doc_id}]: version conflict, required seqNo [{wanted}], "
+            f"primary term [{wanted_term}]. current document has seqNo "
+            f"[{seq_no}] and primary term [{primary_term}]"
+        )
+        super().__init__(self.reason)
+
+
+class SeqNoWithoutTermError(Exception):
+    """``if_seq_no`` given without ``if_primary_term``, which is a 400."""
+
+    def __init__(self) -> None:
+        """Carry Elasticsearch's own wording for the half-given pair."""
+        super().__init__("Validation Failed: 1: ifSeqNo is set, but primary term is [0];")
+
+
+def check_precondition(
+    index: str, doc_id: str, if_seq_no: int | None, if_primary_term: int | None,
+) -> None:
+    """Refuse a write whose precondition no longer holds.
+
+    Raises:
+        SeqNoWithoutTermError: If only one of the pair was given.
+        VersionConflictError:  If the document has moved on since.
+    """
+    if if_seq_no is None and if_primary_term is None:
+        return
+    if if_seq_no is None or if_primary_term is None:
+        raise SeqNoWithoutTermError
+    existing = store.get("es_documents", f"{index}:{doc_id}") or {}
+    # A document that is not there has no seq_no to match, and Elasticsearch
+    # reports the conflict against seqNo -1 rather than a missing document.
+    seq_no = _seq_no_of(index, doc_id)
+    primary_term = 1 if existing else 0
+    if seq_no != if_seq_no or primary_term != if_primary_term:
+        raise VersionConflictError(
+            index, doc_id, if_seq_no, if_primary_term, seq_no, primary_term)
+
+
 def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
     """Store a document so a subsequent read finds it.
 
@@ -1285,7 +1348,10 @@ def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
     key = f"{index}:{doc_id}"
     existing = store.get("es_documents", key)
     version = int(existing.get("_version", 0)) + 1 if existing else 1
-    store.save("es_documents", key, {"_version": version, "_source": dict(body)})
+    seq_no = _next_seq_no(index)
+    store.save("es_documents", key, {
+        "_version": version, "_seq_no": seq_no, "_source": dict(body),
+    })
     if not existing:
         _count_document(index, 1)
     return {
@@ -1294,9 +1360,33 @@ def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
         "_version": version,
         "result": "updated" if existing else "created",
         "_shards": {"total": 2, "successful": 1, "failed": 0},
-        "_seq_no": version - 1,
+        "_seq_no": seq_no,
         "_primary_term": 1,
     }
+
+
+def _next_seq_no(index: str) -> int:
+    """The next sequence number for this index.
+
+    ``_seq_no`` counts *writes to the shard*, not versions of one document:
+    three documents created in an index get 0, 1 and 2, and writing the first
+    one again gets 3. mockdr derived it from the document's own version, so
+    every freshly created document claimed `_seq_no: 0` — and a client
+    reasoning about write order across documents, or resuming from a
+    remembered position, was reading a number that meant nothing.
+    """
+    entry = store.get("es_indices", index) or {
+        "uuid": _index_uuid(index), "settings": {}, "docs": 0,
+    }
+    seq_no = int(entry.get("seq_no", 0))
+    store.save("es_indices", index, {**entry, "seq_no": seq_no + 1})
+    return seq_no
+
+
+def _seq_no_of(index: str, doc_id: str) -> int:
+    """The sequence number a document was last written at, or -1 for none."""
+    existing = store.get("es_documents", f"{index}:{doc_id}")
+    return int(existing.get("_seq_no", -1)) if existing else -1
 
 
 def _count_document(index: str, delta: int) -> None:

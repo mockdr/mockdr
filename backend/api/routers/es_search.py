@@ -626,12 +626,15 @@ def field_caps(
 def update_doc(
     index: str,
     doc_id: str,
+    if_seq_no: int | None = Query(default=None),
+    if_primary_term: int | None = Query(default=None),
     body: dict = Body(...),
     refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> JSONResponse:
     """Apply a partial document or a script to one document."""
     forced = _forced_refresh(refresh)
+    search_queries.check_precondition(index, doc_id, if_seq_no, if_primary_term)
     try:
         result = search_queries.es_update_doc(index, doc_id, body)
     except search_queries.DocumentMissingError as exc:
@@ -946,6 +949,8 @@ def get_doc(
 def index_doc(
     index: str,
     doc_id: str,
+    if_seq_no: int | None = Query(default=None),
+    if_primary_term: int | None = Query(default=None),
     body: dict = Body(...),
     refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
@@ -957,6 +962,7 @@ def index_doc(
     without writing anything, which meant the very next read 404'd.
     """
     forced = _forced_refresh(refresh)
+    search_queries.check_precondition(index, doc_id, if_seq_no, if_primary_term)
     result = search_queries.es_index_doc(index, doc_id, body)
     if forced:
         result["forced_refresh"] = True
@@ -1043,11 +1049,14 @@ def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
 def delete_doc(
     index: str,
     doc_id: str,
+    if_seq_no: int | None = Query(default=None),
+    if_primary_term: int | None = Query(default=None),
     refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Delete a document written through the index API."""
     forced = _forced_refresh(refresh)
+    search_queries.check_precondition(index, doc_id, if_seq_no, if_primary_term)
     result = search_queries.es_delete_doc(index, doc_id)
     if result is not None and forced:
         result["forced_refresh"] = True

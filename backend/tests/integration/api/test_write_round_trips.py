@@ -1393,3 +1393,84 @@ class TestAParameterDoesNotSwallowItsSibling:
             answer = client.get(path, headers=SPLUNK_AUTH, params=JSON_OUT)
             assert answer.status_code == 405, path
             assert answer.headers["allow"] == "POST", path
+
+
+class TestTwoClientsWritingTheSameDocument:
+    """Optimistic concurrency, measured against Elasticsearch 8.15.
+
+    Two clients read the same document and both write it. Without the
+    precondition both succeed and one write is lost — silently, with a 200
+    each. That is what `_seq_no` is handed out for, and mockdr handed it out
+    and never checked it.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def _write(self, client: TestClient, doc_id: str, body: dict, **params: str) -> dict:
+        answer = client.put(f"/elastic/zzz-cc/_doc/{doc_id}", headers=self.ES,
+                            params={"refresh": "true", **params}, json=body)
+        return {"status": answer.status_code, **answer.json()}
+
+    def test_a_write_at_the_current_seq_no_succeeds(self, client: TestClient) -> None:
+        first = self._write(client, "a", {"v": 1})
+        again = self._write(client, "a", {"v": 2},
+                            if_seq_no=str(first["_seq_no"]),
+                            if_primary_term=str(first["_primary_term"]))
+        assert again["status"] == 200
+        assert again["result"] == "updated"
+
+    def test_the_second_of_two_writers_is_refused(self, client: TestClient) -> None:
+        first = self._write(client, "b", {"v": 1})
+        # Both clients read the same seq_no; the first one to write moves it.
+        self._write(client, "b", {"v": 2}, if_seq_no=str(first["_seq_no"]),
+                    if_primary_term="1")
+        loser = self._write(client, "b", {"v": 3}, if_seq_no=str(first["_seq_no"]),
+                            if_primary_term="1")
+        assert loser["status"] == 409
+        assert loser["error"]["type"] == "version_conflict_engine_exception"
+        assert "version conflict, required seqNo" in loser["error"]["reason"]
+
+    def test_half_the_pair_is_a_validation_failure(self, client: TestClient) -> None:
+        self._write(client, "c", {"v": 1})
+        answer = client.put("/elastic/zzz-cc/_doc/c", headers=self.ES,
+                            params={"if_seq_no": "0"}, json={"v": 2})
+        assert answer.status_code == 400
+        assert answer.json()["error"]["type"] == "action_request_validation_exception"
+
+    def test_a_delete_carries_the_same_precondition(self, client: TestClient) -> None:
+        self._write(client, "d", {"v": 1})
+        answer = client.delete("/elastic/zzz-cc/_doc/d", headers=self.ES,
+                               params={"if_seq_no": "99", "if_primary_term": "1"})
+        assert answer.status_code == 409
+
+    def test_an_update_carries_it_too(self, client: TestClient) -> None:
+        self._write(client, "e", {"v": 1})
+        answer = client.post("/elastic/zzz-cc/_update/e", headers=self.ES,
+                             params={"if_seq_no": "99", "if_primary_term": "1"},
+                             json={"doc": {"v": 2}})
+        assert answer.status_code == 409
+
+    def test_the_sequence_counts_writes_to_the_index_not_versions(
+        self, client: TestClient,
+    ) -> None:
+        """Three documents created get 0, 1, 2 — and rewriting the first gets 3.
+
+        Derived from each document's own version instead, every freshly
+        created document claimed `_seq_no: 0`, and a client reasoning about
+        write order across documents read a number that meant nothing.
+        """
+        seq = [self._write(client, f"s{i}", {"v": 1})["_seq_no"] for i in range(3)]
+        assert seq == sorted(seq)
+        assert len(set(seq)) == 3
+        again = self._write(client, "s0", {"v": 2})["_seq_no"]
+        assert again > max(seq)
+
+    def test_a_noop_update_does_not_move_the_sequence(
+        self, client: TestClient,
+    ) -> None:
+        written = self._write(client, "n", {"v": 1})
+        answer = client.post("/elastic/zzz-cc/_update/n", headers=self.ES,
+                             json={"doc": {"v": 1}}).json()
+        assert answer["result"] == "noop"
+        assert answer["_seq_no"] == written["_seq_no"]

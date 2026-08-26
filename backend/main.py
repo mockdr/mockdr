@@ -320,7 +320,11 @@ from api.routers.splunk import (
     splunk_server as splunk_server_router,
 )
 from api.sentinel_auth import require_arm_api_version
-from application.es_search.queries import es_index_uuid
+from application.es_search.queries import (
+    SeqNoWithoutTermError,
+    VersionConflictError,
+    es_index_uuid,
+)
 from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
@@ -694,6 +698,30 @@ def _searched_index(request: Request) -> str:
     if len(parts) >= 2 and parts[0] == "elastic" and not parts[1].startswith("_"):
         return parts[1]
     return "mockdr"
+
+
+@app.exception_handler(VersionConflictError)
+async def version_conflict_handler(
+    request: Request, exc: VersionConflictError,
+) -> JSONResponse:
+    """A write whose precondition no longer holds is a 409, not a silent 200."""
+    detail = {
+        "type": "version_conflict_engine_exception", "reason": exc.reason,
+        "index_uuid": es_index_uuid(exc.index), "shard": "0", "index": exc.index,
+    }
+    return JSONResponse(status_code=409, content={
+        "error": {"root_cause": [dict(detail)], **detail}, "status": 409,
+    })
+
+
+@app.exception_handler(SeqNoWithoutTermError)
+async def seq_no_without_term_handler(
+    request: Request, exc: SeqNoWithoutTermError,
+) -> JSONResponse:
+    """`if_seq_no` without `if_primary_term` is a validation failure."""
+    return JSONResponse(status_code=400, content=build_es_error_response(
+        400, "action_request_validation_exception", str(exc),
+    ))
 
 
 @app.exception_handler(CatSortError)

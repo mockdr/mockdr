@@ -3110,3 +3110,58 @@ probes:
       method: PATCH
       path: /_cluster/health
       auth: basic
+
+  # ── Optimistic concurrency (2.3.1) ───────────────────────────────────────
+  #
+  # Two clients read the same document and both write it. Without the
+  # precondition both succeed and one write is lost, silently, with a 200
+  # each — which is why `_seq_no` is handed out at all, and mockdr handed it
+  # out and never checked it.
+
+  - id: es-write-with-a-stale-seq-no
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A write whose `if_seq_no` no longer matches is a 409, naming what was
+      required and what the document actually holds.
+    request:
+      method: PUT
+      path: /${seed_index}/_doc/a
+      query: {if_seq_no: '0', if_primary_term: '1'}
+      content: '{"sev": 1}'
+      headers: {Content-Type: application/json}
+      auth: basic
+    ignore_paths:
+      # The shard's own identifier for the index it lives in.
+      - $.error.index_uuid
+      - $.error.root_cause[*].index_uuid
+
+  - id: es-seq-no-without-a-term
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And half the pair is a validation failure, not a write.
+    request:
+      method: PUT
+      path: /${seed_index}/_doc/a
+      query: {if_seq_no: '1'}
+      content: '{"sev": 1}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-delete-with-a-stale-seq-no
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A delete carries the same precondition as a write.
+    request:
+      method: DELETE
+      path: /${seed_index}/_doc/b
+      query: {if_seq_no: '99', if_primary_term: '1'}
+      auth: basic
+    ignore_paths:
+      - $.error.index_uuid
+      - $.error.root_cause[*].index_uuid
