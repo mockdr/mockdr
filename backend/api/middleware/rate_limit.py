@@ -1,4 +1,16 @@
-"""ASGI middleware that simulates per-token rate limiting."""
+"""ASGI middleware that simulates per-token rate limiting.
+
+Falcon's own SDK reads two headers this had never sent. It takes
+``X-Ratelimit-Remaining`` off *every* response and keeps it, so a client
+paces itself before it is ever throttled; and on a 429 it reads
+``X-RateLimit-RetryAfter``, which is a **Unix epoch** and not a number of
+seconds — a client given only the standard `Retry-After` gets nothing it
+looks for and falls back to its own backoff
+(``CrowdStrike/gofalcon``, ``falcon/api_client.go``).
+
+No other mocked vendor's SDK or connector reads a rate-limit header, so no
+other mount sends one.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +19,8 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from utils.vendor_errors import build_vendor_error, vendor_for_path
 
@@ -33,6 +46,9 @@ def _rate_limited_body(scope: Scope) -> bytes:
 
 
 _UNAUTHENTICATED_EXEMPT_PATHS = {"/web/api/v2.1/system/status"}
+
+#: The one mount whose client reads a rate-limit header.
+_CS_PREFIX = "/cs"
 
 
 @dataclass
@@ -147,15 +163,23 @@ class RateLimitMiddleware:
 
         if len(bucket) >= _config.requests_per_minute:
             # Return 429
+            headers = [
+                (b"content-type", b"application/json"),
+                # Every mocked vendor tells a throttled client when to
+                # return; without it a client can only guess or spin.
+                (b"retry-after", str(_RETRY_AFTER_SECONDS).encode()),
+            ]
+            if scope.get("path", "").startswith(_CS_PREFIX):
+                # Falcon's is a Unix epoch, and its SDK reads no other.
+                headers += [
+                    (b"x-ratelimit-remaining", b"0"),
+                    (b"x-ratelimit-retryafter",
+                     str(int(time.time()) + _RETRY_AFTER_SECONDS).encode()),
+                ]
             await send({
                 "type": "http.response.start",
                 "status": 429,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    # Every mocked vendor tells a throttled client when to
-                    # return; without it a client can only guess or spin.
-                    (b"retry-after", str(_RETRY_AFTER_SECONDS).encode()),
-                ],
+                "headers": headers,
             })
             await send({
                 "type": "http.response.body",
@@ -164,4 +188,15 @@ class RateLimitMiddleware:
             return
 
         bucket.append(now)
-        await self.app(scope, receive, send)
+        if not scope.get("path", "").startswith(_CS_PREFIX):
+            await self.app(scope, receive, send)
+            return
+
+        remaining = str(max(0, _config.requests_per_minute - len(bucket))).encode()
+
+        async def send_with_remaining(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message)["x-ratelimit-remaining"] = remaining.decode()
+            await send(message)
+
+        await self.app(scope, receive, send_with_remaining)

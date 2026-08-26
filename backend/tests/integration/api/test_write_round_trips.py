@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import base64
 import re
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1537,3 +1538,64 @@ class TestTwoPeopleEditingOneComment:
 
         missing = client.get("/kibana/api/cases/no-such-case", headers=self.KBN)
         assert missing.json()["message"] == "Saved object [cases/no-such-case] not found"
+
+
+class TestFalconTellsAClientItsBudget:
+    """From ``CrowdStrike/gofalcon``, ``falcon/api_client.go``.
+
+    Its transport takes ``X-Ratelimit-Remaining`` off *every* response and
+    keeps it, so a client paces itself before it is ever throttled. On a 429
+    it reads ``X-RateLimit-RetryAfter``, which is a **Unix epoch** and not a
+    number of seconds — given only the standard `Retry-After`, a Falcon
+    client finds nothing it looks for and falls back to its own backoff.
+
+    No other mocked vendor's SDK or connector reads a rate-limit header, so
+    no other mount sends one.
+    """
+
+    @pytest.fixture
+    def throttled(self, client: TestClient) -> dict:
+        client.post("/web/api/v2.1/_dev/rate-limit",
+                    headers={"Authorization": "ApiToken admin-token-0000-0000-000000000001"},
+                    json={"enabled": True, "requestsPerMinute": 3})
+        token = client.post("/cs/oauth2/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        yield {"Authorization": f"Bearer {token}"}
+        client.post("/web/api/v2.1/_dev/rate-limit",
+                    headers={"Authorization": "ApiToken admin-token-0000-0000-000000000001"},
+                    json={"enabled": False, "requestsPerMinute": 100})
+
+    def test_the_remaining_budget_counts_down(
+        self, client: TestClient, throttled: dict,
+    ) -> None:
+        seen = []
+        for _ in range(3):
+            answer = client.get("/cs/devices/queries/devices/v1", headers=throttled,
+                                params={"limit": 1})
+            seen.append(int(answer.headers["x-ratelimit-remaining"]))
+        assert seen == [2, 1, 0]
+
+    def test_the_429_names_an_epoch_to_return_at(
+        self, client: TestClient, throttled: dict,
+    ) -> None:
+        for _ in range(3):
+            client.get("/cs/devices/queries/devices/v1", headers=throttled,
+                       params={"limit": 1})
+        answer = client.get("/cs/devices/queries/devices/v1", headers=throttled,
+                            params={"limit": 1})
+        assert answer.status_code == 429
+        assert answer.headers["x-ratelimit-remaining"] == "0"
+        # An epoch in the future, not a count of seconds.
+        assert int(answer.headers["x-ratelimit-retryafter"]) > time.time()
+
+    def test_no_other_mount_claims_a_budget(
+        self, client: TestClient, throttled: dict,
+    ) -> None:
+        answer = client.get(
+            "/web/api/v2.1/agents",
+            headers={"Authorization": "ApiToken admin-token-0000-0000-000000000001"},
+            params={"limit": 1})
+        assert "x-ratelimit-remaining" not in {k.lower() for k in answer.headers}
