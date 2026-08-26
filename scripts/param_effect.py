@@ -26,6 +26,12 @@ A route whose collection is already empty is skipped — there is nothing to
 filter — as is one that refuses the baseline request. Exit status 1 when
 anything is flagged.
 
+A route may also read a parameter it never *declares* — Elasticsearch's URI
+search and Splunk's collection parameters are read straight off the query
+string — and those are invisible to a sweep over the OpenAPI schema. They
+are listed here per route instead, and exercised the same way. Every one of
+them was ignored when the list was first written.
+
     backend/.venv/bin/python scripts/param_effect.py [mount ...]
 """
 
@@ -222,6 +228,59 @@ def judge(kind, base_items, probe_items, probe_body):
     return True
 
 
+#: Parameters a route reads without declaring them, so no schema sweep can
+#: find them: ``(mount, path, {parameter: value}, kind)``, where *kind* is
+#: judged exactly as a declared parameter of that kind would be.
+_UNDECLARED = [
+    ("elastic", "/elastic/logs-endpoint/_search", {"size": "1"}, "limit"),
+    ("elastic", "/elastic/logs-endpoint/_search", {"q": _IMPOSSIBLE["q"]}, "filter"),
+    # Past every document, but inside the 10 000-result window both the
+    # product and the mock refuse to page beyond.
+    ("elastic", "/elastic/logs-endpoint/_search",
+     {"from": "9000", "size": "10"}, "skip"),
+    ("elastic", "/elastic/logs-endpoint/_search", {"_source_includes": "id"}, "select"),
+    ("elastic", "/elastic/logs-endpoint/_count", {"q": _IMPOSSIBLE["q"]}, "filter"),
+    ("splunk", "/splunk/services/data/indexes",
+     {"output_mode": "json", "count": "1"}, "limit"),
+    ("splunk", "/splunk/services/data/indexes",
+     {"output_mode": "json", "count": "0", "search": _IMPOSSIBLE["search"]}, "filter"),
+    ("splunk", "/splunk/services/data/indexes",
+     {"output_mode": "json", "count": "0", "offset": "100000"}, "skip"),
+    ("splunk", "/splunk/services/saved/searches",
+     {"output_mode": "json", "count": "0", "search": _IMPOSSIBLE["search"]}, "filter"),
+]
+
+
+def undeclared():
+    """The parameters no schema declares, judged like the ones that are."""
+    flags, checked = [], 0
+    for mount, path, params, kind in _UNDECLARED:
+        headers = AUTH.get(mount)
+        if headers is None:
+            continue
+        base = client.get(path, headers=headers, params={
+            k: v for k, v in params.items() if k in ("output_mode",)
+        })
+        if base.status_code != 200:
+            continue
+        base_items = collection(base.json())
+        if not base_items:
+            continue
+        checked += 1
+        response = client.get(path, headers=headers, params=params)
+        if response.status_code != 200:
+            flags.append((mount, path, ",".join(params), kind,
+                          len(base_items), f"HTTP {response.status_code}"))
+            continue
+        items = collection(response.json())
+        if items is None:
+            continue
+        if not judge(kind, base_items, items, response.json()):
+            flags.append((mount, path, ",".join(params), kind,
+                          len(base_items), len(items)))
+    return flags, checked
+
+
 def main():
     wanted = sys.argv[1:]
     flags = []
@@ -302,6 +361,10 @@ def main():
                 continue
             if [i.get(field) for i in first] == [i.get(field) for i in second]:
                 flags.append((mount, path, name, "sort", len(first), len(second)))
+
+    found, count = undeclared()
+    flags += [f for f in found if not wanted or f[0] in wanted]
+    checked += count
 
     print(f"=== PARAMETER EFFECT === {checked} parameter(s) exercised")
     by_mount = {}
