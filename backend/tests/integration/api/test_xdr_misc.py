@@ -350,9 +350,18 @@ class TestQuarantineStatus:
     """Tests for quarantine status listing."""
 
     def test_get_quarantine_status(self, client: TestClient) -> None:
+        """The route answers about the files it was asked about.
+
+        `request_data.files` is what it is *for*, and the canned row it used
+        to answer with was somebody else's file.
+        """
         resp = client.post(
             f"{XDR_PREFIX}/quarantine/status/",
-            json={"request_data": {}},
+            json={"request_data": {"files": [{
+                "endpoint_id": "EP-1",
+                "file_hash": "b" * 64,
+                "file_path": "/tmp/sample.bin",
+            }]}},
             headers=_xdr_headers(),
         )
         assert resp.status_code == 200
@@ -360,3 +369,5 @@ class TestQuarantineStatus:
         # recorded: a bare list of {endpoint_id, file_hash, file_path, status}
         assert isinstance(reply, list) and reply
         assert set(reply[0]) == {"endpoint_id", "file_hash", "file_path", "status"}
+        assert reply[0]["endpoint_id"] == "EP-1"
+        assert reply[0]["file_path"] == "/tmp/sample.bin"

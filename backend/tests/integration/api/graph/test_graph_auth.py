@@ -8,6 +8,8 @@ _ADMIN_CREDENTIALS = {
     "client_id": "graph-mock-admin-client",
     "client_secret": "graph-mock-admin-secret",
     "grant_type": "client_credentials",
+    # Entra requires the scope on this grant and refuses a request without.
+    "scope": "https://graph.microsoft.com/.default",
 }
 
 
@@ -40,6 +42,7 @@ class TestGraphAuth:
                 "client_id": "graph-mock-admin-client",
                 "client_secret": "wrong-secret",
                 "grant_type": "client_credentials",
+                "scope": "https://graph.microsoft.com/.default",
             },
         )
         assert resp.status_code == 401
@@ -57,6 +60,7 @@ class TestGraphAuth:
                 "client_id": "nonexistent-client",
                 "client_secret": "any-secret",
                 "grant_type": "client_credentials",
+                "scope": "https://graph.microsoft.com/.default",
             },
         )
         assert resp.status_code == 401
@@ -81,6 +85,7 @@ class TestGraphAuth:
                 "client_id": "graph-mock-smb-client",
                 "client_secret": "graph-mock-smb-secret",
                 "grant_type": "client_credentials",
+                "scope": "https://graph.microsoft.com/.default",
             },
         )
         assert resp.status_code == 200

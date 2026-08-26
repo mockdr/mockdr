@@ -12,6 +12,7 @@ _ADMIN_CREDENTIALS = {
     "client_id": "mde-mock-admin-client",
     "client_secret": "mde-mock-admin-secret",
     "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
 }
 
 
@@ -66,6 +67,7 @@ def _mde_auth(client: TestClient) -> dict[str, str]:
         "client_id": "mde-mock-admin-client",
         "client_secret": "mde-mock-admin-secret",
         "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
     })
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -78,6 +80,7 @@ class TestMdeTokenEndpoint:
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         assert resp.status_code == 200
 
@@ -86,6 +89,7 @@ class TestMdeTokenEndpoint:
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         body = resp.json()
         assert "access_token" in body
@@ -98,6 +102,7 @@ class TestMdeTokenEndpoint:
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         body = resp.json()
         assert body["token_type"] == "Bearer"
@@ -110,6 +115,7 @@ class TestMdeTokenEndpoint:
             "client_id": "wrong-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         assert resp.status_code == 401
 
@@ -118,6 +124,7 @@ class TestMdeTokenEndpoint:
             "client_id": "mde-mock-admin-client",
             "client_secret": "wrong-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         assert resp.status_code == 401
 
@@ -167,6 +174,7 @@ class TestMdeRbac:
             "client_id": "mde-mock-viewer-client",
             "client_secret": "mde-mock-viewer-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
         resp = client.get("/mde/api/machines", headers=headers)
@@ -178,6 +186,7 @@ class TestMdeRbac:
             "client_id": "mde-mock-viewer-client",
             "client_secret": "mde-mock-viewer-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         })
         viewer_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 

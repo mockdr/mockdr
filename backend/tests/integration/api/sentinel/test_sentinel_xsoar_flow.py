@@ -24,6 +24,7 @@ class TestXsoarSentinelFlow:
                 "client_id": "sentinel-mock-client-id",
                 "client_secret": "sentinel-mock-client-secret",
                 "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
             },
         )
         assert token_resp.status_code == 200
@@ -97,7 +98,8 @@ class TestXsoarSentinelFlow:
             f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
             data={"client_id": "sentinel-mock-client-id",
                   "client_secret": "sentinel-mock-client-secret",
-                  "grant_type": "client_credentials"},
+                  "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default"},
         )
         headers = {"Authorization": f"Bearer {token_resp.json()['access_token']}"}
 
@@ -118,7 +120,8 @@ class TestXsoarSentinelFlow:
             f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
             data={"client_id": "sentinel-mock-client-id",
                   "client_secret": "sentinel-mock-client-secret",
-                  "grant_type": "client_credentials"},
+                  "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default"},
         )
         headers = {"Authorization": f"Bearer {token_resp.json()['access_token']}"}
 

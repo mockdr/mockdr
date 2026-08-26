@@ -65,8 +65,9 @@ def get_user_groups(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
 ) -> dict:
-    """List XDR user groups."""
-    return rbac_queries.get_user_groups()
+    """List the user groups the body names, or all of them."""
+    names = (body.get("request_data") or {}).get("group_names")
+    return rbac_queries.get_user_groups(names if isinstance(names, list) else None)
 
 
 @router.post("/rbac/get_roles/")
@@ -195,15 +196,29 @@ def get_quarantine_status(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
 ) -> dict:
-    """List quarantine status entries (canned data)."""
+    """Report the status of the files the body asks about.
+
+    `request_data.files` is what this route is *for* — a client asks whether
+    the file it just quarantined is quarantined — and mockdr answered the
+    same canned row whatever was asked, so a playbook read someone else's
+    file back and believed it was its own.
+    """
     # The product answers a bare list of {endpoint_id, file_hash, file_path,
     # status} (recorded in the XSOAR pack), not a paged envelope.
+    asked = (body.get("request_data") or {}).get("files")
+    if not isinstance(asked, list) or not asked:
+        return build_xdr_reply([])
     entries = [
         {
-            "endpoint_id": "mock-endpoint-001",
-            "file_hash": "a" * 64,
-            "file_path": "C:\\Users\\analyst\\Downloads\\sample.exe",
+            "endpoint_id": str(item.get("endpoint_id", "")),
+            "file_hash": str(item.get("file_hash", "")),
+            "file_path": str(item.get("file_path", "")),
+            # Every file this mock is asked about is quarantined: it holds no
+            # quarantine store of its own, and answering "no" for a file a
+            # client has just quarantined would be the worse invention.
             "status": "quarantined",
-        },
+        }
+        for item in asked
+        if isinstance(item, dict)
     ]
     return build_xdr_reply(entries)

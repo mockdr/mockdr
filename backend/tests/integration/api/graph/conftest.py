@@ -34,6 +34,7 @@ def graph_p1_token(client: TestClient) -> str:
             "client_id": "graph-mock-p1-client",
             "client_secret": "graph-mock-p1-secret",
             "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
         },
     )
     assert resp.status_code == 200

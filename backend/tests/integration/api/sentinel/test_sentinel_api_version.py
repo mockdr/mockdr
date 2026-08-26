@@ -30,6 +30,7 @@ def _auth(client: TestClient) -> dict[str, str]:
         "client_id": "sentinel-mock-client-id",
         "client_secret": "sentinel-mock-client-secret",
         "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
     })
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -96,6 +97,7 @@ class TestApiVersionRequired:
             "client_id": "sentinel-mock-client-id",
             "client_secret": "sentinel-mock-client-secret",
             "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
         })
         assert resp.status_code == 200
 

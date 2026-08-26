@@ -178,6 +178,7 @@ class TestGraphHunting:
                 "client_id": "graph-mock-smb-client",
                 "client_secret": "graph-mock-smb-secret",
                 "grant_type": "client_credentials",
+        "scope": "https://graph.microsoft.com/.default",
             },
         )
         assert token_resp.status_code == 200

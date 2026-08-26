@@ -20,6 +20,7 @@ def _mde_token(client: TestClient) -> str:
         "client_id": "mde-mock-admin-client",
         "client_secret": "mde-mock-admin-secret",
         "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
     })
     return str(resp.json()["access_token"])
 
@@ -29,6 +30,7 @@ def _graph_token(client: TestClient) -> str:
         "client_id": "graph-mock-admin-client",
         "client_secret": "graph-mock-admin-secret",
         "grant_type": "client_credentials",
+        "scope": "https://graph.microsoft.com/.default",
     })
     return str(resp.json()["access_token"])
 
@@ -276,6 +278,7 @@ def _vendor_headers(client: TestClient, vendor: str) -> dict[str, str]:
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
     if vendor == "es":

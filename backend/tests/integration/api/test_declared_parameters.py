@@ -26,9 +26,9 @@ def graph_headers(client: TestClient) -> dict:
     """An application token for the Graph mount."""
     token = client.post("/graph/oauth2/v2.0/token", data={
         "grant_type": "client_credentials",
+        "scope": "https://graph.microsoft.com/.default",
         "client_id": "graph-mock-admin-client",
         "client_secret": "graph-mock-admin-secret",
-        "scope": "https://graph.microsoft.com/.default",
     }).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -49,9 +49,9 @@ def sentinel_headers(client: TestClient) -> dict:
     """An ARM token for the Sentinel mount."""
     token = client.post("/sentinel/oauth2/v2.0/token", data={
         "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
         "client_id": "sentinel-mock-client-id",
         "client_secret": "sentinel-mock-client-secret",
-        "scope": "https://management.azure.com/.default",
     }).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

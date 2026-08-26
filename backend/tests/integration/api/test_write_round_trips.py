@@ -608,9 +608,9 @@ class TestAFieldMeansOneThing:
     def _mde(self, client: TestClient) -> dict:
         token = client.post("/mde/oauth2/v2.0/token", data={
             "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
-            "scope": "https://api.securitycenter.microsoft.com/.default",
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
 
@@ -664,18 +664,18 @@ class TestGraphAlertEvidenceIsGraphsOwnShape:
     def _graph(self, client: TestClient) -> dict:
         token = client.post("/graph/oauth2/v2.0/token", data={
             "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
             "client_id": "graph-mock-admin-client",
             "client_secret": "graph-mock-admin-secret",
-            "scope": "https://graph.microsoft.com/.default",
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
 
     def _mde(self, client: TestClient) -> dict:
         token = client.post("/mde/oauth2/v2.0/token", data={
             "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
-            "scope": "https://api.securitycenter.microsoft.com/.default",
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
 
@@ -761,18 +761,18 @@ class TestAnEnumSortsByItsDeclaredOrder:
     def _graph(self, client: TestClient) -> dict:
         token = client.post("/graph/oauth2/v2.0/token", data={
             "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
             "client_id": "graph-mock-admin-client",
             "client_secret": "graph-mock-admin-secret",
-            "scope": "https://graph.microsoft.com/.default",
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
 
     def _mde(self, client: TestClient) -> dict:
         token = client.post("/mde/oauth2/v2.0/token", data={
             "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
-            "scope": "https://api.securitycenter.microsoft.com/.default",
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
 
@@ -3074,7 +3074,9 @@ class TestOneDirectoryAnswersOneWay:
 
     SENTINEL = "/sentinel/oauth2/v2.0/token"
     CREDENTIALS = {"client_id": "sentinel-mock-client-id",
-                   "client_secret": "sentinel-mock-client-secret"}
+                   "client_secret": "sentinel-mock-client-secret",
+                   # Entra requires the scope on this grant.
+                   "scope": "https://management.azure.com/.default"}
 
     def test_a_grant_it_does_not_issue_for(self, client: TestClient) -> None:
         response = client.post(self.SENTINEL,
@@ -3105,10 +3107,12 @@ class TestOneDirectoryAnswersOneWay:
         for path, credentials in (
             ("/mde/oauth2/v2.0/token",
              {"client_id": "mde-mock-admin-client",
-              "client_secret": "mde-mock-admin-secret"}),
+              "client_secret": "mde-mock-admin-secret",
+              "scope": "https://api.securitycenter.microsoft.com/.default"}),
             ("/graph/oauth2/v2.0/token",
              {"client_id": "graph-mock-admin-client",
-              "client_secret": "graph-mock-admin-secret"}),
+              "client_secret": "graph-mock-admin-secret",
+              "scope": "https://graph.microsoft.com/.default"}),
             (self.SENTINEL, self.CREDENTIALS),
         ):
             bodies.append(client.post(path, data={
@@ -3123,10 +3127,12 @@ class TestOneDirectoryAnswersOneWay:
         for path, credentials in (
             ("/mde/oauth2/v2.0/token",
              {"client_id": "mde-mock-admin-client",
-              "client_secret": "mde-mock-admin-secret"}),
+              "client_secret": "mde-mock-admin-secret",
+              "scope": "https://api.securitycenter.microsoft.com/.default"}),
             ("/graph/oauth2/v2.0/token",
              {"client_id": "graph-mock-admin-client",
-              "client_secret": "graph-mock-admin-secret"}),
+              "client_secret": "graph-mock-admin-secret",
+              "scope": "https://graph.microsoft.com/.default"}),
             (self.SENTINEL, self.CREDENTIALS),
         ):
             body = client.post(
@@ -3605,3 +3611,109 @@ class TestWhatShapingDoesNotApplyTo:
         response = client.get("/elastic/_count", headers=self.ES,
                               params={"filter_path": "zzz-nothing"})
         assert response.content == b"{}"
+
+
+class TestEntraWantsToKnowWhatTheTokenIsFor:
+    """`scope` is required on the client-credentials grant at the v2 endpoint.
+
+    All three Entra mounts took it as a form field and never looked at it —
+    Graph's own docstring said so — and issued a token for a request Entra
+    would have refused. Every client written against mockdr could therefore
+    omit the one parameter the real directory insists on, and fifteen of this
+    repo's own test files did.
+    """
+
+    MOUNTS = [
+        ("/graph/oauth2/v2.0/token", "graph-mock-admin-client",
+         "graph-mock-admin-secret", "https://graph.microsoft.com/.default"),
+        ("/mde/oauth2/v2.0/token", "mde-mock-admin-client",
+         "mde-mock-admin-secret",
+         "https://api.securitycenter.microsoft.com/.default"),
+        ("/sentinel/oauth2/v2.0/token", "sentinel-mock-client-id",
+         "sentinel-mock-client-secret", "https://management.azure.com/.default"),
+    ]
+
+    @pytest.mark.parametrize(("path", "client_id", "secret", "scope"), MOUNTS)
+    def test_a_request_without_one_is_refused(
+        self, client: TestClient, path: str, client_id: str, secret: str,
+        scope: str,
+    ) -> None:
+        response = client.post(path, data={
+            "client_id": client_id, "client_secret": secret,
+            "grant_type": "client_credentials"})
+        assert response.status_code == 400
+        assert response.json()["error"] == "invalid_request"
+        assert "'scope'" in response.json()["error_description"]
+
+    @pytest.mark.parametrize(("path", "client_id", "secret", "scope"), MOUNTS)
+    def test_a_request_with_one_is_answered(
+        self, client: TestClient, path: str, client_id: str, secret: str,
+        scope: str,
+    ) -> None:
+        response = client.post(path, data={
+            "client_id": client_id, "client_secret": secret,
+            "grant_type": "client_credentials", "scope": scope})
+        assert response.status_code == 200
+        assert response.json()["token_type"] == "Bearer"
+
+    def test_the_tenant_scoped_url_wants_it_too(
+        self, client: TestClient,
+    ) -> None:
+        tenant = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        without = client.post(f"/graph/{tenant}/oauth2/v2.0/token", data={
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "grant_type": "client_credentials"})
+        assert without.status_code == 400
+
+
+class TestACortexBodyThatSaysWhichRecords:
+    """Two routes were built to read a body and read none of it.
+
+    `rbac/get_user_group` documents `group_names` and `quarantine/status`
+    documents `files` — the reference lists no other member for either — and
+    both were answered from a canned list. A client asking about one group
+    got every group; a client asking whether *its* file was quarantined read
+    somebody else's row and believed it was its own.
+    """
+
+    XDR = {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"}
+
+    def _groups(self, client: TestClient, request_data: dict) -> list[str]:
+        reply = client.post("/xdr/public_api/v1/rbac/get_user_group/",
+                            headers=self.XDR,
+                            json={"request_data": request_data}).json()["reply"]
+        return [g["group_name"] for g in reply]
+
+    def test_a_body_that_names_a_group_gets_that_group(
+        self, client: TestClient,
+    ) -> None:
+        assert self._groups(client, {"group_names": ["SOC Team"]}) == ["SOC Team"]
+
+    def test_a_body_that_names_none_gets_all_of_them(
+        self, client: TestClient,
+    ) -> None:
+        assert len(self._groups(client, {})) > 1
+
+    def test_a_group_nobody_has(self, client: TestClient) -> None:
+        assert self._groups(client, {"group_names": ["zzz-no-such"]}) == []
+
+    def test_quarantine_answers_about_the_files_it_was_given(
+        self, client: TestClient,
+    ) -> None:
+        reply = client.post("/xdr/public_api/v1/quarantine/status/",
+                            headers=self.XDR,
+                            json={"request_data": {"files": [
+                                {"endpoint_id": "EP-9", "file_hash": "c" * 64,
+                                 "file_path": "/opt/x"},
+                            ]}}).json()["reply"]
+        assert [r["endpoint_id"] for r in reply] == ["EP-9"]
+        assert reply[0]["file_path"] == "/opt/x"
+
+    def test_asking_about_no_files_answers_about_none(
+        self, client: TestClient,
+    ) -> None:
+        reply = client.post("/xdr/public_api/v1/quarantine/status/",
+                            headers=self.XDR,
+                            json={"request_data": {}}).json()["reply"]
+        assert reply == []

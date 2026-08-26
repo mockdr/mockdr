@@ -12,6 +12,7 @@ def _mde_auth(client: TestClient) -> dict[str, str]:
         "client_id": "mde-mock-admin-client",
         "client_secret": "mde-mock-admin-secret",
         "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
     })
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 

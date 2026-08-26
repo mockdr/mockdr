@@ -21,9 +21,10 @@ async def oauth2_token(
     client_id: str = Form(default=""),
     client_secret: str = Form(default=""),
     grant_type: str = Form(default=""),
+    scope: str = Form(default=""),
 ) -> dict:
     """Exchange client credentials for an access token."""
-    return _issue_token(None, client_id, client_secret, grant_type)
+    return _issue_token(None, client_id, client_secret, grant_type, scope)
 
 
 @router.post("/{tenant_id}/oauth2/v2.0/token")
@@ -32,6 +33,7 @@ async def oauth2_token_for_tenant(
     client_id: str = Form(default=""),
     client_secret: str = Form(default=""),
     grant_type: str = Form(default=""),
+    scope: str = Form(default=""),
 ) -> dict:
     """Exchange client credentials on the tenant-scoped URL real Entra uses.
 
@@ -42,15 +44,18 @@ async def oauth2_token_for_tenant(
         client_id:     Azure AD application client ID (form-encoded).
         client_secret: Client secret (form-encoded).
         grant_type:    Must be ``"client_credentials"``.
+        scope:         The resource being asked for. Entra requires it on
+                       this grant and refuses a request without one.
 
     Returns:
         Token response — see :func:`_issue_token`.
     """
-    return _issue_token(tenant_id, client_id, client_secret, grant_type)
+    return _issue_token(tenant_id, client_id, client_secret, grant_type, scope)
 
 
 def _issue_token(
     tenant_id: str | None, client_id: str, client_secret: str, grant_type: str = "",
+    scope: str = "",
 ) -> dict:
     """Resolve the tenant, validate the credentials and mint a token.
 
@@ -59,6 +64,8 @@ def _issue_token(
         client_id:     Azure AD application client ID.
         client_secret: Client secret.
         grant_type:    Must be ``"client_credentials"``, the only grant this
+        scope:         The resource being asked for. Entra requires it on
+                       this grant and refuses a request without one.
                        directory issues for.
 
     Returns:
@@ -73,6 +80,14 @@ def _issue_token(
     # directory minted a token for `grant_type=password` — and for a request
     # that named no grant at all — where the two other Entra mounts in this
     # mock refuse both. One identity platform cannot answer three ways.
+    if not scope:
+        raise HTTPException(status_code=400, detail=build_token_error(
+            "invalid_request",
+            "AADSTS900144: The request body must contain the following "
+            "parameter: 'scope'.",
+            AADSTS_MISSING_PARAMETER,
+        ))
+
     if grant_type != "client_credentials":
         raise HTTPException(status_code=400, detail=build_token_error(
             "unsupported_grant_type" if grant_type else "invalid_request",

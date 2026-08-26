@@ -25,6 +25,7 @@ from repository.store import store
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
+    AADSTS_MISSING_PARAMETER,
     AADSTS_TENANT_NOT_FOUND,
     AADSTS_UNSUPPORTED_GRANT,
     build_token_error,
@@ -40,7 +41,7 @@ async def create_token(
     client_id: str = Form(...),
     client_secret: str = Form(...),
     grant_type: str = Form(...),
-    scope: str = Form("https://graph.microsoft.com/.default"),
+    scope: str = Form(default=""),
 ) -> dict:
     """Exchange client credentials for an access token.
 
@@ -48,12 +49,13 @@ async def create_token(
         client_id:     OAuth2 client identifier (form-encoded).
         client_secret: OAuth2 client secret (form-encoded).
         grant_type:    Must be ``"client_credentials"``.
-        scope:         OAuth2 scope (ignored — mock accepts any scope).
+        scope:         The resource being asked for. Entra requires it on
+                       this grant and refuses a request without one.
 
     Returns:
         Token response — see :func:`_issue_token`.
     """
-    return _issue_token(None, client_id, client_secret, grant_type)
+    return _issue_token(None, client_id, client_secret, grant_type, scope)
 
 
 @router.post("/{tenant_id}/oauth2/v2.0/token")
@@ -62,7 +64,7 @@ async def create_token_for_tenant(
     client_id: str = Form(...),
     client_secret: str = Form(...),
     grant_type: str = Form(...),
-    scope: str = Form("https://graph.microsoft.com/.default"),
+    scope: str = Form(default=""),
 ) -> dict:
     """Exchange client credentials on the tenant-scoped URL real Entra uses.
 
@@ -73,12 +75,13 @@ async def create_token_for_tenant(
         client_id:     OAuth2 client identifier (form-encoded).
         client_secret: OAuth2 client secret (form-encoded).
         grant_type:    Must be ``"client_credentials"``.
-        scope:         OAuth2 scope (ignored — mock accepts any scope).
+        scope:         The resource being asked for. Entra requires it on
+                       this grant and refuses a request without one.
 
     Returns:
         Token response — see :func:`_issue_token`.
     """
-    return _issue_token(tenant_id, client_id, client_secret, grant_type)
+    return _issue_token(tenant_id, client_id, client_secret, grant_type, scope)
 
 
 def _issue_token(
@@ -86,6 +89,7 @@ def _issue_token(
     client_id: str,
     client_secret: str,
     grant_type: str,
+    scope: str = "",
 ) -> dict:
     """Validate a client-credentials request and mint an access token.
 
@@ -99,6 +103,8 @@ def _issue_token(
         client_id:     OAuth2 client identifier.
         client_secret: OAuth2 client secret.
         grant_type:    Must be ``"client_credentials"``.
+        scope:         The resource being asked for. Entra requires it on
+                       this grant and refuses a request without one.
 
     Returns:
         Dict with ``access_token``, ``token_type``, ``expires_in``, and
@@ -108,6 +114,14 @@ def _issue_token(
         HTTPException: 400 if grant_type is invalid or the tenant is unknown.
         HTTPException: 401 if the credentials are invalid.
     """
+    if not scope:
+        raise HTTPException(status_code=400, detail=build_token_error(
+            "invalid_request",
+            "AADSTS900144: The request body must contain the following "
+            "parameter: 'scope'.",
+            AADSTS_MISSING_PARAMETER,
+        ))
+
     if grant_type != "client_credentials":
         raise HTTPException(
             status_code=400,

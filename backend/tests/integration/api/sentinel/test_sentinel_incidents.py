@@ -15,7 +15,8 @@ def _get_token(client: TestClient) -> str:
         f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
         data={"client_id": "sentinel-mock-client-id",
               "client_secret": "sentinel-mock-client-secret",
-              "grant_type": "client_credentials"},
+              "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default"},
     )
     return resp.json()["access_token"]
 

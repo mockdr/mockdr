@@ -714,6 +714,31 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Three parameters a route declared and never looked at.**
+Found by reading the source rather than asking the mock: a handler that
+takes a parameter and never mentions it again answers 200 with something
+plausible, and the parameter the client sent simply never happened. That is
+invisible to every other audit here, which can only compare answers.
+
+* `scope` is required on the client-credentials grant at Entra's v2
+  endpoint, and all three Entra mounts took it as a form field and dropped
+  it — Graph's own docstring said "ignored". Every client written against
+  mockdr could omit the one parameter the real directory insists on, and
+  fifteen of this repo's own test files did.
+* Cortex's `rbac/get_user_group` documents `group_names` and reads none of
+  it: a client asking about one group was handed every group.
+* Cortex's `quarantine/status` documents `files` — it is the whole point of
+  the route — and answered a canned row whatever was asked, so a playbook
+  checking whether *its* file was quarantined read somebody else's and
+  believed it was its own.
+
+`scripts/unread_params.py` is the audit, and it knows the three ways a
+declaration is not a defect: a `Depends` whose presence is the effect, a
+parameter another layer answers for (`output_mode` is Splunk middleware's,
+`api-version` is the ARM middleware's — each checked against the running
+mock before it was written down), and a body the vendor's reference
+documents no member for.
+
 **The three things Elasticsearch lets a client do to any answer.**
 None of them is a per-route feature — every endpoint takes them — and mockdr
 took all three as decoration:

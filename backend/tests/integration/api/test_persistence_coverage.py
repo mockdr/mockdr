@@ -66,6 +66,7 @@ class TestSnapshotRoundTrip:
             "client_id": "graph-mock-admin-client",
             "client_secret": "graph-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://graph.microsoft.com/.default",
         })
         assert graph.status_code == 200
         users = client.get(

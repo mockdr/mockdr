@@ -12,6 +12,7 @@ def _get_token(client: TestClient) -> str:
             "client_id": "sentinel-mock-client-id",
             "client_secret": "sentinel-mock-client-secret",
             "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
         },
     )
     assert resp.status_code == 200
@@ -29,6 +30,7 @@ class TestTenantScopedTokenUrl:
         "client_id": "sentinel-mock-client-id",
         "client_secret": "sentinel-mock-client-secret",
         "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
     }
 
     def test_tenant_scoped_url_returns_token(self, client: TestClient) -> None:
@@ -74,6 +76,7 @@ class TestOAuth2TokenExchange:
                 "client_id": "sentinel-mock-client-id",
                 "client_secret": "sentinel-mock-client-secret",
                 "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
             },
         )
         assert resp.status_code == 200
@@ -89,6 +92,7 @@ class TestOAuth2TokenExchange:
                 "client_id": "wrong",
                 "client_secret": "wrong",
                 "grant_type": "client_credentials",
+        "scope": "https://management.azure.com/.default",
             },
         )
         assert resp.status_code == 401

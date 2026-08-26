@@ -42,17 +42,27 @@ def get_users() -> dict:
     return build_xdr_reply(users)  # recorded: a bare list in reply
 
 
-def get_user_groups() -> dict:
-    """Return a synthetic list of XDR user groups.
+def get_user_groups(group_names: list[str] | None = None) -> dict:
+    """Return the user groups asked for, or all of them.
+
+    `request_data.group_names` is the one member this route documents, and
+    it was read by nothing: a client asking about one group was handed every
+    group, and could not tell that its question had been ignored.
+
+    Args:
+        group_names: The groups to describe, or None for all of them.
 
     Returns:
-        XDR list reply with canned group records.
+        XDR list reply with the matching group records.
     """
     groups = [
         {"group_name": "XDR Admins", "user_count": 1, "description": "Full access administrators"},
         {"group_name": "SOC Team", "user_count": 1, "description": "Security operations analysts"},
         {"group_name": "Read Only", "user_count": 1, "description": "Read-only viewers"},
     ]
+    if group_names:
+        wanted = {str(name) for name in group_names}
+        groups = [g for g in groups if g["group_name"] in wanted]
     return build_xdr_reply(groups)  # recorded: a bare list in reply
 
 

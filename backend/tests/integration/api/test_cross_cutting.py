@@ -109,6 +109,7 @@ class TestStoreReadsAreThreadSafe:
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         }).json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -172,6 +173,7 @@ class TestEdrToSiemBridge:
             "client_id": "mde-mock-admin-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
+        "scope": "https://api.securitycenter.microsoft.com/.default",
         }).json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
         machine_id = client.get(
