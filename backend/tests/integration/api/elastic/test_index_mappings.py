@@ -181,16 +181,48 @@ class TestFielddata:
         )
         assert response.status_code == 200
 
-    def test_the_collections_mockdr_owns_are_not_judged(
+    def test_a_collection_mockdr_owns_sorts_by_what_it_carries(
         self, client: TestClient,
     ) -> None:
-        # Their mapping is a summary rather than the whole index, so refusing
-        # a sort on a field it does not list would be inventing a failure.
+        """Their mapping is a summary, so the documents settle it.
+
+        A field neither the mapping declares nor any document carries is one
+        the cluster has no doc values for, and 8.15 refuses it — measured
+        against the conformance cluster. The two alert families spell the
+        same number differently, and each sorts by its own spelling:
+        `.siem-signals-*` carries `signal.rule.risk_score`, the
+        `.alerts-*` family `kibana.alert.risk_score`.
+        """
+        legacy = client.post(
+            "/elastic/.siem-signals-default/_search", headers=AUTH,
+            json={"size": 1, "sort": [{"signal.rule.risk_score": "desc"}]},
+        )
+        assert legacy.status_code == 200
+
+        current = client.post(
+            "/elastic/.alerts-security/_search", headers=AUTH,
+            json={"size": 1, "sort": [{"kibana.alert.risk_score": "desc"}]},
+        )
+        assert current.status_code == 200
+
+    def test_a_field_neither_declared_nor_carried_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        """`No mapping found for [x] in order to sort on`, as 8.15 answers.
+
+        Sorting the first page of an unsorted search instead told a client
+        its sort had run.
+        """
         response = client.post(
             "/elastic/.siem-signals-default/_search", headers=AUTH,
             json={"size": 1, "sort": [{"kibana.alert.risk_score": "desc"}]},
         )
-        assert response.status_code == 200
+        assert response.status_code == 400
+        error = response.json()["error"]
+        assert error["type"] == "search_phase_execution_exception"
+        assert "No mapping found for [kibana.alert.risk_score]" in (
+            error["root_cause"][0]["reason"]
+        )
 
     def test_a_keyword_field_aggregates(self, client: TestClient) -> None:
         response = client.post(

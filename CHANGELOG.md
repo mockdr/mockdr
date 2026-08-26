@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A sort that did not run, reported as one that did.**
+Elasticsearch sorts on doc values, so a field with no mapping is refused —
+`No mapping found for [x] in order to sort on`, wrapped in a
+`search_phase_execution_exception`, measured against 8.15. mockdr refused it
+only for indices a client had created with a mapping; for its own collections
+it answered the first page of an *unsorted* search with a 200, which tells a
+client its sort ran. Those collections are judged by what they publish and
+hold now: a field neither their mapping declares nor any document carries is
+refused, `unmapped_type` still runs the sort as the cluster does, and the two
+alert families keep sorting by the spelling their own documents use —
+`.siem-signals-*` by `signal.rule.risk_score`, the `.alerts-*` family by
+`kibana.alert.risk_score`. Two conformance probes hold the pair in place.
+
 **A Log Analytics table this workspace does not have, answered with silence.**
 `MicrosoftDefender_CL | count` — a name a client can plausibly type, where
 the connector's table is `SecurityAlert` — was answered `200` with an empty

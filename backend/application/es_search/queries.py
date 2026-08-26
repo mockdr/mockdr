@@ -622,21 +622,31 @@ def _missing_target(index: str) -> str | None:
 _SORT_METADATA = frozenset({"_doc", "_score", "_id", "_index", "_shard_doc"})
 
 
-def _refuse_unsortable(index: str, sort_spec: list) -> None:
+def _refuse_unsortable(index: str, sort_spec: list, records: list[dict] | None = None) -> None:
     """Refuse a sort a real cluster cannot run.
 
     A cluster sorts on doc values, so a `text` field is refused for the same
     reason it cannot be aggregated, and a field the mapping does not have at
     all is refused as well — unless the client says what type to assume.
-    Only an index mockdr holds a full mapping for is judged: for its own
-    collections the mapping is a summary, and refusing a sort on a field it
-    does not happen to list would be inventing a failure.
+    Only an index mockdr holds a full mapping for is judged that way: for its
+    own collections the mapping is a summary, and refusing a sort on a field
+    it does not happen to list would be inventing a failure.
+
+    Those collections are judged by what they publish and hold: a field
+    neither the mapping `GET /{index}/_mapping` answers nor any document of
+    the collection carries is one the cluster has no doc values for, and 8.15
+    answers `No mapping found for [x] in order to sort on` — measured.
+    Answering the first page of an unsorted search instead told a client its
+    sort had run.
 
     Raises:
         ESQueryError: If a sort key cannot be run.
     """
     entry = store.get("es_indices", index)
-    if not entry or not sort_spec:
+    if not sort_spec:
+        return
+    if not entry:
+        _refuse_sorting_on_nothing(index, sort_spec, records or [])
         return
     properties = flatten_properties(_mapped_properties(index))
     for key in sort_spec:
@@ -654,6 +664,38 @@ def _refuse_unsortable(index: str, sort_spec: list) -> None:
                 FIELDDATA_DISABLED.format(field=name, index=index),
                 es_type="illegal_argument_exception", shard_failure=True,
             )
+
+
+def _refuse_sorting_on_nothing(index: str, sort_spec: list, records: list[dict]) -> None:
+    """Refuse a sort key this collection neither declares nor holds.
+
+    Raises:
+        ESQueryError: If the mapping does not declare the field and no
+            document carries it.
+    """
+    declared = flatten_properties(_mapped_properties(index))
+    for key in sort_spec:
+        name, spec = _sort_key_name(key)
+        if not name or name in _SORT_METADATA or spec.get("unmapped_type"):
+            continue
+        if name in declared or any(_holds(record, name) for record in records):
+            continue
+        raise ESQueryError(
+            f"No mapping found for [{name}] in order to sort on",
+            es_type="query_shard_exception", shard_failure=True,
+        )
+
+
+def _holds(record: dict, field: str) -> bool:
+    """Whether a stored record carries a field, in either of its two shapes.
+
+    A seeded record is rendered to ECS on the way out, so the field a client
+    sorts on may be spelled as a dotted path over the answer rather than as a
+    key of what is stored.
+    """
+    if get_nested(record, field) is not None:
+        return True
+    return get_nested(to_ecs_document(dict(record), ""), field) is not None
 
 
 def _sort_key_name(key: object) -> tuple[str, dict]:
@@ -756,7 +798,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     total_before = len(records)
 
     validate_search_body(body)
-    _refuse_unsortable(canonical_index, body.get("sort") or [])
+    _refuse_unsortable(canonical_index, body.get("sort") or [], records)
     # Apply query DSL (filter, sort, from/size).
     filtered = apply_es_query(records, body, written_ids, _terms_lookup)
 

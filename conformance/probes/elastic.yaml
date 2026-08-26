@@ -3625,3 +3625,35 @@ probes:
                           {"_index": "zzz-no-such-index", "_id": "x"}]}'
       headers: {Content-Type: application/json}
       auth: basic
+
+  - id: es-sort-on-an-unmapped-field
+    endpoint: search
+    needs_seed: true
+    why: >
+      A cluster sorts on doc values, so a field with no mapping is refused
+      rather than ignored. mockdr answered the first page of an unsorted
+      search for its own collections, which tells a client its sort ran.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 2, sort: [{definitely_not_a_field: "asc"}]}
+      auth: basic
+    ignore_paths:
+      - $.error.failed_shards[*].index
+      - $.error.failed_shards[*].node
+      - $.error.root_cause[*].index_uuid
+      - $.error.failed_shards[*].reason.index_uuid
+
+  - id: es-sort-unmapped-with-a-type-to-assume
+    endpoint: search
+    needs_seed: true
+    why: >
+      `unmapped_type` is the client saying what to assume, and the same sort
+      then runs — the missing values sorting at the extreme of that type.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json:
+        size: 2
+        sort: [{definitely_not_a_field: {order: "asc", unmapped_type: "long"}}]
+      auth: basic
