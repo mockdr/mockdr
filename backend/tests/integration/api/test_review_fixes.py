@@ -200,8 +200,15 @@ class TestRuleImportActuallyImports:
 
     @staticmethod
     def _export(client: TestClient) -> str:
+        """Export the rules by name — `objects` is required, and an empty
+        selection exports nothing rather than everything."""
+        found = client.get(
+            "/kibana/api/detection_engine/rules/_find", headers=ES_AUTH,
+            params={"per_page": 10_000},
+        ).json()["data"]
         return client.post(
-            "/kibana/api/detection_engine/rules/_export", headers=ES_AUTH, json={},
+            "/kibana/api/detection_engine/rules/_export", headers=ES_AUTH,
+            json={"objects": [{"rule_id": r["rule_id"]} for r in found]},
         ).text
 
     @staticmethod

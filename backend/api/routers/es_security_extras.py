@@ -180,23 +180,45 @@ def export_rules(
     body: dict = Body(default={}),
     _: dict = Depends(require_es_auth),
 ) -> PlainTextResponse:
-    """Export rules as NDJSON, the format ``_import`` consumes."""
+    """Export rules as NDJSON, the format ``_import`` consumes.
+
+    ``objects`` is required even when it is empty: a client that meant to
+    export a selection and sent no body was handed every rule mockdr held.
+    """
     import json
 
-    wanted = {
-        str(o.get("rule_id"))
-        for o in (body or {}).get("objects", []) or []
-        if isinstance(o, dict)
+    if "objects" not in body:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: objects: Required",
+        ))
+    objects = body.get("objects") or []
+    wanted = [str(o.get("rule_id")) for o in objects if isinstance(o, dict)]
+    by_rule_id = {
+        str(r.get("rule_id")): r
+        for r in rule_queries.find_rules(page=1, per_page=10_000)["data"]
     }
-    rules = rule_queries.find_rules(page=1, per_page=10_000)["data"]
-    selected = [r for r in rules if not wanted or str(r.get("rule_id")) in wanted]
+    # An empty selection exports nothing. Treating it as "everything" handed
+    # a client that meant to export one rule the whole ruleset.
+    selected = [by_rule_id[rule_id] for rule_id in wanted if rule_id in by_rule_id]
+    missing = [{"rule_id": rule_id} for rule_id in wanted if rule_id not in by_rule_id]
 
     lines = [json.dumps(r) for r in selected]
     lines.append(json.dumps({
         "exported_count": len(selected),
         "exported_rules_count": len(selected),
-        "missing_rules": [],
-        "missing_rules_count": 0,
+        "missing_rules": missing,
+        "missing_rules_count": len(missing),
+        "exported_exception_list_count": 0,
+        "exported_exception_list_item_count": 0,
+        "missing_exception_list_item_count": 0,
+        "missing_exception_list_items": [],
+        "missing_exception_lists": [],
+        "missing_exception_lists_count": 0,
+        "exported_action_connector_count": 0,
+        "missing_action_connection_count": 0,
+        "missing_action_connections": [],
+        "excluded_action_connection_count": 0,
+        "excluded_action_connections": [],
     }))
     # NDJSON, not a JSON-encoded string: returning `str` made FastAPI
     # serialise it with escapes, so the caller received a quoted blob.
@@ -614,9 +636,22 @@ def endpoint_suggestions(
     body: dict = Body(default={}),
     _: dict = Depends(require_es_auth),
 ) -> list[str]:
-    """Suggest values for a field, which the UI uses for autocomplete."""
-    field = str(body.get("fieldName") or body.get("field") or "")
+    """Suggest values for a field, which the UI uses for autocomplete.
+
+    The Endpoint routes validate with @kbn/config-schema, which names the
+    member in the bracket and reports the type it wanted. Without `field`
+    there is nothing to suggest values for, and the route used to answer with
+    every hostname it held.
+    """
+    field = body.get("field", body.get("fieldName"))
+    if not isinstance(field, str):
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400,
+            "[request body.field]: expected value of type [string] "
+            f"but got [{'undefined' if field is None else type(field).__name__}]",
+        ))
     entries = endpoint_queries.list_endpoints(page=1, per_page=10_000).get("data", [])
+
 
     values: set[str] = set()
     for entry in entries:

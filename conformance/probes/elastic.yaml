@@ -556,6 +556,63 @@ probes:
       query: {status: exploded}
       auth: basic
 
+  - id: es-aliases-with-nothing-to-do
+    endpoint: search
+    why: An alias update with an empty action list, which used to be acknowledged.
+    request:
+      method: POST
+      path: /_aliases
+      json: {actions: []}
+      auth: basic
+
+  - id: es-aliases-unknown-member
+    endpoint: search
+    why: An alias body carrying a member Elasticsearch refuses by name.
+    request:
+      method: POST
+      path: /_aliases
+      json: {zzz_undeclared_member: 1}
+      auth: basic
+
+  - id: es-count-takes-only-a-query
+    endpoint: search
+    why: A `_search` member sent to `_count`, which used to be dropped silently.
+    request:
+      method: POST
+      path: /_count
+      json: {size: 1}
+      auth: basic
+
+  - id: kbn-export-without-objects
+    endpoint: kibana
+    why: An export naming nothing, which used to export everything.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/_export
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-export-missing-rule
+    endpoint: kibana
+    why: An export naming a rule that does not exist.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/_export
+      json: {objects: [{rule_id: conformance-no-such-rule}]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-suggestions-without-a-field
+    endpoint: kibana
+    why: Autocomplete with no field named, which used to answer with every host.
+    request:
+      method: POST
+      path: /api/endpoint/suggestions/eventFilters
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
   - id: kbn-item-create-empty
     endpoint: kibana
     why: An exception item with nothing in it, which used to be created.

@@ -696,6 +696,27 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Five routes that read nothing of the body they declare.**
+Found by a new audit that asks every such route what it does with a body
+that cannot be what it meant — an empty object, and one carrying a single
+member the route never declared:
+
+* `POST /_aliases` answered `acknowledged` to an empty action list, so a
+  client whose own filter had matched nothing was told the aliases were
+  updated; and it took a member Elasticsearch refuses by name.
+* `POST /_count` took `size`, `aggs` and `from` — the neighbouring
+  `_search`'s members — and counted with them silently dropped.
+* `POST …/rules/_export` exported *everything* when the body named nothing,
+  where Kibana requires `objects` and exports nothing for an empty
+  selection; the rules it could not find are now listed in `missing_rules`,
+  and the summary line carries the fifteen members the real one does.
+* `POST …/endpoint/suggestions/{type}` answered with every hostname it held
+  when the body said which field to suggest for.
+
+All measured on 8.15. The audit is `scripts/body_audit.py`, and it needs no
+vendor reference: a route that accepts a body it cannot have meant is wrong
+whatever the product does.
+
 **An exception item nothing checked.**
 Every write to `/api/exception_lists/items` was accepted: an empty body
 created an item, so did one naming a list that does not exist, and so did an

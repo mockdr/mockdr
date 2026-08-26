@@ -329,6 +329,24 @@ def _with_uri_params(body: dict, query: Mapping[str, str]) -> dict:
     return merged
 
 
+#: The only member `_count` takes in its body. Everything else is refused by
+#: name — including `size` and `aggs`, which the neighbouring `_search`
+#: takes, so a client reusing a search body here is told so rather than
+#: quietly counted with the parameter dropped.
+_COUNT_BODY_KEYS = frozenset({"query"})
+
+
+def _checked_count_body(body: dict) -> dict:
+    """Refuse a `_count` body member Elasticsearch does not support."""
+    for key in body:
+        if key not in _COUNT_BODY_KEYS:
+            raise HTTPException(status_code=400, detail=build_es_error_response(
+                400, "parsing_exception", f"request does not support [{key}]",
+                {"line": 1, "col": 2},
+            ))
+    return body
+
+
 @router.get("/_count", operation_id="es_count_all_get")
 @router.post("/_count", operation_id="es_count_all_post")
 def es_count_all(
@@ -339,7 +357,7 @@ def es_count_all(
 ) -> dict:
     """Count across every index; the route was missing, like ``/_search`` was."""
     return search_queries.es_count(
-        "_all", _with_uri_params(body, request.query_params),
+        "_all", _with_uri_params(_checked_count_body(body), request.query_params),
         ignore_unavailable=ignore_unavailable,
     )
 
@@ -581,7 +599,7 @@ def es_count(
     """Return a document count without the hits."""
     try:
         return search_queries.es_count(
-            index, _with_uri_params(body, request.query_params),
+            index, _with_uri_params(_checked_count_body(body), request.query_params),
             ignore_unavailable=ignore_unavailable,
         )
     except IndexNotFoundError as exc:
@@ -883,9 +901,30 @@ def get_index_alias(index: str, _: dict = Depends(require_es_auth)) -> dict:
 
 @router.post("/_aliases", operation_id="es_update_aliases")
 def update_aliases(body: dict = Body(...), _: dict = Depends(require_es_write)) -> dict:
-    """Add and remove aliases in one request."""
+    """Add and remove aliases in one request.
+
+    A body with nothing to do is refused rather than answered `acknowledged`:
+    a client that built an empty action list — because its own filter matched
+    nothing — was told the aliases had been updated.
+    """
+    for key in body:
+        if key != "actions":
+            raise HTTPException(status_code=400, detail=build_es_error_response(
+                400, "x_content_parse_exception",
+                f"[1:2] [aliases] unknown field [{key}]",
+            ))
+    actions = body.get("actions")
+    if not isinstance(actions, list) and actions is not None:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "x_content_parse_exception",
+            "[1:12] [aliases] actions doesn't support values of type: VALUE_STRING",
+        ))
+    if not actions:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "illegal_argument_exception", "No action specified",
+        ))
     try:
-        return search_queries.update_aliases(body.get("actions") or [])
+        return search_queries.update_aliases(actions)
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
 

@@ -129,6 +129,7 @@ def build_es_error_response(
     status_code: int,
     error: str,
     reason: str,
+    detail: dict | None = None,
 ) -> dict:
     """Build an Elasticsearch error response.
 
@@ -136,15 +137,18 @@ def build_es_error_response(
         status_code: HTTP status code.
         error:       Error type string (e.g. ``security_exception``).
         reason:      Human-readable error description.
+        detail:      Members this error carries beside its reason — a parse
+                     failure names the ``line`` and ``col`` it stopped at,
+                     and carries them in the root cause as well.
 
     Returns:
         Elasticsearch error response envelope.
     """
+    cause = {"type": error, "reason": reason, **(detail or {})}
     return {
         "error": {
-            "root_cause": [{"type": error, "reason": reason}],
-            "type": error,
-            "reason": reason,
+            "root_cause": [dict(cause)],
+            **cause,
         },
         "status": status_code,
     }

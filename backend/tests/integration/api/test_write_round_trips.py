@@ -15,6 +15,7 @@ request schema, cited where it is not obvious.
 from __future__ import annotations
 
 import base64
+import json
 import re
 import time
 
@@ -2336,3 +2337,105 @@ class TestAnExceptionItemIsChecked:
         assert read.json()["message"] == "id or item_id required"
         assert removed.json()["message"] == (
             'Either "item_id" or "id" needs to be defined in the request')
+
+
+class TestAWriteRouteReadsTheBodyItDeclares:
+    """Measured on Elasticsearch 8.15 and Kibana 8.15.
+
+    Found by asking every route that declares a body what it does with one
+    that cannot be what it meant — an empty object, and an object with one
+    member the route never declared. Five routes answered 200 to both.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+    KBN = {**ES, "kbn-xsrf": "true"}
+
+    def test_aliases_with_nothing_to_do(self, client: TestClient) -> None:
+        """A client whose own filter matched nothing built an empty action
+        list, and was told the aliases had been updated."""
+        for body in ({}, {"actions": []}):
+            response = client.post("/elastic/_aliases", headers=self.ES, json=body)
+            assert response.status_code == 400
+            assert response.json()["error"]["reason"] == "No action specified"
+
+    def test_aliases_with_a_member_it_does_not_know(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post("/elastic/_aliases", headers=self.ES,
+                               json={"zzz_undeclared_member": 1})
+        assert response.status_code == 400
+        assert response.json()["error"] == {
+            "root_cause": [{
+                "type": "x_content_parse_exception",
+                "reason": "[1:2] [aliases] unknown field [zzz_undeclared_member]",
+            }],
+            "type": "x_content_parse_exception",
+            "reason": "[1:2] [aliases] unknown field [zzz_undeclared_member]",
+        }
+
+    def test_count_takes_a_query_and_nothing_else(
+        self, client: TestClient,
+    ) -> None:
+        """`size` and `aggs` belong to the neighbouring `_search`, and a
+        client reusing a search body here was counted with them dropped."""
+        assert client.post("/elastic/_count", headers=self.ES,
+                           json={"query": {"match_all": {}}}).status_code == 200
+        for key in ("size", "aggs", "from", "min_score"):
+            response = client.post("/elastic/_count", headers=self.ES,
+                                   json={key: 1})
+            assert response.status_code == 400
+            assert response.json()["error"] == {
+                "root_cause": [{
+                    "type": "parsing_exception",
+                    "reason": f"request does not support [{key}]",
+                    "line": 1, "col": 2,
+                }],
+                "type": "parsing_exception",
+                "reason": f"request does not support [{key}]",
+                "line": 1, "col": 2,
+            }
+
+    def test_an_export_says_what_to_export(self, client: TestClient) -> None:
+        response = client.post("/kibana/api/detection_engine/rules/_export",
+                               headers=self.KBN, json={})
+        assert response.status_code == 400
+        assert response.json()["message"] == "[request body]: objects: Required"
+
+    def test_an_empty_selection_exports_nothing(
+        self, client: TestClient,
+    ) -> None:
+        """It used to export every rule mockdr held."""
+        text = client.post("/kibana/api/detection_engine/rules/_export",
+                           headers=self.KBN, json={"objects": []}).text
+        summary = json.loads(text.strip().split("\n")[-1])
+        assert summary["exported_count"] == 0
+
+    def test_a_rule_the_export_could_not_find_is_listed(
+        self, client: TestClient,
+    ) -> None:
+        text = client.post(
+            "/kibana/api/detection_engine/rules/_export", headers=self.KBN,
+            json={"objects": [{"rule_id": "no-such-rule"}]}).text
+        summary = json.loads(text.strip().split("\n")[-1])
+        assert summary["missing_rules"] == [{"rule_id": "no-such-rule"}]
+        assert summary["missing_rules_count"] == 1
+        assert summary["excluded_action_connections"] == []
+
+    def test_suggestions_need_a_field_to_suggest_for(
+        self, client: TestClient,
+    ) -> None:
+        """It used to answer with every hostname it held."""
+        response = client.post("/kibana/api/endpoint/suggestions/eventFilters",
+                               headers=self.KBN, json={})
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            "[request body.field]: expected value of type [string] "
+            "but got [undefined]")
+
+    def test_suggestions_with_a_field_answer(self, client: TestClient) -> None:
+        response = client.post("/kibana/api/endpoint/suggestions/eventFilters",
+                               headers=self.KBN,
+                               json={"field": "host.os.name", "query": ""})
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
