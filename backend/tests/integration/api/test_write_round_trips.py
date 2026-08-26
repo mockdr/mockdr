@@ -1216,3 +1216,47 @@ class TestTheCatApiReadsItsParameters:
         error = answer.json()["error"]
         assert error["type"] == "illegal_argument_exception"
         assert error["reason"] == "Unable to sort by unknown sort key `zzzNope`"
+
+
+class TestTheHttpLevelItself:
+    """Two things below the JSON, measured against Elasticsearch 8.15."""
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def test_head_is_served_where_existence_is_the_question(
+        self, client: TestClient,
+    ) -> None:
+        assert client.head("/elastic/", headers=self.ES).status_code == 200
+        assert client.head("/elastic/logs-endpoint", headers=self.ES).status_code == 200
+        assert client.head("/elastic/zzz-no-such-index",
+                           headers=self.ES).status_code == 404
+
+    def test_head_is_405_where_it_is_not(self, client: TestClient) -> None:
+        """A client asking "does this exist" got a 200 from a path that
+        cannot answer it."""
+        for path in ("/elastic/_cluster/health", "/elastic/_cat/indices",
+                     "/elastic/logs-endpoint/_search"):
+            assert client.head(path, headers=self.ES).status_code == 405, path
+
+    def test_kibana_still_answers_head_wherever_it_answers_get(
+        self, client: TestClient,
+    ) -> None:
+        """Kibana does serve it broadly, so the restriction is Elasticsearch's."""
+        assert client.head("/kibana/api/status", headers=self.ES).status_code == 200
+
+    def test_each_challenge_is_its_own_header(self, client: TestClient) -> None:
+        """Folding them into one value is ambiguous: the first contains a comma.
+
+        `Basic realm="security", charset="UTF-8", ApiKey` cannot be split
+        back into the two schemes it came from.
+        """
+        answer = client.get("/elastic/_cluster/health")
+        assert answer.status_code == 401
+        challenges = [
+            value for name, value in answer.headers.raw
+            if name.decode().lower() == "www-authenticate"
+        ]
+        assert [c.decode() for c in challenges] == [
+            'Basic realm="security", charset="UTF-8"', "ApiKey",
+        ]

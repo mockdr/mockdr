@@ -1,5 +1,5 @@
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from json import JSONDecodeError
@@ -328,7 +328,11 @@ from utils.cs_fql import FqlError
 from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
 from utils.es_aggs import ESAggregationError
 from utils.es_query import ESQueryError
-from utils.es_response import build_es_error_response, build_es_index_not_found
+from utils.es_response import (
+    ES_WWW_AUTHENTICATE,
+    build_es_error_response,
+    build_es_index_not_found,
+)
 from utils.logging import setup_logging
 from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
@@ -433,17 +437,38 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     which is the part of the response RFC 7235 clients actually read.
     """
     if isinstance(exc.detail, dict):
-        return JSONResponse(
+        return _with_repeated_challenges(JSONResponse(
             status_code=exc.status_code, content=exc.detail, headers=exc.headers,
-        )
+        ), exc.headers)
 
     vendor = vendor_for_path(request.url.path)
     message = exc.detail if isinstance(exc.detail, str) else "Error"
-    return JSONResponse(
+    return _with_repeated_challenges(JSONResponse(
         status_code=exc.status_code,
         content=build_vendor_error(vendor, exc.status_code, message),
         headers=exc.headers,
-    )
+    ), exc.headers)
+
+
+def _with_repeated_challenges(
+    response: JSONResponse, headers: Mapping[str, str] | None,
+) -> JSONResponse:
+    """Send each ``WWW-Authenticate`` scheme as its own header.
+
+    Elasticsearch offers two challenges on a 401 and sends two headers.
+    Folding them into one comma-separated value is legal for most headers and
+    ambiguous for this one, whose first challenge already contains a comma:
+    `Basic realm="security", charset="UTF-8", ApiKey` cannot be split back
+    into the two schemes it came from.
+    """
+    combined = (headers or {}).get("WWW-Authenticate")
+    if not combined or "ApiKey" not in combined:
+        return response
+    del response.headers["WWW-Authenticate"]
+    for challenge in ES_WWW_AUTHENTICATE:
+        response.raw_headers.append(
+            (b"www-authenticate", challenge.encode("latin-1")))
+    return response
 
 
 #: Paths that mock Entra's token endpoint rather than the API in front of it.

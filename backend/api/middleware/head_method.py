@@ -8,10 +8,29 @@ fell through to the unmatched-route fallback and came back ``405``.
 
 Rewriting the method and discarding the body keeps one implementation per
 endpoint rather than a second ``HEAD`` handler beside every ``GET``.
+
+Elasticsearch is the exception, and answering HEAD everywhere was wrong
+there: it serves HEAD on its *existence* endpoints alone — the root, an
+index, a document, an alias — and 405 anywhere else, including
+``/_cluster/health`` and ``_search`` (measured on 8.15). A client using HEAD
+to ask whether something exists would read a 200 from this mock as a yes on
+a path where the cluster does not answer the question at all. Kibana answers
+HEAD wherever it answers GET, and is left alone.
 """
 from __future__ import annotations
 
+import re
+
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+#: Where Elasticsearch answers HEAD. Anything else under `/elastic` is a 405.
+_ES_HEAD_PATHS = re.compile(
+    r"^/elastic/?$"                                  # the root
+    r"|^/elastic/[^_/][^/]*/?$"                      # an index
+    r"|^/elastic/[^/]+/_doc/[^/]+/?$"                # a document
+    r"|^/elastic/_alias/[^/]+/?$"                    # an alias
+    r"|^/elastic/[^/]+/_alias/[^/]+/?$",
+)
 
 
 class HeadMethodMiddleware:
@@ -30,6 +49,13 @@ class HeadMethodMiddleware:
             send:    ASGI send channel.
         """
         if scope["type"] != "http" or scope["method"] != "HEAD":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if path.startswith("/elastic") and not _ES_HEAD_PATHS.match(path):
+            # Left as HEAD, so the unmatched-route fallback answers the 405
+            # Elasticsearch answers — with the `Allow` header it carries.
             await self.app(scope, receive, send)
             return
 

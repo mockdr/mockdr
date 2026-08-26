@@ -3018,3 +3018,34 @@ probes:
       path: /_cat/indices
       query: {format: json, s: zzzNoSuchColumn}
       auth: basic
+
+  - id: es-head-where-it-is-not-served
+    endpoint: search
+    why: >
+      Elasticsearch serves HEAD on its *existence* endpoints alone — the
+      root, an index, a document, an alias — and 405 anywhere else. mockdr
+      answered HEAD wherever it answered GET, so a client asking "does this
+      exist" got a 200 on a path where the cluster does not answer the
+      question at all.
+    request:
+      method: HEAD
+      path: /_cluster/health
+      auth: basic
+
+  - id: es-head-on-the-root
+    endpoint: search
+    why: >
+      And where it *is* served, it still is.
+    request:
+      method: HEAD
+      path: /
+      auth: basic
+
+  - id: es-head-a-missing-index
+    endpoint: search
+    why: >
+      The existence question itself: 404 for an index that is not there.
+    request:
+      method: HEAD
+      path: /zzz-no-such-index
+      auth: basic
