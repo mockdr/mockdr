@@ -556,6 +556,28 @@ probes:
       query: {status: exploded}
       auth: basic
 
+  - id: es-cat-json-filtered-to-nothing
+    endpoint: search
+    why: >
+      A list that a filter leaves empty is written as nothing at all, where
+      an object that filters to nothing is written `{}`.
+    request:
+      method: GET
+      path: /_cat/health
+      query: {format: json, filter_path: zzz-nothing}
+      auth: basic
+
+  - id: es-cat-table-is-not-shaped
+    endpoint: search
+    why: >
+      `pretty` and `filter_path` do nothing to a `_cat` table — the answer
+      has to be a document first.
+    request:
+      method: GET
+      path: /_cat/health
+      query: {pretty: "", filter_path: zzz-nothing}
+      auth: basic
+
   - id: es-cat-bytes-raw
     endpoint: search
     why: >

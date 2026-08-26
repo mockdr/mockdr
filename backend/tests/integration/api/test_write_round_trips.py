@@ -3558,3 +3558,50 @@ class TestCatSizesInTheUnitAsked:
         text = client.get("/elastic/_cat/indices", headers=self.ES,
                           params={"h": "store.size", "bytes": "b"}).text
         assert all(line.strip().isdigit() for line in text.splitlines() if line.strip())
+
+
+class TestWhatShapingDoesNotApplyTo:
+    """Measured on 8.15: `_cat` answers a text table, which neither `pretty`
+    nor `filter_path` shapes — unless `format=json` turns the answer into a
+    document first. And a list that filters to nothing is written as nothing
+    at all, where an object that filters to nothing is written `{}`.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def test_pretty_does_not_touch_a_table(self, client: TestClient) -> None:
+        plain = client.get("/elastic/_cat/health", headers=self.ES).text
+        asked = client.get("/elastic/_cat/health", headers=self.ES,
+                           params={"pretty": ""}).text
+        assert asked == plain
+
+    def test_filter_path_does_not_touch_a_table(
+        self, client: TestClient,
+    ) -> None:
+        plain = client.get("/elastic/_cat/health", headers=self.ES).text
+        asked = client.get("/elastic/_cat/health", headers=self.ES,
+                           params={"filter_path": "zzz-nothing"}).text
+        assert asked == plain
+
+    def test_both_apply_once_the_answer_is_a_document(
+        self, client: TestClient,
+    ) -> None:
+        text = client.get("/elastic/_cat/health", headers=self.ES,
+                          params={"format": "json", "pretty": ""}).text
+        assert text.startswith('[\n  {\n    "epoch" : ')
+
+    def test_a_list_that_filters_to_nothing_is_nothing(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/elastic/_cat/health", headers=self.ES,
+                              params={"format": "json",
+                                      "filter_path": "zzz-nothing"})
+        assert response.content == b""
+
+    def test_an_object_that_filters_to_nothing_is_an_empty_one(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/elastic/_count", headers=self.ES,
+                              params={"filter_path": "zzz-nothing"})
+        assert response.content == b"{}"

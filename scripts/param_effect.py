@@ -19,6 +19,8 @@ Each parameter is sent a value whose effect is not a matter of taste:
   value nothing can match must answer with none;
 * `$select=id` must not answer with every field;
 * `$count=true` must add a count;
+* a parameter that shapes the *answer* — `pretty`, `filter_path`, `bytes`,
+  a `format` or `output_mode` that names a renderer — must change it;
 * a sort asked for in both directions must not answer with the same order
   twice, when the collection holds two different values to order by — asked
   once per field the vendor documents as sortable, because guessing one from
@@ -95,6 +97,28 @@ _IDS = {
 }
 
 #: Parameters every route takes for reasons other than filtering.
+#: Parameters that shape the *answer* rather than select records. They were
+#: all filed under "structural" and exercised by nothing, which is how four
+#: of them — `filter_path`, `pretty`, `bytes` and the `_cat` `format` — were
+#: declared and ignored for as long as they were. Each is sent with a value
+#: whose effect can be judged from the answer alone.
+#: These are read off the query string by the product rather than declared
+#: per route, so requiring a declaration would skip every one of them — the
+#: same blind spot one level down. Each entry says which paths it applies to.
+_SHAPERS = (
+    # (path predicate, parameter, value, how to tell it worked)
+    # `_cat` answers a text table, which neither of these shapes — measured:
+    # `pretty` and `filter_path` do nothing there unless `format=json` turns
+    # the answer into a document first.
+    (lambda p: p.startswith("/elastic/") and "/_cat/" not in p,
+     "pretty", "", "indented"),
+    (lambda p: p.startswith("/elastic/") and "/_cat/" not in p,
+     "filter_path", "zzz-nothing-matches-this", "empty-document"),
+    (lambda p: p.startswith("/elastic/_cat/"), "format", "json", "json"),
+    (lambda p: p.startswith("/elastic/_cat/"), "bytes", "b", "no-units"),
+    (lambda p: p.startswith("/splunk/services/"), "output_mode", "json", "json"),
+)
+
 _STRUCTURAL = {
     "api-version", "output_mode", "format", "pretty", "human", "kbn-xsrf",
     "$expand", "namespace_type", "namespaceType", "keep_alive", "refresh",
@@ -331,6 +355,50 @@ def undeclared():
 DOCUMENTED_SORTS = documented_sort_fields()
 
 
+def shaping(wanted):
+    """Ask the answer-shaping parameters whether they shape the answer."""
+    flags, checked = [], 0
+    for path, operations in app.openapi()["paths"].items():
+        operation = operations.get("get")
+        if not operation or "/_dev/" in path:
+            continue
+        mount = path.split("/")[1]
+        if (wanted and mount not in wanted) or AUTH.get(mount) is None:
+            continue
+        url = fill(path, mount)
+        for applies, name, value, judgment in _SHAPERS:
+            if not applies(path):
+                continue
+            base = client.get(url, headers=AUTH[mount])
+            if base.status_code != 200:
+                continue
+            shaped = client.get(url, headers=AUTH[mount], params={name: value})
+            if shaped.status_code != 200:
+                continue
+            checked += 1
+            if not _shaped(judgment, base, shaped):
+                flags.append((mount, path, name, "shape", judgment, "unchanged"))
+    return flags, checked
+
+
+def _shaped(judgment, base, shaped):
+    """Whether the answer changed the way this parameter promises."""
+    if judgment == "indented":
+        return b"\n" in shaped.content and b"\n" not in base.content
+    if judgment == "empty-document":
+        return shaped.content.strip() in (b"{}", b"[]")
+    if judgment == "json":
+        try:
+            shaped.json()
+        except ValueError:
+            return False
+        return True
+    if judgment == "no-units":
+        text = shaped.text
+        return not any(unit in text for unit in ("kb", "mb", "gb"))
+    return True
+
+
 def main():
     wanted = sys.argv[1:]
     flags = []
@@ -416,6 +484,10 @@ def main():
     found, count = undeclared()
     flags += [f for f in found if not wanted or f[0] in wanted]
     checked += count
+
+    shaped_flags, shaped_count = shaping(wanted)
+    flags += shaped_flags
+    checked += shaped_count
 
     print(f"=== PARAMETER EFFECT === {checked} parameter(s) exercised")
     by_mount = {}

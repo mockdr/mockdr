@@ -737,8 +737,14 @@ at render time, in the product's own human form: one decimal at most,
 truncated rather than rounded, and none at all when it would be a zero.
 
 All measured on 8.15, and all four invisible to `param_effect.py`, which
-lists `pretty`, `format` and `bytes` among the parameters that are
-*structural* and exercises none of them.
+listed `pretty`, `format` and `bytes` among the parameters that are
+*structural* and exercised none of them. It exercises them now, per mount
+rather than per declaration — these are read off the query string by the
+product, so requiring a route to declare one would have been the same blind
+spot one level down — and it knows what they do *not* apply to: a `_cat`
+table is shaped by neither until `format=json` makes the answer a document,
+and a list that a filter leaves empty is written as nothing at all where an
+empty object is written `{}`.
 
 `?format=yaml` and `Accept: application/yaml` are the one member of the
 family left alone: Elasticsearch answers those in YAML, and rendering YAML

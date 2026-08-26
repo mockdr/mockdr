@@ -7,7 +7,7 @@ took all three as decoration:
   `**` for any depth, and a leading `-` to drop instead of keep. A client
   asking for `hits.hits._source` was handed the whole document tree, which
   is more data than it asked for and a shape it did not expect. Nothing
-  matching answers `{}`.
+  matching answers `{}` — or, where the answer was a list, nothing at all.
 * **`?pretty`** indents two spaces, separates with ` : ` and ends with a
   newline, which is Jackson's own printer. A client that logs or diffs the
   answer sees a different document.
@@ -130,8 +130,19 @@ async def _send_shaped(
         await send({"type": "http.response.body", "body": body})
         return
 
+    empty_list = False
     if wanted:
+        was_list = isinstance(document, list)
         document = filter_path(document, wanted)
+        # A `_cat` answer is a list, and Elasticsearch writes *nothing* when
+        # a filter leaves one empty — where an object that filters to
+        # nothing is written `{}`.
+        empty_list = was_list and not document
+    if empty_list:
+        headers["content-length"] = "0"
+        await send(start)
+        await send({"type": "http.response.body", "body": b""})
+        return
     rendered = (
         # Jackson ends a pretty document with a newline; a compact one has
         # none.
@@ -162,7 +173,9 @@ def filter_path(document: Any, spec: str) -> Any:  # noqa: ANN401 - any JSON
         result = _keep(result, [_pattern(p) for p in keeps])
     for path in drops:
         result = _drop(result, _pattern(path))
-    return result if result is not None else {}
+    if result is None:
+        return [] if isinstance(document, list) else {}
+    return result
 
 
 def _pattern(path: str) -> list[str]:
