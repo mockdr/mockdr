@@ -556,6 +556,57 @@ probes:
       query: {status: exploded}
       auth: basic
 
+  - id: es-filter-path-keeps-what-it-names
+    endpoint: search
+    why: A client asking for two members was handed the whole health document.
+    request:
+      method: GET
+      path: /_cluster/health
+      query: {filter_path: "status,cluster_name"}
+      auth: basic
+    ignore_paths:
+      # The same fixture difference `es-cluster-health` states: a single-node
+      # install is yellow, and mockdr models a healthy cluster.
+      - $.status
+
+  - id: es-filter-path-drops-what-it-marks
+    endpoint: search
+    why: A leading `-` drops instead of keeping.
+    request:
+      method: GET
+      path: /_count
+      query: {filter_path: "-_shards"}
+      auth: basic
+
+  - id: es-filter-path-matching-nothing
+    endpoint: search
+    why: Nothing matching answers an empty document, not the whole one.
+    request:
+      method: GET
+      path: /_count
+      query: {filter_path: "zzz-nothing"}
+      auth: basic
+
+  - id: es-filter-path-nested
+    endpoint: search
+    why: A dotted path reaches into the hits.
+    request:
+      method: GET
+      path: /_count
+      query: {filter_path: "_shards.total"}
+      auth: basic
+
+  - id: es-opaque-id-comes-back
+    endpoint: search
+    why: >
+      The official clients offer `opaque_id` so a request can be found again
+      in a log, and mockdr dropped it.
+    request:
+      method: GET
+      path: /_count
+      headers: {X-Opaque-Id: conformance-probe}
+      auth: basic
+
   - id: es-aliases-with-nothing-to-do
     endpoint: search
     why: An alias update with an empty action list, which used to be acknowledged.

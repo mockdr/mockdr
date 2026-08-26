@@ -52,7 +52,7 @@ _VOLATILE: tuple[tuple[str, re.Pattern[str]], ...] = (
 SIGNIFICANT_HEADERS: frozenset[str] = frozenset({
     "content-type", "www-authenticate", "x-elastic-product",
     "kbn-name", "kbn-license-sig", "cache-control",
-    "server", "vary", "etag",
+    "server", "vary", "etag", "x-opaque-id",
 })
 
 #: Headers whose *presence* is the behaviour and whose value names the

@@ -3431,3 +3431,81 @@ class TestEachProductCompressesItsOwnWay:
             "Authorization": "ApiToken admin-token-0000-0000-000000000001",
             **self.GZIP})
         assert "content-encoding" not in response.headers
+
+
+class TestTheThreeThingsElasticsearchLetsAClientDo:
+    """Measured on 8.15. They are not per-route features — every endpoint
+    takes them — and mockdr took all three as decoration.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def test_filter_path_keeps_only_what_it_names(
+        self, client: TestClient,
+    ) -> None:
+        body = client.get("/elastic/_cluster/health", headers=self.ES,
+                          params={"filter_path": "status,cluster_name"}).json()
+        assert set(body) == {"status", "cluster_name"}
+
+    def test_a_leading_minus_drops_instead(self, client: TestClient) -> None:
+        body = client.get("/elastic/_count", headers=self.ES,
+                          params={"filter_path": "-_shards"}).json()
+        assert "_shards" not in body
+        assert "count" in body
+
+    def test_a_dotted_path_reaches_inside(self, client: TestClient) -> None:
+        body = client.post("/elastic/_search", headers=self.ES,
+                           params={"filter_path": "hits.total,hits.hits._id",
+                                   "size": "1"},
+                           json={}).json()
+        assert set(body) == {"hits"}
+        assert set(body["hits"]) == {"total", "hits"}
+        assert set(body["hits"]["hits"][0]) == {"_id"}
+
+    def test_nothing_matching_is_an_empty_document(
+        self, client: TestClient,
+    ) -> None:
+        """Not the whole one."""
+        response = client.get("/elastic/_count", headers=self.ES,
+                              params={"filter_path": "zzz-nothing"})
+        assert response.json() == {}
+
+    def test_a_wildcard_matches_one_segment(self, client: TestClient) -> None:
+        body = client.get("/elastic/_count", headers=self.ES,
+                          params={"filter_path": "_shards.*"}).json()
+        assert set(body) == {"_shards"}
+        assert "total" in body["_shards"]
+
+    def test_pretty_prints_the_way_jackson_prints(
+        self, client: TestClient,
+    ) -> None:
+        text = client.get("/elastic/_count", headers=self.ES,
+                          params={"pretty": "", "filter_path": "count"}).text
+        assert text.startswith('{\n  "count" : ')
+        assert text.endswith("}\n")
+
+    def test_pretty_false_is_not_pretty(self, client: TestClient) -> None:
+        text = client.get("/elastic/_count", headers=self.ES,
+                          params={"pretty": "false"}).text
+        assert "\n" not in text
+
+    def test_the_opaque_id_comes_back(self, client: TestClient) -> None:
+        """The official clients offer it as `opaque_id`, to find a request
+        again in a log."""
+        response = client.get("/elastic/_count", headers={
+            **self.ES, "X-Opaque-Id": "zzz-probe"})
+        assert response.headers["x-opaque-id"] == "zzz-probe"
+
+    def test_a_cat_answer_is_left_alone(self, client: TestClient) -> None:
+        """`_cat` answers text, which none of this shapes."""
+        response = client.get("/elastic/_cat/indices", headers=self.ES,
+                              params={"pretty": ""})
+        assert response.headers["content-type"].startswith("text/plain")
+        assert "green open" in response.text
+
+    def test_another_mount_is_not_shaped(self, client: TestClient) -> None:
+        body = client.get("/kibana/api/status", headers={
+            **self.ES, "kbn-xsrf": "true"},
+            params={"filter_path": "name"}).json()
+        assert set(body) != {"name"}

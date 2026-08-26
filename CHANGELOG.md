@@ -714,6 +714,31 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**The three things Elasticsearch lets a client do to any answer.**
+None of them is a per-route feature — every endpoint takes them — and mockdr
+took all three as decoration:
+
+* `?filter_path=` keeps only the paths named, with `*` for one segment and a
+  leading `-` to drop instead of keep. A client asking for
+  `hits.hits._source` was handed the whole document tree: more data than it
+  asked for, in a shape it did not expect. Nothing matching answers `{}`,
+  where mockdr answered everything.
+* `?pretty` indents two spaces, separates with ` : ` and ends with a
+  newline — Jackson's own printer, to the character.
+* `X-Opaque-Id` comes back on the response. The official clients offer it as
+  `opaque_id` precisely so a request can be found again in a log, and mockdr
+  dropped it.
+
+All measured on 8.15, and all three invisible to `param_effect.py`, which
+lists `pretty` and `format` among the parameters that are *structural* and
+exercises neither.
+
+`?format=yaml` and `Accept: application/yaml` are the one member of the
+family left alone: Elasticsearch answers those in YAML, and rendering YAML
+the way Jackson renders it is a larger piece of work than the clients that
+would ask for it justify. A client asking for YAML gets JSON here, which is
+stated rather than hidden.
+
 **splunkd's own headers, and the caching it publishes.**
 `Server: uvicorn` was on every answer, which is the plainest way there is to
 tell a mock from the thing it mocks. Under it, measured on 10.4.2 header by

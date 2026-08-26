@@ -20,6 +20,7 @@ from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.compression import CompressionMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
+from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
@@ -426,6 +427,7 @@ app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the 
 # content type for the JSON form and would overwrite a charset set beneath it.
 app.add_middleware(JsonCharsetMiddleware)      # each product names the charset its own way
 app.add_middleware(TokenCacheMiddleware)       # RFC 6749 §5.1 — a token answer is never cached
+app.add_middleware(ElasticShapingMiddleware)   # filter_path, pretty, X-Opaque-Id
 app.add_middleware(ElasticHeadersMiddleware)   # the header every Elasticsearch client checks for
 app.add_middleware(SplunkHeadersMiddleware)    # Server/Vary/caching, and 304 on a fresh read
 # Path rewriting must happen before routing, so this is added last (outermost).
