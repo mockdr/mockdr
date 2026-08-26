@@ -714,6 +714,24 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**The header every Elasticsearch client checks for, which mockdr never sent.**
+`X-elastic-product: Elasticsearch` is not decoration: every official client
+since 7.14 — Python, JavaScript, Java, Go — reads it off the first response
+and refuses to talk to a server that does not send it, with an
+`UnsupportedProductError`. The one client this mount exists for could not
+use mockdr at all. Measured on 8.15: the header is on every answer including
+a 404, and *not* on the 401 that asks for credentials.
+
+Kibana names itself the same way on every answer, whatever the status:
+`kbn-name`, `kbn-license-sig`, and a `cache-control` that keeps its API
+answers out of every cache. mockdr sent none of the three.
+
+Nothing noticed because the conformance harness compared two headers and no
+others — a header no probe compares is a header no probe can miss. It
+compares these too now: the two whose value is the behaviour by value, and
+Kibana's node name and licence digest by *presence*, since their values name
+the install rather than the behaviour.
+
 **Splunk JSON that was the same document and different bytes.**
 splunkd writes its JSON compact — `{"name":"x"}`, no space after the colon —
 and writes non-ASCII as the UTF-8 bytes themselves. mockdr's Splunk mount

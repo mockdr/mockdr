@@ -20,7 +20,12 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from harness.normalize import SIGNIFICANT_HEADERS, mask, skeleton
+from harness.normalize import (
+    PRESENCE_ONLY_HEADERS,
+    SIGNIFICANT_HEADERS,
+    mask,
+    skeleton,
+)
 
 #: Severity order, worst first. Also the report's sort order.
 KIND_ORDER: tuple[str, ...] = (
@@ -188,6 +193,10 @@ def compare(
     for name in sorted(SIGNIFICANT_HEADERS):
         mock_value = mask(mock.headers.get(name, ""))
         real_value = mask(real.headers.get(name, ""))
+        if name in PRESENCE_ONLY_HEADERS:
+            # What matters is that the header is there at all.
+            mock_value = "<present>" if mock_value else ""
+            real_value = "<present>" if real_value else ""
         # A header absent from both is agreement, not a finding.
         if mock_value != real_value and (mock_value or real_value):
             findings.append(Finding(

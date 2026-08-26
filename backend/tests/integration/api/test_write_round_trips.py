@@ -3194,3 +3194,65 @@ class TestSplunkWritesJsonTheWaySplunkdWrites:
                               headers=self.SPLUNK,
                               params={"output_mode": "json", "count": "-2"})
         assert b'": "' not in response.content
+
+
+class TestTheElasticProductsNameThemselves:
+    """Measured on Elasticsearch 8.15 and Kibana 8.15.
+
+    `X-elastic-product: Elasticsearch` is not decoration: every official
+    Elasticsearch client since 7.14 — Python, JavaScript, Java, Go — reads it
+    off the first response and refuses to talk to a server that does not send
+    it, with an `UnsupportedProductError`. mockdr never sent it, so the one
+    client this mount exists for could not use it at all.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+    KBN = {**ES, "kbn-xsrf": "true"}
+
+    @pytest.mark.parametrize("path", [
+        "/elastic/",
+        "/elastic/_cluster/health",
+        "/elastic/zzz-no-such-index/_search",
+        "/elastic/_cat/indices",
+    ])
+    def test_every_answer_names_the_product(
+        self, client: TestClient, path: str,
+    ) -> None:
+        response = client.get(path, headers=self.ES)
+        assert response.headers["x-elastic-product"] == "Elasticsearch"
+
+    def test_the_401_that_asks_for_credentials_does_not(
+        self, client: TestClient,
+    ) -> None:
+        """The header goes on once the request has been authenticated."""
+        response = client.get("/elastic/_cluster/health")
+        assert response.status_code == 401
+        assert "x-elastic-product" not in response.headers
+
+    def test_another_product_is_not_elasticsearch(
+        self, client: TestClient,
+    ) -> None:
+        assert "x-elastic-product" not in client.get(
+            "/splunk/services/data/indexes").headers
+
+    @pytest.mark.parametrize("path", [
+        "/kibana/api/status",
+        "/kibana/api/zzz-no-such-route",
+        "/kibana/api/cases/_find",
+    ])
+    def test_kibana_names_itself_on_every_answer(
+        self, client: TestClient, path: str,
+    ) -> None:
+        response = client.get(path, headers=self.KBN)
+        assert response.headers["kbn-name"]
+        assert len(response.headers["kbn-license-sig"]) == 64
+        assert response.headers["cache-control"] == (
+            "private, no-cache, no-store, must-revalidate")
+
+    def test_the_node_name_is_the_one_status_reports(
+        self, client: TestClient,
+    ) -> None:
+        """A client reading both must not see two Kibanas."""
+        status = client.get("/kibana/api/status", headers=self.KBN)
+        assert status.headers["kbn-name"] == status.json()["name"]

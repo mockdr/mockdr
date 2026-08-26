@@ -439,6 +439,11 @@ class TestSeededProbesLoad:
             path = probe.request.path
             if path.startswith("/services/data/indexes"):
                 continue
+            # A KV Store collection no install has is data-free by
+            # construction: both sides answer the same refusal, which is the
+            # envelope and the arity these probes were written to compare.
+            if "/storage/collections/data/zzz_absent" in path:
+                continue
             # A refusal reads no data either: what a wrong verb answers is
             # the same on an empty install and a seeded one.
             if probe.request.method not in ("POST", "GET") or "takes-no-get" in probe.id:

@@ -40,8 +40,23 @@ _VOLATILE: tuple[tuple[str, re.Pattern[str]], ...] = (
 #: and friends where a stock Elasticsearch does not, and that is mockdr being
 #: stricter than the thing it mocks — a difference no client can observe as a
 #: behavioural one, and not a defect to be fixed by removing the header.
+#: `x-elastic-product` earns its place: every official Elasticsearch client
+#: since 7.14 reads it off the first response and refuses to talk to a server
+#: that does not send it. mockdr never sent it, and nothing here noticed,
+#: because a header no probe compares is a header no probe can miss.
+#: `kbn-name` and `kbn-license-sig` are how Kibana names itself on every
+#: answer, and its `cache-control` keeps those answers out of every cache.
 SIGNIFICANT_HEADERS: frozenset[str] = frozenset({
-    "content-type", "www-authenticate",
+    "content-type", "www-authenticate", "x-elastic-product",
+    "kbn-name", "kbn-license-sig", "cache-control",
+})
+
+#: Headers whose *presence* is the behaviour and whose value names the
+#: install: Kibana's node name is its container's hostname, and its licence
+#: signature is a digest of a licence only that install holds. Comparing
+#: those values would report one finding per probe for ever and say nothing.
+PRESENCE_ONLY_HEADERS: frozenset[str] = frozenset({
+    "kbn-name", "kbn-license-sig",
 })
 
 
