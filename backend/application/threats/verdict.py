@@ -1,5 +1,6 @@
 """Threat verdict and incident status commands."""
 
+from application import bridge
 from application.webhooks import commands as webhook_commands
 from domain.webhook import THREAT_UPDATED
 from repository.activity_repo import activity_repo
@@ -29,6 +30,7 @@ def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None 
         threat.threatInfo["analystVerdict"] = verdict
         threat.threatInfo["updatedAt"] = utc_now()
         threat_repo.save(threat)
+        bridge.threat_changed(threat)
         site_id = threat.agentDetectionInfo.get("agentSiteId")
         activity_repo.create(
             activity_type=3784 if verdict == "true_positive" else 3016,
@@ -64,6 +66,7 @@ def set_incident_status(status: str, ids: list[str], actor_user_id: str | None =
         threat.threatInfo["resolved"] = status == "resolved"
         threat.threatInfo["updatedAt"] = utc_now()
         threat_repo.save(threat)
+        bridge.threat_changed(threat)
         site_id = threat.agentDetectionInfo.get("agentSiteId")
         activity_repo.create(
             activity_type=27,
@@ -92,6 +95,7 @@ def mark_as_threat(ids: list[str], actor_user_id: str | None = None) -> dict:
         threat.threatInfo["analystVerdict"] = "true_positive"
         threat.threatInfo["updatedAt"] = utc_now()
         threat_repo.save(threat)
+        bridge.threat_changed(threat)
         site_id = threat.agentDetectionInfo.get("agentSiteId")
         activity_repo.create(
             3784, "Threat marked as malicious",
@@ -117,6 +121,7 @@ def mark_as_resolved(ids: list[str], actor_user_id: str | None = None) -> dict:
         threat.threatInfo["resolved"] = True
         threat.threatInfo["updatedAt"] = utc_now()
         threat_repo.save(threat)
+        bridge.threat_changed(threat)
         site_id = threat.agentDetectionInfo.get("agentSiteId")
         activity_repo.create(
             27, "Threat marked as resolved",

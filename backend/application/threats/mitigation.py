@@ -4,6 +4,7 @@ import zipfile
 
 from fastapi import HTTPException
 
+from application import bridge
 from repository.activity_repo import activity_repo
 from repository.blocklist_repo import blocklist_repo
 from repository.threat_repo import threat_repo
@@ -47,6 +48,7 @@ def mitigate(action: str, ids: list[str], actor_user_id: str | None = None) -> d
         threat.threatInfo["mitigationStatus"] = new_status
         threat.threatInfo["updatedAt"] = utc_now()
         threat_repo.save(threat)
+        bridge.threat_changed(threat)
         site_id = threat.agentDetectionInfo.get("agentSiteId")
         activity_repo.create(
             activity_type=26,
@@ -139,6 +141,7 @@ def fetch_file(ids: list[str], actor_user_id: str | None = None) -> dict:
         threat._fetched_file = buf.getvalue()
         site_id = threat.agentDetectionInfo.get("agentSiteId")
         threat_repo.save(threat)
+        bridge.threat_changed(threat)
         activity_repo.create(
             25, f"File fetch completed: {file_name}",
             threat_id=threat_id, user_id=actor_user_id, site_id=site_id,

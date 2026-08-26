@@ -1,6 +1,7 @@
 """Elastic Security alert command handlers (mutations)."""
 from __future__ import annotations
 
+from application import bridge
 from repository.es_alert_repo import es_alert_repo
 
 
@@ -21,6 +22,7 @@ def update_alert_status(alert_ids: list[str], status: str) -> dict:
             alert.workflow_status = status
             alert.signal_status = status
             es_alert_repo.save(alert)
+            bridge.es_alert_changed(alert)
             updated += 1
     # Kibana proxies Elasticsearch's update_by_query and returns its whole
     # response; `{"updated": N}` alone left a client with nothing to check for
@@ -73,6 +75,7 @@ def update_alert_tags(
             existing.update(add)
             alert.tags = sorted(existing)
             es_alert_repo.save(alert)
+            bridge.es_alert_changed(alert)
             updated += 1
     return {"updated": updated}
 
@@ -106,5 +109,6 @@ def update_alert_assignees(
                     existing_uids.add(assignee.get("uid"))
             alert.assignees = existing
             es_alert_repo.save(alert)
+            bridge.es_alert_changed(alert)
             updated += 1
     return {"updated": updated}

@@ -1,4 +1,5 @@
 """Threat analyst note commands."""
+from application import bridge
 from repository.threat_repo import threat_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
@@ -26,6 +27,7 @@ def add_note(threat_id: str, note_text: str, user_id: str | None) -> dict | None
     }
     threat.notes.append(note)
     threat_repo.save(threat)
+    bridge.threat_changed(threat)
     return {"data": note}
 
 

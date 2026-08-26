@@ -1,6 +1,7 @@
 """CrowdStrike Falcon Detection command handlers (mutations)."""
 from __future__ import annotations
 
+from application import bridge
 from domain.cs_detection import CsDetection
 from repository.cs_detection_repo import cs_detection_repo
 from utils.cs_response import build_cs_action_response
@@ -56,6 +57,7 @@ def update_detections(
         _apply_changes(detection, changes)
         detection.date_updated = utc_now()
         cs_detection_repo.save(detection)
+        bridge.cs_detection_changed(detection)
         affected.append({"id": detection.composite_id})
     return build_cs_action_response(affected)
 

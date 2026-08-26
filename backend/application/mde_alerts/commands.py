@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 import uuid
 
+from application import bridge
 from domain.event_bus import MdeAlertCreated, event_bus
 from domain.mde_alert import MdeAlert
 from repository.mde_alert_repo import mde_alert_repo
@@ -51,6 +52,7 @@ def update_alert(alert_id: str, body: dict) -> dict | None:
         alert.resolvedTime = now
 
     mde_alert_repo.save(alert)
+    bridge.mde_alert_changed(alert)
     return complete_mde(to_mde_resource(record_dict(alert), "alertId"), "alert")
 
 

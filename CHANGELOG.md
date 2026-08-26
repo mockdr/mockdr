@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Six of seven writes never reached the SIEM the mock bridges them to.**
+ADR-009 says that after an EDR command returns, the corresponding Splunk
+event already exists. The bridge subscribes to ten event types, and four of
+them had a publisher: an agent disconnected through the SentinelOne API, a
+threat mitigated, a CrowdStrike alert triaged, a Defender alert closed, an
+Elastic signal acknowledged and a Cortex incident moved on all answered 200
+while `index=sentinelone`, `index=crowdstrike`, `index=msdefender`,
+`index=elastic_security` and `index=cortex_xdr` went on answering the state
+this install was seeded with. A playbook that acts through the EDR and then
+verifies through the SIEM — which is the ordinary shape of one — was reading
+a document its own action had not touched. Every one of those writes
+publishes now, and each path has a test that counts the events before and
+after.
+
 **A suppression that stopped suppressing.**
 `main.py` binds the mock on `0.0.0.0` on purpose and said so with a
 `# nosec B104` on the `uvicorn.run(` line. bandit 1.9.4 attributes the

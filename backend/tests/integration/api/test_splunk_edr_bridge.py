@@ -259,3 +259,142 @@ class TestSentinelOneChannelAgents:
         assert events
         missing = expected - _keys(events)
         assert not missing, sorted(missing)
+
+
+class TestAWriteReachesTheSiemWhileTheCallerWaits:
+    """ADR-009: "after an EDR command returns, the corresponding Splunk event
+    already exists".
+
+    The bridge subscribes to ten event types and four of them had a
+    publisher. An agent disconnected through the SentinelOne API, a threat
+    mitigated, a CrowdStrike alert triaged, a Defender alert closed, an
+    Elastic signal acknowledged and a Cortex incident moved on all answered
+    200 while the Splunk mount went on answering the state this install was
+    seeded with — which is what a playbook that verifies its own action
+    through the SIEM reads.
+    """
+
+    SPLUNK = {"Authorization": "Basic YWRtaW46bW9ja2RyLWFkbWlu"}  # admin:mockdr-admin
+    S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+
+    def _count(self, client: TestClient, search: str) -> int:
+        sid = client.post(
+            "/splunk/services/search/jobs", data={"search": search},
+            headers=self.SPLUNK, params={"output_mode": "json"},
+        ).json()["sid"]
+        results = client.get(
+            f"/splunk/services/search/v2/jobs/{sid}/results",
+            headers=self.SPLUNK, params={"output_mode": "json", "count": 0},
+        ).json()
+        return len(results.get("results", []))
+
+    @staticmethod
+    def _crowdstrike(client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "client_id": "cs-mock-admin-client", "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _defender(client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _elastic() -> dict:
+        return {
+            "Authorization": "Basic YW5hbHlzdDptb2NrLWFuYWx5c3QtcGFzc3dvcmQ=",
+            "kbn-xsrf": "true",
+        }
+
+    @staticmethod
+    def _cortex() -> dict:
+        nonce = secrets.token_hex(32)
+        stamp = str(int(time.time() * 1000))
+        digest = hashlib.sha256(("xdr-admin-secret" + nonce + stamp).encode()).hexdigest()
+        return {
+            "x-xdr-auth-id": "1", "x-xdr-nonce": nonce,
+            "x-xdr-timestamp": stamp, "Authorization": digest,
+        }
+
+    def test_a_sentinelone_agent_action(self, client: TestClient) -> None:
+        search = 'search index=sentinelone sourcetype="sentinelone:channel:agents"'
+        before = self._count(client, search)
+        agent = client.get(
+            "/web/api/v2.1/agents", headers=self.S1, params={"limit": 1},
+        ).json()["data"][0]["id"]
+        assert client.post(
+            "/web/api/v2.1/agents/actions/disconnect", headers=self.S1,
+            json={"filter": {"ids": [agent]}},
+        ).status_code == 200
+        assert self._count(client, search) == before + 1
+
+    def test_a_sentinelone_threat_mitigation(self, client: TestClient) -> None:
+        search = 'search index=sentinelone sourcetype="sentinelone:channel:threats"'
+        before = self._count(client, search)
+        threat = client.get(
+            "/web/api/v2.1/threats", headers=self.S1, params={"limit": 1},
+        ).json()["data"][0]["id"]
+        assert client.post(
+            "/web/api/v2.1/threats/mitigate/quarantine", headers=self.S1,
+            json={"filter": {"ids": [threat]}},
+        ).status_code == 200
+        assert self._count(client, search) == before + 1
+
+    def test_a_crowdstrike_triage(self, client: TestClient) -> None:
+        headers = self._crowdstrike(client)
+        search = "search index=crowdstrike"
+        before = self._count(client, search)
+        ids = client.get(
+            "/cs/alerts/queries/alerts/v2", headers=headers, params={"limit": 1},
+        ).json()["resources"]
+        assert client.patch(
+            "/cs/alerts/entities/alerts/v3", headers=headers,
+            json={"composite_ids": ids,
+                  "action_parameters": [{"name": "update_status", "value": "in_progress"}]},
+        ).status_code == 200
+        assert self._count(client, search) == before + 1
+
+    def test_a_defender_alert_update(self, client: TestClient) -> None:
+        headers = self._defender(client)
+        search = 'search index=msdefender sourcetype="ms:defender:atp:alerts"'
+        before = self._count(client, search)
+        alert = client.get("/mde/api/alerts", headers=headers).json()["value"][0]["id"]
+        assert client.patch(
+            f"/mde/api/alerts/{alert}", headers=headers, json={"status": "InProgress"},
+        ).status_code == 200
+        assert self._count(client, search) == before + 1
+
+    def test_an_elastic_signal_status_change(self, client: TestClient) -> None:
+        headers = self._elastic()
+        search = 'search index=elastic_security sourcetype="elastic:security:alerts"'
+        before = self._count(client, search)
+        hits = client.post(
+            "/kibana/api/detection_engine/signals/search", headers=headers,
+            json={"query": {"match_all": {}}, "size": 1},
+        ).json()["hits"]["hits"]
+        assert hits
+        assert client.post(
+            "/kibana/api/detection_engine/signals/status", headers=headers,
+            json={"signal_ids": [hits[0]["_id"]], "status": "acknowledged"},
+        ).status_code == 200
+        assert self._count(client, search) == before + 1
+
+    def test_a_cortex_incident_update(self, client: TestClient) -> None:
+        search = 'search index=cortex_xdr sourcetype="pan:xdr:incident"'
+        before = self._count(client, search)
+        incident = client.post(
+            "/xdr/public_api/v1/incidents/get_incidents/", headers=self._cortex(),
+            json={"request_data": {}},
+        ).json()["reply"]["incidents"][0]["incident_id"]
+        assert client.post(
+            "/xdr/public_api/v1/incidents/update_incident/", headers=self._cortex(),
+            json={"request_data": {"incident_id": incident,
+                                   "update_data": {"status": "under_investigation"}}},
+        ).status_code == 200
+        assert self._count(client, search) == before + 1

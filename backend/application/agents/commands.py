@@ -4,6 +4,7 @@ import uuid as _uuid
 import zipfile
 from typing import cast
 
+from application import bridge
 from application.agents.queries import FILTER_SPECS as AGENT_FILTER_SPECS
 from application.webhooks import commands as webhook_commands
 from domain.tag import Tag
@@ -257,6 +258,10 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
             pass  # nothing on the record changes; the activity is the answer
 
         agent_repo.save(agent)
+        # The SIEM mounts learn what this action did (ADR-009): the Splunk
+        # view of the agent used to keep answering the state it was seeded
+        # with, however many actions a client had run against it.
+        bridge.agent_changed(agent)
         activity_repo.create(
             activity_type=52 if action == "disconnect" else 53,
             description=f"Agent action '{action}' executed",

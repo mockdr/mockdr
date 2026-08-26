@@ -1,6 +1,7 @@
 """Cortex XDR Incident command handlers (mutations)."""
 from __future__ import annotations
 
+from application import bridge
 from repository.xdr_incident_repo import xdr_incident_repo
 from utils.xdr_response import build_xdr_reply
 
@@ -35,4 +36,5 @@ def update_incident(incident_id: str, update_data: dict) -> dict | None:
             setattr(incident, key, value)
 
     xdr_incident_repo.save(incident)
+    bridge.xdr_incident_changed(incident)
     return build_xdr_reply(True)
