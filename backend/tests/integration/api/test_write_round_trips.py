@@ -592,3 +592,58 @@ class TestTheSameRecordTwoWays:
         if empty is not None:
             assert empty["minTime"] == ""
             assert empty["maxTime"] == ""
+
+
+class TestAFieldMeansOneThing:
+    """From ``scripts/type_stability_audit.py``, which sweeps 1 189 records.
+
+    A client writes one parser per field and runs it over every record. A
+    field that is a string in one record and a number in the next breaks it,
+    and which of the two is right barely matters — a product does not answer
+    both.
+    """
+
+    def _mde(self, client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_a_process_id_is_a_number_or_absent_never_an_empty_string(
+        self, client: TestClient,
+    ) -> None:
+        """Recorded from a real Defender reply: 39 integers, 56 nulls, no strings.
+
+        The docs table types the fields it lists and says nothing about the
+        ones that only appear in an example, so every member of `evidence`
+        was defaulted to a string — including this one.
+        """
+        headers = self._mde(client)
+        alerts = client.get("/mde/api/alerts", headers=headers,
+                            params={"$top": 200}).json()["value"]
+        seen = [
+            evidence[field]
+            for alert in alerts for evidence in alert.get("evidence") or []
+            for field in ("processId", "parentProcessId") if field in evidence
+        ]
+        assert seen, "no evidence carried a process id"
+        for value in seen:
+            assert value is None or isinstance(value, int), repr(value)
+
+    def test_an_empty_evidence_member_is_null_not_an_empty_string(
+        self, client: TestClient,
+    ) -> None:
+        """Every member the recording ever saw empty, Defender sends as null."""
+        headers = self._mde(client)
+        alerts = client.get("/mde/api/alerts", headers=headers,
+                            params={"$top": 200}).json()["value"]
+        empties = [
+            (field, value)
+            for alert in alerts for evidence in alert.get("evidence") or []
+            for field, value in evidence.items()
+            if field not in ("entityType", "evidenceCreationTime") and value == ""
+        ]
+        assert empties == [], f"empty strings where the product sends null: {empties[:5]}"

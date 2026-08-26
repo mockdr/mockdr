@@ -5,6 +5,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from domain.splunk.splunk_index import SplunkIndex
 from repository.splunk.splunk_event_repo import splunk_event_repo
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
@@ -70,7 +71,7 @@ def _bound(epoch: float | None) -> str:
     return datetime.fromtimestamp(epoch, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
-def index_content(idx: object, event_count: int,
+def index_content(idx: SplunkIndex, event_count: int,
                   bounds: tuple[float, float] | None = None) -> dict:
     """One index's content block, wherever it is served from.
 

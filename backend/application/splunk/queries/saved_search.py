@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from domain.splunk.saved_search import SavedSearch
 from repository.splunk.saved_search_repo import saved_search_repo
 from utils.splunk.response import (
     build_splunk_entry,
@@ -23,7 +24,7 @@ _SAVED_ACL = {
 _SAVED_LINKS = fixture_links("saved_searches")
 
 
-def saved_search_content(ss: object) -> dict:
+def saved_search_content(ss: SavedSearch) -> dict:
     """One saved search's content block, wherever it is served from.
 
     The listing and the single-entry route each built this by hand, and

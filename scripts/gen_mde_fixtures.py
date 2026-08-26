@@ -97,8 +97,53 @@ def _default_for_type(type_name: str):
     return ""
 
 
+def _recorded_types() -> dict[str, str]:
+    """The leaf types a recorded reply was seen holding.
+
+    The docs give a type for the fields their tables list and none for the
+    ones that only appear in an example — so every member of `evidence` was
+    defaulted to a string, including `processId`, which a real reply carries
+    as a number. A recorded reply settles it where the table is silent.
+    """
+    recorded = REDUCED.with_name("splunk_ta_samples_reduced.json")
+    if not recorded.exists():
+        return {}
+    out: dict[str, str] = {}
+    for entry in json.load(open(recorded)).values():
+        out.update(entry.get("types") or {})
+        # A field the reply was seen leaving empty defaults to null, whatever
+        # type its populated values had.
+        for path in entry.get("nullable") or []:
+            out[path] = "null"
+    return out
+
+
+_FROM_TYPE: dict[str, object] = {
+    "number": 0, "boolean": False, "array": [], "object": {}, "string": "",
+    "null": None,
+}
+
+
+def _apply_types(tree: dict, observed: dict[str, str], prefix: str = "") -> None:
+    """Replace a guessed default with the type a real reply was seen holding."""
+    for key, value in tree.items():
+        path = f"{prefix}{key}"
+        if isinstance(value, dict):
+            _apply_types(value, observed, f"{path}.")
+        elif isinstance(value, list) and value and isinstance(value[0], dict):
+            _apply_types(value[0], observed, f"{path}[*].")
+        else:
+            kind = observed.get(path)
+            if kind is None or kind not in _FROM_TYPE:
+                continue
+            wanted = _FROM_TYPE[kind]
+            if wanted is None or not isinstance(value, type(wanted)):
+                tree[key] = wanted
+
+
 def main() -> int:
     doc = json.load(open(REDUCED))
+    observed = _recorded_types()
     OUT.mkdir(parents=True, exist_ok=True)
     tables = doc.get("entities", {})
     # the docs spell paths with their own casing (/API/machines/…)
@@ -124,6 +169,7 @@ def main() -> int:
             name = _CASE.get(prop, prop)
             tree.setdefault(name, "")
         tree = {k: v for k, v in tree.items() if k and k not in ("[]",)}
+        _apply_types(tree, observed)
         (OUT / f"{entity}.json").write_text(json.dumps(tree, indent=1, sort_keys=True) + "\n")
         print(f"  {entity:14} {len(tree):3} keys")
     return 0

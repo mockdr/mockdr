@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**A field that means two things.**
+A client writes one parser per field and runs it over every record, so a
+field that is a string in one record and a number in the next breaks it —
+and which of the two is right barely matters, because a product does not
+answer both. `scripts/type_stability_audit.py` sweeps every listing, walks
+1 189 records to their leaves, and asks of each field path whether it held
+one type, and — where the name says it is a time — one notation.
+
+**`processId` and `parentProcessId` were sometimes numbers and sometimes
+empty strings**, in the same reply. Defender's docs table types the fields
+it lists and says nothing about the ones that appear only in an example, so
+every member of `evidence` had been defaulted to a string. A recorded reply
+settles it: 39 integers, 56 nulls, no strings.
+
+Rather than hand-correcting two fields, `scripts/splunk_ta_samples_spec.py`
+now records the JSON type each path was seen holding and which paths were
+seen null, and `gen_mde_fixtures.py` prefers that over the guess. Every
+`evidence` member the recording ever saw empty now defaults to `null`, which
+is what Defender sends — `""` for a missing file name is a different thing
+to a typed client, and `0` for a missing process id would have claimed PID 0.
+
+The audit judges within one route rather than across a vendor: `severity` is
+a string on a Graph alert and a number on a Graph tiIndicator, and both are
+right. The drift that would escape it — one type in a listing and another in
+a fetch by id — is what `consistency_audit.py` compares.
+
 **The same record, fetched two ways.**
 Every product here serves a record from more than one route, and a client
 moves between them freely: it lists to find an id, then fetches that id to
