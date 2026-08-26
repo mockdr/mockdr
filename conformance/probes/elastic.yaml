@@ -2867,6 +2867,10 @@ probes:
   # The form a client reaches for from a shell — `_search?q=…&size=…` —
   # which mockdr read none of: the whole index came back, unfiltered,
   # unsorted and unlimited, with a 200.
+  #
+  # Each sorts by `sev` rather than `_doc`: `_doc` is index order, which is
+  # explicitly unspecified — a fresh cluster and a seeded mock hold the same
+  # six documents in different ones, and comparing that compares nothing.
 
   - id: es-uri-search-size
     endpoint: search
@@ -2877,7 +2881,7 @@ probes:
     request:
       method: GET
       path: /${seed_index}/_search
-      query: {size: '2', sort: '_doc'}
+      query: {size: '2', sort: 'sev:asc'}
       auth: basic
 
   - id: es-uri-search-from
@@ -2889,7 +2893,7 @@ probes:
     request:
       method: GET
       path: /${seed_index}/_search
-      query: {from: '2', size: '2', sort: '_doc'}
+      query: {from: '2', size: '2', sort: 'sev:asc'}
       auth: basic
 
   - id: es-uri-search-q
@@ -2901,7 +2905,7 @@ probes:
     request:
       method: GET
       path: /${seed_index}/_search
-      query: {q: 'sev:99', sort: '_doc'}
+      query: {q: 'sev:99', sort: 'sev:asc'}
       auth: basic
 
   - id: es-uri-search-source-includes
@@ -2913,7 +2917,7 @@ probes:
     request:
       method: GET
       path: /${seed_index}/_search
-      query: {_source_includes: sev, sort: '_doc', size: '2'}
+      query: {_source_includes: sev, sort: 'sev:asc', size: '2'}
       auth: basic
 
   - id: es-uri-search-no-total
@@ -2926,7 +2930,7 @@ probes:
     request:
       method: GET
       path: /${seed_index}/_search
-      query: {track_total_hits: 'false', size: '1', sort: '_doc'}
+      query: {track_total_hits: 'false', size: '1', sort: 'sev:asc'}
       auth: basic
 
   - id: es-uri-search-beats-the-body
@@ -2939,7 +2943,7 @@ probes:
       method: POST
       path: /${seed_index}/_search
       query: {size: '1'}
-      content: '{"size": 3, "query": {"match_all": {}}, "sort": ["_doc"]}'
+      content: '{"size": 3, "query": {"match_all": {}}, "sort": [{"sev": "asc"}]}'
       headers: {Content-Type: application/json}
       auth: basic
 
