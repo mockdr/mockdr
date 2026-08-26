@@ -68,6 +68,30 @@ services:
       retries: 20
       start_period: 60s
 
+  # Elasticsearch starts with a password for `elastic` and none for
+  # `kibana_system`, so Kibana cannot authenticate and never leaves
+  # "unavailable" — every Kibana probe then compares against a product that
+  # is not running. It survived unnoticed for as long as a data volume did:
+  # the password had been set by hand once and persisted. The first
+  # `down -v` took it with the volume.
+  kibana-credentials:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    entrypoint:
+      - bash
+      - -c
+      - >
+        curl -sf -u "elastic:$${ELASTIC_PASSWORD}"
+        -X POST "http://elasticsearch:9200/_security/user/kibana_system/_password"
+        -H 'Content-Type: application/json'
+        -d "{\"password\": \"$${KIBANA_PASSWORD}\"}"
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-Probe-Passw0rd!}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD:-Probe-Passw0rd!}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: on-failure
+
   kibana:
     image: docker.elastic.co/kibana/kibana:8.15.0
     ports:
@@ -86,6 +110,8 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
+      kibana-credentials:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
       interval: 15s

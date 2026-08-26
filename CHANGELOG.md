@@ -696,6 +696,18 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**A conformance stack that could not be rebuilt.**
+Elasticsearch starts with a password for `elastic` and none for
+`kibana_system`, so Kibana could not authenticate and never left
+`unavailable` — and every Kibana probe then compared the mock against a
+product that was not running. The password was a manual step in the README,
+and it survived unnoticed for as long as a data volume did: the first
+`docker compose down -v` took it with the volume, and the harness reported
+fifty differences that were all the same fact. `compose.yml` sets it now,
+and the bootstrap refuses to run at all while Kibana reports itself
+unavailable — saying it once, at the top, beats fifty findings that read as
+mock defects.
+
 **A conformance job that failed on the weather.**
 `es-count` reported eight differences in CI and none locally: a shard still
 allocating when the search reached it puts a whole `_shards.failures`

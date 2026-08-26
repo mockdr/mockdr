@@ -86,13 +86,16 @@ key". `compose.yml` sets them. The first Kibana run without them made every
 cases probe a measurement of a broken fixture, which is the failure this
 harness exists to prevent on the other side.
 
+Kibana's service account also needs a password, which Elasticsearch does not
+set for it: without one Kibana never leaves `unavailable`, and every Kibana
+probe then compares the mock against a product that is not running. That was
+a manual step here, and it survived unnoticed for as long as a data volume
+did — the first `docker compose down -v` took the password with it. The
+`kibana-credentials` service sets it now, and the harness refuses to run at
+all if Kibana still reports itself unavailable.
+
 ```bash
-docker compose up -d elasticsearch
-# Kibana's service account needs a password before Kibana will start:
-curl -u elastic:'Probe-Passw0rd!' -X POST \
-  http://localhost:19200/_security/user/kibana_system/_password \
-  -H 'Content-Type: application/json' -d '{"password":"Probe-Passw0rd!"}'
-docker compose up -d kibana mockdr
+docker compose up -d
 
 python -m harness.runner probes/elastic.yaml
 ```

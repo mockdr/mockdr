@@ -172,6 +172,7 @@ def bootstrap_elastic(
         raise BootstrapError("elastic spec has no 'search' endpoint")
 
     _await_allocated_shards(spec, target, clients)
+    _require_kibana_available(spec, target, clients)
 
     response = clients.get("search", target).get(
         "/_cat/indices", params={"format": "json"},
@@ -261,6 +262,45 @@ def _create_probe_index(spec: PlatformSpec, target: str, clients: Clients) -> st
     if health.status_code != 200 or health.json().get("timed_out"):
         raise BootstrapError(f"{_ES_PROBE_INDEX} on {target} never went green")
     return _ES_PROBE_INDEX
+
+
+def _require_kibana_available(
+    spec: PlatformSpec, target: str, clients: Clients,
+) -> None:
+    """Refuse to run if Kibana is up but not *available*.
+
+    Kibana answers every request with a 503 while it is starting, and with a
+    503 forever if it cannot authenticate against Elasticsearch. Either way
+    the probes then compare the mock against a product that is not running,
+    and report dozens of differences that read as mock defects — the exact
+    inversion this harness exists to prevent. Saying so once, at the top, is
+    worth more than fifty findings that are all the same fact.
+    """
+    if "kibana" not in spec.endpoints:
+        return
+    auth = (
+        spec.credentials[target].pair if target in spec.credentials
+        else httpx.USE_CLIENT_DEFAULT
+    )
+    try:
+        response = clients.get("kibana", target).get("/api/status", auth=auth)
+    except httpx.HTTPError as exc:
+        raise BootstrapError(f"{target}: Kibana is unreachable — {exc}") from exc
+    if response.status_code != 200:
+        raise BootstrapError(
+            f"{target}: Kibana answered {response.status_code} at /api/status; "
+            f"it is not ready to be compared against",
+        )
+    try:
+        level = response.json()["status"]["overall"]["level"]
+    except (ValueError, KeyError, TypeError):
+        level = "unreadable"
+    if level != "available":
+        raise BootstrapError(
+            f"{target}: Kibana reports its status as {level!r}, not 'available'. "
+            f"It cannot authenticate against Elasticsearch unless the "
+            f"`kibana-credentials` service has run — see conformance/README.md.",
+        )
 
 
 def _await_allocated_shards(spec: PlatformSpec, target: str, clients: Clients) -> None:
