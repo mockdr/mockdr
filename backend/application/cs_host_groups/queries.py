@@ -10,7 +10,14 @@ from utils.cs_response import (
     build_cs_id_response,
     build_cs_list_response,
 )
+from utils.internal_fields import CS_HOST_INTERNAL_FIELDS
 from utils.serde import record_dict
+from utils.strip import strip_fields
+
+
+def _public_host(host: object) -> dict:
+    """One host as Falcon serves it: no bookkeeping, and never a hidden one."""
+    return strip_fields(record_dict(host), CS_HOST_INTERNAL_FIELDS)
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
@@ -122,7 +129,8 @@ def list_group_members(
     Returns:
         CS list response envelope with host entities and pagination.
     """
-    all_hosts = [record_dict(h) for h in cs_host_repo.list_all()]
+    all_hosts = [_public_host(h) for h in cs_host_repo.list_all()
+                 if not getattr(h, "hidden", False)]
     members = [h for h in all_hosts if group_id in h.get("groups", [])]
     if filter_fql:
         members = apply_fql(members, filter_fql)
@@ -153,7 +161,8 @@ def query_group_member_ids(
     Returns:
         CS ID response envelope.
     """
-    all_hosts = [record_dict(h) for h in cs_host_repo.list_all()]
+    all_hosts = [_public_host(h) for h in cs_host_repo.list_all()
+                 if not getattr(h, "hidden", False)]
     members = [h for h in all_hosts if group_id in h.get("groups", [])]
     if filter_fql:
         members = apply_fql(members, filter_fql)

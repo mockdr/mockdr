@@ -1697,3 +1697,102 @@ class TestEachBulkActionDoesWhatItSays:
         assert docs[1]["found"] is False
         assert "found" not in docs[2]
         assert docs[2]["error"]["type"] == "index_not_found_exception"
+
+
+class TestHidingAHostIsSomethingFalconCanUndo:
+    """``hide_host`` "will delete a host"; ``unhide_host`` "will restore a host".
+
+    Falcon's own words, from the four actions its device-actions endpoint
+    documents. mockdr dropped the record, so hiding was irreversible — a host
+    hidden by mistake could never come back, and
+    `/devices/combined/devices-hidden/v1`, the one place a hidden host
+    appears, had nothing to list.
+    """
+
+    @pytest.fixture
+    def cs(self, client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _device(self, client: TestClient, cs: dict) -> str:
+        return client.get("/cs/devices/queries/devices/v1", headers=cs,
+                          params={"limit": 1}).json()["resources"][0]
+
+    def _act(self, client: TestClient, cs: dict, action: str, device: str) -> object:
+        return client.post("/cs/devices/entities/devices-actions/v2", headers=cs,
+                           params={"action_name": action}, json={"ids": [device]})
+
+    def test_hidden_then_restored(self, client: TestClient, cs: dict) -> None:
+        device = self._device(client, cs)
+
+        def visible() -> int:
+            return len(client.post("/cs/devices/entities/devices/v2", headers=cs,
+                                   json={"ids": [device]}).json()["resources"])
+
+        def hidden() -> list:
+            return client.get("/cs/devices/combined/devices-hidden/v1",
+                              headers=cs).json()["resources"]
+
+        assert visible() == 1
+        assert self._act(client, cs, "hide_host", device).status_code == 200
+        assert visible() == 0
+        assert [h["device_id"] for h in hidden()] == [device]
+
+        assert self._act(client, cs, "unhide_host", device).status_code == 200
+        assert visible() == 1
+        assert hidden() == []
+
+    def test_a_hidden_host_leaves_the_id_listing_too(
+        self, client: TestClient, cs: dict,
+    ) -> None:
+        device = self._device(client, cs)
+        self._act(client, cs, "hide_host", device)
+        ids = client.get("/cs/devices/queries/devices/v1", headers=cs,
+                         params={"limit": 500}).json()["resources"]
+        assert device not in ids
+        self._act(client, cs, "unhide_host", device)
+
+    def test_the_flag_is_mockdrs_and_stays_out_of_the_answer(
+        self, client: TestClient, cs: dict,
+    ) -> None:
+        """Falcon's device model has no `hidden` property."""
+        device = self._device(client, cs)
+        record = client.post("/cs/devices/entities/devices/v2", headers=cs,
+                             json={"ids": [device]}).json()["resources"][0]
+        assert "hidden" not in record
+
+    def test_tagging_is_its_own_route(self, client: TestClient, cs: dict) -> None:
+        """``DeviceapiUpdateDeviceTagsRequestV1``: action, device_ids, tags."""
+        device = self._device(client, cs)
+        answer = client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
+                              json={"action": "add", "device_ids": [device],
+                                    "tags": ["zzz-tag"]})
+        assert answer.status_code == 200
+        assert "zzz-tag" in answer.json()["resources"][0]["tags"]
+
+        removed = client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
+                               json={"action": "remove", "device_ids": [device],
+                                     "tags": ["zzz-tag"]})
+        assert "zzz-tag" not in removed.json()["resources"][0]["tags"]
+
+    @pytest.mark.parametrize("missing", ["action", "device_ids", "tags"])
+    def test_all_three_members_are_required(
+        self, client: TestClient, cs: dict, missing: str,
+    ) -> None:
+        body = {"action": "add", "device_ids": ["x"], "tags": ["y"]}
+        del body[missing]
+        answer = client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
+                              json=body)
+        assert answer.status_code == 400
+        assert missing in answer.json()["errors"][0]["message"]
+
+    def test_the_device_actions_endpoint_does_not_tag(
+        self, client: TestClient, cs: dict,
+    ) -> None:
+        """Falcon documents four actions there, and none of them is tagging."""
+        device = self._device(client, cs)
+        assert self._act(client, cs, "add-hosts", device).status_code == 400

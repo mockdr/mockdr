@@ -79,6 +79,12 @@ class CsHost:
     # ── Meta ──────────────────────────────────────────────────────────────────
     meta: dict = field(default_factory=lambda: {"version": "1"})
 
+    #: Falcon's `hide_host` "will delete a host", and its `unhide_host`
+    #: "will restore a host" — so a hidden host is kept and marked, not
+    #: dropped. Dropping it made hiding irreversible, and left
+    #: `/devices/combined/devices-hidden/v1` nothing to list.
+    hidden: bool = False
+
     @property
     def id(self) -> str:
         """Return the primary identifier expected by ``Repository[T]``."""

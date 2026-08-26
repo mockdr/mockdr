@@ -4,7 +4,9 @@ from __future__ import annotations
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_response import build_cs_action_response
 from utils.dt import utc_now
+from utils.internal_fields import CS_HOST_INTERNAL_FIELDS
 from utils.serde import record_dict
+from utils.strip import strip_fields
 
 
 def contain_host(ids: list[str]) -> dict:
@@ -54,9 +56,12 @@ def lift_containment(ids: list[str]) -> dict:
 
 
 def hide_host(ids: list[str]) -> dict:
-    """Hide (soft-delete) hosts.
+    """Hide hosts, which Falcon can undo.
 
-    Removes the host from the repository entirely, matching real CS behavior.
+    ``hide_host`` "will delete a host" and ``unhide_host`` "will restore a
+    host" — Falcon's own words, and its ``devices-hidden`` route lists what
+    is hidden. Dropping the record made hiding irreversible: a host hidden
+    by mistake could never come back, and the listing had nothing to show.
 
     Args:
         ids: List of device IDs to hide.
@@ -64,10 +69,31 @@ def hide_host(ids: list[str]) -> dict:
     Returns:
         CS action response with affected host resources.
     """
+    return _set_hidden(ids, hidden=True)
+
+
+def unhide_host(ids: list[str]) -> dict:
+    """Restore hosts that were hidden, so detections resume for them.
+
+    Args:
+        ids: List of device IDs to restore.
+
+    Returns:
+        CS action response with affected host resources.
+    """
+    return _set_hidden(ids, hidden=False)
+
+
+def _set_hidden(ids: list[str], *, hidden: bool) -> dict:
     affected: list[dict] = []
     for device_id in ids:
-        if cs_host_repo.delete(device_id):
-            affected.append({"id": device_id})
+        host = cs_host_repo.get(device_id)
+        if not host:
+            continue
+        host.hidden = hidden
+        host.modified_timestamp = utc_now()
+        cs_host_repo.save(host)
+        affected.append({"id": device_id})
     return build_cs_action_response(affected)
 
 
@@ -98,5 +124,5 @@ def tag_hosts(ids: list[str], tags: list[str], action: str) -> dict:
         host.tags = current_tags
         host.modified_timestamp = utc_now()
         cs_host_repo.save(host)
-        affected.append(record_dict(host))
+        affected.append(strip_fields(record_dict(host), CS_HOST_INTERNAL_FIELDS))
     return build_cs_action_response(affected)

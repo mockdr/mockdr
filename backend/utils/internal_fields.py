@@ -13,6 +13,12 @@ AGENT_INTERNAL_FIELDS: frozenset[str] = frozenset({
     "decommissionedAt",  # a filter field; AgentViewSchema does not declare it
 })
 
+#: Falcon's device model has no `hidden` property: whether a host has been
+#: hidden is mockdr's bookkeeping, and it is visible in the answer only as
+#: the host's absence from the listings and its presence in
+#: `/devices/combined/devices-hidden/v1`.
+CS_HOST_INTERNAL_FIELDS: frozenset[str] = frozenset({"hidden"})
+
 DEVICE_CONTROL_INTERNAL_FIELDS: frozenset[str] = frozenset({"siteId"})
 
 EXCLUSION_INTERNAL_FIELDS: frozenset[str] = frozenset({"siteId"})
