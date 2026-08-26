@@ -185,6 +185,7 @@ from api.routers import (
 from api.routers import (
     xdr_xql as xdr_xql_router,
 )
+from api.routers.es_search import CatSortError
 from api.routers.graph import (
     app_protection as graph_app_protection_router,
 )
@@ -659,6 +660,14 @@ def _searched_index(request: Request) -> str:
     if len(parts) >= 2 and parts[0] == "elastic" and not parts[1].startswith("_"):
         return parts[1]
     return "mockdr"
+
+
+@app.exception_handler(CatSortError)
+async def cat_sort_error_handler(request: Request, exc: CatSortError) -> JSONResponse:
+    """`_cat?s=…` naming a column no row carries is an illegal argument."""
+    return JSONResponse(status_code=400, content=build_es_error_response(
+        400, "illegal_argument_exception", str(exc),
+    ))
 
 
 @app.exception_handler(ESQueryError)

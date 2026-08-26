@@ -66,22 +66,24 @@ def cluster_health(
 def cat_indices(
     pattern: str = "",
     format: str = Query(default=""),  # noqa: A002 - ES's own parameter name
-    v: bool = Query(default=False),
+    v: str | None = Query(default=None),
     h: str = Query(default=""),
+    s: str = Query(default=""),
     _: dict = Depends(require_es_auth),
 ) -> Response:
     """List indices, as a text table unless the caller asks for json."""
     rows = search_queries.es_cat_indices()
     if pattern and pattern not in ("*", "_all"):
         rows = [r for r in rows if fnmatch(str(r["index"]), pattern)]
-    return _cat_response(rows, format, headers=v, columns=h)
+    return _cat_response(rows, format, headers=_flag(v), columns=h, order=s)
 
 
 @router.get("/_cat/health")
 def cat_health(
     format: str = Query(default=""),  # noqa: A002 - ES's own parameter name
-    v: bool = Query(default=False),
+    v: str | None = Query(default=None),
     h: str = Query(default=""),
+    s: str = Query(default=""),
     _: dict = Depends(require_es_auth),
 ) -> Response:
     """One-row cluster health, as a text table unless json is asked for."""
@@ -102,24 +104,73 @@ def cat_health(
         "max_task_wait_time": "-",
         "active_shards_percent": "100.0%",
     }]
-    return _cat_response(rows, format, headers=v, columns=h)
+    return _cat_response(rows, format, headers=_flag(v), columns=h, order=s)
+
+
+class CatSortError(ValueError):
+    """A `_cat` sort naming a column no row carries."""
+
+
+def _flag(value: str | None) -> bool:
+    """A `_cat` flag, which is true when named at all.
+
+    `?v` — no value — is the canonical way to ask for a header row, and
+    declaring it as a boolean made FastAPI refuse the empty value with a
+    400. `?v=false` is still false.
+    """
+    if value is None:
+        return False
+    return value.strip().lower() not in ("false", "0", "no")
+
+
+def _cat_sorted(rows: list[dict], order: str) -> list[dict]:
+    """Order the rows per `s=column[:asc|desc]`, as Elasticsearch does.
+
+    A column no row carries is a 400 there, and was silently ignored here.
+    """
+    for clause in reversed([c.strip() for c in order.split(",") if c.strip()]):
+        column, _, direction = clause.partition(":")
+        if rows and column not in rows[0]:
+            # Elasticsearch's own wording, and its own exception type: this
+            # is an illegal argument, not a parse failure (measured on 8.15).
+            raise CatSortError(f"Unable to sort by unknown sort key `{column}`")
+        rows = sorted(
+            rows, key=lambda row: _cat_key(row.get(column)),
+            reverse=direction.lower() == "desc",
+        )
+    return rows
+
+
+def _cat_key(value: object) -> tuple[int, float, str]:
+    text = "" if value is None else str(value)
+    try:
+        return (0, float(text), "")
+    except ValueError:
+        return (1, 0.0, text)
 
 
 def _cat_response(
     rows: list[dict], format: str, *, headers: bool, columns: str,  # noqa: A002
+    order: str = "",
 ) -> Response:
     """A `_cat` answer, as json or as the text table that is its default.
 
     Every `_cat` endpoint answers a *table* unless the caller asks for json,
     and mockdr answered json regardless — so a script reading columns got a
     document. The columns are padded to their widest value, `v` adds the
-    header row and `h` picks the columns (all measured against 8.15).
+    header row, `h` picks the columns and `s` orders the rows. `h` and `s`
+    apply to the json form too, which they did not: a client asking for two
+    columns as json was handed all twelve (all measured against 8.15).
     """
-    if format.lower() == "json":
-        return JSONResponse(content=rows)
     names = [c.strip() for c in columns.split(",") if c.strip()] or (
         list(rows[0]) if rows else []
     )
+    if order:
+        rows = _cat_sorted(rows, order)
+    if format.lower() == "json":
+        return JSONResponse(content=[
+            {name: row.get(name, "") for name in names if name in row} for row in rows
+        ] if columns else rows)
     table = [[str(row.get(name, "")) for name in names] for row in rows]
     if headers:
         table.insert(0, names)

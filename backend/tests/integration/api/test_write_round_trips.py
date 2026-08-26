@@ -1152,3 +1152,67 @@ class TestUriQueryOnTheOtherRoutes:
                              params={"q": "name:zzz", "refresh": "true"},
                              json={"script": {"source": "ctx._source.n = 1"}}).json()
         assert answer["updated"] == 0
+
+
+class TestTheCatApiReadsItsParameters:
+    """`_cat` is a text API driven entirely by its query string.
+
+    Measured against Elasticsearch 8.15.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def test_a_bare_v_asks_for_the_header_row(self, client: TestClient) -> None:
+        """`?v` — no value — is the commonest `_cat` request there is.
+
+        Declared as a boolean, FastAPI refused the empty value with a 400.
+        """
+        answer = client.get("/elastic/_cat/indices?v", headers=self.ES)
+        assert answer.status_code == 200
+        first = answer.text.splitlines()[0]
+        assert first.split()[:3] == ["health", "status", "index"]
+
+    def test_v_false_still_means_false(self, client: TestClient) -> None:
+        answer = client.get("/elastic/_cat/indices", headers=self.ES,
+                            params={"v": "false"})
+        assert not answer.text.splitlines()[0].startswith("health status")
+
+    def test_h_picks_the_columns_of_the_json_form_too(
+        self, client: TestClient,
+    ) -> None:
+        rows = client.get("/elastic/_cat/indices", headers=self.ES,
+                          params={"format": "json", "h": "index,docs.count"}).json()
+        assert rows
+        assert all(set(row) == {"index", "docs.count"} for row in rows)
+
+    def test_a_column_no_row_carries_is_simply_left_out(
+        self, client: TestClient,
+    ) -> None:
+        rows = client.get("/elastic/_cat/indices", headers=self.ES,
+                          params={"format": "json", "h": "index,zzzNope"}).json()
+        assert all(set(row) == {"index"} for row in rows)
+
+    def test_s_orders_the_rows(self, client: TestClient) -> None:
+        rows = client.get("/elastic/_cat/indices", headers=self.ES,
+                          params={"format": "json", "s": "index:desc",
+                                  "h": "index"}).json()
+        names = [r["index"] for r in rows]
+        assert names == sorted(names, reverse=True)
+
+    def test_s_sorts_a_numeric_column_numerically(self, client: TestClient) -> None:
+        rows = client.get("/elastic/_cat/indices", headers=self.ES,
+                          params={"format": "json", "s": "docs.count:desc",
+                                  "h": "index,docs.count"}).json()
+        counts = [int(r["docs.count"]) for r in rows]
+        assert counts == sorted(counts, reverse=True)
+
+    def test_sorting_by_a_column_nothing_carries_is_a_400(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.get("/elastic/_cat/indices", headers=self.ES,
+                            params={"format": "json", "s": "zzzNope"})
+        assert answer.status_code == 400
+        error = answer.json()["error"]
+        assert error["type"] == "illegal_argument_exception"
+        assert error["reason"] == "Unable to sort by unknown sort key `zzzNope`"

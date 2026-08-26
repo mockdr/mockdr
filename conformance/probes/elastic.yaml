@@ -2980,3 +2980,37 @@ probes:
       path: /${seed_index}/_delete_by_query
       query: {q: 'sev:12345', refresh: 'true'}
       auth: basic
+
+  - id: es-cat-v-as-a-bare-flag
+    endpoint: search
+    why: >
+      `_cat/indices?v` — no value — is the canonical way to ask for a header
+      row. mockdr declared `v` as a boolean, so FastAPI refused the empty
+      value with a 400 on the commonest `_cat` request there is.
+    request:
+      method: GET
+      path: /_cat/health
+      query: {v: ''}
+      auth: basic
+
+  - id: es-cat-columns-as-json
+    endpoint: search
+    why: >
+      `h` picks the columns of the json form as much as of the table.
+      mockdr applied it to the table only, so a client asking for two
+      columns as json was handed all twelve.
+    request:
+      method: GET
+      path: /_cat/health
+      query: {format: json, h: 'node.total,node.data,shards'}
+      auth: basic
+
+  - id: es-cat-sort-unknown-column
+    endpoint: search
+    why: >
+      A column no row carries is a 400, not a silently unsorted answer.
+    request:
+      method: GET
+      path: /_cat/indices
+      query: {format: json, s: zzzNoSuchColumn}
+      auth: basic
