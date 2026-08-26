@@ -20,7 +20,6 @@ import time
 from domain.event_bus import (
     AgentUpdated,
     CsDetectionCreated,
-    CsIncidentCreated,
     EsAlertCreated,
     MdeAlertCreated,
     ThreatCreated,
@@ -59,15 +58,6 @@ def cs_detection_changed(detection: object) -> None:
     event_bus.publish(CsDetectionCreated(
         entity_id=str(getattr(detection, "id", "")),
         payload=_payload(detection),
-        timestamp=time.time(),
-    ))
-
-
-def cs_incident_changed(incident: object) -> None:
-    """A CrowdStrike incident was created or acted on."""
-    event_bus.publish(CsIncidentCreated(
-        entity_id=str(getattr(incident, "id", "")),
-        payload=_payload(incident),
         timestamp=time.time(),
     ))
 

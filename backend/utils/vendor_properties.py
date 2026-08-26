@@ -84,8 +84,3 @@ def _mde_properties() -> dict[str, frozenset[str]]:
 def properties_by_route() -> dict[str, frozenset[str]]:
     """Every route either reference speaks for, and what its resource carries."""
     return {**_graph_properties(), **_mde_properties()}
-
-
-def properties_for(route: str) -> frozenset[str]:
-    """The properties of the resource ``route`` answers, empty when unknown."""
-    return properties_by_route().get(route, frozenset())
