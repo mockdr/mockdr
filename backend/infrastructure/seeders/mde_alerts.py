@@ -12,7 +12,6 @@ from infrastructure.seeders.mde_shared import (
     MDE_ALERT_CATEGORIES,
     MDE_ALERT_TITLES,
     MDE_DETECTION_SOURCES,
-    MDE_INVESTIGATION_STATES,
     MDE_SEVERITY_LEVELS,
     MDE_THREAT_NAMES,
     mde_guid,
@@ -145,9 +144,15 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
             determination=determination,
             assignedTo=assigned_to,
             machineId=machine_id,
-            incidentId=random.randint(1, 100),
-            investigationId=random.randint(1, 50),
-            investigationState=random.choice(MDE_INVESTIGATION_STATES),
+            # Both are set once the records they name exist: the incident
+            # this alert belongs to, and the investigation it triggered.
+            # They used to be `random.randint`, so an alert named an
+            # investigation the install did not have and a client following
+            # `/api/investigations/{id}` got a 404 from an id the alert
+            # itself had just supplied.
+            incidentId=0,
+            investigationId=0,
+            investigationState="",
             category=category,
             detectionSource=random.choice(MDE_DETECTION_SOURCES),
             threatName=threat_name,

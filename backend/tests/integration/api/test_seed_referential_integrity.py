@@ -5,6 +5,7 @@ be drawn at random independently of the collection they were counting. Both
 read as success to a client — a 200 with a plausible number — while the pivot
 a real integration performs came back empty.
 """
+import pytest
 from fastapi.testclient import TestClient
 
 PREFIX = "/web/api/v2.1"
@@ -132,7 +133,7 @@ class TestTimestampOrdering:
         ("created_timestamp", "modified_timestamp"),
     ]
 
-    def test_no_record_updates_before_it_was_created(self, client: TestClient) -> None:
+    def _violations(self) -> list[str]:
         from dataclasses import asdict, is_dataclass
 
         from repository.store import store
@@ -150,8 +151,32 @@ class TestTimestampOrdering:
                     a, b = data.get(earlier), data.get(later)
                     if isinstance(a, str) and isinstance(b, str) and a and b and a > b:
                         violations.append(f"{name}.{earlier} > {later}")
+        return violations
 
-        assert not violations, f"{len(violations)} ordering violations: {violations[:5]}"
+    def test_no_record_updates_before_it_was_created(self, client: TestClient) -> None:
+        assert not self._violations(), self._violations()[:5]
+
+    def test_the_ordering_holds_for_other_draws_too(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """One draw is not the invariant.
+
+        `seed_es_rules` drew `created_at` with `rand_ago(random.randint(30,
+        180))`, which picks *between 0 and n* days back — so a rule could be
+        created today and report an `updated_at` eleven hours earlier. It sat
+        there until an unrelated seeder change shifted the random stream and
+        the single seeded draw happened to hit it. Every draw has to hold.
+        """
+        from infrastructure import seed
+
+        try:
+            for value in (7, 1337, 2024, 90210):
+                monkeypatch.setattr(seed, "SEED", value)
+                seed.generate_all()
+                assert not self._violations(), (value, self._violations()[:5])
+        finally:
+            monkeypatch.undo()
+            seed.generate_all()
 
 
 class TestLicenceCountsMatchAssignments:
@@ -238,3 +263,53 @@ class TestCasesReferenceRealAlerts:
         for case in cases:
             assert len(case.alert_ids) == case.total_alerts
             assert all(alert_id in known for alert_id in case.alert_ids)
+
+
+class TestNoRecordNamesSomethingThatIsNotThere:
+    """The sweep `scripts/dangling_references.py` runs, over several draws.
+
+    A Cortex incident assigned to somebody the tenant's user list never had,
+    a Defender alert reporting an investigation `/api/investigations/{id}`
+    answers 404 for, a Falcon detection assigned to a `fake.email()`: each
+    is one plausible answer and one broken follow-up. The script that finds
+    them reads the store, so a test can run it — and run it against draws
+    other than the one this install ships with.
+    """
+
+    @staticmethod
+    def _dangling() -> list[str]:
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts"))
+        sweep = pytest.importorskip("dangling_references")
+
+        from repository.store import store
+
+        known = sweep.addressable(store)
+        flagged = []
+        for (collection, path), values in sweep.references(store).items():
+            if f"{collection}{path}" in sweep._OPAQUE:
+                continue
+            carried = {v for v in values if v not in ("", "0", "None")}
+            resolved = carried & known
+            if resolved and carried - known:
+                flagged.append(f"{collection}{path}")
+        return flagged
+
+    def test_this_install_has_none(self, client: TestClient) -> None:
+        assert not self._dangling()
+
+    def test_other_draws_have_none_either(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from infrastructure import seed
+
+        try:
+            for value in (7, 1337, 2024):
+                monkeypatch.setattr(seed, "SEED", value)
+                seed.generate_all()
+                assert not self._dangling(), (value, self._dangling())
+        finally:
+            monkeypatch.undo()
+            seed.generate_all()

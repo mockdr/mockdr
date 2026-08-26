@@ -6,6 +6,7 @@ import random
 from faker import Faker
 
 from domain.cs_detection import CsDetection
+from domain.cs_user import CsUser
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.cs_shared import (
     CS_BEHAVIOR_CMDLINES,
@@ -100,7 +101,14 @@ def _build_behavior(fake: Faker, host_id: str, timestamp: str) -> dict:
     }
 
 
-def seed_cs_detections(fake: Faker, host_ids: list[str]) -> list[str]:
+def _name_of(user: CsUser) -> str:
+    """A console user as Falcon writes their name on an assignment."""
+    return f"{user.first_name} {user.last_name}"
+
+
+def seed_cs_detections(
+    fake: Faker, host_ids: list[str], analysts: list[CsUser],
+) -> list[str]:
     """Create CrowdStrike detection records linked to seeded hosts.
 
     Generates ``_COUNT`` detections, each tied to a random host with 1-3
@@ -109,6 +117,7 @@ def seed_cs_detections(fake: Faker, host_ids: list[str]) -> list[str]:
     Args:
         fake: Shared Faker instance (seeded externally).
         host_ids: List of CS ``device_id`` strings from host seeder.
+        analysts: The console users a triaged detection can be assigned to.
 
     Returns:
         List of ``composite_id`` strings.
@@ -120,6 +129,7 @@ def seed_cs_detections(fake: Faker, host_ids: list[str]) -> list[str]:
     for i in range(1, _COUNT + 1):
         composite_id = f"ldt:{CS_CID}:{i}"
         detection_ids.append(composite_id)
+        analyst = random.choice(analysts)
 
         host_id = random.choice(host_ids)
         host = host_lookup.get(host_id)
@@ -184,8 +194,11 @@ def seed_cs_detections(fake: Faker, host_ids: list[str]) -> list[str]:
             first_behavior=first_behavior_ts,
             last_behavior=last_behavior_ts,
             date_updated=rand_ago(5),
-            assigned_to_name="" if status == "new" else fake.name(),
-            assigned_to_uid="" if status == "new" else fake.email(),
+            # A triaged detection is assigned to somebody this tenant has:
+            # Falcon names them by their console address and their name, and
+            # both used to be invented per detection.
+            assigned_to_name="" if status == "new" else _name_of(analyst),
+            assigned_to_uid="" if status == "new" else analyst.uid,
             seconds_to_triaged=seconds_to_triaged,
             seconds_to_resolved=seconds_to_resolved,
             hostinfo={"domain": host.machine_domain if host else ""},

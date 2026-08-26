@@ -17,26 +17,30 @@ _ROLES: list[list[str]] = [
 ]
 
 
-def seed_cs_users(fake: Faker) -> list[str]:
+def seed_cs_users(fake: Faker) -> list[CsUser]:
     """Create mock CrowdStrike user accounts.
+
+    These are the people the console can assign work to, so they are seeded
+    before the detections, incidents and cases that are assigned — each of
+    which used to invent a name and an address of its own, none of which
+    this Falcon tenant had.
 
     Args:
         fake: Shared Faker instance (seeded externally).
 
     Returns:
-        List of user UUIDs.
+        The user records, in the order they were created.
     """
-    user_ids: list[str] = []
+    users: list[CsUser] = []
 
     for i in range(8):
         user_uuid = fake.uuid4()
-        user_ids.append(user_uuid)
 
         first = fake.first_name()
         last = fake.last_name()
         email = f"{first.lower()}.{last.lower()}@acmecorp.internal"
 
-        cs_user_repo.save(CsUser(
+        user = CsUser(
             uuid=user_uuid,
             cid=CS_CID,
             uid=email,
@@ -47,6 +51,8 @@ def seed_cs_users(fake: Faker) -> list[str]:
             created_at=rand_ago(180),
             last_login_at=rand_ago(2),
             status="active",
-        ))
+        )
+        cs_user_repo.save(user)
+        users.append(user)
 
-    return user_ids
+    return users

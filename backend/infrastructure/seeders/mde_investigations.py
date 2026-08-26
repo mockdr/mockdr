@@ -7,7 +7,8 @@ from faker import Faker
 
 from domain.mde_investigation import MdeInvestigation
 from infrastructure.seeders._shared import rand_ago
-from infrastructure.seeders.mde_shared import MDE_INVESTIGATION_STATES, mde_guid
+from infrastructure.seeders.mde_shared import MDE_INVESTIGATION_STATES
+from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_investigation_repo import mde_investigation_repo
 from repository.mde_machine_repo import mde_machine_repo
 
@@ -22,52 +23,59 @@ _STATUS_DETAILS: dict[str, str] = {
 }
 
 
+#: How many of the tenant's alerts triggered an automated investigation.
+_INVESTIGATION_COUNT = 10
+
+
 def seed_mde_investigations(
     fake: Faker,
     machine_ids: list[str],
     alert_ids: list[str],
 ) -> None:
-    """Generate approximately 10 automated investigation records.
+    """Generate the automated investigations the tenant's alerts triggered.
 
-    Each investigation is linked to a machine and optionally to an alert.
-    States are drawn from the weighted ``MDE_INVESTIGATION_STATES`` list.
+    An investigation is what an alert set off, so each one here is built
+    from an alert this install has: the alert's machine, and the alert's id
+    as ``triggeringAlertId``. The alert is given the investigation's id back,
+    which is what makes `/api/investigations/{id}` answer for the id an alert
+    reports — it used to be a `random.randint`, so it never did.
+
+    Defender numbers its investigations rather than naming them with a GUID:
+    the Splunk add-on's own sample declares ``investigationId`` a number, and
+    the alert field that carries it is one.
 
     Args:
         fake: Shared Faker instance (seeded externally).
-        machine_ids: List of ``machineId`` strings to link investigations to.
-        alert_ids: List of ``alertId`` strings to use as triggering alerts.
+        machine_ids: Machines this tenant has, used when an alert names none.
+        alert_ids: The alert ids this install seeded, in order.
     """
-    investigation_count = 10
+    triggering = alert_ids[:_INVESTIGATION_COUNT]
 
-    # Build a machine_id -> computerDnsName lookup
-    all_machines = mde_machine_repo.list_all()
-    machine_dns_map: dict[str, str] = {
-        m.machineId: m.computerDnsName for m in all_machines
-    }
+    for number, alert_id in enumerate(triggering, start=1):
+        alert = mde_alert_repo.get(alert_id)
+        if alert is None:  # pragma: no cover - the seeder just wrote them
+            continue
 
-    for i in range(investigation_count):
-        investigation_id = mde_guid()
-        machine_id = random.choice(machine_ids)
         state = random.choice(MDE_INVESTIGATION_STATES)
-
         start_time = rand_ago(20)
         # Completed investigations have an end time
-        end_time = ""
-        if state not in ("Running", "Queued"):
-            end_time = rand_ago(5)
-
-        # Use alert_ids cyclically as triggering alerts
-        triggering_alert = alert_ids[i % len(alert_ids)] if alert_ids else ""
-
-        computer_dns = machine_dns_map.get(machine_id, "unknown-host")
+        end_time = "" if state in ("Running", "Queued") else rand_ago(5)
+        machine_id = alert.machineId or random.choice(machine_ids)
+        machine = mde_machine_repo.get(machine_id)
 
         mde_investigation_repo.save(MdeInvestigation(
-            investigationId=investigation_id,
+            investigationId=str(number),
             startTime=start_time,
             endTime=end_time,
             state=state,
             statusDetails=_STATUS_DETAILS.get(state, ""),
             machineId=machine_id,
-            computerDnsName=computer_dns,
-            triggeringAlertId=triggering_alert,
+            computerDnsName=machine.computerDnsName if machine else "",
+            triggeringAlertId=alert_id,
         ))
+
+        # The alert reports the investigation it set off, and the state that
+        # investigation is actually in.
+        alert.investigationId = number
+        alert.investigationState = state
+        mde_alert_repo.save(alert)

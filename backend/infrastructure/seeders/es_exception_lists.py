@@ -7,7 +7,7 @@ from faker import Faker
 
 from domain.es_exception_item import EsExceptionItem
 from domain.es_exception_list import EsExceptionList
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import ago, rand_after
 from infrastructure.seeders.es_shared import es_uuid
 from repository.es_exception_item_repo import es_exception_item_repo
 from repository.es_exception_list_repo import es_exception_list_repo
@@ -118,7 +118,6 @@ def seed_es_exception_lists(fake: Faker, rule_ids: list[str]) -> None:
         rule_ids: List of rule ID strings (available for linking).
     """
     created_by = "elastic"
-    now_ts = rand_ago(0)
 
     for i, list_def in enumerate(_EXCEPTION_LISTS):
         list_id = es_uuid()
@@ -135,9 +134,12 @@ def seed_es_exception_lists(fake: Faker, rule_ids: list[str]) -> None:
             namespace_type="single",
             tags=[list_type, "acmecorp"],
             os_types=os_types,
-            created_at=rand_ago(random.randint(30, 90)),
+            # `rand_ago(n)` draws between 0 and n days back, so a shared
+            # "now" for `updated_at` could precede a `created_at` that landed
+            # today. Each pair is derived from its own creation now.
+            created_at=(list_created := ago(days=random.randint(30, 90))),
             created_by=created_by,
-            updated_at=now_ts,
+            updated_at=rand_after(list_created),
             updated_by=created_by,
             version=random.randint(1, 5),
         ))
@@ -159,8 +161,8 @@ def seed_es_exception_lists(fake: Faker, rule_ids: list[str]) -> None:
                 entries=item_def["entries"],
                 os_types=os_types,
                 tags=[list_type],
-                created_at=rand_ago(random.randint(7, 60)),
+                created_at=(item_created := ago(days=random.randint(7, 60))),
                 created_by=created_by,
-                updated_at=now_ts,
+                updated_at=rand_after(item_created),
                 updated_by=created_by,
             ))

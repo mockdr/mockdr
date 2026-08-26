@@ -6,6 +6,7 @@ import random
 from faker import Faker
 
 from domain.cs_incident import CsIncident
+from domain.cs_user import CsUser
 from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.cs_shared import (
     CS_CID,
@@ -39,6 +40,7 @@ def seed_cs_incidents(
     fake: Faker,
     host_ids: list[str],
     detection_ids: list[str],
+    responders: list[CsUser],
 ) -> list[str]:
     """Create CrowdStrike incident records grouping hosts and detections.
 
@@ -49,6 +51,7 @@ def seed_cs_incidents(
         fake: Shared Faker instance (seeded externally).
         host_ids: List of CS ``device_id`` strings.
         detection_ids: List of detection ``composite_id`` strings.
+        responders: The console users an incident can be assigned to.
 
     Returns:
         List of ``incident_id`` strings.
@@ -60,6 +63,7 @@ def seed_cs_incidents(
     for i in range(1, _COUNT + 1):
         incident_id = f"inc:{CS_CID}:{i}"
         incident_ids.append(incident_id)
+        responder = random.choice(responders)
 
         # Pick 1-5 random hosts for this incident
         host_count = random.randint(1, min(5, len(host_ids)))
@@ -127,8 +131,11 @@ def seed_cs_incidents(
             end=end_ts,
             created=created_ts,
             modified_timestamp=rand_after(created_ts),
-            assigned_to="" if status == 20 else fake.email(),
-            assigned_to_name="" if status == 20 else fake.name(),
+            # Falcon names the assignee by uuid and by name; both used to be
+            # invented here, so an incident was assigned to somebody
+            # `/user-management/queries/users/v1` had never heard of.
+            assigned_to="" if status == 20 else responder.uuid,
+            assigned_to_name="" if status == 20 else f"{responder.first_name} {responder.last_name}",
             objectives=[f"Falcon Detection Method - {tactics[0]}"] if tactics else [],
             tactics=tactics,
             techniques=techniques,

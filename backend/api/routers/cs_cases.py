@@ -26,6 +26,17 @@ def query_case_ids(
     return case_queries.query_case_ids(filter, offset, limit, sort)
 
 
+@router.post("/message-center/entities/cases/GET/v1")
+def get_cases(
+    body: dict = Body(...),
+    _: dict = Depends(require_cs_auth),
+) -> dict:
+    """Return the case entities named by ``ids``."""
+    from utils.cs_response import require_list  # noqa: PLC0415
+
+    return case_queries.get_case_entities([str(i) for i in require_list(body, "ids")])
+
+
 @router.post("/cases/entities/case-tags/v1")
 def add_case_tags(
     body: dict = Body(...),

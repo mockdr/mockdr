@@ -95,6 +95,13 @@ from repository.store import store
 from utils import id_gen
 
 
+#: What every draw in this install comes from. A test sweeps the seeders
+#: over other values of it, because an invariant that holds for one draw is
+#: not an invariant: a rule created today and updated eleven hours earlier
+#: waited in `seed_es_rules` until an unrelated change shifted the stream.
+SEED = 42
+
+
 def generate_all() -> None:
     """Re-seed all in-memory repositories with deterministic fake data.
 
@@ -102,12 +109,12 @@ def generate_all() -> None:
     in dependency order.  The RNG is re-seeded at entry so repeated calls
     always produce the same data set.
     """
-    random.seed(42)
+    random.seed(SEED)
     fake = Faker()
-    Faker.seed(42)
+    Faker.seed(SEED)
     # Ids and uuids came from secrets/uuid4, neither of which can be seeded, so
     # the docstring's promise held for attributes but not for identifiers.
-    id_gen.reseed(42)
+    id_gen.reseed(SEED)
 
     store.clear_all()
     reset_registry()
@@ -136,13 +143,15 @@ def generate_all() -> None:
     # ── CrowdStrike Falcon seeders ──────────────────────────────────────────
     seed_cs_oauth_clients()
     cs_host_ids = seed_cs_hosts(fake)
-    cs_detection_ids = seed_cs_detections(fake, cs_host_ids)
-    seed_cs_incidents(fake, cs_host_ids, cs_detection_ids)
+    # The console's users come first: detections, incidents and cases are
+    # assigned to them, and each used to invent somebody of its own.
+    cs_users = seed_cs_users(fake)
+    cs_detection_ids = seed_cs_detections(fake, cs_host_ids, cs_users)
+    seed_cs_incidents(fake, cs_host_ids, cs_detection_ids, cs_users)
     seed_cs_iocs(fake)
     seed_cs_host_groups(fake, cs_host_ids)
-    seed_cs_users(fake)
     seed_cs_quarantine(fake, cs_host_ids, cs_detection_ids)
-    seed_cs_cases(fake, cs_detection_ids)
+    seed_cs_cases(fake, cs_detection_ids, cs_users)
 
     # ── Microsoft Defender for Endpoint seeders ──────────────────────────────
     seed_mde_oauth_clients()

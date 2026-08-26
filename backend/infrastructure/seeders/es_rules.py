@@ -6,7 +6,7 @@ import random
 from faker import Faker
 
 from domain.es_rule import EsRule
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import ago, rand_after, rand_ago
 from infrastructure.seeders.es_shared import (
     ES_EQL_QUERIES,
     ES_KQL_QUERIES,
@@ -89,7 +89,10 @@ def seed_es_rules(fake: Faker) -> list[str]:
         tags = random.sample(_TAG_POOL, random.randint(2, 5))
         threat = _build_threat_mapping()
         enabled = random.random() < 0.80
-        created_at = rand_ago(random.randint(30, 180))
+        # `rand_ago(n)` draws *between 0 and n* days back, so passing a
+        # random 30-180 could still land today — and the rule then reported
+        # having been updated eleven hours before it was created.
+        created_at = ago(days=random.randint(30, 180), hours=random.randint(0, 23))
 
         es_rule_repo.save(EsRule(
             id=doc_id,
@@ -116,9 +119,9 @@ def seed_es_rules(fake: Faker) -> list[str]:
             exceptions_list=[],
             created_at=created_at,
             created_by=created_by,
-            # taken after created_at: now_ts was sampled before the loop, so a
-            # created_at drawn close to "now" could land after it
-            updated_at=rand_ago(0),
+            # Derived from `created_at`, so the ordering holds by
+            # construction rather than by how the draws happened to fall.
+            updated_at=rand_after(created_at),
             updated_by=created_by,
             immutable=False,
             last_execution=_last_execution(enabled),

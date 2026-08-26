@@ -232,7 +232,14 @@ def seed_graph_security(fake: Faker) -> None:
             key=lambda s: _SEVERITY_RANK.get(s, 0),
         )
 
-        incident_id = graph_uuid()
+        # Defender numbers its incidents. The Graph alert names its incident
+        # with a string (`incidentId` is `Edm.String` in the CSDL) and the
+        # Defender alert reports the same incident as a number — the Splunk
+        # add-on's sample declares `incidentId` a number. A GUID here left
+        # every Defender alert naming an incident nothing had, and the two
+        # products disagreeing about which incident an alert belongs to.
+        incident_number = i + 1
+        incident_id = str(incident_number)
         alert_ids = [a.id for a in group]
         categories = {a.category for a in group if a.category}
         category_str = next(iter(categories)) if categories else "SuspiciousActivity"
@@ -254,10 +261,16 @@ def seed_graph_security(fake: Faker) -> None:
         )
         graph_security_incident_repo.save(incident)
 
-        # Link incidentId back to each alert in this group
+        # Link the incident back to each alert in this group — on both
+        # surfaces, so a client that reads the Defender alert and a client
+        # that reads the Graph alert land on the same incident.
         for alert in group:
             alert.incidentId = incident_id
             graph_security_alert_repo.save(alert)
+            source = mde_alert_repo.get(alert.providerAlertId)
+            if source is not None:
+                source.incidentId = incident_number
+                mde_alert_repo.save(source)
 
     # ── Secure Scores (30 daily snapshots) ────────────────────────────────
     for day_index in range(30):

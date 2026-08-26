@@ -4077,3 +4077,151 @@ class TestAnAssigneeIsSomebodyTheTenantHas:
         mails = {u["user_email"] for u in self._users(client)}
         assert {"admin@acmecorp.internal", "analyst@acmecorp.internal",
                 "viewer@acmecorp.internal"} <= mails
+
+
+class TestAnAlertNamesRecordsTheInstallHas:
+    """The ids a Defender alert reports have to resolve where it says.
+
+    A sweep over the seeded store for id-shaped fields that resolve nowhere
+    found two on every Defender alert: `investigationId` was a
+    `random.randint(1, 50)` and `incidentId` a `random.randint(1, 100)`, so
+    an alert named an investigation `/api/investigations/{id}` answered 404
+    for, and an incident neither Defender nor Graph had. This is the same
+    failure as an incident assigned to somebody the tenant never employed:
+    each single answer is plausible and the second request is the one that
+    fails.
+    """
+
+    @staticmethod
+    def _mde(client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _graph(client: TestClient) -> dict:
+        token = client.post("/graph/oauth2/v2.0/token", data={
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_every_investigation_an_alert_names_answers(
+        self, client: TestClient,
+    ) -> None:
+        headers = self._mde(client)
+        alerts = client.get("/mde/api/alerts", headers=headers).json()["value"]
+        named = [a for a in alerts if a["investigationId"]]
+        assert named, "no alert triggered an investigation"
+        for alert in named:
+            resp = client.get(
+                f"/mde/api/investigations/{alert['investigationId']}", headers=headers,
+            )
+            assert resp.status_code == 200, alert["investigationId"]
+            investigation = resp.json()
+            # The investigation an alert set off is about that alert, on that
+            # alert's machine, and in the state the alert reports.
+            assert investigation["triggeringAlertId"] == alert["id"]
+            assert investigation["machineId"] == alert["machineId"]
+            assert investigation["state"] == alert["investigationState"]
+
+    def test_every_incident_an_alert_names_answers(self, client: TestClient) -> None:
+        mde, graph = self._mde(client), self._graph(client)
+        alerts = client.get("/mde/api/alerts", headers=mde).json()["value"]
+        for alert in alerts:
+            resp = client.get(
+                f"/graph/v1.0/security/incidents/{alert['incidentId']}", headers=graph,
+            )
+            assert resp.status_code == 200, alert["incidentId"]
+
+    def test_the_two_surfaces_agree_on_which_incident(
+        self, client: TestClient,
+    ) -> None:
+        """The same alert, read through Defender and through Graph."""
+        mde, graph = self._mde(client), self._graph(client)
+        alerts = {a["id"]: a for a in client.get("/mde/api/alerts", headers=mde).json()["value"]}
+        graph_alerts = client.get(
+            "/graph/v1.0/security/alerts_v2", headers=graph,
+        ).json()["value"]
+        compared = 0
+        for graph_alert in graph_alerts:
+            counterpart = alerts.get(graph_alert["providerAlertId"])
+            if counterpart is None:
+                continue
+            compared += 1
+            assert graph_alert["incidentId"] == str(counterpart["incidentId"])
+        assert compared, "no Graph alert came from a Defender alert"
+
+
+class TestFalconAssignsWorkToItsOwnUsers:
+    """Detections, incidents and cases, assigned to people the tenant has.
+
+    All three invented an assignee: a detection took `fake.email()` and an
+    unrelated `fake.name()`, an incident took another pair, and a case was
+    assigned by `analyst0@acmecorp.internal` to `responder0@acmecorp.internal`
+    — addresses `/user-management/queries/users/v1` has never heard of. Same
+    failure as the Cortex incidents assigned to nobody: the assignment reads
+    fine until someone looks the person up.
+    """
+
+    @staticmethod
+    def _auth(client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _users(client: TestClient, headers: dict) -> list[dict]:
+        ids = client.get(
+            "/cs/user-management/queries/users/v1", headers=headers, params={"limit": 500},
+        ).json()["resources"]
+        return list(client.post(
+            "/cs/user-management/entities/users/GET/v1", headers=headers, json={"ids": ids},
+        ).json()["resources"])
+
+    def test_a_detection_is_assigned_to_a_console_user(
+        self, client: TestClient,
+    ) -> None:
+        headers = self._auth(client)
+        users = self._users(client, headers)
+        addresses = {u["uid"] for u in users}
+        names = {f"{u['first_name']} {u['last_name']}" for u in users}
+
+        ids = client.get(
+            "/cs/alerts/queries/alerts/v2", headers=headers, params={"limit": 500},
+        ).json()["resources"]
+        detections = client.post(
+            "/cs/alerts/entities/alerts/v2", headers=headers, json={"composite_ids": ids},
+        ).json()["resources"]
+        assigned = [d for d in detections if d.get("assigned_to_uid")]
+        assert assigned, "no detection is assigned to anybody"
+        for detection in assigned:
+            assert detection["assigned_to_uid"] in addresses
+            # The name belongs to that address, rather than to nobody.
+            assert detection["assigned_to_name"] in names
+
+    def test_a_case_is_assigned_between_console_users(
+        self, client: TestClient,
+    ) -> None:
+        headers = self._auth(client)
+        addresses = {u["uid"] for u in self._users(client, headers)}
+        ids = client.get(
+            "/cs/cases/queries/cases/v1", headers=headers, params={"limit": 500},
+        ).json()["resources"]
+        cases = client.post(
+            "/cs/message-center/entities/cases/GET/v1", headers=headers, json={"ids": ids},
+        ).json()["resources"]
+        assert cases
+        for case in cases:
+            assert case["assigner"]["uid"] in addresses
+            assert case["assigner"]["email_address"] in addresses
+            # gofalcon's case entity carries `assigner` and no `assignee`.
+            assert "assignee" not in case

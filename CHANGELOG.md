@@ -8,6 +8,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Work assigned to people the tenant does not employ, on two more products.**
+The same defect as the Cortex incidents: a Falcon detection was assigned to a
+`fake.email()` under an unrelated `fake.name()`, an incident to another
+invented pair, and a case was assigned by `analyst0@acmecorp.internal` to
+`responder0@acmecorp.internal` — addresses `/user-management/queries/users/v1`
+has never heard of. All three now draw from the console's own user directory,
+which is seeded before them, and the case names its assigner the way gofalcon
+does: uid, uuid, both name parts, display name and address.
+
+**A Defender alert that named an investigation and an incident nobody had.**
+`investigationId` was a `random.randint(1, 50)` and `incidentId` a
+`random.randint(1, 100)`, so `/api/investigations/{id}` answered 404 for an id
+the alert itself had just supplied, and the incident an alert belonged to
+existed on neither surface. Investigations are now the ones the tenant's
+alerts triggered — the alert's machine, the alert's id as
+`triggeringAlertId`, the alert reporting the investigation's state — and
+Defender numbers its incidents, which is what Graph's `incidentId` (an
+`Edm.String` in the CSDL) and Defender's (a number, per the Splunk add-on's
+own sample) both name. Read an alert through either product now and it points
+at the same incident.
+
+**A rule updated eleven hours before it was created.**
+`rand_ago(n)` draws *between* 0 and n days back, so `rand_ago(random.randint(30,
+180))` could land today — and `seed_es_rules` paired that with an `updated_at`
+drawn independently within the last day. The install shipped it whenever the
+random stream happened to fall that way, which an unrelated seeder change made
+it do. Rules and exception lists derive the later timestamp from the earlier
+one now, and the ordering test sweeps four more draws, because an invariant
+that holds for one draw is not an invariant.
+
 **Every policy update answered 200 and changed nothing.**
 `PUT /sites/{id}/policy`, `PUT /groups/{id}/policy` and `PUT /tenant/policy`
 passed the request body in whole to a routine that assigns each of its keys
@@ -56,6 +86,24 @@ of the snapshot, so it survives a restart along with the incidents that point
 into it.
 
 ### Added
+
+**A sweep for records that name records this install does not have.**
+The audits that read answers check one answer at a time, and this defect
+needs two. `scripts/dangling_references.py` reads the seeded store instead:
+for every id-shaped field it asks whether the values resolve to a record some
+collection holds, and flags the field that resolves for some of its values
+and not for others. A field that resolves nowhere at all is left alone — a
+Falcon customer id or a behaviour id identifies something this mock does not
+model, and inventing records for those would be worse than leaving them
+opaque; the two that collide with a record key on some draws are listed with
+what they identify. The sweep runs as a test too, over four draws besides the
+one this install ships with.
+
+**The Falcon case a client could list and never read.**
+`/cases/queries/cases/v1` answered case ids and nothing served the cases, so
+`POST /message-center/entities/cases/GET/v1` is served now — gofalcon's own
+route, carrying the fields its `APIMessageCenterCasesResponse` declares and
+not the three the stored record has beside them.
 
 **The same sweep across the other four references, and what Defender hid.**
 `scripts/method_drift.py` now asks the question above of every vendor
