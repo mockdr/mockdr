@@ -1856,3 +1856,51 @@ class TestTheKvStoreBatchEndpoints:
                              headers=SPLUNK_AUTH, params=JSON_OUT, json=["nope"])
         assert answer.status_code == 400
         assert answer.json()["messages"][0]["text"] == "The provided query was invalid."
+
+
+class TestBulkCreateReportsTheClashItFound:
+    """Measured on Kibana 8.15.
+
+    The single-rule route already refused a duplicate `rule_id`; the bulk one
+    did not, so an import run twice made a second rule under an id that is
+    meant to be unique — and answered as though it had created it.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    @staticmethod
+    def _rule(rule_id: str) -> dict:
+        return {"name": rule_id, "description": "d", "risk_score": 1,
+                "severity": "low", "type": "query", "query": "*:*",
+                "index": ["logs-*"], "from": "now-6m", "interval": "5m",
+                "rule_id": rule_id}
+
+    def _bulk(self, client: TestClient, *rules: dict) -> list:
+        return client.post("/kibana/api/detection_engine/rules/_bulk_create",
+                           headers=self.KBN, json=list(rules)).json()
+
+    def test_the_second_import_reports_the_clash(self, client: TestClient) -> None:
+        assert "id" in self._bulk(client, self._rule("zzz-bulk-a"))[0]
+        again = self._bulk(client, self._rule("zzz-bulk-a"))[0]
+        assert again == {
+            "rule_id": "zzz-bulk-a",
+            "error": {"status_code": 409,
+                      "message": 'rule_id: "zzz-bulk-a" already exists'},
+        }
+
+    def test_the_rest_of_the_batch_is_still_created(
+        self, client: TestClient,
+    ) -> None:
+        self._bulk(client, self._rule("zzz-bulk-b"))
+        results = self._bulk(client, self._rule("zzz-bulk-b"),
+                             self._rule("zzz-bulk-c"))
+        assert "error" in results[0]
+        assert "id" in results[1]
+
+    def test_no_duplicate_rule_id_survives(self, client: TestClient) -> None:
+        self._bulk(client, self._rule("zzz-bulk-d"))
+        self._bulk(client, self._rule("zzz-bulk-d"))
+        found = client.get("/kibana/api/detection_engine/rules/_find",
+                           headers=self.KBN, params={"per_page": 200}).json()["data"]
+        assert [r["rule_id"] for r in found].count("zzz-bulk-d") == 1

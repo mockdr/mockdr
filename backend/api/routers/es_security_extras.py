@@ -102,6 +102,7 @@ def bulk_create_rules(
     or an ``error`` object, rather than failing the whole batch.
     """
     from application.es_rules import commands as rule_commands
+    from application.es_rules import queries as rule_queries
 
     if not isinstance(body, list):
         raise HTTPException(
@@ -126,6 +127,18 @@ def bulk_create_rules(
                 "status_code": 400,
                 "message": f'Invalid value "undefined" supplied to "{missing[0]}"',
                 "rule_id": entry.get("rule_id"),
+            }})
+            continue
+        # The single-rule route already refused a duplicate `rule_id`; this
+        # one did not, so a bulk import run twice made a second rule under
+        # an id that is meant to be unique — and answered as though it had
+        # created it. Kibana reports the clash on that entry and creates
+        # the rest.
+        rule_id = entry.get("rule_id")
+        if rule_id and rule_queries.get_rule_by_rule_id(str(rule_id)):
+            results.append({"rule_id": rule_id, "error": {
+                "status_code": 409,
+                "message": f'rule_id: "{rule_id}" already exists',
             }})
             continue
         results.append(rule_commands.create_rule(entry))
@@ -211,6 +224,7 @@ async def import_rules(
     import json
 
     from application.es_rules import commands as rule_commands
+    from application.es_rules import queries as rule_queries
 
     payload = _import_payload(await request.body(), request.headers.get("content-type", ""))
 
