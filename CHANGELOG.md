@@ -714,6 +714,22 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**A token answer that any cache was free to keep.**
+RFC 6749 §5.1: the authorization server answers a token request with
+`Cache-Control: no-store`, and `Pragma: no-cache` for the caches that
+predate it. None of the four OAuth mounts sent either, so a proxy or a
+client library following its own cache rules could keep a bearer token and
+hand it out again — the reason the requirement exists, and a step a client
+built against mockdr would not have been designed around.
+
+**One directory answering three ways.**
+Defender, Graph and Sentinel sit behind the same Entra directory here.
+Defender and Graph refuse a grant they do not issue for; Sentinel took
+`grant_type` as a form field and never looked at it, so it minted a token
+for `grant_type=password`, and for a request that named no grant at all. It
+refuses both now, in the same `AADSTS70003` / `AADSTS900144` wording its two
+siblings use.
+
 **Four OAuth mounts that refused a request without saying where to get a
 token.** RFC 6750 §3: a resource server that turns down a Bearer-protected
 request answers with `WWW-Authenticate`, and the challenge is where a client

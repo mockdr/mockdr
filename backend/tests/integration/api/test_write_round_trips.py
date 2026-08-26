@@ -3018,3 +3018,100 @@ class TestARefusedBearerRequestSaysWhereToGetOne:
         unaffected."""
         body = client.get("/graph/v1.0/users").json()
         assert body["error"]["code"] == "InvalidAuthenticationToken"
+
+
+class TestATokenAnswerIsNeverCached:
+    """RFC 6749 §5.1, which every OAuth mount here ignored.
+
+    The authorization server must answer a token request with
+    `Cache-Control: no-store`, and the section adds `Pragma: no-cache` for
+    the caches that predate it. A proxy or a client library following its own
+    cache rules could otherwise keep a bearer token and hand it out again —
+    which is the reason the requirement exists, and a client built against
+    mockdr would not have been designed around it.
+    """
+
+    TOKENS = [
+        ("/cs/oauth2/token", {
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+            "grant_type": "client_credentials"}),
+        ("/mde/oauth2/v2.0/token", {
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials"}),
+        ("/graph/oauth2/v2.0/token", {
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "grant_type": "client_credentials"}),
+        ("/sentinel/oauth2/v2.0/token", {
+            "client_id": "sentinel-mock-client-id",
+            "client_secret": "sentinel-mock-client-secret",
+            "grant_type": "client_credentials"}),
+    ]
+
+    @pytest.mark.parametrize(("path", "form"), TOKENS)
+    def test_the_answer_says_do_not_store_it(
+        self, client: TestClient, path: str, form: dict,
+    ) -> None:
+        response = client.post(path, data=form)
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["pragma"] == "no-cache"
+
+    def test_a_protected_route_is_left_alone(self, client: TestClient) -> None:
+        """Only the endpoints that mint tokens are touched."""
+        assert "cache-control" not in client.get("/graph/v1.0/users").headers
+
+
+class TestOneDirectoryAnswersOneWay:
+    """Three mounts sit behind the same Entra directory in this mock.
+
+    Defender and Graph refused a grant they do not issue for; Sentinel took
+    `grant_type` as a form field and never looked at it, so it minted a token
+    for `grant_type=password` — and for a request that named no grant at all.
+    One identity platform cannot answer three ways.
+    """
+
+    SENTINEL = "/sentinel/oauth2/v2.0/token"
+    CREDENTIALS = {"client_id": "sentinel-mock-client-id",
+                   "client_secret": "sentinel-mock-client-secret"}
+
+    def test_a_grant_it_does_not_issue_for(self, client: TestClient) -> None:
+        response = client.post(self.SENTINEL,
+                               data={**self.CREDENTIALS, "grant_type": "password"})
+        assert response.status_code == 400
+        assert response.json()["error"] == "unsupported_grant_type"
+        assert response.json()["error_codes"] == [70003]
+
+    def test_a_request_that_names_no_grant(self, client: TestClient) -> None:
+        response = client.post(self.SENTINEL, data=self.CREDENTIALS)
+        assert response.status_code == 400
+        assert response.json()["error"] == "invalid_request"
+        assert "'grant_type'" in response.json()["error_description"]
+
+    def test_the_grant_it_does_issue_for_still_works(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post(
+            self.SENTINEL,
+            data={**self.CREDENTIALS, "grant_type": "client_credentials"})
+        assert response.status_code == 200
+        assert response.json()["token_type"] == "Bearer"
+
+    def test_the_three_entra_mounts_refuse_alike(
+        self, client: TestClient,
+    ) -> None:
+        errors = set()
+        for path, credentials in (
+            ("/mde/oauth2/v2.0/token",
+             {"client_id": "mde-mock-admin-client",
+              "client_secret": "mde-mock-admin-secret"}),
+            ("/graph/oauth2/v2.0/token",
+             {"client_id": "graph-mock-admin-client",
+              "client_secret": "graph-mock-admin-secret"}),
+            (self.SENTINEL, self.CREDENTIALS),
+        ):
+            body = client.post(
+                path, data={**credentials, "grant_type": "password"}).json()
+            errors.add((body["error"], tuple(body["error_codes"])))
+        assert len(errors) == 1

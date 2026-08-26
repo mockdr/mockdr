@@ -33,6 +33,7 @@ from api.middleware.splunk_paging import SplunkPagingMiddleware
 from api.middleware.splunk_search import SplunkSearchMiddleware
 from api.middleware.splunk_sort import SplunkSortMiddleware
 from api.middleware.tenant_scope import TenantScopeMiddleware
+from api.middleware.token_cache import TokenCacheMiddleware
 from api.routers import (
     accounts,
     activities,
@@ -421,6 +422,7 @@ app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the 
 # Outside the renderer, so it has the last word: the renderer writes its own
 # content type for the JSON form and would overwrite a charset set beneath it.
 app.add_middleware(JsonCharsetMiddleware)      # each product names the charset its own way
+app.add_middleware(TokenCacheMiddleware)       # RFC 6749 §5.1 — a token answer is never cached
 # Path rewriting must happen before routing, so this is added last (outermost).
 app.add_middleware(SplunkNamespaceMiddleware)  # /servicesNS/{owner}/{app} -> /services
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last

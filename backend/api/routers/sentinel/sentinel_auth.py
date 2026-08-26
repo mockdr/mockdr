@@ -9,6 +9,7 @@ from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
     AADSTS_MISSING_PARAMETER,
     AADSTS_TENANT_NOT_FOUND,
+    AADSTS_UNSUPPORTED_GRANT,
     build_token_error,
 )
 
@@ -22,7 +23,7 @@ async def oauth2_token(
     grant_type: str = Form(default=""),
 ) -> dict:
     """Exchange client credentials for an access token."""
-    return _issue_token(None, client_id, client_secret)
+    return _issue_token(None, client_id, client_secret, grant_type)
 
 
 @router.post("/{tenant_id}/oauth2/v2.0/token")
@@ -45,16 +46,20 @@ async def oauth2_token_for_tenant(
     Returns:
         Token response — see :func:`_issue_token`.
     """
-    return _issue_token(tenant_id, client_id, client_secret)
+    return _issue_token(tenant_id, client_id, client_secret, grant_type)
 
 
-def _issue_token(tenant_id: str | None, client_id: str, client_secret: str) -> dict:
+def _issue_token(
+    tenant_id: str | None, client_id: str, client_secret: str, grant_type: str = "",
+) -> dict:
     """Resolve the tenant, validate the credentials and mint a token.
 
     Args:
         tenant_id:     Tenant from the URL, or ``None`` on the bare path.
         client_id:     Azure AD application client ID.
         client_secret: Client secret.
+        grant_type:    Must be ``"client_credentials"``, the only grant this
+                       directory issues for.
 
     Returns:
         Token response dict.
@@ -64,6 +69,21 @@ def _issue_token(tenant_id: str | None, client_id: str, client_secret: str) -> d
             address this directory.
         HTTPException: 401 if the credentials are invalid.
     """
+    # `grant_type` was taken as a form field and never looked at, so this
+    # directory minted a token for `grant_type=password` — and for a request
+    # that named no grant at all — where the two other Entra mounts in this
+    # mock refuse both. One identity platform cannot answer three ways.
+    if grant_type != "client_credentials":
+        raise HTTPException(status_code=400, detail=build_token_error(
+            "unsupported_grant_type" if grant_type else "invalid_request",
+            "AADSTS70003: The app requested an unsupported grant type. "
+            "Only client_credentials is supported."
+            if grant_type else
+            "AADSTS900144: The request body must contain the following "
+            "parameter: 'grant_type'.",
+            AADSTS_UNSUPPORTED_GRANT if grant_type else AADSTS_MISSING_PARAMETER,
+        ))
+
     # An absent field is a malformed request, not a rejected credential: Entra
     # answers it 400 invalid_request, and a client that retries on 401 would
     # otherwise loop on a request that can never succeed.
