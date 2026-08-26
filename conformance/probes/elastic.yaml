@@ -3049,3 +3049,44 @@ probes:
       method: HEAD
       path: /zzz-no-such-index
       auth: basic
+
+  # ── The HTTP level itself (2.3.1) ────────────────────────────────────────
+  #
+  # Kibana and Elasticsearch ship together and differ here in three ways, so
+  # a client that moves between them cannot assume one of anything.
+
+  - id: kbn-wrong-method-is-not-a-405
+    endpoint: kibana
+    compare: values
+    why: >
+      Kibana registers a route per method, so a verb it does not take is
+      simply no route: 404, with the body it sends for any path it cannot
+      reach, and no Allow header. mockdr answered 405 with one, and a client
+      correcting itself off that header waited for something Kibana never
+      sends.
+    request:
+      method: DELETE
+      path: /api/cases/_find
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-unknown-path-says-only-that
+    endpoint: kibana
+    compare: values
+    why: >
+      And its 404 for an unknown path says `Not Found` and nothing about the
+      request — mockdr named the method and the path in it.
+    request:
+      method: GET
+      path: /api/zzz-no-such-route
+      auth: basic
+
+  - id: kbn-json-names-its-charset
+    endpoint: kibana
+    why: >
+      Kibana serves through Hapi, which names the charset on every JSON
+      response; Elasticsearch, in the same distribution, does not.
+    request:
+      method: GET
+      path: /api/status
+      auth: basic

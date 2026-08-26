@@ -266,12 +266,19 @@ class TestUpdateCase:
 
     def test_per_id_route_is_not_served(self, client: TestClient) -> None:
         # This route exists in no Kibana; it used to be the only one that did.
+        # Kibana registers a route per method, so a verb it does not take is
+        # simply no route: 404 with the body it sends for any path it cannot
+        # reach, and no Allow header (measured on 8.15).
         resp = client.patch(
             f"/kibana/api/cases/{self._case(client)['id']}",
             headers=KBN_WRITE_HEADERS,
             json={"title": "x"},
         )
-        assert resp.status_code == 405
+        assert resp.status_code == 404
+        assert resp.json() == {
+            "statusCode": 404, "error": "Not Found", "message": "Not Found",
+        }
+        assert "allow" not in {k.lower() for k in resp.headers}
 
 
 class TestCaseComments:

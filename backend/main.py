@@ -18,6 +18,7 @@ from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import HeadMethodMiddleware
+from api.middleware.kibana_charset import KibanaCharsetMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
@@ -332,6 +333,7 @@ from utils.es_response import (
     ES_WWW_AUTHENTICATE,
     build_es_error_response,
     build_es_index_not_found,
+    build_kbn_error_response,
 )
 from utils.logging import setup_logging
 from utils.mde_kql import KqlError
@@ -405,6 +407,7 @@ app.add_middleware(
 # Paging runs inside XML rendering, so the sliced entries are what gets rendered.
 # Searching runs innermost of the four, so what is ordered, narrowed, sliced
 # and counted is what the search selected.
+app.add_middleware(KibanaCharsetMiddleware)    # Hapi names the charset; ES does not
 app.add_middleware(SplunkSearchMiddleware)     # search= on Atom collections
 app.add_middleware(SplunkSortMiddleware)       # sort_key/sort_dir, name asc by default
 app.add_middleware(SplunkFieldFilterMiddleware)  # f= on Atom entry content
@@ -1100,6 +1103,14 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
                      f"[{request.method}], allowed: [{', '.join(allowed)}]",
             "status": 405,
         }, headers={"Allow": ", ".join(allowed)})
+    if allowed and vendor == "kibana":
+        # Kibana registers a route per method, so a verb it does not take is
+        # simply no route: 404, with the same body it sends for a path that
+        # does not exist, and no Allow header (measured on 8.15). A client
+        # correcting itself off a 405 would wait for one that never comes.
+        return JSONResponse(
+            status_code=404, content=build_kbn_error_response(404, "Not Found"),
+        )
     if allowed:
         return JSONResponse(
             status_code=405,
@@ -1159,7 +1170,12 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
         return JSONResponse(
             status_code=404,
             content=build_vendor_error(
-                vendor, 404, f"Resource not found: {request.method} {path}",
+                vendor,
+                404,
+                # Kibana's own wording for anything it cannot route, which is
+                # the bare status title and nothing about the request.
+                "Not Found" if vendor == "kibana"
+                else f"Resource not found: {request.method} {path}",
             ),
         )
 

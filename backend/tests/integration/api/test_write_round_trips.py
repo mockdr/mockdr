@@ -1260,3 +1260,47 @@ class TestTheHttpLevelItself:
         assert [c.decode() for c in challenges] == [
             'Basic realm="security", charset="UTF-8"', "ApiKey",
         ]
+
+
+class TestKibanaAndElasticsearchDifferBelowTheJson:
+    """They ship together and differ in three ways, all measured on 8.15."""
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+    KBN = {**ES, "kbn-xsrf": "true"}
+
+    def test_a_verb_kibana_does_not_take_is_a_404(self, client: TestClient) -> None:
+        answer = client.request("DELETE", "/kibana/api/cases/_find", headers=self.KBN)
+        assert answer.status_code == 404
+        assert answer.json() == {
+            "statusCode": 404, "error": "Not Found", "message": "Not Found",
+        }
+        assert "allow" not in {k.lower() for k in answer.headers}
+
+    def test_a_verb_elasticsearch_does_not_take_is_a_405_with_allow(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.request("DELETE", "/elastic/_cluster/health", headers=self.ES)
+        assert answer.status_code == 405
+        assert "GET" in answer.headers["allow"]
+
+    def test_kibana_says_only_not_found_for_an_unknown_path(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.get("/kibana/api/zzz-no-such-route", headers=self.KBN)
+        assert answer.json()["message"] == "Not Found"
+
+    def test_kibana_names_the_charset_and_elasticsearch_does_not(
+        self, client: TestClient,
+    ) -> None:
+        kibana = client.get("/kibana/api/cases/_find", headers=self.KBN)
+        assert kibana.headers["content-type"] == "application/json; charset=utf-8"
+        elastic = client.get("/elastic/_cluster/health", headers=self.ES)
+        assert elastic.headers["content-type"] == "application/json"
+
+    def test_the_charset_is_added_to_kibanas_errors_too(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.get("/kibana/api/cases/no-such-case", headers=self.KBN)
+        assert answer.status_code == 404
+        assert answer.headers["content-type"] == "application/json; charset=utf-8"
