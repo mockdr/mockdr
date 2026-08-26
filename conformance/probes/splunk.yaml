@@ -3010,3 +3010,33 @@ probes:
       path: /services/search/jobs/export
       query: {output_mode: json}
       auth: basic
+
+  - id: spl-kvstore-batch-find-wrapper
+    endpoint: management
+    compare: values
+    why: >
+      `batch_find` takes a list of *wrappers* — `{"query": …}` — and mockdr
+      read each element itself as the filter, so the documented form matched
+      a field called `query` that no record has and came back empty, while
+      an undocumented bare filter worked. Against an empty collection on
+      both sides, what is compared is the envelope and the arity.
+    request:
+      method: POST
+      path: /servicesNS/nobody/search/storage/collections/data/zzz_absent/batch_find
+      query: {output_mode: json}
+      content: '[{"query": {"a": 1}}]'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: spl-kvstore-batch-find-not-an-object
+    endpoint: management
+    compare: values
+    why: >
+      An element that is not an object is the one thing it refuses.
+    request:
+      method: POST
+      path: /servicesNS/nobody/search/storage/collections/data/zzz_absent/batch_find
+      query: {output_mode: json}
+      content: '["not an object"]'
+      headers: {Content-Type: application/json}
+      auth: basic

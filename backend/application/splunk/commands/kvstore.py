@@ -180,8 +180,12 @@ def batch_save(
     name: str,
     records: list[dict],
     app: str = "search",
-) -> list[dict]:
+) -> list[str]:
     """Batch upsert records into a KV collection.
+
+    splunkd answers with the *keys* it wrote — `["a", "b"]` — and mockdr
+    answered a list of record objects, so a client reading the keys back got
+    dictionaries where it expected strings.
 
     Args:
         name:    Collection name.
@@ -189,7 +193,7 @@ def batch_save(
         app:     Splunk app context.
 
     Returns:
-        List of upserted records with ``_key``.
+        The ``_key`` of every record written, in order.
     """
     coll = kv_collection_repo.get_by_name(name, app)
     if not coll:
@@ -209,7 +213,7 @@ def batch_save(
                 break
         if not found:
             coll.records.append(record)
-        result.append(record)
+        result.append(key)
 
     kv_collection_repo.save(coll)
     return result

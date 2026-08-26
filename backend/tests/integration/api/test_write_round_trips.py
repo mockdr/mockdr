@@ -1796,3 +1796,63 @@ class TestHidingAHostIsSomethingFalconCanUndo:
         """Falcon documents four actions there, and none of them is tagging."""
         device = self._device(client, cs)
         assert self._act(client, cs, "add-hosts", device).status_code == 400
+
+
+class TestTheKvStoreBatchEndpoints:
+    """Measured on Splunk 10.4.2, where both answers were subtly off.
+
+    `batch_find` takes a list of *wrappers* — `{"query": …}` — and mockdr read
+    each element itself as the filter, so the documented form matched a field
+    called `query` that no record has and came back empty, while an
+    undocumented bare filter worked. `batch_save` answers with the keys
+    themselves, and mockdr wrapped each in an object.
+    """
+
+    C = "/splunk/servicesNS/nobody/search/storage/collections"
+
+    @pytest.fixture
+    def collection(self, client: TestClient) -> str:
+        client.post(f"{self.C}/config", headers=FORM, params=JSON_OUT,
+                    data={"name": "zzz_batch"})
+        client.post(f"{self.C}/data/zzz_batch/batch_save", headers=SPLUNK_AUTH,
+                    json=[{"_key": "a", "v": 1}, {"_key": "b", "v": 2}])
+        return "zzz_batch"
+
+    def test_batch_save_answers_bare_keys(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        answer = client.post(f"{self.C}/data/{collection}/batch_save",
+                             headers=SPLUNK_AUTH, json=[{"_key": "c", "v": 3}])
+        assert answer.json() == ["c"]
+
+    def test_the_documented_wrapper_filters(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        answer = client.post(f"{self.C}/data/{collection}/batch_find",
+                             headers=SPLUNK_AUTH, json=[{"query": {"v": 2}}])
+        assert [[r["_key"] for r in group] for group in answer.json()] == [["b"]]
+
+    def test_one_result_set_per_query(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        answer = client.post(f"{self.C}/data/{collection}/batch_find",
+                             headers=SPLUNK_AUTH,
+                             json=[{"query": {"v": 1}}, {"query": {"v": 2}},
+                                   {"query": {"v": 999}}])
+        assert [len(group) for group in answer.json()] == [1, 1, 0]
+
+    def test_an_element_without_a_query_matches_everything(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        """splunkd does not error on it; it simply filters by nothing."""
+        answer = client.post(f"{self.C}/data/{collection}/batch_find",
+                             headers=SPLUNK_AUTH, json=[{"v": 2}])
+        assert len(answer.json()[0]) == 2
+
+    def test_an_element_that_is_not_an_object_is_refused(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        answer = client.post(f"{self.C}/data/{collection}/batch_find",
+                             headers=SPLUNK_AUTH, params=JSON_OUT, json=["nope"])
+        assert answer.status_code == 400
+        assert answer.json()["messages"][0]["text"] == "The provided query was invalid."

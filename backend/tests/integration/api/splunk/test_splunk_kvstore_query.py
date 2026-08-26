@@ -166,7 +166,9 @@ class TestResponseShapes:
             headers=_auth(),
         )
         assert resp.status_code == 200
-        assert all(set(r) == {"_key"} for r in resp.json())
+        # splunkd answers with the keys themselves — bare strings, not
+        # objects carrying one (measured on 10.4.2).
+        assert all(isinstance(key, str) and key for key in resp.json())
 
     def test_missing_collection_is_404_not_empty_list(self, client: TestClient) -> None:
         # `200 []` is indistinguishable from an empty collection.

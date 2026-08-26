@@ -126,9 +126,12 @@ class TestSplunkKvBatchFind:
         for row in ({"k": "a"}, {"k": "b"}):
             client.post(f"{self.URL}/batch_probe", json=row, headers=SPLUNK_AUTH)
 
+        # Each element is a *wrapper*: splunkd reads the filter from
+        # `query`, and an element without one matches everything.
         resp = client.post(
             f"{self.URL}/batch_probe/batch_find",
-            json=[{"k": "a"}, {"k": "b"}, {"k": "missing"}],
+            json=[{"query": {"k": "a"}}, {"query": {"k": "b"}},
+                  {"query": {"k": "missing"}}],
             headers=SPLUNK_AUTH,
         )
 

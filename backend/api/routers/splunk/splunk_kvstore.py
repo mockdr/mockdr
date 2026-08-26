@@ -154,16 +154,19 @@ async def batch_save_records(
     name: str,
     request: Request,
     current_user: dict = Depends(require_splunk_auth),
-) -> list[dict]:
-    """Batch upsert records into a KV collection."""
+) -> list[str]:
+    """Batch upsert records into a KV collection.
+
+    splunkd answers with the keys it wrote — ``["a", "b"]``, bare strings —
+    and this answered a list of ``{"_key": …}`` objects, which is close
+    enough to read as right and is not what a client indexes into.
+    """
     records = await request.json()
     if not isinstance(records, list):
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "ERROR", "text": "Expected a JSON array of records"},
         ]})
-    saved = batch_save(name, records, app)
-    # Splunk returns the keys, not the documents.
-    return [{"_key": r["_key"]} for r in saved]
+    return batch_save(name, records, app)
 
 
 @router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_find")
@@ -176,8 +179,15 @@ async def batch_find_records(
 ) -> list[list[dict]]:
     """Run several KV Store queries in one request.
 
-    splunklib's ``KVStoreCollectionData.batch_find`` posts an array of query
-    objects and reads back one result array per query; the route was absent.
+    splunklib's ``KVStoreCollectionData.batch_find`` posts an array and reads
+    back one result array per element. Each element is a *wrapper* —
+    ``{"query": {...}}`` — and mockdr read the element itself as the filter,
+    so the documented form matched a field called `query` that no record has
+    and came back empty, while an undocumented bare filter worked.
+
+    An element with no ``query`` matches everything, which is what splunkd
+    does rather than erroring; an element that is not an object is the one
+    thing it refuses (all measured on 10.4.2).
     """
     if not collection_exists(name, app):
         raise HTTPException(status_code=404, detail={"messages": [
@@ -190,9 +200,18 @@ async def batch_find_records(
             {"type": "ERROR", "text": "Expected a JSON array of query objects"},
         ]})
 
+    for element in queries:
+        if not isinstance(element, dict):
+            raise HTTPException(status_code=400, detail={"messages": [
+                {"type": "ERROR", "text": "The provided query was invalid."},
+            ]})
     return [
-        get_records(name, app, query=json.dumps(q) if isinstance(q, dict) else "")
-        for q in queries
+        get_records(
+            name, app,
+            query=json.dumps(element["query"])
+            if isinstance(element.get("query"), dict) else "",
+        )
+        for element in queries
     ]
 
 
