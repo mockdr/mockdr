@@ -714,6 +714,31 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**A Cortex action a playbook could poll for ever.**
+`get_action_status` answers `data` as a map from endpoint id to status —
+which is exactly what a playbook waits on: it isolates an endpoint and polls
+until that endpoint's key says `COMPLETED_SUCCESSFULLY`. mockdr answered
+with the action's own record, completed against a reply recorded on another
+install, so every answer carried the same three foreign endpoint ids and the
+one the client had just acted on was never among them. The completion step
+is gone from that route — the recorded reply's members are *endpoint ids*,
+not member names, so filling an answer out against it adds someone else's
+endpoints to it — and the status is spelled the way the recordings spell it.
+`errorReasons` appears only for the endpoints that failed, as it does there.
+
+The seeded action statuses shrank with it: `in_progress` and `canceled` were
+seeded, and no reading in `data/vendor-specs/` shows how Cortex spells either
+on the wire. A client switching on that value would have been handed a
+guess, so the seeded vocabulary is now the one that can be answered exactly.
+
+**Six Cortex routes that answered only one spelling of their own path.**
+Cortex paths are written both ways in the wild — the community transcription
+without a trailing slash, connector code with one — and mockdr served
+forty-five of its fifty-one with the slash and six without, refusing the
+other form with a 404. A client keeping to either convention hit a wall on
+some routes. Each answers to both now, and the alias stays out of the schema
+so the published surface still names one path per route.
+
 **Half the agent actions the vendor publishes answered 400.**
 SentinelOne publishes one path per agent action, and mockdr serves them
 through a single route that knew twenty-three of the thirty-eight — so

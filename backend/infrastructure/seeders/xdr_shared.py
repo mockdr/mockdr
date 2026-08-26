@@ -39,9 +39,17 @@ XDR_ACTION_TYPES: list[str] = [
 
 XDR_ACTION_STATUSES: list[str] = [
     "completed", "completed", "completed", "completed",
-    "pending", "in_progress", "failed", "canceled",
+    "pending", "pending", "failed", "failed",
 ]
-"""Weighted action statuses."""
+"""Weighted action statuses.
+
+`in_progress` and `canceled` were seeded too, and no reading of a real
+`get_action_status` reply in `data/vendor-specs/` shows how Cortex spells
+either on the wire — the recordings carry `COMPLETED_SUCCESSFULLY` and
+`FAILED` and nothing else. A client switching on that value would have been
+handed a guess, so the seeded vocabulary is the one that can be answered
+exactly.
+"""
 
 XDR_AGENT_VERSIONS: list[str] = [
     "8.3.0.12345",

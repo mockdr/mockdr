@@ -16,7 +16,9 @@ router = APIRouter(tags=["XDR Actions"])
 
 
 @router.post("/actions/get_action_status/")
-@xdr_shape("actions_get_action_status")
+# No `@xdr_shape` here: the recorded reply's members are *endpoint ids*, not
+# member names, so completing an answer against it adds three endpoints from
+# the install the recording came from to every reply.
 def get_action_status(
     body: dict = Body(...),
     _: object = Depends(require_xdr_auth),

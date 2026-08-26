@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.routing import Match
 from starlette.types import Scope
@@ -906,7 +907,7 @@ for _es_module in [
 XDR_PREFIX = "/xdr/public_api/v1"
 
 # All XDR endpoints — each handler applies its own auth dependency via require_xdr_auth
-for _xdr_module in [
+_XDR_MODULES = [
     xdr_incidents_router,
     xdr_alerts_router,
     xdr_endpoints_router,
@@ -918,9 +919,33 @@ for _xdr_module in [
     xdr_distributions_router,
     xdr_xql_router,
     xdr_system_router,
-]:
+]
+
+for _xdr_module in _XDR_MODULES:
     app.include_router(_xdr_module.router, prefix=XDR_PREFIX,
                        dependencies=[Depends(require_documented_body)])
+
+# Cortex paths are written both ways in the wild — the community
+# transcription of the reference spells them without a trailing slash, the
+# connector code with one — and mockdr served forty-five of its fifty-one
+# with the slash and six without, refusing the other spelling with a 404. A
+# client keeping to either convention therefore hit a wall on some routes.
+# Each route answers to both now; the alias stays out of the schema so the
+# published surface still names one path per route.
+for _xdr_module in _XDR_MODULES:
+    for _route in list(_xdr_module.router.routes):
+        if not isinstance(_route, APIRoute):
+            continue
+        _twin = _route.path[:-1] if _route.path.endswith("/") else _route.path + "/"
+        if any(isinstance(r, APIRoute) and r.path == _twin
+               for r in _xdr_module.router.routes):
+            continue
+        app.router.add_api_route(
+            XDR_PREFIX + _twin, _route.endpoint,
+            methods=sorted(_route.methods or {"POST"}),
+            dependencies=[Depends(require_documented_body)],
+            include_in_schema=False, name=f"{_route.name}_slash",
+        )
 
 # ── Splunk SIEM mock endpoints (mounted at /splunk) ─────────────────────────
 SPLUNK_PREFIX = "/splunk"

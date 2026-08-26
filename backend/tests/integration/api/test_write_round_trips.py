@@ -2678,3 +2678,125 @@ class TestACortexWriteBodyIsRecognisable:
         body = client.post("/xdr/public_api/v1/rbac/get_user_group/",
                            headers=self.XDR, json={}).json()
         assert set(body["reply"]) == {"err_code", "err_msg", "err_extra"}
+
+
+class TestPollingACortexActionFinds:
+    """From `xsoar-samples/*/action_status_get.json`, recorded off the product.
+
+    Cortex answers `get_action_status` as a map from endpoint id to status —
+    which is what a playbook polls: it isolates an endpoint and waits for
+    that endpoint's key to say `COMPLETED_SUCCESSFULLY`. mockdr answered with
+    the action's own record, completed against the recording, so every reply
+    carried the same three endpoints from someone else's install and the one
+    the client had just acted on was never among them. The wait never ended.
+    """
+
+    XDR = {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"}
+
+    def _endpoint_id(self, client: TestClient) -> str:
+        found = client.post("/xdr/public_api/v1/endpoints/get_endpoint/",
+                            headers=self.XDR, json={"request_data": {}}).json()
+        return str(found["reply"]["endpoints"][0]["endpoint_id"])
+
+    def _isolate(self, client: TestClient, endpoint_id: str) -> str:
+        reply = client.post("/xdr/public_api/v1/endpoints/isolate/",
+                            headers=self.XDR,
+                            json={"request_data": {"endpoint_id": endpoint_id}})
+        return str(reply.json()["reply"]["action_id"])
+
+    def _status(self, client: TestClient, action_id: str) -> dict:
+        return dict(client.post(
+            "/xdr/public_api/v1/actions/get_action_status/", headers=self.XDR,
+            json={"request_data": {"group_action_id": action_id}},
+        ).json()["reply"])
+
+    def test_the_endpoint_acted_on_is_the_one_reported(
+        self, client: TestClient,
+    ) -> None:
+        endpoint_id = self._endpoint_id(client)
+        reply = self._status(client, self._isolate(client, endpoint_id))
+        assert list(reply["data"]) == [endpoint_id]
+
+    def test_nobody_elses_endpoints_are_in_the_answer(
+        self, client: TestClient,
+    ) -> None:
+        """The recording's three endpoint ids used to be in every reply."""
+        reply = self._status(client, self._isolate(client, self._endpoint_id(client)))
+        assert "aeec6a2cc92e46fab3b6f621722e9916" not in reply["data"]
+
+    def test_the_status_is_spelled_the_way_cortex_spells_it(
+        self, client: TestClient,
+    ) -> None:
+        reply = self._status(client, self._isolate(client, self._endpoint_id(client)))
+        assert set(reply["data"].values()) == {"COMPLETED_SUCCESSFULLY"}
+
+    def test_polling_an_action_nobody_started(self, client: TestClient) -> None:
+        response = client.post(
+            "/xdr/public_api/v1/actions/get_action_status/", headers=self.XDR,
+            json={"request_data": {"group_action_id": "no-such-action"}})
+        assert response.status_code == 500
+        assert response.json()["reply"]["err_extra"] == (
+            "Action no-such-action not found")
+
+    def test_only_a_failure_carries_a_reason(self, client: TestClient) -> None:
+        """`errorReasons` is keyed by the endpoints that failed, and is
+        absent when none did."""
+        from repository.xdr_action_repo import xdr_action_repo
+
+        replies = [self._status(client, a.action_id)
+                   for a in xdr_action_repo.list_all()]
+        for reply in replies:
+            failed = [e for e, s in reply["data"].items() if s == "FAILED"]
+            assert list(reply.get("errorReasons", {})) == failed
+
+    def test_a_client_only_ever_sees_a_status_the_product_spells(
+        self, client: TestClient,
+    ) -> None:
+        from repository.xdr_action_repo import xdr_action_repo
+
+        seen = {
+            status
+            for action in xdr_action_repo.list_all()
+            for status in self._status(client, action.action_id)["data"].values()
+        }
+        assert seen <= {"COMPLETED_SUCCESSFULLY", "FAILED"}
+
+
+class TestBothSpellingsOfACortexPath:
+    """Cortex paths are written both ways in the wild.
+
+    The community transcription of the reference spells them without a
+    trailing slash, connector code with one — and mockdr served forty-five of
+    its fifty-one XDR routes with the slash and six without, refusing the
+    other spelling with a 404. A client keeping to either convention hit a
+    wall on some routes.
+    """
+
+    XDR = {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"}
+
+    @pytest.mark.parametrize("path", [
+        "/xdr/public_api/v1/rbac/get_roles",
+        "/xdr/public_api/v1/xql/get_quota",
+        "/xdr/public_api/v1/system/get_tenant_info",
+    ])
+    def test_either_spelling_reaches_the_route(
+        self, client: TestClient, path: str,
+    ) -> None:
+        for candidate in (path, path + "/"):
+            response = client.post(candidate, headers=self.XDR,
+                                   json={"request_data": {}})
+            assert response.status_code == 200, candidate
+
+    def test_the_alias_is_not_a_second_published_route(
+        self, client: TestClient,
+    ) -> None:
+        """The published surface still names one path per route."""
+        from main import app
+
+        paths = app.openapi()["paths"]
+        assert "/xdr/public_api/v1/rbac/get_roles" not in paths
+        assert "/xdr/public_api/v1/rbac/get_roles/" in paths
+
+    def test_the_alias_still_wants_credentials(self, client: TestClient) -> None:
+        assert client.post("/xdr/public_api/v1/rbac/get_roles",
+                           json={"request_data": {}}).status_code == 401
