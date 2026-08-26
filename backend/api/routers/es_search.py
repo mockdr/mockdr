@@ -14,6 +14,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 
 from api.es_auth import require_es_auth, require_es_write
+from api.reserved_names import register as _register_convertors
 from api.spa import spa_response, wants_html
 from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
@@ -28,6 +29,8 @@ from utils.es_response import (
     build_es_resource_exists,
 )
 from utils.id_gen import new_hex
+
+_register_convertors()
 
 router = APIRouter(tags=["ES Search"])
 
@@ -441,8 +444,8 @@ def _bulk_parse_error(line: str, exc: json.JSONDecodeError, line_no: int) -> dic
     return content
 
 
-@router.get("/{index}/_search", operation_id="es_search_get")
-@router.post("/{index}/_search", operation_id="es_search_post")
+@router.get("/{index:esindex}/_search", operation_id="es_search_get")
+@router.post("/{index:esindex}/_search", operation_id="es_search_post")
 def es_search(
     index: str,
     request: Request,
@@ -467,7 +470,7 @@ def es_search(
     return page
 
 
-@router.post("/{index}/_pit", operation_id="es_open_pit")
+@router.post("/{index:esindex}/_pit", operation_id="es_open_pit")
 def open_pit(
     index: str,
     _keep_alive: str | None = Query(default=None, alias="keep_alive"),
@@ -510,8 +513,8 @@ def clear_scroll(body: dict = Body(default={}), _: dict = Depends(require_es_aut
     return search_queries.close_context(str(body.get("scroll_id", "")))
 
 
-@router.get("/{index}/_count", operation_id="es_count_get")
-@router.post("/{index}/_count", operation_id="es_count_post")
+@router.get("/{index:esindex}/_count", operation_id="es_count_get")
+@router.post("/{index:esindex}/_count", operation_id="es_count_post")
 def es_count(
     index: str,
     request: Request,
@@ -529,8 +532,8 @@ def es_count(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index}/_mget", operation_id="es_mget_get")
-@router.post("/{index}/_mget", operation_id="es_mget_post")
+@router.get("/{index:esindex}/_mget", operation_id="es_mget_get")
+@router.post("/{index:esindex}/_mget", operation_id="es_mget_post")
 def es_mget(
     index: str,
     body: dict = Body(default={}),
@@ -544,7 +547,7 @@ def es_mget(
 # ── Mapping / Stats ──────────────────────────────────────────────────────────
 
 
-@router.get("/{index}/_mapping")
+@router.get("/{index:esindex}/_mapping")
 def get_mapping(
     index: str,
     ignore_unavailable: bool = Query(default=False),
@@ -557,7 +560,7 @@ def get_mapping(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index}/_mapping/field/{field}")
+@router.get("/{index:esindex}/_mapping/field/{field}")
 def get_field_mapping(
     index: str,
     field: str,
@@ -577,7 +580,7 @@ def get_field_mapping(
     return {index: {"mappings": fields}}
 
 
-@router.put("/{index}/_mapping", operation_id="es_put_mapping")
+@router.put("/{index:esindex}/_mapping", operation_id="es_put_mapping")
 def put_mapping(
     index: str,
     body: dict = Body(...),
@@ -598,8 +601,8 @@ def put_mapping(
         )) from exc
 
 
-@router.get("/{index}/_field_caps", operation_id="es_field_caps_get")
-@router.post("/{index}/_field_caps", operation_id="es_field_caps_post")
+@router.get("/{index:esindex}/_field_caps", operation_id="es_field_caps_get")
+@router.post("/{index:esindex}/_field_caps", operation_id="es_field_caps_post")
 def field_caps(
     index: str,
     fields: str | None = Query(default=None),
@@ -619,7 +622,7 @@ def field_caps(
         raise _missing_index(exc) from exc
 
 
-@router.post("/{index}/_update/{doc_id}", operation_id="es_update_doc")
+@router.post("/{index:esindex}/_update/{doc_id}", operation_id="es_update_doc")
 def update_doc(
     index: str,
     doc_id: str,
@@ -645,7 +648,7 @@ def update_doc(
     return JSONResponse(status_code=201 if created else 200, content=result)
 
 
-@router.post("/{index}/_update_by_query", operation_id="es_update_by_query")
+@router.post("/{index:esindex}/_update_by_query", operation_id="es_update_by_query")
 def update_by_query(
     index: str,
     request: Request,
@@ -665,7 +668,7 @@ def update_by_query(
         )) from exc
 
 
-@router.post("/{index}/_delete_by_query", operation_id="es_delete_by_query")
+@router.post("/{index:esindex}/_delete_by_query", operation_id="es_delete_by_query")
 def delete_by_query(
     index: str,
     request: Request,
@@ -686,7 +689,7 @@ def delete_by_query(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index}/_source/{doc_id}", operation_id="es_get_source")
+@router.get("/{index:esindex}/_source/{doc_id}", operation_id="es_get_source")
 def get_source(
     index: str,
     doc_id: str,
@@ -711,10 +714,10 @@ def get_source(
 _SHARD_ACK = {"_shards": {"total": 2, "successful": 1, "failed": 0}}
 
 
-@router.post("/{index}/_refresh", operation_id="es_refresh")
-@router.post("/{index}/_flush", operation_id="es_flush")
-@router.post("/{index}/_forcemerge", operation_id="es_forcemerge")
-@router.post("/{index}/_cache/clear", operation_id="es_cache_clear")
+@router.post("/{index:esindex}/_refresh", operation_id="es_refresh")
+@router.post("/{index:esindex}/_flush", operation_id="es_flush")
+@router.post("/{index:esindex}/_forcemerge", operation_id="es_forcemerge")
+@router.post("/{index:esindex}/_cache/clear", operation_id="es_cache_clear")
 def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
     """Answer the maintenance calls that follow a write."""
     try:
@@ -725,7 +728,7 @@ def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
 
 
 @router.post("/_msearch", operation_id="es_msearch_all")
-@router.post("/{index}/_msearch", operation_id="es_msearch")
+@router.post("/{index:esindex}/_msearch", operation_id="es_msearch")
 async def msearch(request: Request, index: str = "", _: dict = Depends(require_es_auth)) -> dict:
     """Several searches in one request, the way Kibana asks for them.
 
@@ -773,7 +776,7 @@ def _one_search(index: str, body: dict) -> dict:
         }
 
 
-@router.get("/{index}/_settings", operation_id="es_get_settings")
+@router.get("/{index:esindex}/_settings", operation_id="es_get_settings")
 def get_settings(index: str, _: dict = Depends(require_es_auth)) -> dict:
     """An index's settings, which is the half of it a client tunes."""
     try:
@@ -782,7 +785,7 @@ def get_settings(index: str, _: dict = Depends(require_es_auth)) -> dict:
         raise _missing_index(exc) from exc
 
 
-@router.put("/{index}/_settings", operation_id="es_put_settings")
+@router.put("/{index:esindex}/_settings", operation_id="es_put_settings")
 def put_settings(
     index: str, body: dict = Body(...), _: dict = Depends(require_es_write),
 ) -> dict:
@@ -793,7 +796,7 @@ def put_settings(
         raise _missing_index(exc) from exc
 
 
-@router.put("/{index}/_alias/{alias}", operation_id="es_put_alias")
+@router.put("/{index:esindex}/_alias/{alias}", operation_id="es_put_alias")
 def put_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> dict:
     """Point an alias at an index."""
     try:
@@ -802,7 +805,7 @@ def put_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> di
         raise _missing_index(exc) from exc
 
 
-@router.delete("/{index}/_alias/{alias}", operation_id="es_delete_alias")
+@router.delete("/{index:esindex}/_alias/{alias}", operation_id="es_delete_alias")
 def delete_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> dict:
     """Take an alias off an index."""
     try:
@@ -811,7 +814,7 @@ def delete_alias(index: str, alias: str, _: dict = Depends(require_es_write)) ->
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index}/_alias", operation_id="es_get_index_alias")
+@router.get("/{index:esindex}/_alias", operation_id="es_get_index_alias")
 def get_index_alias(index: str, _: dict = Depends(require_es_auth)) -> dict:
     """Which aliases an index carries."""
     if not search_queries.index_exists(index):
@@ -848,7 +851,7 @@ def resolve_index(expression: str, _: dict = Depends(require_es_auth)) -> dict:
     return search_queries.resolve_index(expression)
 
 
-@router.post("/{index}/_analyze", operation_id="es_analyze")
+@router.post("/{index:esindex}/_analyze", operation_id="es_analyze")
 def analyze(
     index: str, body: dict = Body(default={}), _: dict = Depends(require_es_auth),
 ) -> dict:
@@ -863,7 +866,7 @@ def analyze(
         )) from exc
 
 
-@router.post("/{index}/_validate/query", operation_id="es_validate_query")
+@router.post("/{index:esindex}/_validate/query", operation_id="es_validate_query")
 def validate_query(
     index: str,
     body: dict = Body(default={}),
@@ -881,7 +884,7 @@ def validate_query(
         )) from exc
 
 
-@router.post("/{index}/_terms_enum", operation_id="es_terms_enum")
+@router.post("/{index:esindex}/_terms_enum", operation_id="es_terms_enum")
 def terms_enum(
     index: str, body: dict = Body(default={}), _: dict = Depends(require_es_auth),
 ) -> dict:
@@ -892,7 +895,7 @@ def terms_enum(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index}/_stats")
+@router.get("/{index:esindex}/_stats")
 def get_stats(
     index: str,
     ignore_unavailable: bool = Query(default=False),
@@ -908,7 +911,7 @@ def get_stats(
 # ── Document CRUD ────────────────────────────────────────────────────────────
 
 
-@router.get("/{index}/_doc/{doc_id}")
+@router.get("/{index:esindex}/_doc/{doc_id}")
 def get_doc(
     index: str,
     doc_id: str,
@@ -938,8 +941,8 @@ def get_doc(
     return result
 
 
-@router.post("/{index}/_doc/{doc_id}", operation_id="es_index_doc_post")
-@router.put("/{index}/_doc/{doc_id}", operation_id="es_index_doc_put")
+@router.post("/{index:esindex}/_doc/{doc_id}", operation_id="es_index_doc_post")
+@router.put("/{index:esindex}/_doc/{doc_id}", operation_id="es_index_doc_put")
 def index_doc(
     index: str,
     doc_id: str,
@@ -973,7 +976,7 @@ def _forced_refresh(refresh: str | None) -> bool:
         )) from exc
 
 
-@router.put("/{index}", operation_id="es_create_index")
+@router.put("/{index:esindex}", operation_id="es_create_index")
 def create_index(
     index: str,
     body: dict | None = Body(default=None),
@@ -992,7 +995,7 @@ def create_index(
         )) from exc
 
 
-@router.get("/{index}", operation_id="es_get_index")
+@router.get("/{index:esindex}", operation_id="es_get_index")
 async def get_index(request: Request, index: str) -> Response:
     """The index's settings and mappings.
 
@@ -1023,7 +1026,7 @@ async def get_index(request: Request, index: str) -> Response:
     return JSONResponse(content=described)
 
 
-@router.delete("/{index}", operation_id="es_delete_index")
+@router.delete("/{index:esindex}", operation_id="es_delete_index")
 def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
     """Delete an index and everything written to it."""
     if index.startswith("_"):
@@ -1036,7 +1039,7 @@ def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
     return result
 
 
-@router.delete("/{index}/_doc/{doc_id}")
+@router.delete("/{index:esindex}/_doc/{doc_id}")
 def delete_doc(
     index: str,
     doc_id: str,

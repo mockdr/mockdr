@@ -178,7 +178,9 @@ class TestJobLifecycleStatusCodes:
         assert "results" in body
 
     def test_export_streams_ndjson(self, client: TestClient) -> None:
-        resp = client.get(
+        # POST: splunkd answers 405 `Allow: POST` to a GET here, whatever
+        # query string it carries (measured on 10.4.2).
+        resp = client.post(
             f"{SPLUNK_PREFIX}/services/search/jobs/export",
             params={"search": "search index=sentinelone | head 3", "output_mode": "json"},
             headers=_auth(),

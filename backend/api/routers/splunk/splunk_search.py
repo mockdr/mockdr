@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from api.reserved_names import register as _register_convertors
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.search import (
     InvalidTimeParameterError,
@@ -43,6 +44,8 @@ _SEARCH_REQUIRED = (
     "search/jobs endpoint is not specified. Specify the required 'search' "
     "parameter for the POST request on the endpoint and then retry your request."
 )
+
+_register_convertors()
 
 router = APIRouter(tags=["Splunk Search"])
 
@@ -135,14 +138,13 @@ def list_search_jobs(
 
 # One decorator per method: an api_route with two methods emits two OpenAPI
 # operations under one id, which a client generator rejects as a duplicate.
-@router.get(
-    "/services/search/v2/jobs/export", response_model=None, operation_id="splunk_export_v2_get",
-)
+#
+# POST only: splunkd answers 405 `Allow: POST` to a GET here, whatever query
+# string it carries (measured on 10.4.2). Serving GET as well did no harm on
+# its own and put GET in the `Allow` of every *other* verb's refusal, which
+# is how a route nobody has claims to exist.
 @router.post(
     "/services/search/v2/jobs/export", response_model=None, operation_id="splunk_export_v2_post",
-)
-@router.get(
-    "/services/search/jobs/export", response_model=None, operation_id="splunk_export_get",
 )
 @router.post(
     "/services/search/jobs/export", response_model=None, operation_id="splunk_export_post",
@@ -276,8 +278,8 @@ def _export_lines(result: dict) -> Iterator[str]:
         yield json.dumps(line, separators=(",", ":")) + "\n"
 
 
-@router.get("/services/search/v2/jobs/{sid}")
-@router.get("/services/search/jobs/{sid}")
+@router.get("/services/search/v2/jobs/{sid:splunksid}")
+@router.get("/services/search/jobs/{sid:splunksid}")
 def get_search_job(
     sid: str,
     output_mode: str = "json",
@@ -292,8 +294,8 @@ def get_search_job(
     return result
 
 
-@router.post("/services/search/v2/jobs/{sid}/control")
-@router.post("/services/search/jobs/{sid}/control")
+@router.post("/services/search/v2/jobs/{sid:splunksid}/control")
+@router.post("/services/search/jobs/{sid:splunksid}/control")
 async def control_job(
     sid: str,
     request: Request,
@@ -341,10 +343,16 @@ _CONTROL_ACTIONS = frozenset({
 })
 
 
-@router.get("/services/search/v2/jobs/{sid}/results", operation_id="splunk_results_v2_get")
-@router.post("/services/search/v2/jobs/{sid}/results", operation_id="splunk_results_v2_post")
-@router.get("/services/search/jobs/{sid}/results", operation_id="splunk_results_v1_get")
-@router.post("/services/search/jobs/{sid}/results", operation_id="splunk_results_v1_post")
+@router.get(
+    "/services/search/v2/jobs/{sid:splunksid}/results",
+    operation_id="splunk_results_v2_get",
+)
+@router.post(
+    "/services/search/v2/jobs/{sid:splunksid}/results",
+    operation_id="splunk_results_v2_post",
+)
+@router.get("/services/search/jobs/{sid:splunksid}/results", operation_id="splunk_results_v1_get")
+@router.post("/services/search/jobs/{sid:splunksid}/results", operation_id="splunk_results_v1_post")
 def get_job_results(
     sid: str,
     count: int = Query(default=100),
@@ -367,10 +375,13 @@ def get_job_results(
     return result
 
 
-@router.get("/services/search/v2/jobs/{sid}/events", operation_id="splunk_events_v2_get")
-@router.post("/services/search/v2/jobs/{sid}/events", operation_id="splunk_events_v2_post")
-@router.get("/services/search/jobs/{sid}/events", operation_id="splunk_events_v1_get")
-@router.post("/services/search/jobs/{sid}/events", operation_id="splunk_events_v1_post")
+@router.get("/services/search/v2/jobs/{sid:splunksid}/events", operation_id="splunk_events_v2_get")
+@router.post(
+    "/services/search/v2/jobs/{sid:splunksid}/events",
+    operation_id="splunk_events_v2_post",
+)
+@router.get("/services/search/jobs/{sid:splunksid}/events", operation_id="splunk_events_v1_get")
+@router.post("/services/search/jobs/{sid:splunksid}/events", operation_id="splunk_events_v1_post")
 def get_job_events(
     sid: str,
     count: int = Query(default=100),
@@ -393,8 +404,8 @@ def get_job_events(
     return result
 
 
-@router.get("/services/search/v2/jobs/{sid}/summary")
-@router.get("/services/search/jobs/{sid}/summary")
+@router.get("/services/search/v2/jobs/{sid:splunksid}/summary")
+@router.get("/services/search/jobs/{sid:splunksid}/summary")
 def get_job_summary(
     sid: str,
     output_mode: str = "json",
@@ -409,8 +420,8 @@ def get_job_summary(
     return result
 
 
-@router.get("/services/search/v2/jobs/{sid}/timeline")
-@router.get("/services/search/jobs/{sid}/timeline")
+@router.get("/services/search/v2/jobs/{sid:splunksid}/timeline")
+@router.get("/services/search/jobs/{sid:splunksid}/timeline")
 def get_job_timeline(
     sid: str,
     output_mode: str = "json",
@@ -425,8 +436,8 @@ def get_job_timeline(
     return result
 
 
-@router.delete("/services/search/v2/jobs/{sid}")
-@router.delete("/services/search/jobs/{sid}")
+@router.delete("/services/search/v2/jobs/{sid:splunksid}")
+@router.delete("/services/search/jobs/{sid:splunksid}")
 def delete_job(
     sid: str,
     current_user: dict = Depends(require_splunk_auth),

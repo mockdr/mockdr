@@ -17,7 +17,7 @@ from api.auth import require_admin, require_auth
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
-from api.middleware.head_method import HeadMethodMiddleware
+from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
@@ -475,6 +475,10 @@ def _with_repeated_challenges(
             (b"www-authenticate", challenge.encode("latin-1")))
     return response
 
+
+#: The splunkd paths that answer 405 rather than the EAI collections' 400.
+_SPLUNK_SEARCH_405 = re.compile(r"/splunk/services/search/")
+_SPLUNK_KVSTORE_405 = re.compile(r"/storage/collections/data/[^/]+/batch_")
 
 #: Paths that mock Entra's token endpoint rather than the API in front of it.
 _TOKEN_ENDPOINT_SUFFIX = "/oauth2/v2.0/token"
@@ -1056,8 +1060,11 @@ def _allowed_methods_for(path: str) -> tuple[str, ...]:
 
     # RFC 9110 makes HEAD mandatory wherever GET is served, and requires Allow
     # to list it. Starlette answers HEAD from the GET route without registering
-    # one, so probing never reports it.
-    if "GET" in allowed and "HEAD" not in allowed:
+    # one, so probing never reports it. Elasticsearch is the exception twice
+    # over: it serves HEAD on its existence endpoints alone, and so lists it
+    # in `Allow` there alone — `/_cluster/health` answers `Allow: GET`.
+    serves_head = not path.startswith("/elastic") or bool(ES_HEAD_PATHS.match(path))
+    if "GET" in allowed and "HEAD" not in allowed and serves_head:
         allowed.append("HEAD")
     return tuple(allowed)
 
@@ -1087,9 +1094,23 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
             content={"text": "The requested URL was not found on this server.", "code": 404},
         )
     if allowed and vendor == "splunk":
-        # splunkd has no 405 for this. A verb a collection does not take is a
-        # 400 — the same wording it uses for a POST with no name — and it
-        # sends no Allow header (measured on 10.4.2).
+        # splunkd is three services under one mount, and they disagree here.
+        # The EAI collections have no 405 at all: a verb they do not take is
+        # a 400, in the wording they use for a POST with no name, and with no
+        # Allow header. The search endpoints and the KV store *do* answer
+        # 405, with an Allow header and two different bodies. All measured on
+        # 10.4.2, which is the only way anyone would know.
+        if _SPLUNK_SEARCH_405.search(path):
+            return JSONResponse(
+                status_code=405, headers={"Allow": ",".join(allowed)},
+                content={"messages": [
+                    {"type": "FATAL", "text": "The method is not allowed."}]},
+            )
+        if _SPLUNK_KVSTORE_405.search(path):
+            return JSONResponse(
+                status_code=405, headers={"Allow": ",".join(allowed)},
+                content={"messages": [{"type": "ERROR", "text": "Method Not Allowed"}]},
+            )
         return JSONResponse(
             status_code=400,
             content={"messages": [{"type": "ERROR", "text":
@@ -1104,7 +1125,8 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
             "error": f"Incorrect HTTP method for uri [{inner}] and method "
                      f"[{request.method}], allowed: [{', '.join(allowed)}]",
             "status": 405,
-        }, headers={"Allow": ", ".join(allowed)})
+            # No space after the comma, which is how the cluster writes it.
+        }, headers={"Allow": ",".join(allowed)})
     if allowed and vendor == "kibana":
         # Kibana registers a route per method, so a verb it does not take is
         # simply no route: 404, with the same body it sends for a path that

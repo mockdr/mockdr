@@ -24,7 +24,8 @@ import re
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 #: Where Elasticsearch answers HEAD. Anything else under `/elastic` is a 405.
-_ES_HEAD_PATHS = re.compile(
+#: `main.py` reads it too, to decide whether HEAD belongs in an `Allow`.
+ES_HEAD_PATHS = re.compile(
     r"^/elastic/?$"                                  # the root
     r"|^/elastic/[^_/][^/]*/?$"                      # an index
     r"|^/elastic/[^/]+/_doc/[^/]+/?$"                # a document
@@ -53,7 +54,7 @@ class HeadMethodMiddleware:
             return
 
         path = scope.get("path", "")
-        if path.startswith("/elastic") and not _ES_HEAD_PATHS.match(path):
+        if path.startswith("/elastic") and not ES_HEAD_PATHS.match(path):
             # Left as HEAD, so the unmatched-route fallback answers the 405
             # Elasticsearch answers — with the `Allow` header it carries.
             await self.app(scope, receive, send)

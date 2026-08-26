@@ -9,7 +9,6 @@ probing the instance concluded it was talking to something that was not Splunk.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
 
 from api.splunk_auth import require_splunk_auth
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope
@@ -371,10 +370,9 @@ async def search_parser(
     return _parse_query(str(form.get("q", "")))
 
 
-@router.get("/services/search/parser", operation_id="splunk_search_parser_get")
-@router.get("/services/search/v2/parser", operation_id="splunk_search_v2_parser_get")
-def search_parser_get(
-    current_user: dict = Depends(require_splunk_auth),
-) -> JSONResponse:
-    """Refused: the parser is POST-only, and splunkd says so with Allow: POST."""
-    return JSONResponse(status_code=405, content=_PARSER_405, headers={"Allow": "POST"})
+# The parser is POST-only, and splunkd refuses every other verb with 405,
+# `Allow: POST` and a FATAL message. A GET route registered here purely to
+# say so did answer correctly — and made itself part of the answer: `Allow`
+# lists the verbs that are *registered*, so a DELETE was told GET was
+# available. The unmatched-route fallback produces the same 405 from the
+# absence of the route, which is where the truth was all along.

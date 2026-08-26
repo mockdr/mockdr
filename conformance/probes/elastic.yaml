@@ -3090,3 +3090,27 @@ probes:
       method: GET
       path: /api/status
       auth: basic
+
+  - id: es-underscore-is-not-an-index
+    endpoint: search
+    compare: values
+    why: >
+      An index name may not begin with an underscore — Elasticsearch reserves
+      that for its own endpoints, and says so in the very error this used to
+      produce. Without the rule `/{index}` swallowed every `_`-prefixed path
+      whose verb had no route of its own: `DELETE /_search` was read as
+      "delete the index named `_search`".
+    request:
+      method: DELETE
+      path: /_search
+      auth: basic
+
+  - id: es-allow-lists-what-is-served
+    endpoint: search
+    why: >
+      And the Allow it comes with lists the verbs the uri takes, without a
+      space after the comma and without HEAD where HEAD is not served.
+    request:
+      method: PATCH
+      path: /_cluster/health
+      auth: basic

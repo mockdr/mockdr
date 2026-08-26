@@ -8,6 +8,7 @@ from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
+from api.reserved_names import register as _register_convertors
 from api.splunk_auth import require_splunk_admin, require_splunk_auth
 from application.splunk.commands.kvstore import (
     DuplicateKeyError,
@@ -26,6 +27,8 @@ from application.splunk.queries.kvstore import (
     list_collections,
 )
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope
+
+_register_convertors()
 
 router = APIRouter(tags=["Splunk KV Store"])
 
@@ -193,7 +196,7 @@ async def batch_find_records(
     ]
 
 
-@router.get("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key}")
+@router.get("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key:kvkey}")
 def get_kv_record(
     owner: str,
     app: str,
@@ -210,7 +213,7 @@ def get_kv_record(
     return result
 
 
-@router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key}")
+@router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key:kvkey}")
 async def update_kv_record(
     owner: str,
     app: str,
@@ -229,7 +232,7 @@ async def update_kv_record(
     return result
 
 
-@router.delete("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key}")
+@router.delete("/servicesNS/{owner}/{app}/storage/collections/data/{name}/{key:kvkey}")
 def delete_kv_record(
     owner: str,
     app: str,

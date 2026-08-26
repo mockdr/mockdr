@@ -1327,3 +1327,69 @@ class TestKibanaAndElasticsearchDifferBelowTheJson:
         answer = client.get("/kibana/api/cases/no-such-case", headers=self.KBN)
         assert answer.status_code == 404
         assert answer.headers["content-type"] == "application/json; charset=utf-8"
+
+
+class TestAParameterDoesNotSwallowItsSibling:
+    """From ``scripts/http_contract_audit.py``.
+
+    ``…/jobs/{sid}`` and ``…/jobs/export`` are two endpoints, and a parameter
+    that matches anything matches the second as well. The same pair exists in
+    the KV store, and in Elasticsearch, where ``/{index}`` matched every one
+    of its underscore-prefixed endpoints — the mock's own error message
+    ("must not start with '_'") is the rule the product states.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def test_export_is_not_a_search_job(self, client: TestClient) -> None:
+        answer = client.request("DELETE", "/splunk/services/search/jobs/export",
+                                headers=SPLUNK_AUTH, params=JSON_OUT)
+        assert answer.status_code == 405
+        assert answer.json()["messages"][0]["text"] == "The method is not allowed."
+        assert answer.headers["allow"] == "POST"
+
+    def test_batch_find_is_not_a_record_key(self, client: TestClient) -> None:
+        answer = client.request(
+            "DELETE",
+            "/splunk/servicesNS/nobody/search/storage/collections/data/zzz/batch_find",
+            headers=SPLUNK_AUTH, params=JSON_OUT)
+        assert answer.status_code == 405
+        assert answer.json()["messages"][0]["text"] == "Method Not Allowed"
+
+    def test_a_real_sid_still_reaches_the_job_route(self, client: TestClient) -> None:
+        answer = client.get("/splunk/services/search/jobs/no-such-sid",
+                            headers=SPLUNK_AUTH, params=JSON_OUT)
+        assert answer.status_code == 404
+        assert answer.json()["messages"][0]["text"] == "Unknown sid."
+
+    def test_an_underscore_path_is_not_an_index(self, client: TestClient) -> None:
+        answer = client.request("DELETE", "/elastic/_search", headers=self.ES)
+        assert answer.status_code == 405
+        assert answer.headers["allow"] == "GET,POST"
+        assert "Incorrect HTTP method" in answer.json()["error"]
+
+    def test_all_is_the_exception(self, client: TestClient) -> None:
+        """`_all` names every index rather than one, and still routes."""
+        assert client.get("/elastic/_all/_count", headers=self.ES).status_code == 200
+
+    def test_a_real_index_still_reaches_the_index_route(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.request("DELETE", "/elastic/zzz-not-there", headers=self.ES)
+        assert answer.status_code == 404
+        assert answer.json()["error"]["type"] == "index_not_found_exception"
+
+    def test_allow_lists_only_what_is_served(self, client: TestClient) -> None:
+        """No space after the comma, and no HEAD where HEAD is not served."""
+        answer = client.request("PATCH", "/elastic/_cluster/health", headers=self.ES)
+        assert answer.headers["allow"] == "GET"
+        index = client.request("PATCH", "/elastic/logs-endpoint", headers=self.ES)
+        assert index.headers["allow"] == "GET,PUT,DELETE,HEAD"
+
+    def test_export_and_parser_take_no_get(self, client: TestClient) -> None:
+        for path in ("/splunk/services/search/jobs/export",
+                     "/splunk/services/search/parser"):
+            answer = client.get(path, headers=SPLUNK_AUTH, params=JSON_OUT)
+            assert answer.status_code == 405, path
+            assert answer.headers["allow"] == "POST", path

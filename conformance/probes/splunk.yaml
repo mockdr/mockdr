@@ -2971,3 +2971,42 @@ probes:
       method: GET
       path: /services/data/indexes
       query: {output_mode: json}
+
+  - id: spl-export-takes-no-get
+    endpoint: management
+    compare: values
+    why: >
+      The export endpoint is POST-only: splunkd answers 405 `Allow: POST` to
+      a GET whatever query string it carries. mockdr served the GET, which
+      did no harm on its own and put GET into the `Allow` of every other
+      verb's refusal — a route nobody has, claiming to exist.
+    request:
+      method: GET
+      path: /services/search/jobs/export
+      query: {search: 'search index=main | head 1', output_mode: json}
+      auth: basic
+
+  - id: spl-parser-takes-no-get
+    endpoint: management
+    compare: values
+    why: >
+      The same for the parser.
+    request:
+      method: GET
+      path: /services/search/parser
+      query: {q: 'search index=main', output_mode: json}
+      auth: basic
+
+  - id: spl-a-sibling-is-not-a-sid
+    endpoint: management
+    compare: values
+    why: >
+      `…/jobs/{sid}` and `…/jobs/export` are two endpoints, and a parameter
+      that matches anything matches the second as well: a DELETE here was
+      read as "delete the job with sid `export`" and answered 404 `Unknown
+      sid` where splunkd answers 405.
+    request:
+      method: DELETE
+      path: /services/search/jobs/export
+      query: {output_mode: json}
+      auth: basic

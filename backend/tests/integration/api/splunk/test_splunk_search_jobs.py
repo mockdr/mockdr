@@ -178,7 +178,8 @@ class TestSearchJobLifecycle:
         assert resp.status_code == 200
 
     def test_export_search(self, client: TestClient) -> None:
-        resp = client.get(
+        # POST: the export endpoint takes no GET (measured on 10.4.2).
+        resp = client.post(
             f"{SPLUNK_PREFIX}/services/search/jobs/export",
             params={"search": "search index=sentinelone | head 5"},
             headers=_auth(),
