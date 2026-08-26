@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**A comparator that stopped looking one level down.**
+The Graph evidence above was wrong for as long as it was, and
+`schema_drift.py graph` reported no drift the whole time, because the
+comparison stopped at an item's top-level keys: a nested object could carry
+anything at all. OData marks a polymorphic member with `@odata.type`, which
+is exactly the handle needed to judge it, and the comparator now follows
+every one of them and checks its keys against the type it names. It reports
+clean on the corrected evidence and would have reported the invented
+properties — which is the only reason to trust the first half of that
+sentence.
+
 **An alert that named a device no client could find.**
 Asking whether a reference resolves — a client lists alerts, reads the
 device off one, and goes to fetch it — turned up something larger than a

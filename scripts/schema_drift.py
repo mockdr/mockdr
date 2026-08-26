@@ -271,6 +271,28 @@ def _graph_types() -> dict:
     return json.load(open(path)) if path.exists() else {}
 
 
+def graph_typed_objects(value: object, path: str = "") -> list[tuple[str, str, set[str]]]:
+    """Every nested object that names its own type, and the keys it carries.
+
+    The comparison used to stop at an item's top-level keys, so a nested
+    object could carry anything at all — which is how an alert's `evidence`
+    came to hold two properties Graph has never had while this reported no
+    drift. OData marks a typed object with ``@odata.type``, and that is
+    exactly the handle needed to judge it.
+    """
+    found: list[tuple[str, str, set[str]]] = []
+    if isinstance(value, dict):
+        declared = str(value.get("@odata.type") or "").lstrip("#")
+        if declared and path:
+            found.append((path, declared, {k for k in value if not k.startswith("@odata")}))
+        for key, member in value.items():
+            found += graph_typed_objects(member, f"{path}.{key}" if path else key)
+    elif isinstance(value, list):
+        for member in value[:3]:
+            found += graph_typed_objects(member, f"{path}[]")
+    return found
+
+
 def graph_type_props(type_name: str) -> set[str]:
     """The properties graph_v1.0_types.json declares for ``microsoft.graph.X``."""
     entry = _graph_types().get(type_name)
@@ -792,6 +814,18 @@ def main(platform: str) -> int:
                 declared = set(entry["top"])
                 seen = set(body) if isinstance(body, dict) else set()
                 envelope_seen = envelope_declared = set()
+            # Nested typed objects, judged against the type they name.
+            nested_extra: list[tuple[str, str, str]] = []
+            for item in (body.get("value", [])[:3]
+                         if isinstance(body.get("value"), list) else [body]):
+                for where, type_name, keys in graph_typed_objects(item):
+                    known = graph_type_props(type_name)
+                    if not known:
+                        continue
+                    nested_extra += [
+                        (where, type_name, key) for key in sorted(keys - known)
+                    ]
+
             missing = sorted(declared - seen)
             extra = sorted(seen - declared)
             env_missing = sorted(envelope_declared - envelope_seen)
@@ -803,8 +837,9 @@ def main(platform: str) -> int:
             # Graph's OpenAPI declares every property an entity *can* carry;
             # without $select the API returns a documented default subset, so
             # "missing" is not drift there. A property the spec never declares is.
-            if extra or env_missing or env_extra:
-                findings += len(extra) + len(env_missing) + len(env_extra)
+            if extra or env_missing or env_extra or nested_extra:
+                findings += (len(extra) + len(env_missing) + len(env_extra)
+                             + len(nested_extra))
                 print(f"  {method} {route}  ← {entry['spec']}")
                 for p in env_missing:
                     print(f"      missing  {p}")
@@ -812,6 +847,9 @@ def main(platform: str) -> int:
                     print(f"      extra    {p}")
                 for p in extra[:15]:
                     print(f"      extra    value[*].{p}")
+                for where, type_name, key in nested_extra[:15]:
+                    print(f"      extra    {where}.{key}   "
+                          f"({type_name} declares no such property)")
                 if len(missing) > 15 or len(extra) > 15:
                     print(
                         f"      … {max(0, len(missing) - 15)} more missing, "
