@@ -1599,3 +1599,81 @@ class TestFalconTellsAClientItsBudget:
             headers={"Authorization": "ApiToken admin-token-0000-0000-000000000001"},
             params={"limit": 1})
         assert "x-ratelimit-remaining" not in {k.lower() for k in answer.headers}
+
+
+class TestEachBulkActionDoesWhatItSays:
+    """Measured line by line against Elasticsearch 8.15.
+
+    Every line was indexed whatever verb it named: a `create` overwrote the
+    document it is meant to refuse to touch, a `delete` wrote instead of
+    deleting, an `update` of something absent created it — and `errors` said
+    `false` throughout, which is the one field a client checks. Bulk is how
+    everything is written at scale, and none of it was.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    def _bulk(self, client: TestClient, *lines: str) -> dict:
+        return client.post("/elastic/_bulk", headers=self.ES,
+                           content="".join(f"{line}\n" for line in lines),
+                           params={"refresh": "true"}).json()
+
+    def test_the_whole_action_set(self, client: TestClient) -> None:
+        body = self._bulk(
+            client,
+            '{"index":{"_index":"zzz-bulk","_id":"a"}}', '{"v":1}',
+            '{"create":{"_index":"zzz-bulk","_id":"a"}}', '{"v":2}',
+            '{"update":{"_index":"zzz-bulk","_id":"a"}}', '{"doc":{"v":3}}',
+            '{"update":{"_index":"zzz-bulk","_id":"missing"}}', '{"doc":{"v":9}}',
+            '{"delete":{"_index":"zzz-bulk","_id":"a"}}',
+            '{"delete":{"_index":"zzz-bulk","_id":"gone"}}',
+        )
+        seen = [
+            (next(iter(item)), next(iter(item.values()))["status"],
+             next(iter(item.values())).get("result"),
+             (next(iter(item.values())).get("error") or {}).get("type"))
+            for item in body["items"]
+        ]
+        assert seen == [
+            ("index", 201, "created", None),
+            ("create", 409, None, "version_conflict_engine_exception"),
+            ("update", 200, "updated", None),
+            ("update", 404, None, "document_missing_exception"),
+            ("delete", 200, "deleted", None),
+            ("delete", 404, "not_found", None),
+        ]
+        assert body["errors"] is True
+
+    def test_errors_is_false_when_nothing_failed(self, client: TestClient) -> None:
+        body = self._bulk(
+            client,
+            '{"index":{"_index":"zzz-bulk2","_id":"x"}}', '{"v":1}',
+            '{"index":{"_index":"zzz-bulk2","_id":"y"}}', '{"v":2}',
+        )
+        assert body["errors"] is False
+
+    def test_a_create_leaves_the_document_it_refused_alone(
+        self, client: TestClient,
+    ) -> None:
+        self._bulk(client, '{"index":{"_index":"zzz-bulk3","_id":"k"}}', '{"v":"first"}')
+        self._bulk(client, '{"create":{"_index":"zzz-bulk3","_id":"k"}}', '{"v":"second"}')
+        got = client.get("/elastic/zzz-bulk3/_doc/k", headers=self.ES).json()
+        assert got["_source"]["v"] == "first"
+
+    def test_a_delete_deletes(self, client: TestClient) -> None:
+        self._bulk(client, '{"index":{"_index":"zzz-bulk4","_id":"k"}}', '{"v":1}')
+        self._bulk(client, '{"delete":{"_index":"zzz-bulk4","_id":"k"}}')
+        assert client.get("/elastic/zzz-bulk4/_doc/k",
+                          headers=self.ES).status_code == 404
+
+    def test_a_failed_item_carries_an_error_and_no_result(
+        self, client: TestClient,
+    ) -> None:
+        body = self._bulk(
+            client, '{"update":{"_index":"zzz-bulk5","_id":"nope"}}', '{"doc":{"v":1}}')
+        item = body["items"][0]["update"]
+        assert item["status"] == 404
+        assert item["error"]["reason"] == "[nope]: document missing"
+        assert item["error"]["index"] == "zzz-bulk5"
+        assert "_version" not in item

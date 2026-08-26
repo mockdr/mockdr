@@ -3195,3 +3195,30 @@ probes:
     ignore_paths:
       - $.error.index_uuid
       - $.error.root_cause[*].index_uuid
+
+  - id: es-bulk-does-what-each-action-says
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      Bulk is how everything is written at scale, and every line of it was
+      indexed whatever verb it named: a `create` overwrote the document it
+      is meant to refuse to touch, a `delete` wrote instead of deleting, an
+      `update` of something absent created it — and `errors` said `false`
+      throughout, which is the one field a client checks.
+    request:
+      method: POST
+      path: /_bulk
+      content: |
+        {"create":{"_index":"${seed_index}","_id":"a"}}
+        {"sev":1}
+        {"update":{"_index":"${seed_index}","_id":"zzz-missing"}}
+        {"doc":{"sev":2}}
+        {"delete":{"_index":"${seed_index}","_id":"zzz-gone"}}
+      headers: {Content-Type: application/x-ndjson}
+      auth: basic
+    ignore_paths:
+      # The shard's own identifier for the index, and the run's own timing.
+      - $.items[*].create.error.index_uuid
+      - $.items[*].update.error.index_uuid
+      - $.took

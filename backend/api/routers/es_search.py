@@ -369,8 +369,14 @@ async def es_bulk(
 
     Both refusals measured on 8.15: an empty body is parse_exception
     "request body is required"; a body that is not JSON is
-    x_content_parse_exception with Jackson's diagnostic. Valid pairs are
-    indexed through the same path as ``PUT /{index}/_doc/{id}``.
+    x_content_parse_exception with Jackson's diagnostic.
+
+    Each action does what it says. It used to do only one thing: every line,
+    whatever verb it named, was indexed. So a `create` overwrote the document
+    it was meant to refuse to touch, a `delete` wrote instead of deleting, an
+    `update` of something absent created it — and `errors` was reported as
+    `false` throughout, which is the one field a client checks. Bulk is how
+    everything is written at scale, and none of it was.
     """
     raw = (await request.body()).decode("utf-8", errors="replace")
     lines = [line for line in raw.split("\n") if line.strip()]
@@ -409,12 +415,62 @@ async def es_bulk(
                     )) from exc
         index = str(meta.get("_index") or "")
         doc_id = str(meta.get("_id") or new_hex()[:20])
-        source = doc.get("doc", doc) if verb == "update" else doc
-        result = search_queries.es_index_doc(index, doc_id, source)
-        status = 201 if result.get("result") == "created" else 200
-        items.append({verb: {**result, "status": status}})
+        items.append({verb: _bulk_action(verb, index, doc_id, doc)})
         i += 1
-    return {"errors": False, "took": 1, "items": items}
+    errors = any(
+        int(next(iter(item.values())).get("status", 200)) >= 400 for item in items
+    )
+    return {"errors": errors, "took": 1, "items": items}
+
+
+def _bulk_item_error(index: str, doc_id: str, status: int,
+                     kind: str, reason: str) -> dict:
+    """One failed bulk item, which carries an error instead of a result."""
+    return {
+        "_index": index, "_id": doc_id, "status": status,
+        "error": {
+            "type": kind, "reason": reason,
+            "index_uuid": search_queries.es_index_uuid(index),
+            "shard": "0", "index": index,
+        },
+    }
+
+
+def _bulk_action(verb: str, index: str, doc_id: str, doc: dict) -> dict:
+    """Carry out one bulk action, in the shape its own verb answers with."""
+    if verb == "delete":
+        result = search_queries.es_delete_doc(index, doc_id)
+        if result is not None:
+            return {**result, "status": 200}
+        # A delete that found nothing still moves the shard's sequence, and
+        # answers the document envelope with `not_found` — not an error item.
+        return {
+            "_index": index, "_id": doc_id, "_version": 1, "result": "not_found",
+            "_shards": {"total": 2, "successful": 1, "failed": 0},
+            "_seq_no": search_queries.next_seq_no(index), "_primary_term": 1,
+            "status": 404,
+        }
+
+    if verb == "create" and search_queries.document_exists(index, doc_id):
+        version = search_queries.document_version(index, doc_id)
+        return _bulk_item_error(
+            index, doc_id, 409, "version_conflict_engine_exception",
+            f"[{doc_id}]: version conflict, document already exists "
+            f"(current version [{version}])",
+        )
+
+    if verb == "update":
+        try:
+            result = search_queries.es_update_doc(index, doc_id, doc)
+        except search_queries.DocumentMissingError:
+            return _bulk_item_error(
+                index, doc_id, 404, "document_missing_exception",
+                f"[{doc_id}]: document missing",
+            )
+        return {**result, "status": 200}
+
+    result = search_queries.es_index_doc(index, doc_id, doc)
+    return {**result, "status": 201 if result.get("result") == "created" else 200}
 
 
 _BULK_VERBS = frozenset({"create", "delete", "index", "update"})

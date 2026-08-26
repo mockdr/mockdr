@@ -1383,6 +1383,22 @@ def _next_seq_no(index: str) -> int:
     return seq_no
 
 
+def next_seq_no(index: str) -> int:
+    """Consume the index's next sequence number, for a write with no document."""
+    return _next_seq_no(index)
+
+
+def document_exists(index: str, doc_id: str) -> bool:
+    """Whether a document is there, which is what ``create`` refuses over."""
+    return store.get("es_documents", f"{index}:{doc_id}") is not None
+
+
+def document_version(index: str, doc_id: str) -> int:
+    """The version a document currently holds, for a conflict's wording."""
+    existing = store.get("es_documents", f"{index}:{doc_id}") or {}
+    return int(existing.get("_version", 0))
+
+
 def _seq_no_of(index: str, doc_id: str) -> int:
     """The sequence number a document was last written at, or -1 for none."""
     existing = store.get("es_documents", f"{index}:{doc_id}")
