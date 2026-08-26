@@ -3222,3 +3222,21 @@ probes:
       - $.items[*].create.error.index_uuid
       - $.items[*].update.error.index_uuid
       - $.took
+
+  - id: es-mget-a-missing-index-is-an-error-not-a-miss
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      A document asked for from an index that does not exist is an error on
+      that document, not a document that was looked for and not found. The
+      `ids` form of `_mget` already said so and the `docs` form did not, so
+      a client could not tell a typo in the index name from an absent
+      document.
+    request:
+      method: POST
+      path: /_mget
+      content: '{"docs": [{"_index": "${seed_index}", "_id": "a"},
+                          {"_index": "zzz-no-such-index", "_id": "x"}]}'
+      headers: {Content-Type: application/json}
+      auth: basic

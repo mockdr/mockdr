@@ -1677,3 +1677,23 @@ class TestEachBulkActionDoesWhatItSays:
         assert item["error"]["reason"] == "[nope]: document missing"
         assert item["error"]["index"] == "zzz-bulk5"
         assert "_version" not in item
+
+    def test_mget_reports_a_missing_index_per_document(
+        self, client: TestClient,
+    ) -> None:
+        """The `ids` form already said so; the `docs` form did not.
+
+        Reported as `found: false`, a client cannot tell a typo in the index
+        name from a document that is genuinely absent.
+        """
+        client.put("/elastic/zzz-mget/_doc/a", headers=self.ES,
+                   params={"refresh": "true"}, json={"v": 1})
+        docs = client.post("/elastic/_mget", headers=self.ES, json={"docs": [
+            {"_index": "zzz-mget", "_id": "a"},
+            {"_index": "zzz-mget", "_id": "nope"},
+            {"_index": "zzz-no-such-index", "_id": "x"},
+        ]}).json()["docs"]
+        assert docs[0]["found"] is True
+        assert docs[1]["found"] is False
+        assert "found" not in docs[2]
+        assert docs[2]["error"]["type"] == "index_not_found_exception"

@@ -908,11 +908,18 @@ def es_mget(index: str, body: dict) -> dict:
     for entry in body.get("docs", []) or []:
         target = entry.get("_index") or index
         doc_id = str(entry.get("_id", ""))
-        found = None
         try:
             found = es_get_doc(target, doc_id)
         except (IndexNotFoundError, MultipleIndicesError):
-            found = None
+            # As in the `ids` form below, which was already right: a missing
+            # index is an error on that document, not a document that was
+            # looked for and not found. Reported as `found: false`, a client
+            # cannot tell a typo in the index name from an absent document.
+            docs.append({
+                "_index": target, "_id": doc_id,
+                "error": build_es_index_not_found(target)["error"],
+            })
+            continue
         docs.append(found or {"_index": target, "_id": doc_id, "found": False})
 
     for doc_id in body.get("ids", []) or []:
