@@ -87,4 +87,10 @@ def seed_sites(fake: Faker, account_id: str, account_name: str) -> list[str]:
         ))
         policy_repo.save_for_site(sid, make_policy(sid, "site"))
 
+    # The account-wide policy every site and group inherits from. Without it
+    # `/tenant/policy` and `/accounts/{id}/policy` answered a 200 with a null
+    # body, which reads as "this install has no policy" rather than as the
+    # document a console shows.
+    policy_repo.save_for_tenant(make_policy(account_id, "account"))
+
     return site_ids

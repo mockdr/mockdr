@@ -714,6 +714,29 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Three routes that ignored the record their own URL names.**
+A path parameter is the strongest case of the kind above: it names what the
+answer is meant to be about, and ignoring it answers about something else.
+
+* `GET /tenant/policy` and `GET /accounts/{id}/policy` answered
+  `{"data": null}` — a 200 with nothing in it — for every id anyone could
+  type, including ids the same install refuses on `/accounts/{id}`. The
+  lookup underneath took a site or a group and returned nothing when given
+  neither, so the account-wide policy every site and group inherits from did
+  not exist at all. It is seeded now, both routes answer the document a
+  console shows, and an account this install does not have is a 404 like
+  everywhere else.
+* `POST /api/endpoint/suggestions/{suggestion_type}` answered the same list
+  whatever the type — measured on 8.15, which refuses every name but
+  `eventFilters`, including Kibana's own `trustedApps`. Its body needs a
+  `query` as well as a `field`, which was unchecked too.
+
+`unread_params.py` checks path parameters as well now, with the three it is
+right to ignore written down: `/servicesNS/{owner}/{app}`, which the
+namespace middleware collapses because this mock holds one namespace, and
+the Log Analytics workspace, because the whole ARM surface answers for one
+tenant addressed by any name.
+
 **Three parameters a route declared and never looked at.**
 Found by reading the source rather than asking the mock: a handler that
 takes a parameter and never mentions it again answers 200 with something

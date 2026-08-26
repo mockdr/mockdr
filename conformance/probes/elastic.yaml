@@ -706,6 +706,28 @@ probes:
       headers: {kbn-xsrf: "true"}
       auth: basic
 
+  - id: kbn-suggestions-wrong-type
+    endpoint: kibana
+    why: >
+      `suggestion_type` has exactly one legal value and mockdr read it not
+      at all — every name answered the same list.
+    request:
+      method: POST
+      path: /api/endpoint/suggestions/trustedApps
+      json: {field: "host.os.name", query: ""}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-suggestions-without-a-query
+    endpoint: kibana
+    why: The body needs a query as well as a field.
+    request:
+      method: POST
+      path: /api/endpoint/suggestions/eventFilters
+      json: {field: "host.os.name"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
   - id: kbn-item-create-empty
     endpoint: kibana
     why: An exception item with nothing in it, which used to be created.

@@ -3717,3 +3717,84 @@ class TestACortexBodyThatSaysWhichRecords:
                             headers=self.XDR,
                             json={"request_data": {}}).json()["reply"]
         assert reply == []
+
+
+class TestARouteAnswersAboutWhatTheUrlNames:
+    """A path parameter names the record the answer is meant to be about.
+
+    Three routes ignored theirs. `/accounts/{id}/policy` answered the same
+    document for every id — including ids the same install refuses on
+    `/accounts/{id}` — and answered it as `{"data": null}`, a 200 with
+    nothing in it, because the lookup underneath took a site or a group and
+    there was no record for neither. `/endpoint/suggestions/{type}` answered
+    the same list for a type Kibana has no such thing as.
+    """
+
+    S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    def _an_account(self, client: TestClient) -> str:
+        return str(client.get("/web/api/v2.1/accounts", headers=self.S1,
+                              params={"limit": 1}).json()["data"][0]["id"])
+
+    def test_the_account_policy_is_a_document(self, client: TestClient) -> None:
+        body = client.get(
+            f"/web/api/v2.1/accounts/{self._an_account(client)}/policy",
+            headers=self.S1).json()
+        assert body["data"], "an account policy is not null"
+        assert "mitigationMode" in body["data"]
+
+    def test_the_tenant_policy_is_the_same_document(
+        self, client: TestClient,
+    ) -> None:
+        tenant = client.get("/web/api/v2.1/tenant/policy",
+                            headers=self.S1).json()["data"]
+        site_id = client.get("/web/api/v2.1/sites", headers=self.S1
+                             ).json()["data"]["sites"][0]["id"]
+        site = client.get(f"/web/api/v2.1/sites/{site_id}/policy",
+                          headers=self.S1).json()["data"]
+        assert tenant
+        assert set(tenant) == set(site)
+
+    def test_an_account_this_install_does_not_have(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/web/api/v2.1/accounts/zzz-no-such/policy",
+                              headers=self.S1)
+        assert response.status_code == 404
+        assert client.get("/web/api/v2.1/accounts/zzz-no-such",
+                          headers=self.S1).status_code == 404
+
+    def test_the_only_suggestion_type_kibana_has(
+        self, client: TestClient,
+    ) -> None:
+        ok = client.post("/kibana/api/endpoint/suggestions/eventFilters",
+                         headers=self.KBN,
+                         json={"field": "host.os.name", "query": ""})
+        assert ok.status_code == 200
+
+    @pytest.mark.parametrize("suggestion_type", [
+        "trustedApps", "endpointExceptions", "zzz-not-a-type",
+    ])
+    def test_every_other_type_is_refused(
+        self, client: TestClient, suggestion_type: str,
+    ) -> None:
+        """Measured on 8.15, which refuses even Kibana's own `trustedApps`."""
+        response = client.post(
+            f"/kibana/api/endpoint/suggestions/{suggestion_type}",
+            headers=self.KBN, json={"field": "host.os.name", "query": ""})
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            "[request params.suggestion_type]: expected value to equal "
+            "[eventFilters]")
+
+    def test_the_suggestion_body_needs_a_query_too(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post("/kibana/api/endpoint/suggestions/eventFilters",
+                               headers=self.KBN, json={"field": "host.os.name"})
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            "[request body.query]: expected value of type [string] "
+            "but got [undefined]")

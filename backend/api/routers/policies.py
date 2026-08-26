@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import require_admin
 from api.dto.requests import PolicyUpdateBody
+from application.accounts import queries as account_queries
 from application.policies import commands as policy_commands
 from application.policies import queries as policy_queries
 from utils.s1_fixtures import restrict_s1
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Policies"])
 
@@ -34,7 +36,18 @@ def get_group_policy(group_id: str) -> dict:
 
 @router.get("/accounts/{account_id}/policy")
 def get_account_policy(account_id: str) -> dict:
-    """Return the account-level policy; the mock keeps one tenant-wide default."""
+    """Return the account-level policy; the mock keeps one tenant-wide default.
+
+    The account itself has to exist: `/accounts/{id}` answers 404 for one
+    that does not, and this route answered the same policy for every id
+    anyone could type — including ids the same install had just refused.
+    """
+    if account_queries.get_account(account_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_vendor_error(
+                "sentinelone", 404, f"Account {account_id} not found"),
+        )
     return _shaped(
         policy_queries.get_policy(None, None), "policies_schemas_EnrichedPolicySchema_200"
     )

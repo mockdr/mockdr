@@ -627,6 +627,11 @@ def endpoint_policy_response(
     }
 
 
+#: The only suggestion type this route takes — measured on 8.15, which
+#: refuses every other name including Kibana's own `trustedApps`.
+_SUGGESTION_TYPE = "eventFilters"
+
+
 @router.post(
     "/api/endpoint/suggestions/{suggestion_type}",
     dependencies=[Depends(require_kbn_xsrf)],
@@ -639,16 +644,30 @@ def endpoint_suggestions(
     """Suggest values for a field, which the UI uses for autocomplete.
 
     The Endpoint routes validate with @kbn/config-schema, which names the
-    member in the bracket and reports the type it wanted. Without `field`
-    there is nothing to suggest values for, and the route used to answer with
-    every hostname it held.
+    member in the bracket and reports the type it wanted. Three things were
+    unchecked: `suggestion_type`, which has exactly one legal value and was
+    read by nothing at all — every name answered the same list — and the two
+    body members, without which there is nothing to suggest values for.
     """
+    if suggestion_type != _SUGGESTION_TYPE:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400,
+            "[request params.suggestion_type]: expected value to equal "
+            f"[{_SUGGESTION_TYPE}]",
+        ))
     field = body.get("field", body.get("fieldName"))
     if not isinstance(field, str):
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
             400,
             "[request body.field]: expected value of type [string] "
             f"but got [{'undefined' if field is None else type(field).__name__}]",
+        ))
+    query = body.get("query")
+    if not isinstance(query, str):
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400,
+            "[request body.query]: expected value of type [string] "
+            f"but got [{'undefined' if query is None else type(query).__name__}]",
         ))
     entries = endpoint_queries.list_endpoints(page=1, per_page=10_000).get("data", [])
 

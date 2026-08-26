@@ -24,6 +24,13 @@ Three kinds of declaration are not defects and are skipped:
   `_NOTHING_TO_READ` — Cortex takes a `request_data` wrapper on every call
   and declares nothing inside it for those routes.
 
+A *path* parameter is the strongest case of all, and is checked too: it
+names the record the answer is meant to be about, so ignoring it answers
+about a different one. `/accounts/{id}/policy` answered the same document
+for every id, including ids the same install refuses on `/accounts/{id}`,
+and `/endpoint/suggestions/{type}` answered the same list for a type Kibana
+has no such thing as.
+
     backend/.venv/bin/python scripts/unread_params.py
 
 Exit status 1 when anything is flagged.
@@ -32,6 +39,7 @@ Exit status 1 when anything is flagged.
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -78,6 +86,21 @@ _NOTHING_TO_READ = {
     ("api/routers/xdr_xql.py", "get_quota", "body"),
 }
 
+#: Path parameters a route is right to ignore, with the reason. A path
+#: parameter is otherwise the strongest case of all: it names the record the
+#: answer is about, and ignoring it answers about a different one.
+_NAMES_NOTHING = {
+    # `/servicesNS/{owner}/{app}` is collapsed to `/services` by the
+    # namespace middleware: this mock holds one namespace, and says so.
+    ("api/routers/splunk/splunk_kvstore.py", "owner"),
+    ("api/routers/splunk/splunk_catalogs.py", "owner"),
+    ("api/routers/splunk/splunk_catalogs.py", "app"),
+    # The whole ARM surface answers for one tenant addressed by any
+    # subscription, resource group or workspace name — a mock cannot know a
+    # customer's resource ids, and every Sentinel route agrees about it.
+    ("api/routers/sentinel/sentinel_log_analytics.py", "workspace_id"),
+}
+
 #: How a parameter's default says where its value comes from.
 _SOURCES = frozenset({"Query", "Form", "Body", "Header", "Cookie", "File"})
 
@@ -112,6 +135,21 @@ def declared(node):
     return list(zip(args, defaults, strict=False))
 
 
+def path_parameters(node):
+    """Every `{name}` the decorators of this handler put in the URL."""
+    names = set()
+    for decorator in node.decorator_list:
+        if not isinstance(decorator, ast.Call) or not decorator.args:
+            continue
+        first = decorator.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            names |= {
+                found.split(":")[0]
+                for found in re.findall(r"\{([^}]+)\}", first.value)
+            }
+    return names
+
+
 def unread(path, tree):
     """Every parameter this module's handlers declare and never read."""
     found = []
@@ -138,6 +176,13 @@ def unread(path, tree):
             if name in read or (path, node.name, name) in _NOTHING_TO_READ:
                 continue
             found.append((path, node.name, name, source))
+
+        for name in sorted(path_parameters(node)):
+            if name.startswith("_") or name in read:
+                continue
+            if (path, name) in _NAMES_NOTHING:
+                continue
+            found.append((path, node.name, name, "path"))
     return found
 
 
