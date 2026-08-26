@@ -31,11 +31,17 @@ _TOKEN_TTL = 3600  # 1 hour
 def create_sentinel_token(client_id: str) -> dict:
     """Create a new OAuth2 access token for the given client.
 
+    The members Entra's v2 endpoint answers with, and no more: `resource`
+    belongs to the v1.0 endpoint this mount is not, and the two other Entra
+    mounts in this mock — Defender and Graph, the same directory — have
+    never sent it.
+
     Args:
         client_id: The authenticated client ID.
 
     Returns:
-        Token response dict with ``access_token``, ``token_type``, ``expires_in``.
+        Token response dict with ``access_token``, ``token_type``,
+        ``expires_in`` and ``ext_expires_in``.
     """
     access_token = secrets.token_hex(32)
     store.save(_SENTINEL_TOKEN_COLLECTION, access_token, {
@@ -47,7 +53,6 @@ def create_sentinel_token(client_id: str) -> dict:
         "token_type": "Bearer",
         "expires_in": _TOKEN_TTL,
         "ext_expires_in": _TOKEN_TTL,
-        "resource": "https://management.azure.com/",
     }
 
 

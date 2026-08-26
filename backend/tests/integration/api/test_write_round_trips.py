@@ -3098,6 +3098,24 @@ class TestOneDirectoryAnswersOneWay:
         assert response.status_code == 200
         assert response.json()["token_type"] == "Bearer"
 
+    def test_the_token_body_is_the_v2_one(self, client: TestClient) -> None:
+        """`resource` belongs to the v1.0 endpoint this mount is not, and the
+        two other Entra mounts here have never sent it."""
+        bodies = []
+        for path, credentials in (
+            ("/mde/oauth2/v2.0/token",
+             {"client_id": "mde-mock-admin-client",
+              "client_secret": "mde-mock-admin-secret"}),
+            ("/graph/oauth2/v2.0/token",
+             {"client_id": "graph-mock-admin-client",
+              "client_secret": "graph-mock-admin-secret"}),
+            (self.SENTINEL, self.CREDENTIALS),
+        ):
+            bodies.append(client.post(path, data={
+                **credentials, "grant_type": "client_credentials"}).json())
+        assert {frozenset(b) for b in bodies} == {frozenset(
+            {"access_token", "token_type", "expires_in", "ext_expires_in"})}
+
     def test_the_three_entra_mounts_refuse_alike(
         self, client: TestClient,
     ) -> None:

@@ -728,7 +728,8 @@ Defender and Graph refuse a grant they do not issue for; Sentinel took
 `grant_type` as a form field and never looked at it, so it minted a token
 for `grant_type=password`, and for a request that named no grant at all. It
 refuses both now, in the same `AADSTS70003` / `AADSTS900144` wording its two
-siblings use.
+siblings use — and its token body lost `resource`, which belongs to the v1.0
+endpoint this mount is not and which neither sibling has ever sent.
 
 **Four OAuth mounts that refused a request without saying where to get a
 token.** RFC 6750 §3: a resource server that turns down a Bearer-protected
