@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**A collection that came back in no order at all.**
+splunkd sorts every ``/services`` collection by ``name`` ascending when the
+request says nothing, and by ``sort_key``/``sort_dir`` when it does. mockdr
+answered in whatever order its store held and applied neither parameter
+while declaring both, so ``sort_dir=desc`` came back identical to
+``sort_dir=asc`` — and a client paging through a collection had no guarantee
+of seeing each record once, which is the guarantee paging exists for. A new
+middleware sorts beside the one that pages, and runs inside it, because
+sorting a page orders each page separately and leaves the collection
+unordered. A ``sort_key`` naming a content field sorts by it, numerically
+where the values are numbers; a key nothing carries leaves the order alone,
+as splunkd does, rather than reordering by nothing.
+
+**And an index could not be disabled through the link that offers to disable
+it.** An index is not disabled by editing a `disabled` argument — the
+handler refuses that name, correctly — but through
+``POST …/{name}/disable``, which mockdr published in every entry's links and
+answered 404 at the end of. Both actions work now, and the links follow the
+state: a disabled index offers `enable` and an enabled one `disable`, never
+both, and the answer to either action offers neither — it describes what was
+done, not what can be done next. All measured on 10.4.2.
+
 **Sorting by severity put the wrong alerts on top.**
 OData orders an enum-typed field by where the member sits in the declared
 list, not by how it is spelled. Sorted as text, `$orderby=severity desc`

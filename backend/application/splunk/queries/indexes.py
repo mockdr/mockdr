@@ -42,9 +42,16 @@ def _index_acl(name: str) -> dict:
     return {**_INDEX_ACL, "app": "search", "sharing": "app", "removable": True}
 
 
-def _index_links(name: str, *, created: bool = False) -> tuple[str, ...]:
-    """The link relations splunkd offers for this index."""
-    links = ("_reload", "alternate", "edit", "list") if created else _INDEX_LINKS
+def _index_links(name: str, *, created: bool = False,
+                 disabled: bool = False) -> tuple[str, ...]:
+    """The link relations splunkd offers for this index.
+
+    A link is an action that can be taken, so an index offers `enable` when
+    it is disabled and `disable` when it is not — never both, and never the
+    one that would do nothing. mockdr offered `disable` whatever the state.
+    """
+    links = ("_reload", "alternate", "edit", "list") if created else (
+        "_reload", "alternate", "enable" if disabled else "disable", "edit", "list")
     return (*links, "remove") if not _is_system(name) else links
 
 
@@ -116,7 +123,8 @@ def list_indexes() -> dict:
         entries.append(build_splunk_entry(
             idx.name, complete(content, "indexes"),
             collection="data/indexes",
-            links=_index_links(idx.name), fields=False, acl_extra=_index_acl(idx.name),
+            links=_index_links(idx.name, disabled=bool(idx.disabled)),
+            fields=False, acl_extra=_index_acl(idx.name),
         ))
     return build_splunk_envelope(entries, links=_INDEX_COLLECTION_LINKS)
 
@@ -131,10 +139,28 @@ def get_index(name: str) -> dict | None:
         splunk_event_repo.time_bounds_by_index().get(idx.name))
     entry = build_splunk_entry(
         idx.name, complete(content, "indexes"), collection="data/indexes",
-        links=_index_links(idx.name), fields=_index_fields(),
+        links=_index_links(idx.name, disabled=bool(idx.disabled)), fields=_index_fields(),
         acl_extra=_index_acl(idx.name),
     )
     return build_splunk_envelope([entry], total=1, links=_INDEX_COLLECTION_LINKS)
+
+
+def actioned_index(name: str) -> dict:
+    """The answer to a `disable` or `enable`.
+
+    splunkd sends the entry with its new state and *neither* action link —
+    the answer describes what was done, not what can be done next, exactly
+    as the create answer does.
+    """
+    answer = get_index(name)
+    if not answer:
+        return {}
+    entry = answer["entry"][0]
+    entry["links"] = {
+        rel: path for rel, path in entry["links"].items()
+        if rel not in ("disable", "enable")
+    }
+    return answer
 
 
 def created_index(name: str) -> dict:

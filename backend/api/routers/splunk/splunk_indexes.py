@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from api.splunk_auth import require_splunk_admin, require_splunk_auth
-from application.splunk.queries.indexes import created_index, get_index, list_indexes
+from application.splunk.queries.indexes import (
+    actioned_index,
+    created_index,
+    get_index,
+    list_indexes,
+)
 from domain.splunk.splunk_index import SplunkIndex
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.response import complete
@@ -140,6 +145,34 @@ async def edit_index(
     idx.settings = {**idx.settings, **_typed(settings)}
     splunk_index_repo.save(idx)
     return get_index(name) or {}
+
+
+@router.post("/services/data/indexes/{name}/{action}", response_model=None)
+def set_index_state(
+    name: str,
+    action: str,
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_admin),
+) -> dict:
+    """Disable or enable an index.
+
+    An index is not disabled by editing a `disabled` argument — the handler
+    refuses that name — but through the link the entry itself offers. mockdr
+    published those links and answered 404 at the end of them.
+    """
+    if action not in ("disable", "enable"):
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Could not find object id={action}"},
+        ]})
+    idx = splunk_index_repo.get(name)
+    if not idx:
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
+        ]})
+    idx.disabled = action == "disable"
+    idx.settings = {k: v for k, v in idx.settings.items() if k != "disabled"}
+    splunk_index_repo.save(idx)
+    return actioned_index(name)
 
 
 @router.delete("/services/data/indexes/{name}")

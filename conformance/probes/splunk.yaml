@@ -2858,3 +2858,55 @@ probes:
       path: /services/server/info
       query: {output_mode: json, f: version}
       auth: basic
+
+  - id: spl-collection-order-default
+    endpoint: management
+    ignore_paths:
+      # Which links an entry offers follows that entry's own kind and state —
+      # a system index cannot be removed, a disabled one is enabled rather
+      # than disabled — and the two installs hold different indexes. The
+      # ordering is what this probe is about; the links have their own.
+      - $.entry[*].links
+    why: >
+      splunkd sorts a collection by name ascending when the request says
+      nothing, so a client that pages through one sees each record once.
+      mockdr answered in whatever order its store held.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, count: '3', f: datatype}
+      auth: basic
+
+  - id: spl-collection-order-descending
+    endpoint: management
+    ignore_paths:
+      # Which links an entry offers follows that entry's own kind and state —
+      # a system index cannot be removed, a disabled one is enabled rather
+      # than disabled — and the two installs hold different indexes. The
+      # ordering is what this probe is about; the links have their own.
+      - $.entry[*].links
+    why: >
+      And `sort_dir=desc` reverses it. mockdr declared both parameters and
+      applied neither, so descending came back identical to ascending.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, count: '3', sort_key: name, sort_dir: desc, f: datatype}
+      auth: basic
+
+  - id: spl-collection-order-unknown-key
+    endpoint: management
+    ignore_paths:
+      # Which links an entry offers follows that entry's own kind and state —
+      # a system index cannot be removed, a disabled one is enabled rather
+      # than disabled — and the two installs hold different indexes. The
+      # ordering is what this probe is about; the links have their own.
+      - $.entry[*].links
+    why: >
+      A key nothing carries is not an error: splunkd answers 200 and leaves
+      the order alone.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, count: '3', sort_key: zzzNoSuchKey, f: datatype}
+      auth: basic

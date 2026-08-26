@@ -815,3 +815,101 @@ class TestAnEnumSortsByItsDeclaredOrder:
                        params={"$top": 50, "$orderby": "computerDnsName asc"}).json()["value"]
         ]
         assert values == sorted(values)
+
+
+class TestACollectionComesBackInOrder:
+    """Measured on Splunk 10.4.2, where every collection is sorted by name.
+
+    mockdr answered in whatever order its store held and ignored both
+    parameters while declaring them, so `sort_dir=desc` came back identical
+    to `sort_dir=asc` — and a client paging through a collection had no
+    guarantee of seeing each record once.
+    """
+
+    def _names(self, client: TestClient, **params: str) -> list[str]:
+        body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "0", **params}).json()
+        return [e["name"] for e in body["entry"]]
+
+    def test_the_default_order_is_by_name_ascending(self, client: TestClient) -> None:
+        names = self._names(client)
+        assert names == sorted(names)
+
+    def test_sort_dir_descending_reverses_it(self, client: TestClient) -> None:
+        names = self._names(client, sort_dir="desc")
+        assert names == sorted(names, reverse=True)
+
+    def test_a_content_field_sorts_numerically(self, client: TestClient) -> None:
+        body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "0",
+                                  "sort_key": "totalEventCount", "sort_dir": "desc"}).json()
+        counts = [e["content"]["totalEventCount"] for e in body["entry"]]
+        assert counts == sorted(counts, reverse=True)
+
+    def test_a_key_nothing_carries_leaves_the_order_alone(
+        self, client: TestClient,
+    ) -> None:
+        """splunkd answers 200 and does not reorder by nothing."""
+        assert self._names(client, sort_key="zzzNoSuchKey") != []
+
+    def test_the_collection_is_sorted_before_it_is_paged(
+        self, client: TestClient,
+    ) -> None:
+        """Sorting a page would order each page separately."""
+        whole = self._names(client)
+        first = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                           params={**JSON_OUT, "count": "3"}).json()["entry"]
+        assert [e["name"] for e in first] == whole[:3]
+
+
+class TestAnIndexIsDisabledThroughItsOwnLink:
+    """The link the entry publishes has to lead somewhere.
+
+    An index is not disabled by editing a `disabled` argument — the handler
+    refuses that name — but through `POST …/{name}/disable`. mockdr published
+    both links and answered 404 at the end of them.
+    """
+
+    def _entry(self, client: TestClient, name: str) -> dict:
+        return client.get(f"/splunk/services/data/indexes/{name}", headers=SPLUNK_AUTH,
+                          params=JSON_OUT).json()["entry"][0]
+
+    def test_disable_then_enable(self, client: TestClient) -> None:
+        client.post("/splunk/services/data/indexes", headers=FORM, params=JSON_OUT,
+                    data={"name": "zzz_state"})
+        assert self._entry(client, "zzz_state")["content"]["disabled"] is False
+
+        answer = client.post("/splunk/services/data/indexes/zzz_state/disable",
+                             headers=SPLUNK_AUTH, params=JSON_OUT)
+        assert answer.status_code == 200
+        assert answer.json()["entry"][0]["content"]["disabled"] is True
+        # The answer describes what was done, not what can be done next.
+        assert "disable" not in answer.json()["entry"][0]["links"]
+        assert "enable" not in answer.json()["entry"][0]["links"]
+
+        # And a later read offers the action that is now available.
+        read = self._entry(client, "zzz_state")
+        assert read["content"]["disabled"] is True
+        assert "enable" in read["links"]
+        assert "disable" not in read["links"]
+
+        client.post("/splunk/services/data/indexes/zzz_state/enable",
+                    headers=SPLUNK_AUTH, params=JSON_OUT)
+        read = self._entry(client, "zzz_state")
+        assert read["content"]["disabled"] is False
+        assert "disable" in read["links"]
+        assert "enable" not in read["links"]
+
+    def test_an_index_that_is_not_there(self, client: TestClient) -> None:
+        answer = client.post("/splunk/services/data/indexes/zzz_absent/disable",
+                             headers=SPLUNK_AUTH, params=JSON_OUT)
+        assert answer.status_code == 404
+
+    def test_disabled_is_not_an_argument_the_handler_takes(
+        self, client: TestClient,
+    ) -> None:
+        client.post("/splunk/services/data/indexes", headers=FORM, params=JSON_OUT,
+                    data={"name": "zzz_arg"})
+        answer = client.post("/splunk/services/data/indexes/zzz_arg", headers=FORM,
+                             params=JSON_OUT, data={"disabled": "1"})
+        assert answer.status_code == 400
