@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A query naming a property that does not exist, answered as if it did.**
+On both OData mounts, `$select=notAField` answered a page of empty objects,
+`$filter=notAField eq 'x'` an empty collection and `$orderby=notAField` an
+unsorted one. Three `200`s, and all three read as "nothing matched" — which
+is what a client with a typo in a property name concluded, on the two
+products that answer `Could not find a property named 'x'`. What each
+resource carries is read from the references this repo already vendors:
+Graph's from the reduced v1.0 document, which records the properties of the
+resource each route answers, and Defender's from its docs' recorded response
+paths — 53 Graph routes and four of Defender's. A route neither speaks for is
+left alone, because a refusal has to be able to say what the resource *does*
+carry, and a documented property this install does not fill in is still a
+property: `$select=productName` on an alert is answered, not refused.
+
 **A sort that did not run, reported as one that did.**
 Elasticsearch sorts on doc values, so a field with no mapping is refused —
 `No mapping found for [x] in order to sort on`, wrapped in a
