@@ -3133,3 +3133,64 @@ class TestOneDirectoryAnswersOneWay:
                 path, data={**credentials, "grant_type": "password"}).json()
             errors.add((body["error"], tuple(body["error_codes"])))
         assert len(errors) == 1
+
+
+class TestSplunkWritesJsonTheWaySplunkdWrites:
+    """Measured on 10.4.2 by creating a saved search whose name is not ASCII.
+
+    splunkd writes its JSON compact — `{"name":"x"}`, no space after the
+    colon — and writes non-ASCII as the UTF-8 bytes themselves. mockdr's
+    Splunk mount did neither consistently: the paging, search, sort and
+    field-filter middlewares each re-serialised with Python's defaults, so
+    the same collection came back escaped and spaced through one parameter
+    and compact through another. The same value to a parser, a different one
+    to anything that reads the bytes — which is what a SIEM ingesting a raw
+    response does, and what the conformance harness, comparing parsed
+    documents, could never see.
+    """
+
+    SPLUNK = {"Authorization": "Basic " + base64.b64encode(
+        b"admin:mockdr-admin").decode()}
+    NAME = "zzz-Grüße-日本語"
+
+    def _create(self, client: TestClient) -> None:
+        client.post("/splunk/services/saved/searches", headers=self.SPLUNK,
+                    data={"name": self.NAME, "search": "index=main"})
+
+    @pytest.mark.parametrize("params", [
+        {"output_mode": "json", "count": "0"},
+        {"output_mode": "json", "count": "0", "search": "zzz"},
+        {"output_mode": "json", "count": "0", "sort_key": "name"},
+        {"output_mode": "json", "count": "0", "f": "search"},
+    ])
+    def test_the_bytes_are_utf8_and_compact(
+        self, client: TestClient, params: dict,
+    ) -> None:
+        self._create(client)
+        raw = client.get("/splunk/services/saved/searches",
+                         headers=self.SPLUNK, params=params).content
+
+        assert "日本語".encode() in raw
+        assert rb"\u65e5" not in raw
+        assert b'": "' not in raw
+
+    def test_one_server_renders_one_way(self, client: TestClient) -> None:
+        """It rendered the same collection two ways depending on which
+        parameter the client happened to send."""
+        self._create(client)
+        spacings = set()
+        for params in ({"output_mode": "json", "count": "0"},
+                       {"output_mode": "json", "count": "0", "search": "zzz"},
+                       {"output_mode": "json", "count": "0", "sort_key": "name"}):
+            raw = client.get("/splunk/services/saved/searches",
+                             headers=self.SPLUNK, params=params).content
+            spacings.add(b'": "' in raw)
+        assert spacings == {False}
+
+    def test_a_refusal_is_rendered_the_same_way(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/splunk/services/data/indexes",
+                              headers=self.SPLUNK,
+                              params={"output_mode": "json", "count": "-2"})
+        assert b'": "' not in response.content

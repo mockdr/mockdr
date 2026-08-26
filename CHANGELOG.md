@@ -714,6 +714,22 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Splunk JSON that was the same document and different bytes.**
+splunkd writes its JSON compact — `{"name":"x"}`, no space after the colon —
+and writes non-ASCII as the UTF-8 bytes themselves. mockdr's Splunk mount
+did neither consistently: the paging, search, sort and field-filter
+middlewares each re-serialised with Python's defaults, so a saved search
+called `Grüße` came back as `Gr\u00fce`, spaced, through one parameter and
+compact through another. One server rendered the same collection two ways
+depending on which parameter the client happened to send.
+
+The same value to a parser, a different one to anything that reads the bytes
+— which is what a SIEM ingesting a raw response does, and what the
+conformance harness, comparing parsed documents, could never see. Measured
+on 10.4.2 by creating a saved search whose name is not ASCII; the other two
+runnable products already matched, because their responses are rendered
+once.
+
 **A token answer that any cache was free to keep.**
 RFC 6749 §5.1: the authorization server answers a token request with
 `Cache-Control: no-store`, and `Pragma: no-cache` for the caches that

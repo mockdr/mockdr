@@ -14,7 +14,6 @@ path, and a Splunk request that asked for JSON is passed straight through.
 
 from __future__ import annotations
 
-import json
 from urllib.parse import parse_qs
 from xml.sax.saxutils import escape
 
@@ -23,6 +22,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from api.middleware.json_rewrite import rewrite_json_body
 from utils.splunk.csv_output import render_splunk_csv
 from utils.splunk.xml_output import render_splunk_xml
+from utils.splunk_json import splunk_json
 
 _SPLUNK_PREFIX = "/splunk"
 _HEC_PREFIX = "/splunk/services/collector"
@@ -251,9 +251,7 @@ async def _send_refusal(
 ) -> None:
     """Answer with splunkd's refusal, in the shape the caller asked for."""
     if as_json:
-        body = json.dumps(
-            {"messages": [{"type": level, "text": message}]}, separators=(",", ":"),
-        ).encode()
+        body = splunk_json({"messages": [{"type": level, "text": message}]})
         content_type = b"application/json; charset=UTF-8"
     else:
         body = (
@@ -315,7 +313,7 @@ def _rows_body(payload: object, *, columns: bool) -> tuple[bytes, str]:
     if "rows" in body or "columns" in body:
         # The handler rendered it already — `/export` does, because it has to
         # choose between a stream and a document before the body exists.
-        return json.dumps(body, separators=(",", ":")).encode(), (
+        return splunk_json(body), (
             "application/json; charset=UTF-8"
         )
     rows = [row for row in (body.get("results") or []) if isinstance(row, dict)]
@@ -336,7 +334,7 @@ def _rows_body(payload: object, *, columns: bool) -> tuple[bytes, str]:
         reshaped["columns"] = [[row.get(name) for row in rows] for name in names]
     else:
         reshaped["rows"] = [[row.get(name) for name in names] for row in rows]
-    return json.dumps(reshaped, separators=(",", ":")).encode(), (
+    return splunk_json(reshaped), (
         "application/json; charset=UTF-8"
     )
 

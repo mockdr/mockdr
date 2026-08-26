@@ -18,12 +18,12 @@ Measured against Splunk 10.4.2. Pure ASGI: a request outside
 from __future__ import annotations
 
 import fnmatch
-import json
 from urllib.parse import parse_qs
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api.middleware.json_rewrite import rewrite_json_body
+from utils.splunk_json import splunk_json
 
 _SPLUNK_PREFIX = "/splunk/services"
 #: Present in a filtered entry's content whether or not it was selected.
@@ -64,7 +64,7 @@ class SplunkFieldFilterMiddleware:
                 content = entry.get("content") if isinstance(entry, dict) else None
                 if isinstance(content, dict):
                     entry["content"] = _select(content, patterns)
-            return json.dumps(payload).encode(), "application/json"
+            return splunk_json(payload), "application/json"
 
         await rewrite_json_body(
             self.app, scope, receive, send,

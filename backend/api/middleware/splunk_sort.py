@@ -29,13 +29,13 @@ Pure ASGI: a request outside ``/splunk/services`` is passed straight through.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from urllib.parse import parse_qs
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api.middleware.json_rewrite import rewrite_json_body
+from utils.splunk_json import splunk_json
 
 _SPLUNK_PREFIX = "/splunk/services"
 #: What splunkd sorts by when the request says nothing.
@@ -66,7 +66,7 @@ class SplunkSortMiddleware:
             if len(entries) < 2 or not _sortable(entries, key):
                 return None
             entries.sort(key=_key(key, mode), reverse=descending)
-            return json.dumps(payload).encode(), "application/json"
+            return splunk_json(payload), "application/json"
 
         await rewrite_json_body(
             self.app, scope, receive, send,

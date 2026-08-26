@@ -14,12 +14,12 @@ parameter, is passed straight through.
 
 from __future__ import annotations
 
-import json
 from urllib.parse import parse_qs
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api.middleware.json_rewrite import rewrite_json_body
+from utils.splunk_json import splunk_json
 
 _SPLUNK_PREFIX = "/splunk/services"
 _DEFAULT_COUNT = 30
@@ -56,7 +56,7 @@ class SplunkPagingMiddleware:
             if not isinstance(payload, dict) or not isinstance(payload.get("entry"), list):
                 return None
             _apply_paging(payload, offset, count)
-            return json.dumps(payload).encode(), "application/json"
+            return splunk_json(payload), "application/json"
 
         await rewrite_json_body(
             self.app, scope, receive, send,
