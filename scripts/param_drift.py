@@ -13,6 +13,13 @@ Neither is automatically a defect: no mock implements 1 000 filters, and some
 of the mock's own names predate the comparison. The number is the point — it
 is stated, not discovered later by a client.
 
+The same comparison one level up — a *route* the mock serves that the vendor
+does not publish — was not counted anywhere, and that is how a wildcard
+standing in for thirty-eight documented actions answered to any name at all.
+It is listed here now. `_dev` is mockdr's own control surface and never
+claimed to be SentinelOne's, so it is left out; path parameters are compared
+by position, because the two sides name them differently.
+
     backend/.venv/bin/python scripts/param_drift.py            # summary
     backend/.venv/bin/python scripts/param_drift.py --verbose  # every name
     backend/.venv/bin/python scripts/param_drift.py --max-mock-only 20
@@ -23,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
 import warnings
 from pathlib import Path
@@ -34,6 +42,40 @@ PREFIX = "/web/api/v2.1"
 
 def _query_names(operation: dict) -> set[str]:
     return {p["name"] for p in operation.get("parameters", []) if p.get("in") == "query"}
+
+
+_METHODS = ("get", "post", "put", "delete", "patch")
+
+#: One route standing in for many documented ones. It is not undocumented
+#: surface: it refuses every name the vendor does not publish, with the 404 a
+#: path that does not exist answers.
+_STANDS_IN_FOR_MANY = frozenset({("POST", f"{PREFIX}/agents/actions/{{}}")})
+
+
+def _shape(path: str) -> str:
+    """The path with its parameters anonymised, so names cannot differ."""
+    return re.sub(r"\{[^}]+\}", "{}", path)
+
+
+def _undocumented_routes(spec: dict, mock: dict) -> list[str]:
+    """Every route the mock serves under the vendor's prefix that it does not."""
+    documented = {
+        (method.upper(), _shape(path))
+        for path, operations in spec["paths"].items()
+        for method in operations
+        if method in _METHODS
+    }
+    served = {
+        (method.upper(), _shape(path))
+        for path, operations in mock["paths"].items()
+        if path.startswith(PREFIX) and "/_dev/" not in path
+        for method in operations
+        if method in _METHODS
+    }
+    return [
+        f"{method} {path}"
+        for method, path in sorted(served - documented - _STANDS_IN_FOR_MANY)
+    ]
 
 
 def main() -> int:
@@ -82,11 +124,15 @@ def main() -> int:
                 if mock_only:
                     print(f"      mock-only: {', '.join(mock_only)}")
 
+    undocumented = _undocumented_routes(spec, mock)
     print(
         f"\n=== PARAMETER DRIFT === {routes} routes compared\n"
         f"  {ignored_total} documented parameter(s) this mock does not take\n"
-        f"  {mock_only_total} parameter(s) this mock takes that the swagger does not declare"
+        f"  {mock_only_total} parameter(s) this mock takes that the swagger does not declare\n"
+        f"  {len(undocumented)} route(s) this mock serves that the swagger does not publish"
     )
+    for route in undocumented:
+        print(f"      {route}")
     if args.max_mock_only is not None and mock_only_total > args.max_mock_only:
         print(f"  FAIL: more than {args.max_mock_only} undocumented parameters")
         return 1

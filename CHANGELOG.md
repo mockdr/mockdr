@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Route-level drift, which no audit counted.**
+`param_drift.py` compared the parameters of routes both sides describe and
+said nothing about a route only one side has — which is how a single wildcard
+standing in for thirty-eight documented agent actions answered to any name at
+all. It now lists what mockdr serves under the SentinelOne prefix that the
+2.1 swagger does not publish: nine routes, each a convenience the vendor
+addresses another way (`DELETE /exclusions/{id}` where S1 deletes by body,
+`POST /threats/{id}/notes` where it posts to `/threats/notes`). None of them
+is a defect on its own; not knowing about them was.
+
 **Narrowing a Splunk collection, and three things its envelope was saying wrongly.**
 Every ``/services`` collection takes ``search``, and splunkd reads it two
 ways: ``search=name=main`` is an exact match on one field, and a bare term
