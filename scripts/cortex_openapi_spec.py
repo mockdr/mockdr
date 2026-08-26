@@ -6,8 +6,14 @@ rendered client-side. ``github.com/tommynsong/cortex-mcp-custom-tools-openapi``
 carries one OpenAPI 3 file per endpoint, transcribed from the official
 reference. The repository has no licence, so the files are not vendored;
 this reads a local clone and keeps only the facts — the key paths a 200
-response declares — in ``data/vendor-specs/xdr_openapi_reduced.json``. A
-transcription proves what a real reply carries, not what it does not.
+response declares, and the members its *request* marks required — in
+``data/vendor-specs/xdr_openapi_reduced.json``. A transcription proves what
+a real reply carries, not what it does not.
+
+The request side is what stops a write route accepting a body that cannot be
+what it meant: most Cortex routes require nothing at all (`xql/get_quota`
+gives `{"request_data": null}` as its own example), and the few that do
+require something are the only ones anything can be enforced for.
 
     git clone --depth 1 \
         https://github.com/tommynsong/cortex-mcp-custom-tools-openapi \
@@ -58,6 +64,33 @@ def flatten(doc: dict, schema, prefix: str = "", depth: int = 0) -> set[str]:
     return out
 
 
+def request_facts(doc: dict, op: dict) -> dict:
+    """What this operation's request body declares, if it declares anything.
+
+    ``request_required`` is what the top level marks required — for Cortex
+    that is ``request_data`` and nothing else — and ``request_data_required``
+    what it marks required *inside* that wrapper. Most routes state neither,
+    and those are left without either key rather than with an empty one: a
+    silence is not a statement that nothing is required.
+    """
+    body = op.get("requestBody") or {}
+    schema = ((body.get("content") or {}).get("application/json") or {}).get("schema")
+    schema = deref(doc, schema or {})
+    if not isinstance(schema, dict):
+        return {}
+    facts: dict[str, list[str]] = {}
+    required = sorted(schema.get("required") or [])
+    if required:
+        facts["request_required"] = required
+    wrapper = deref(doc, (schema.get("properties") or {}).get("request_data") or {})
+    inner = sorted(wrapper.get("required") or []) if isinstance(wrapper, dict) else []
+    if inner:
+        facts["request_data_required"] = inner
+    if facts:
+        facts["request_paths"] = sorted(flatten(doc, schema))
+    return facts
+
+
 def main(clone: Path) -> int:
     reduced: dict[str, dict] = {}
     for f in sorted(clone.glob("*.yaml")):
@@ -74,7 +107,9 @@ def main(clone: Path) -> int:
                     continue
                 paths = flatten(doc, schema)
                 key = f"{method.upper()} {path}"
-                reduced[key] = {"source": f.name, "paths": sorted(paths)}
+                entry = {"source": f.name, "paths": sorted(paths)}
+                entry.update(request_facts(doc, op))
+                reduced[key] = entry
     OUT.write_text(json.dumps(reduced, indent=1) + "\n")
     print(f"{len(reduced)} routes → {OUT.relative_to(ROOT)}")
     return 0

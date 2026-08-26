@@ -4,6 +4,16 @@
   "paths": [
    "reply",
    "reply.update_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/api_keys/generate": {
@@ -12,6 +22,20 @@
    "reply",
    "reply.id",
    "reply.key"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "roles",
+   "security_level"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.comment",
+   "request_data.expiration",
+   "request_data.roles",
+   "request_data.security_level"
   ]
  },
  "POST /public_api/v1/api_keys/get_api_keys": {
@@ -29,6 +53,16 @@
    "reply.data[*].user_name",
    "reply.filter_count",
    "reply.total_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/asset-groups": {
@@ -149,6 +183,13 @@
    "reply.details[*].service_id",
    "reply.details[*].service_name",
    "reply.details[*].service_type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.service_id_list"
   ]
  },
  "POST /public_api/v1/assets/get_external_services": {
@@ -178,6 +219,22 @@
    "reply.external_services[*].tls_versions",
    "reply.result_count",
    "reply.total_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters.field",
+   "request_data.filters.operator",
+   "request_data.filters.value",
+   "request_data.search_from",
+   "request_data.search_to",
+   "request_data.sort",
+   "request_data.sort.field",
+   "request_data.sort.keyword",
+   "request_data.vulnerability_test_results"
   ]
  },
  "POST /public_api/v1/assets/get_vulnerability_tests": {
@@ -210,6 +267,16 @@
    "reply.vulnerability_tests[*].status",
    "reply.vulnerability_tests[*].vendor_names",
    "reply.vulnerability_tests[*].vulnerability_ids"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/audits/agents_reports": {
@@ -269,6 +336,36 @@
   "source": "authentication_settings_create.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "mappings",
+   "name"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.advanced_settings",
+   "request_data.advanced_settings.authn_context_enabled",
+   "request_data.advanced_settings.force_authn",
+   "request_data.advanced_settings.idp_single_logout_url",
+   "request_data.advanced_settings.relay_state",
+   "request_data.advanced_settings.service_provider_private_key",
+   "request_data.advanced_settings.service_provider_public_cert",
+   "request_data.default_role",
+   "request_data.domain",
+   "request_data.idp_certificate",
+   "request_data.idp_issuer",
+   "request_data.idp_sso_url",
+   "request_data.is_account_role",
+   "request_data.mappings",
+   "request_data.mappings.email",
+   "request_data.mappings.firstname",
+   "request_data.mappings.group_name",
+   "request_data.mappings.lastname",
+   "request_data.metadata_url",
+   "request_data.name"
   ]
  },
  "POST /public_api/v1/authentication-settings/delete": {
@@ -322,6 +419,37 @@
   "source": "authentication_settings_update.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "mappings",
+   "name"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.advanced_settings",
+   "request_data.advanced_settings.authn_context_enabled",
+   "request_data.advanced_settings.force_authn",
+   "request_data.advanced_settings.idp_single_logout_url",
+   "request_data.advanced_settings.relay_state",
+   "request_data.advanced_settings.service_provider_private_key",
+   "request_data.advanced_settings.service_provider_public_cert",
+   "request_data.current_domain_value",
+   "request_data.default_role",
+   "request_data.idp_certificate",
+   "request_data.idp_issuer",
+   "request_data.idp_sso_url",
+   "request_data.is_account_role",
+   "request_data.mappings",
+   "request_data.mappings.email",
+   "request_data.mappings.firstname",
+   "request_data.mappings.group_name",
+   "request_data.mappings.lastname",
+   "request_data.metadata_url",
+   "request_data.name",
+   "request_data.new_domain_value"
   ]
  },
  "POST /public_api/v1/bioc/delete": {
@@ -329,6 +457,16 @@
   "paths": [
    "objects",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/bioc/get": {
@@ -358,6 +496,19 @@
    "objects[*].type",
    "objects_count",
    "objects_type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.extended_view",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.search_from",
+   "request_data.search_to"
   ]
  },
  "POST /public_api/v1/bioc/insert": {
@@ -370,6 +521,22 @@
    "updated_objects",
    "updated_objects[*].id",
    "updated_objects[*].status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data[*].comment",
+   "request_data[*].indicator",
+   "request_data[*].is_xql",
+   "request_data[*].mitre_tactic_id_and_name",
+   "request_data[*].mitre_technique_id_and_name",
+   "request_data[*].name",
+   "request_data[*].rule_id",
+   "request_data[*].severity",
+   "request_data[*].status",
+   "request_data[*].type"
   ]
  },
  "POST /public_api/v1/case/search": {
@@ -386,6 +553,16 @@
   "paths": [
    "objects",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/correlations/get": {
@@ -415,6 +592,19 @@
    "objects[*].xql_query",
    "objects_count",
    "objects_type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.extended_view",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.search_from",
+   "request_data.search_to"
   ]
  },
  "POST /public_api/v1/correlations/insert": {
@@ -427,6 +617,37 @@
    "updated_objects",
    "updated_objects[*].id",
    "updated_objects[*].status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data[*].alert_category",
+   "request_data[*].alert_description",
+   "request_data[*].alert_fields",
+   "request_data[*].alert_name",
+   "request_data[*].crontab",
+   "request_data[*].dataset",
+   "request_data[*].description",
+   "request_data[*].drilldown_query_timeframe",
+   "request_data[*].execution_mode",
+   "request_data[*].investigation_query_link",
+   "request_data[*].is_enabled",
+   "request_data[*].mapping_strategy",
+   "request_data[*].mitre_defs",
+   "request_data[*].name",
+   "request_data[*].rule_id",
+   "request_data[*].search_window",
+   "request_data[*].severity",
+   "request_data[*].simple_schedule",
+   "request_data[*].suppression_duration",
+   "request_data[*].suppression_enabled",
+   "request_data[*].suppression_fields",
+   "request_data[*].timezone",
+   "request_data[*].user_defined_category",
+   "request_data[*].user_defined_severity",
+   "request_data[*].xql_query"
   ]
  },
  "POST /public_api/v1/dashboards/delete": {
@@ -441,6 +662,16 @@
    "objects.succeeded_items[*].global_id",
    "objects.succeeded_items[*].internal_id",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/dashboards/get": {
@@ -500,6 +731,16 @@
    "objects[*].widgets_data[*].widget_key",
    "objects_count",
    "objects_type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/dashboards/insert": {
@@ -518,7 +759,15 @@
  },
  "POST /public_api/v1/dataset/delete_dataset": {
   "source": "dataset_delete_dataset.yaml",
-  "paths": []
+  "paths": [],
+  "request_data_required": [
+   "dataset_name"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.dataset_name",
+   "request_data.delete_underlying_bq_table"
+  ]
  },
  "POST /public_api/v1/dataset/get_created_datasets": {
   "source": "dataset_get_created_datasets.yaml",
@@ -540,6 +789,42 @@
   "paths": [
    "reply",
    "reply.distribution_id"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "agent_version",
+   "default_namespace",
+   "deployment_platform",
+   "name",
+   "package_type",
+   "run_on_all_nodes",
+   "run_on_master_node"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.agent_version",
+   "request_data.cluster_name",
+   "request_data.default_namespace",
+   "request_data.deployment_platform",
+   "request_data.description",
+   "request_data.endpoint_tags",
+   "request_data.linux_version",
+   "request_data.macos_version",
+   "request_data.name",
+   "request_data.node_selector",
+   "request_data.package_type",
+   "request_data.platform",
+   "request_data.proxy",
+   "request_data.run_on_all_nodes",
+   "request_data.run_on_master_node",
+   "request_data.windows_version",
+   "request_data.yaml_preferences",
+   "request_data.yaml_preferences.cloud_provider",
+   "request_data.yaml_preferences.deployment_type",
+   "request_data.yaml_preferences.restrictions_profile",
+   "request_data.yaml_preferences.runtime"
   ]
  },
  "POST /public_api/v1/distributions/get_dist_url": {
@@ -547,6 +832,18 @@
   "paths": [
    "reply",
    "reply.distribution_url"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "distribution_id",
+   "package_type"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.distribution_id",
+   "request_data.package_type"
   ]
  },
  "POST /public_api/v1/distributions/get_distributions": {
@@ -558,6 +855,16 @@
   "paths": [
    "reply",
    "reply.status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "distribution_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.distribution_id"
   ]
  },
  "POST /public_api/v1/distributions/get_versions": {
@@ -575,6 +882,17 @@
    "reply",
    "reply.action_id",
    "reply.endpoints_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "filters"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.incident_id"
   ]
  },
  "POST /public_api/v1/endpoints/file_retrieval": {
@@ -584,6 +902,25 @@
    "reply.action_id",
    "reply.endpoints_count",
    "reply.status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "files",
+   "filters"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.files",
+   "request_data.files.linux",
+   "request_data.files.macos",
+   "request_data.files.windows",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.incident_id"
   ]
  },
  "POST /public_api/v1/endpoints/get_endpoint": {
@@ -658,11 +995,27 @@
   "paths": [
    "reply",
    "reply.policy_name"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "endpoint_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.endpoint_id"
   ]
  },
  "POST /public_api/v1/endpoints/get_profiles": {
   "source": "endpoints_get_profiles.yaml",
-  "paths": []
+  "paths": [],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data"
+  ]
  },
  "POST /public_api/v1/endpoints/isolate": {
   "source": "endpoints_isolate.yaml",
@@ -670,6 +1023,21 @@
    "reply",
    "reply.action_id",
    "reply.endpoints_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "endpoint_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.endpoint_id",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.incident_id"
   ]
  },
  "POST /public_api/v1/endpoints/quarantine": {
@@ -679,6 +1047,23 @@
    "reply.action_id",
    "reply.endpoints_count",
    "reply.status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "file_hash",
+   "file_path",
+   "filters"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.file_hash",
+   "request_data.file_path",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/endpoints/restore": {
@@ -687,6 +1072,18 @@
    "reply",
    "reply.action_id",
    "reply.endpoints_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "file_hash"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.endpoint_id",
+   "request_data.file_hash",
+   "request_data.incident_id"
   ]
  },
  "POST /public_api/v1/endpoints/scan": {
@@ -695,6 +1092,17 @@
    "reply",
    "reply.action_id",
    "reply.endpoints_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "filters"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.incident_id"
   ]
  },
  "POST /public_api/v1/endpoints/unisolate": {
@@ -703,6 +1111,21 @@
    "reply",
    "reply.action_id",
    "reply.endpoints_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "endpoint_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.endpoint_id",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.incident_id"
   ]
  },
  "POST /public_api/v1/endpoints/update_agent_name": {
@@ -715,6 +1138,22 @@
    "reply",
    "reply.details",
    "reply.summary"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "endpoint_ids",
+   "target_versions"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.endpoint_ids",
+   "request_data.target_versions",
+   "request_data.upgrade_timeframe_window",
+   "request_data.upgrade_timeframe_window.upgrade_timeframe_days",
+   "request_data.upgrade_timeframe_window.upgrade_timeframe_end_time",
+   "request_data.upgrade_timeframe_window.upgrade_timeframe_start_time"
   ]
  },
  "POST /public_api/v1/entries/get": {
@@ -924,6 +1363,16 @@
    "reply.risk_level",
    "reply.score",
    "reply.type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.id"
   ]
  },
  "POST /public_api/v1/get_risky_hosts": {
@@ -976,17 +1425,51 @@
  },
  "POST /public_api/v1/hash_exceptions/allowlist": {
   "source": "hash_exceptions_allowlist.yaml",
-  "paths": []
+  "paths": [],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "hash_list"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.comment",
+   "request_data.hash_list",
+   "request_data.incident_id"
+  ]
  },
  "POST /public_api/v1/hash_exceptions/blocklist": {
   "source": "hash_exceptions_blocklist.yaml",
-  "paths": []
+  "paths": [],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "hash_list"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.comment",
+   "request_data.hash_list",
+   "request_data.incident_id"
+  ]
  },
  "POST /public_api/v1/indicators/delete": {
   "source": "indicators_delete.yaml",
   "paths": [
    "objects",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/indicators/get": {
@@ -1001,6 +1484,19 @@
    "objects[*].type",
    "objects_count",
    "objects_type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.extended_view",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.search_from",
+   "request_data.search_to"
   ]
  },
  "POST /public_api/v1/indicators/insert": {
@@ -1013,6 +1509,21 @@
    "updated_objects",
    "updated_objects[*].id",
    "updated_objects[*].status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data[*].comment",
+   "request_data[*].default_expiration_enabled",
+   "request_data[*].expiration_date",
+   "request_data[*].indicator",
+   "request_data[*].reliability",
+   "request_data[*].reputation",
+   "request_data[*].rule_id",
+   "request_data[*].severity",
+   "request_data[*].type"
   ]
  },
  "POST /public_api/v1/integrations/syslog/create": {
@@ -1020,6 +1531,21 @@
   "paths": [
    "name",
    "syslog_integration_id"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.address",
+   "request_data.facility",
+   "request_data.name",
+   "request_data.port",
+   "request_data.protocol",
+   "request_data.security_info",
+   "request_data.security_info.certificate_content",
+   "request_data.security_info.certificate_name",
+   "request_data.security_info.ignore_cert_errors"
   ]
  },
  "POST /public_api/v1/integrations/syslog/get": {
@@ -1037,12 +1563,41 @@
    "objects[*].SYSLOG_INTEGRATION_PROTOCOL",
    "objects[*].SYSLOG_INTEGRATION_STATUS",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/integrations/syslog/update": {
   "source": "integrations_syslog_update.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "syslog_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.address",
+   "request_data.facility",
+   "request_data.name",
+   "request_data.port",
+   "request_data.protocol",
+   "request_data.security_info",
+   "request_data.security_info.certificate_content",
+   "request_data.security_info.certificate_name",
+   "request_data.security_info.ignore_cert_errors",
+   "request_data.syslog_id"
   ]
  },
  "POST /public_api/v1/issue_exceptions/": {
@@ -1058,6 +1613,13 @@
    "reply",
    "reply.rows_affected",
    "reply.status"
+  ],
+  "request_data_required": [
+   "exception_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.exception_id"
   ]
  },
  "POST /public_api/v1/issue_exceptions/search/": {
@@ -1089,18 +1651,37 @@
   "source": "legacy_exceptions_add.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data"
   ]
  },
  "POST /public_api/v1/legacy_exceptions/delete": {
   "source": "legacy_exceptions_delete.yaml",
   "paths": [
    "reply"
+  ],
+  "request_data_required": [
+   "exception_ids"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.exception_ids"
   ]
  },
  "POST /public_api/v1/legacy_exceptions/edit": {
   "source": "legacy_exceptions_edit.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data"
   ]
  },
  "POST /public_api/v1/legacy_exceptions/fetch": {
@@ -1137,6 +1718,15 @@
    "objects.succeeded_items",
    "objects.succeeded_items[*].id",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filter",
+   "request_data.filter.field",
+   "request_data.filter.value"
   ]
  },
  "POST /public_api/v1/playbooks/insert": {
@@ -1157,24 +1747,64 @@
   "source": "profiles_add_signer_cn_to_allowlist.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "profile_name",
+   "signers"
+  ],
+  "request_paths": [
+   "profile_name",
+   "signers"
   ]
  },
  "POST /public_api/v1/profiles/prevention/add": {
   "source": "profiles_prevention_add.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "modules",
+   "name",
+   "platform",
+   "profile_type"
+  ],
+  "request_paths": [
+   "description",
+   "modules",
+   "name",
+   "platform",
+   "profile_type"
   ]
  },
  "POST /public_api/v1/profiles/prevention/edit": {
   "source": "profiles_prevention_edit.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "profile_id",
+   "update_data"
+  ],
+  "request_paths": [
+   "profile_id",
+   "update_data",
+   "update_data.description",
+   "update_data.modules",
+   "update_data.name"
   ]
  },
  "POST /public_api/v1/profiles/prevention/get_modules": {
   "source": "profiles_prevention_get_modules.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "platform",
+   "profile_type"
+  ],
+  "request_paths": [
+   "platform",
+   "profile_type"
   ]
  },
  "POST /public_api/v1/quarantine/status": {
@@ -1185,6 +1815,19 @@
    "reply[*].file_hash",
    "reply[*].file_path",
    "reply[*].status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "files"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.files",
+   "request_data.files[*].endpoint_id",
+   "request_data.files[*].file_hash",
+   "request_data.files[*].file_path"
   ]
  },
  "POST /public_api/v1/rbac/get_roles": {
@@ -1212,6 +1855,13 @@
    "reply[*].source",
    "reply[*].update_time",
    "reply[*].user_email"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.group_names"
   ]
  },
  "POST /public_api/v1/rbac/get_users": {
@@ -1240,6 +1890,12 @@
   "paths": [
    "reply",
    "reply[*].scheduled_query_id"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data"
   ]
  },
  "POST /public_api/v1/scheduled_queries/insert": {
@@ -1254,6 +1910,19 @@
    "reply.<query_id>.timeframe",
    "reply.<query_id>.timeframe.relativeTime",
    "reply.<query_id>.xql"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data[*].query_definition_name",
+   "request_data[*].schedule",
+   "request_data[*].schedule.run_date",
+   "request_data[*].schedule.trigger_type",
+   "request_data[*].timeframe",
+   "request_data[*].timeframe.relativeTime",
+   "request_data[*].xql"
   ]
  },
  "POST /public_api/v1/scheduled_queries/list": {
@@ -1273,6 +1942,18 @@
    "reply.data[*].xql",
    "reply.filter_count",
    "reply.total_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.extended_view",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.list_ids"
   ]
  },
  "POST /public_api/v1/scripts/delete": {
@@ -1285,12 +1966,31 @@
    "objects.succeeded_items",
    "objects.succeeded_items[*].id",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filter",
+   "request_data.filter.field",
+   "request_data.filter.value"
   ]
  },
  "POST /public_api/v1/scripts/get_script_code": {
   "source": "scripts_get_script_code.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "script_uid"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.script_uid"
   ]
  },
  "POST /public_api/v1/scripts/get_script_execution_results": {
@@ -1314,6 +2014,16 @@
    "reply.script_description",
    "reply.script_name",
    "reply.script_parameters"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "action_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.action_id"
   ]
  },
  "POST /public_api/v1/scripts/get_script_execution_results_files": {
@@ -1321,6 +2031,18 @@
   "paths": [
    "reply",
    "reply.data"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "action_id",
+   "endpoint_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.action_id",
+   "request_data.endpoint_id"
   ]
  },
  "POST /public_api/v1/scripts/get_script_execution_status": {
@@ -1338,6 +2060,16 @@
    "reply.endpoints_timeout",
    "reply.error_message",
    "reply.general_status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "action_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.action_id"
   ]
  },
  "POST /public_api/v1/scripts/get_script_metadata": {
@@ -1364,6 +2096,16 @@
    "reply.script_output_type",
    "reply.script_uid",
    "reply.windows_supported"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "script_uid"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.script_uid"
   ]
  },
  "POST /public_api/v1/scripts/get_scripts": {
@@ -1383,6 +2125,19 @@
    "reply.scripts[*].script_uid",
    "reply.scripts[*].windows_supported",
    "reply.total_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "filters"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/scripts/insert": {
@@ -1402,6 +2157,26 @@
    "reply.action_id",
    "reply.endpoints_count",
    "reply.status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "filters",
+   "script_uid"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.incident_id",
+   "request_data.parameters_values",
+   "request_data.parameters_values.x",
+   "request_data.parameters_values.y",
+   "request_data.script_uid",
+   "request_data.timeout"
   ]
  },
  "POST /public_api/v1/scripts/run_snippet_code_script": {
@@ -1410,6 +2185,23 @@
    "reply",
    "reply.action_id",
    "reply.endpoints_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "filters",
+   "snippet_code"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value",
+   "request_data.incident_id",
+   "request_data.snippet_code",
+   "request_data.timeout"
   ]
  },
  "POST /public_api/v1/system/get_tenant_info": {
@@ -1470,6 +2262,17 @@
   "paths": [
    "reply",
    "reply.message"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "tags"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.reason",
+   "request_data.tags"
   ]
  },
  "POST /public_api/v1/tags/agents/remove": {
@@ -1483,6 +2286,17 @@
    "reply.group_action_id",
    "reply.successful_agent_ids",
    "reply.unsuccessful_agent_ids"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "agent_ids"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.agent_ids",
+   "request_data.collector_uuid"
   ]
  },
  "POST /public_api/v1/widgets/delete": {
@@ -1490,6 +2304,16 @@
   "paths": [
    "objects",
    "objects_count"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/widgets/get": {
@@ -1522,6 +2346,16 @@
    "objects[*].widgets_data[*].widget_key",
    "objects_count",
    "objects_type"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.filters",
+   "request_data.filters[*].field",
+   "request_data.filters[*].operator",
+   "request_data.filters[*].value"
   ]
  },
  "POST /public_api/v1/widgets/insert": {
@@ -1542,6 +2376,17 @@
   "source": "xql_add_dataset.yaml",
   "paths": [
    "dataset_name"
+  ],
+  "request_data_required": [
+   "dataset_name",
+   "dataset_schema",
+   "dataset_type"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.dataset_name",
+   "request_data.dataset_schema",
+   "request_data.dataset_type"
   ]
  },
  "POST /public_api/v1/xql/get_datasets": {
@@ -1586,6 +2431,19 @@
    "reply.results.data[*].event_type",
    "reply.results.data[*].insert_timestamp",
    "reply.status"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "query_id"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.format",
+   "request_data.limit",
+   "request_data.pending_flag",
+   "request_data.query_id"
   ]
  },
  "POST /public_api/v1/xql/get_quota": {
@@ -1610,6 +2468,14 @@
    "reply.errors",
    "reply.queries_count",
    "reply.xql_query_names"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.xql_query_names",
+   "request_data.xql_query_tags"
   ]
  },
  "POST /public_api/xql_library/get": {
@@ -1633,6 +2499,15 @@
    "reply.xql_queries[*].query_metadata.query_presets",
    "reply.xql_queries[*].query_metadata.query_tables",
    "reply.xql_queries[*].query_text"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.extended_view",
+   "request_data.xql_query_names",
+   "request_data.xql_query_tags"
   ]
  },
  "POST /public_api/xql_library/insert": {
@@ -1642,6 +2517,20 @@
    "reply.errors",
    "reply.xql_queries_added",
    "reply.xql_queries_updated"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "xql_queries"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.xql_queries",
+   "request_data.xql_queries[*].xql_query",
+   "request_data.xql_queries[*].xql_query_name",
+   "request_data.xql_queries_override",
+   "request_data.xql_query_tags"
   ]
  },
  "POST /public_api/v1/xql/lookups/add_data": {
@@ -1650,6 +2539,16 @@
    "added",
    "skipped",
    "updated"
+  ],
+  "request_data_required": [
+   "data",
+   "dataset_name"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.data",
+   "request_data.dataset_name",
+   "request_data.key_fields"
   ]
  },
  "POST /public_api/v1/xql/lookups/get_data": {
@@ -1658,18 +2557,51 @@
    "data",
    "filter_count",
    "total_count"
+  ],
+  "request_data_required": [
+   "dataset_name"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.dataset_name",
+   "request_data.filters",
+   "request_data.limit"
   ]
  },
  "POST /public_api/v1/xql/lookups/remove_data": {
   "source": "xql_lookups_remove_data.yaml",
   "paths": [
    "deleted"
+  ],
+  "request_data_required": [
+   "dataset_name",
+   "filters"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.dataset_name",
+   "request_data.filters"
   ]
  },
  "POST /public_api/v1/xql/start_xql_query": {
   "source": "xql_start_xql_query.yaml",
   "paths": [
    "reply"
+  ],
+  "request_required": [
+   "request_data"
+  ],
+  "request_data_required": [
+   "query"
+  ],
+  "request_paths": [
+   "request_data",
+   "request_data.query",
+   "request_data.tenants",
+   "request_data.timeframe",
+   "request_data.timeframe.from",
+   "request_data.timeframe.relativeTime",
+   "request_data.timeframe.to"
   ]
  }
 }

@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**A sweep that reseeded the world under itself.**
+`body_audit.py` probed mockdr's own `_dev` control surface along with the
+mocked ones, and posting to `_dev/scenario` reseeds the install — which
+invalidated the tokens every later mount was being probed with and turned
+three platforms' worth of routes into unexplained 401s that the sweep read
+as "never reached". `_dev` imitates nothing and is left out now; the sweep
+sees twenty-three more routes than it did.
+
 **Route-level drift, which no audit counted.**
 `param_drift.py` compared the parameters of routes both sides describe and
 said nothing about a route only one side has — which is how a single wildcard
@@ -724,7 +732,7 @@ missing path answers with, because that is what it is — one route standing
 in for thirty-eight must not turn a path the product does not have into a
 request it understood.
 
-**Twenty-five SentinelOne write routes that answered 200 to an empty body.**
+**Thirty-one write routes that answered 200 to an empty body.**
 A threat marked as an incident with no verdict in the body, an exclusion
 created out of nothing, a policy replaced by an empty document — each
 reported success, which leaves a client believing the write happened the way
@@ -741,6 +749,24 @@ carrying either is let through — the check is that something was sent. A
 route the mock declares no body for is left alone for the same reason: the
 swagger marks `data` required on some of those, and requiring one there
 would invent a rule rather than enforce a documented one.
+
+Two more were Cortex XDR's. Its reference states a requirement for 68 of its
+routes and none at all for most of the rest — `xql/get_quota` gives
+`{"request_data": null}` as its own example — so quarantine status for no
+files and a user group lookup for no group are refused now, and the nine
+routes the reference is silent about go on answering, because refusing a
+body a product may well accept is the same defect facing the other way.
+`scripts/cortex_openapi_spec.py` keeps that side of the transcription now,
+alongside the reply shapes it already kept.
+
+Six more were CrowdStrike's, and gofalcon's `request_required` says the same
+thing about them: a host action addressed to no host, an indicator create
+with no indicators, a case tagged with nothing — each answering 200 with an
+empty `resources` list, which reads exactly like a request that matched
+nothing. The same check covers both mounts, and stops at the same place:
+gofalcon marks `indicators` *and* `bulk_update` required on one route where
+a client sends one or the other, so demanding a particular combination would
+refuse a request the product takes.
 
 **Five routes that read nothing of the body they declare.**
 Found by a new audit that asks every such route what it does with a body

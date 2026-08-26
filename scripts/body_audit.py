@@ -26,8 +26,15 @@ A route that answers 2xx to both read nothing of what it was sent. One that
 refuses either is reading something, and how *well* it reads is what the
 conformance harness measures against the real product.
 
+Some routes are right to answer anything, and those are listed in the script
+with the reason: most Cortex routes require nothing, and for Defender and
+Graph the references this repo holds carry reply shapes only, so nothing can
+be enforced without inventing it. Exit status is 1 for a route that is
+neither reading its body nor on that list, so this gates a pipeline.
+
 Routes with no declared body are skipped: an action route that ignores a
-body is imitating a product that ignores it too. So are the OAuth token
+body is imitating a product that ignores it too. So is mockdr's own `_dev`
+surface, which imitates nothing. So are the OAuth token
 routes, which take a form rather than a document, `_bulk`-style routes whose
 body is NDJSON text rather than JSON, and the ones whose body *is* the
 client's own document — indexing `{}` into Elasticsearch answers 201 there,
@@ -99,6 +106,12 @@ _NONSENSE = (
     ("one undeclared member", {"zzz_undeclared_member": 1}),
 )
 
+#: mockdr's own control surface, which is not imitating anything — and must
+#: not be poked by a sweep: posting to `_dev/scenario` reseeds the world,
+#: which invalidated the tokens every later mount was being probed with and
+#: turned three platforms' worth of routes into unexplained 401s.
+_OWN_SURFACE = re.compile(r"/_dev/")
+
 #: Paths whose body is not a JSON document at all, so a JSON probe says
 #: nothing about them: NDJSON bulk streams, form posts, and raw event text.
 _NOT_JSON = re.compile(
@@ -110,6 +123,46 @@ _NOT_JSON = re.compile(
 #: member in it — or none — is exactly what they are for. Measured: indexing
 #: `{}` into Elasticsearch answers 201, and so does indexing anything else.
 _ANY_DOCUMENT = re.compile(r"/_doc(/|$)|/_create/|/_source$")
+
+#: Routes that answer any body, and stay that way because no reference this
+#: repo holds says otherwise. Each one was looked up, not waved through:
+#: refusing a body a vendor may well accept is the same class of defect in
+#: the other direction. When a reference for one of these arrives, the route
+#: leaves this list rather than the list growing to meet it.
+_NOTHING_SAYS_OTHERWISE = {
+    # The Cortex reference states a requirement for 68 of its routes and
+    # none for these — `xql/get_quota` gives `{"request_data": null}` as its
+    # own example.
+    "POST /xdr/public_api/v1/alerts_exclusion/",
+    "POST /xdr/public_api/v1/device_control/get_violations/",
+    "POST /xdr/public_api/v1/distributions/get_versions/",
+    "POST /xdr/public_api/v1/rbac/get_roles/",
+    "POST /xdr/public_api/v1/rbac/get_users/",
+    "POST /xdr/public_api/v1/system/get_tenant_info/",
+    "POST /xdr/public_api/v1/tags/agents/assign/",
+    "POST /xdr/public_api/v1/tags/agents/remove/",
+    "POST /xdr/public_api/v1/xql/get_quota",
+    # Not in the SentinelOne 2.1 swagger at all — `param_drift.py` counts
+    # them among the routes the vendor does not publish, which is the
+    # question to settle before this one.
+    "POST /web/api/v2.1/threat-intelligence/iocs/bulk",
+    "POST /web/api/v2.1/threats/mark-as-resolved",
+    "POST /web/api/v2.1/threats/mark-as-threat",
+    # Documented, with `data` optional and nothing required inside it.
+    "POST /web/api/v2.1/threats/engines/disable",
+    # gofalcon carries no request schema for this one, and marks nothing
+    # required on the other.
+    "POST /cs/user-management/entities/users/GET/v1",
+    "PATCH /cs/quarantine/entities/quarantined-files/v1",
+    # `mde_docs_reduced.json` and the Graph CSDL keep reply shapes only, so
+    # neither says what these bodies must carry.
+    "POST /mde/api/alerts/batchUpdate",
+    "POST /mde/api/alerts/createAlertByReference",
+    "POST /mde/api/indicators/BatchDelete",
+    "POST /graph/v1.0/informationProtection/threatAssessmentRequests",
+    "POST /graph/v1.0/security/runHuntingQuery",
+    "POST /graph/v1.0/security/tiIndicators",
+}
 
 #: A route can only be judged on a body if it gets that far, so the path
 #: parameters have to resolve to something the mock holds.
@@ -138,7 +191,8 @@ def write_routes(wanted):
         mount = path.split("/")[1]
         if (wanted and mount not in wanted) or AUTH.get(mount) is None:
             continue
-        if _NOT_JSON.search(path) or _ANY_DOCUMENT.search(path):
+        if (_NOT_JSON.search(path) or _ANY_DOCUMENT.search(path)
+                or _OWN_SURFACE.search(path)):
             continue
         for verb in ("post", "put", "patch"):
             operation = operations.get(verb)
@@ -164,6 +218,9 @@ def main():
         if all(200 <= status < 300 for _, status in answers):
             flags.append((mount, verb, path))
 
+    known = [f for f in flags if f"{f[1]} {f[2]}" in _NOTHING_SAYS_OTHERWISE]
+    flags = [f for f in flags if f"{f[1]} {f[2]}" not in _NOTHING_SAYS_OTHERWISE]
+
     print(f"=== BODY CONTRACT === {checked} write route(s) exercised")
     by_mount = {}
     for mount, verb, path in flags:
@@ -172,7 +229,8 @@ def main():
         print(f"\n── {mount} ({len(by_mount[mount])})")
         for verb, path in sorted(by_mount[mount]):
             print(f"  {verb:<6} {path}")
-    print(f"\n  {len(flags)} route(s) that read nothing of the body they declare")
+    print(f"\n  {len(flags)} route(s) that read nothing of the body they declare"
+          f", {len(known)} left that way because no reference says otherwise")
     return 1 if flags else 0
 
 

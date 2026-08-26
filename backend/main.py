@@ -835,6 +835,8 @@ CS_PREFIX = "/cs"
 app.include_router(cs_auth_router.router, prefix=CS_PREFIX)
 
 # Authenticated CS endpoints — each handler applies its own auth dependency
+# The same body guard as the SentinelOne mount: gofalcon says which members
+# a Falcon write body must carry, and six routes answered 200 without them.
 for _cs_module in [
     cs_hosts_router,
     cs_detections_router,
@@ -846,7 +848,8 @@ for _cs_module in [
     cs_cases_router,
     cs_discover_router,
 ]:
-    app.include_router(_cs_module.router, prefix=CS_PREFIX)
+    app.include_router(_cs_module.router, prefix=CS_PREFIX,
+                       dependencies=[Depends(require_documented_body)])
 
 # ── Microsoft Defender for Endpoint mock endpoints (mounted at /mde) ──────────
 MDE_PREFIX = "/mde"
@@ -916,7 +919,8 @@ for _xdr_module in [
     xdr_xql_router,
     xdr_system_router,
 ]:
-    app.include_router(_xdr_module.router, prefix=XDR_PREFIX)
+    app.include_router(_xdr_module.router, prefix=XDR_PREFIX,
+                       dependencies=[Depends(require_documented_body)])
 
 # ── Splunk SIEM mock endpoints (mounted at /splunk) ─────────────────────────
 SPLUNK_PREFIX = "/splunk"

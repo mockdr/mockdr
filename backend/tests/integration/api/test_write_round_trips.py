@@ -2580,3 +2580,101 @@ class TestTheAgentActionsFalconsRivalPublishes:
         assert response.status_code == 404
         assert response.json()["errors"][0]["detail"] == (
             "Resource not found: POST /web/api/v2.1/agents/actions/zzz-not-an-action")
+
+
+class TestAFalconWriteBodyIsRecognisable:
+    """From gofalcon's `request_required`, the same question as SentinelOne's.
+
+    Six Falcon write routes answered 200 to `{}`: a host action addressed to
+    no host, an indicator create with no indicators, a case tagged with
+    nothing. Each came back as a success with an empty `resources` list,
+    which reads exactly like a request that matched nothing.
+    """
+
+    def _auth(self, client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "cs-mock-admin-client",
+            "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @pytest.mark.parametrize("path", [
+        "/cs/devices/entities/devices/v2",
+        "/cs/iocs/entities/indicators/v1",
+        "/cs/cases/entities/case-tags/v1",
+        "/cs/quarantine/entities/quarantined-files/GET/v1",
+    ])
+    def test_an_empty_body_is_refused(
+        self, client: TestClient, path: str,
+    ) -> None:
+        response = client.post(path, headers=self._auth(client), json={})
+        assert response.status_code == 400
+        assert response.json()["errors"][0]["code"] == 400
+
+    def test_the_documented_body_is_taken(self, client: TestClient) -> None:
+        response = client.post("/cs/devices/entities/devices/v2",
+                               headers=self._auth(client), json={"ids": ["x"]})
+        assert response.status_code == 200
+
+    def test_the_error_wears_falcons_envelope(self, client: TestClient) -> None:
+        body = client.post("/cs/devices/entities/devices/v2",
+                           headers=self._auth(client), json={}).json()
+        assert body["resources"] == []
+        assert "trace_id" in body["meta"]
+
+    def test_the_alerts_route_still_takes_the_older_spelling(
+        self, client: TestClient,
+    ) -> None:
+        """`composite_ids` is the v3 name; the handler reads `ids` as well,
+        and this check exists to refuse a body that says nothing — not to
+        withdraw what the mock already answers to."""
+        response = client.post("/cs/alerts/entities/alerts/v2",
+                               headers=self._auth(client),
+                               json={"ids": ["ldt:x:1"]})
+        assert response.status_code == 200
+
+
+class TestACortexWriteBodyIsRecognisable:
+    """From the community transcription of the Cortex reference.
+
+    Most Cortex routes require nothing at all — `xql/get_quota` gives
+    `{"request_data": null}` as its own example — so most of them are right
+    to answer an empty body. The ones whose reference does state a
+    requirement were answering it too: quarantine status for no files,
+    a user group lookup for no group.
+    """
+
+    XDR = {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"}
+
+    def test_a_route_that_states_a_requirement_refuses_nothing(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post("/xdr/public_api/v1/quarantine/status/",
+                               headers=self.XDR, json={})
+        assert response.status_code == 400
+        assert response.json()["reply"]["err_code"] == 400
+
+    def test_the_wrapper_is_all_it_asks_for(self, client: TestClient) -> None:
+        response = client.post("/xdr/public_api/v1/quarantine/status/",
+                               headers=self.XDR,
+                               json={"request_data": {"files": []}})
+        assert response.status_code == 200
+
+    @pytest.mark.parametrize("path", [
+        "/xdr/public_api/v1/rbac/get_roles/",
+        "/xdr/public_api/v1/system/get_tenant_info/",
+        "/xdr/public_api/v1/xql/get_quota",
+    ])
+    def test_a_route_that_states_no_requirement_still_answers(
+        self, client: TestClient, path: str,
+    ) -> None:
+        """Refusing these would invent a rule the reference does not state."""
+        assert client.post(path, headers=self.XDR, json={}).status_code == 200
+
+    def test_the_refusal_wears_cortex_own_envelope(
+        self, client: TestClient,
+    ) -> None:
+        body = client.post("/xdr/public_api/v1/rbac/get_user_group/",
+                           headers=self.XDR, json={}).json()
+        assert set(body["reply"]) == {"err_code", "err_msg", "err_extra"}

@@ -15,7 +15,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `param_effect.py` | Asks every route whether its parameters do anything: a limiter that does not limit, a filter that cannot match and returns everything, a `$select` that projects nothing. Covers the parameters a route reads *without declaring* — Elasticsearch's URI search, Splunk's collection parameters — which no schema sweep can see. Exit 1 on any. |
 | `paging_audit.py` | Walks every collection a page at a time: flags a record that comes back twice, one that never appears, a total that disagrees with the pages, and paging that will not terminate. Exit 1 on any. |
 | `roundtrip_audit.py` | Writes something, then asks for it back: a create that drops the body, an update that answers 200 and changes nothing, a delete that leaves the record in the listing. Every other audit here only reads. Exit 1 on any. |
-| `body_audit.py` | Asks every route that *declares* a body whether it reads one: sends an empty object and one carrying a single member the route never declared, and flags the routes that answer 2xx to both. Needs no vendor reference — a route that accepts a body it cannot have meant is wrong whatever the product does. Exit 1 on any. |
+| `body_audit.py` | Asks every route that *declares* a body whether it reads one: sends an empty object and one carrying a single member the route never declared, and flags the routes that answer 2xx to both. Needs no vendor reference — a route that accepts a body it cannot have meant is wrong whatever the product does. Routes that are right to answer anything are listed in the script with the reason, so exit 1 means something new. |
 | `authz_audit.py` | Asks every write route whether a credential without the right to it gets a 2xx — no credential at all, and the read-only one the vendor issues. The mistake in the other direction: a mock that permits what the product refuses. Exit 1 on any. |
 
 ## Run before a release
@@ -52,7 +52,7 @@ completed against (`backend/infrastructure/fixtures/`):
 | `gen_arm_fixtures.py` | Sentinel (from the ARM spec) |
 | `gen_mde_fixtures.py` | Defender for Endpoint (from the reduced docs) |
 | `gen_xdr_fixtures.py` | Cortex XDR (from the recordings) |
-| `gen_documented_bodies.py` | SentinelOne — what each write body must carry (`backend/application/documented_bodies.py`); the guard that reads it refuses a body carrying nothing the route knows. |
+| `gen_documented_bodies.py` | SentinelOne (swagger) and CrowdStrike (gofalcon) — what each write body must carry (`backend/application/documented_bodies.py`); the guard that reads it refuses a body carrying nothing the route knows. |
 
 Run them from the repository root with the backend's interpreter:
 `backend/.venv/bin/python scripts/<name>.py`.
