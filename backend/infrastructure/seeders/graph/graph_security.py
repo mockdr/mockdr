@@ -9,6 +9,7 @@ from domain.graph.secure_score import GraphSecureScore
 from domain.graph.security_alert import GraphSecurityAlert
 from domain.graph.security_incident import GraphSecurityIncident
 from domain.graph.ti_indicator import GraphTiIndicator
+from domain.mde_alert import MdeAlert
 from infrastructure.seeders._shared import ago, rand_ago
 from infrastructure.seeders.graph.graph_shared import GRAPH_TENANT_ID, graph_uuid
 from repository.graph.secure_score_repo import graph_secure_score_repo
@@ -17,8 +18,71 @@ from repository.graph.security_incident_repo import graph_security_incident_repo
 from repository.graph.ti_indicator_repo import graph_ti_indicator_repo
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_indicator_repo import mde_indicator_repo
+from repository.mde_machine_repo import mde_machine_repo
 
 _MITRE_TECHNIQUES: list[str] = ["T1059", "T1053", "T1071", "T1082", "T1105"]
+
+#: Defender spells these in upper camel case and Graph in lower; the members
+#: are otherwise the same, and both lists come from
+#: `data/vendor-specs/graph_v1.0_csdl_types.json`.
+_GRAPH_HEALTH: dict[str, str] = {
+    "Active": "active", "Inactive": "inactive",
+    "ImpairedCommunication": "impairedCommunication",
+    "NoSensorData": "noSensorData",
+    "NoSensorDataImpairedCommunication": "noSensorDataImpairedCommunication",
+}
+_GRAPH_ONBOARDING: dict[str, str] = {
+    "Onboarded": "onboarded", "CanBeOnboarded": "canBeOnboarded",
+    "Unsupported": "unsupported", "InsufficientInfo": "insufficientInfo",
+}
+_GRAPH_RISK: dict[str, str] = {
+    "None": "none", "Informational": "informational", "Low": "low",
+    "Medium": "medium", "High": "high",
+}
+
+
+def _device_evidence(mde_alert: MdeAlert, created: str) -> dict:
+    """One `microsoft.graph.security.deviceEvidence` for an alert's host.
+
+    Built from the Defender machine the alert names, so the two products'
+    views of one host agree and the reference resolves — `mdeDeviceId` is
+    exactly the machine id Defender serves.
+    """
+    machine = mde_machine_repo.get(mde_alert.machineId)
+    evidence: dict = {
+        "@odata.type": "#microsoft.graph.security.deviceEvidence",
+        "createdDateTime": created,
+        "verdict": "unknown",
+        "remediationStatus": "none",
+        "remediationStatusDetails": None,
+        "roles": ["compromised"],
+        "detailedRoles": [],
+        "tags": [],
+        "mdeDeviceId": mde_alert.machineId,
+        "azureAdDeviceId": getattr(machine, "aadDeviceId", "") or None,
+        "deviceDnsName": getattr(machine, "computerDnsName", "") or None,
+        "hostName": (getattr(machine, "computerDnsName", "") or "").split(".")[0] or None,
+        "ntDomain": None,
+        "dnsDomain": ".".join(
+            (getattr(machine, "computerDnsName", "") or "").split(".")[1:]) or None,
+        "osPlatform": getattr(machine, "osPlatform", "") or None,
+        "osBuild": getattr(machine, "osBuild", 0) or None,
+        "version": getattr(machine, "version", "") or None,
+        "firstSeenDateTime": getattr(machine, "firstSeen", "") or None,
+        "lastIpAddress": getattr(machine, "lastIpAddress", "") or None,
+        "lastExternalIpAddress": getattr(machine, "lastExternalIpAddress", "") or None,
+        "ipInterfaces": [ip for ip in [getattr(machine, "lastIpAddress", "")] if ip],
+        "healthStatus": _GRAPH_HEALTH.get(getattr(machine, "healthStatus", ""), "unknown"),
+        "onboardingStatus": _GRAPH_ONBOARDING.get(
+            getattr(machine, "onboardingStatus", ""), "insufficientInfo"),
+        "riskScore": _GRAPH_RISK.get(getattr(machine, "riskScore", ""), "none"),
+        "defenderAvStatus": "updated",
+        "rbacGroupId": getattr(machine, "rbacGroupId", 0) or None,
+        "rbacGroupName": getattr(machine, "rbacGroupName", "") or None,
+        "loggedOnUsers": [],
+        "vmMetadata": None,
+    }
+    return evidence
 
 _MDE_STATUS_MAP: dict[str, str] = {
     "New": "new",
@@ -91,14 +155,12 @@ def seed_graph_security(fake: Faker) -> None:
         created_dt = mde_alert.alertCreationTime or rand_ago(max_days=30)
         last_update_dt = mde_alert.lastUpdateTime or rand_ago(max_days=5)
 
-        # Build evidence with device cross-reference. edr_id_map is keyed by
-        # S1 agent id, so looking it up by an MDE machine id always missed and
-        # fell through to the `or {}` default — dead code that happened to
-        # produce the right value.
-        evidence: list[dict] = [{
-            "type": "device",
-            "deviceId": mde_alert.machineId,
-        }]
+        # Graph's alert evidence is a typed object, not a pair of invented
+        # keys. `microsoft.graph.security.deviceEvidence` names the device
+        # twice — `mdeDeviceId` for Defender's id and `azureAdDeviceId` for
+        # the directory's — and carries the host's own description beside
+        # them, which is what a client reads to decide what it is looking at.
+        evidence: list[dict] = [_device_evidence(mde_alert, created_dt)]
 
         # Classification / determination for resolved alerts
         classification: str | None = None

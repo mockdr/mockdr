@@ -8,10 +8,12 @@
    "infrastructure",
    "victim",
    "unknownFutureValue"
-  ]
+  ],
+  "namespace": "microsoft.graph"
  },
  "microsoft.graph.entity": {
   "kind": "EntityType",
+  "namespace": "microsoft.graph",
   "properties": {
    "id": "Edm.String"
   }
@@ -27,7 +29,8 @@
    "lsHash",
    "ctph",
    "unknownFutureValue"
-  ]
+  ],
+  "namespace": "microsoft.graph"
  },
  "microsoft.graph.tiAction": {
   "kind": "EnumType",
@@ -37,11 +40,13 @@
    "block",
    "alert",
    "unknownFutureValue"
-  ]
+  ],
+  "namespace": "microsoft.graph"
  },
  "microsoft.graph.tiIndicator": {
-  "base": "graph.entity",
+  "base": "microsoft.graph.entity",
   "kind": "EntityType",
+  "namespace": "microsoft.graph",
   "open": true,
   "properties": {
    "action": "graph.tiAction",
@@ -113,6 +118,7 @@
    "amber",
    "red",
    "unknownFutureValue"
-  ]
+  ],
+  "namespace": "microsoft.graph"
  }
 }

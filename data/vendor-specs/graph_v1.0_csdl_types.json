@@ -1,0 +1,181 @@
+{
+ "microsoft.graph.security.alertEvidence": {
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "createdDateTime": "Edm.DateTimeOffset",
+   "detailedRoles": "Collection(Edm.String)",
+   "remediationStatus": "self.evidenceRemediationStatus",
+   "remediationStatusDetails": "Edm.String",
+   "roles": "Collection(self.evidenceRole)",
+   "tags": "Collection(Edm.String)",
+   "verdict": "self.evidenceVerdict"
+  }
+ },
+ "microsoft.graph.security.defenderAvStatus": {
+  "kind": "EnumType",
+  "members": [
+   "notReporting",
+   "disabled",
+   "notUpdated",
+   "updated",
+   "unknown",
+   "notSupported",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.deviceEvidence": {
+  "base": "microsoft.graph.security.alertEvidence",
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "azureAdDeviceId": "Edm.String",
+   "defenderAvStatus": "self.defenderAvStatus",
+   "deviceDnsName": "Edm.String",
+   "dnsDomain": "Edm.String",
+   "firstSeenDateTime": "Edm.DateTimeOffset",
+   "healthStatus": "self.deviceHealthStatus",
+   "hostName": "Edm.String",
+   "ipInterfaces": "Collection(Edm.String)",
+   "lastExternalIpAddress": "Edm.String",
+   "lastIpAddress": "Edm.String",
+   "loggedOnUsers": "Collection(self.loggedOnUser)",
+   "mdeDeviceId": "Edm.String",
+   "ntDomain": "Edm.String",
+   "onboardingStatus": "self.onboardingStatus",
+   "osBuild": "Edm.Int64",
+   "osPlatform": "Edm.String",
+   "rbacGroupId": "Edm.Int32",
+   "rbacGroupName": "Edm.String",
+   "resourceAccessEvents": "Collection(self.resourceAccessEvent)",
+   "riskScore": "self.deviceRiskScore",
+   "version": "Edm.String",
+   "vmMetadata": "self.vmMetadata"
+  }
+ },
+ "microsoft.graph.security.deviceHealthStatus": {
+  "kind": "EnumType",
+  "members": [
+   "active",
+   "inactive",
+   "impairedCommunication",
+   "noSensorData",
+   "noSensorDataImpairedCommunication",
+   "unknown",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.deviceRiskScore": {
+  "kind": "EnumType",
+  "members": [
+   "none",
+   "informational",
+   "low",
+   "medium",
+   "high",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.evidenceRemediationStatus": {
+  "kind": "EnumType",
+  "members": [
+   "none",
+   "remediated",
+   "prevented",
+   "blocked",
+   "notFound",
+   "unknownFutureValue",
+   "active",
+   "pendingApproval",
+   "declined",
+   "unremediated",
+   "running",
+   "partiallyRemediated"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.evidenceRole": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "contextual",
+   "scanned",
+   "source",
+   "destination",
+   "created",
+   "added",
+   "compromised",
+   "edited",
+   "attacked",
+   "attacker",
+   "commandAndControl",
+   "loaded",
+   "suspicious",
+   "policyViolator",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.evidenceVerdict": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "suspicious",
+   "malicious",
+   "noThreatsFound",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.loggedOnUser": {
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "accountName": "Edm.String",
+   "domainName": "Edm.String"
+  }
+ },
+ "microsoft.graph.security.onboardingStatus": {
+  "kind": "EnumType",
+  "members": [
+   "insufficientInfo",
+   "onboarded",
+   "canBeOnboarded",
+   "unsupported",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.resourceAccessEvent": {
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "accessDateTime": "Edm.DateTimeOffset",
+   "accountId": "Edm.String",
+   "ipAddress": "Edm.String",
+   "resourceIdentifier": "Edm.String"
+  }
+ },
+ "microsoft.graph.security.vmCloudProvider": {
+  "kind": "EnumType",
+  "members": [
+   "unknown",
+   "azure",
+   "unknownFutureValue"
+  ],
+  "namespace": "microsoft.graph.security"
+ },
+ "microsoft.graph.security.vmMetadata": {
+  "kind": "ComplexType",
+  "namespace": "microsoft.graph.security",
+  "properties": {
+   "cloudProvider": "self.vmCloudProvider",
+   "resourceId": "Edm.String",
+   "subscriptionId": "Edm.String",
+   "vmId": "Edm.String"
+  }
+ }
+}

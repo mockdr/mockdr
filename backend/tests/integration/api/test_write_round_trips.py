@@ -647,3 +647,98 @@ class TestAFieldMeansOneThing:
             if field not in ("entityType", "evidenceCreationTime") and value == ""
         ]
         assert empties == [], f"empty strings where the product sends null: {empties[:5]}"
+
+
+class TestGraphAlertEvidenceIsGraphsOwnShape:
+    """``microsoft.graph.security.deviceEvidence``, from the vendored CSDL.
+
+    Found by asking whether a reference resolves: the alert evidence named a
+    device with `{"type": "device", "deviceId": …}`, which is not a shape
+    Graph has — so a client reading `mdeDeviceId`, the property that exists
+    for exactly this, found nothing, and the id it did carry matched no
+    device the mock serves.
+    """
+
+    def _graph(self, client: TestClient) -> dict:
+        token = client.post("/graph/oauth2/v2.0/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "graph-mock-admin-client",
+            "client_secret": "graph-mock-admin-secret",
+            "scope": "https://graph.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _mde(self, client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "grant_type": "client_credentials",
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_evidence_is_typed_and_carries_the_declared_members(
+        self, client: TestClient,
+    ) -> None:
+        alerts = client.get("/graph/v1.0/security/alerts_v2", headers=self._graph(client),
+                            params={"$top": 5}).json()["value"]
+        evidence = [e for a in alerts for e in a.get("evidence") or []]
+        assert evidence
+        for item in evidence:
+            assert item["@odata.type"] == "#microsoft.graph.security.deviceEvidence"
+            # The base type's members, on every evidence item whatever its kind.
+            for member in ("createdDateTime", "verdict", "remediationStatus",
+                           "roles", "tags", "detailedRoles"):
+                assert member in item, member
+            # And the two the invented shape replaced.
+            assert item["mdeDeviceId"]
+            assert "deviceId" not in item
+            assert "type" not in item
+
+    def test_the_enums_are_graphs_spelling_not_defenders(
+        self, client: TestClient,
+    ) -> None:
+        """Defender writes `Active`, Graph writes `active`."""
+        health = {"active", "inactive", "impairedCommunication", "noSensorData",
+                  "noSensorDataImpairedCommunication", "unknown", "unknownFutureValue"}
+        onboarding = {"insufficientInfo", "onboarded", "canBeOnboarded", "unsupported",
+                      "unknownFutureValue"}
+        risk = {"none", "informational", "low", "medium", "high", "unknownFutureValue"}
+        alerts = client.get("/graph/v1.0/security/alerts_v2", headers=self._graph(client),
+                            params={"$top": 200}).json()["value"]
+        for item in (e for a in alerts for e in a.get("evidence") or []):
+            assert item["healthStatus"] in health, item["healthStatus"]
+            assert item["onboardingStatus"] in onboarding, item["onboardingStatus"]
+            assert item["riskScore"] in risk, item["riskScore"]
+
+    def test_the_device_it_names_is_one_defender_serves(
+        self, client: TestClient,
+    ) -> None:
+        """A client that follows the reference must find a machine there."""
+        alerts = client.get("/graph/v1.0/security/alerts_v2", headers=self._graph(client),
+                            params={"$top": 200}).json()["value"]
+        referenced = {e["mdeDeviceId"] for a in alerts for e in a.get("evidence") or []}
+        machines = {
+            m["id"] for m in
+            client.get("/mde/api/machines", headers=self._mde(client),
+                       params={"$top": 200}).json()["value"]
+        }
+        assert referenced
+        assert referenced <= machines, sorted(referenced - machines)[:3]
+
+    def test_the_host_it_describes_is_the_machine_defender_describes(
+        self, client: TestClient,
+    ) -> None:
+        """Two products' views of one host must agree."""
+        alerts = client.get("/graph/v1.0/security/alerts_v2", headers=self._graph(client),
+                            params={"$top": 200}).json()["value"]
+        machines = {
+            m["id"]: m for m in
+            client.get("/mde/api/machines", headers=self._mde(client),
+                       params={"$top": 200}).json()["value"]
+        }
+        for item in (e for a in alerts for e in a.get("evidence") or []):
+            machine = machines[item["mdeDeviceId"]]
+            assert item["deviceDnsName"] == machine["computerDnsName"]
+            assert item["osPlatform"] == machine["osPlatform"]
+            assert item["lastIpAddress"] == machine["lastIpAddress"]

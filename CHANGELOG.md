@@ -8,6 +8,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**An alert that named a device no client could find.**
+Asking whether a reference resolves — a client lists alerts, reads the
+device off one, and goes to fetch it — turned up something larger than a
+dangling id. Graph's alert evidence was `{"type": "device", "deviceId": …}`,
+which is not a shape Graph has: `microsoft.graph.security.alertEvidence`
+carries `@odata.type`, `createdDateTime`, `verdict`, `remediationStatus`,
+`roles`, `tags` and `detailedRoles`, and `deviceEvidence` adds
+`mdeDeviceId`, `azureAdDeviceId`, `deviceDnsName` and twenty more. A client
+reading `mdeDeviceId` — the property that exists for exactly this — found
+nothing, and the id that was there matched no device the mock serves.
+
+The evidence is now built from the Defender machine the alert names, so the
+two products' views of one host agree and all 31 references resolve. Its
+enums are Graph's spelling rather than Defender's (`active`, not `Active`),
+from the vendored CSDL.
+
+Getting that reference vendored found a bug in the reducer itself:
+`scripts/graph_csdl_spec.py` matched only the paired form of a type
+declaration, so a self-closing one swallowed everything up to the next
+closing tag — 184 of the security namespace's 691 types came back, and
+`deviceEvidence` was in the missing half. It also read every `self.` prefix
+as `microsoft.graph.`, where in a namespaced schema it means that schema; a
+type's namespace is recorded now, and both metadata documents reduce
+correctly.
+
 **A field that means two things.**
 A client writes one parser per field and runs it over every record, so a
 field that is a string in one record and a number in the next breaks it —

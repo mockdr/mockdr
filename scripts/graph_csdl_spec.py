@@ -34,57 +34,86 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = ROOT / "data" / "vendor-specs"
 
+_SCHEMA = re.compile(r'<Schema Namespace="([^"]+)"[^>]*>(.*?)</Schema>', re.S)
+#: A type is written either paired or self-closing. Matching only the paired
+#: form let a self-closing one swallow everything up to the next closing tag,
+#: and 184 of the security namespace's types came back instead of 700.
 _TYPE = re.compile(
-    r'<(EntityType|ComplexType) Name="([^"]+)"([^>]*)>(.*?)</\1>', re.S)
-_ENUM = re.compile(r'<EnumType Name="([^"]+)"[^>]*>(.*?)</EnumType>', re.S)
+    r'<(EntityType|ComplexType) Name="([^"]+)"((?:[^>"]|"[^"]*")*?)'
+    r'(?:/>|>(.*?)</\1>)', re.S)
+_ENUM = re.compile(
+    r'<EnumType Name="([^"]+)"((?:[^>"]|"[^"]*")*?)(?:/>|>(.*?)</EnumType>)', re.S)
 _PROPERTY = re.compile(r'<(?:Property|NavigationProperty) Name="([^"]+)" Type="([^"]+)"')
 _MEMBER = re.compile(r'<Member Name="([^"]+)"')
 _BASE = re.compile(r'BaseType="([^"]+)"')
 
 
 def reduce_csdl(text: str) -> dict:
+    """Every type in the document, qualified by the schema that declares it.
+
+    The namespace matters: Graph puts its security types in
+    ``microsoft.graph.security`` and refers to them from inside that schema
+    as ``self.deviceEvidence``. Reading every ``self.`` as
+    ``microsoft.graph.`` put `deviceEvidence`'s enums in a namespace that
+    does not exist, and the closure lost them.
+    """
     out: dict[str, object] = {}
-    for kind, name, attrs, body in _TYPE.findall(text):
-        base = _BASE.search(attrs)
-        entry: dict[str, object] = {
-            "kind": kind, "properties": dict(_PROPERTY.findall(body)),
-        }
-        if base:
-            entry["base"] = base.group(1)
-        if 'OpenType="true"' in attrs:
-            entry["open"] = True
-        out[f"microsoft.graph.{name}"] = entry
-    for name, body in _ENUM.findall(text):
-        out[f"microsoft.graph.{name}"] = {
-            "kind": "EnumType", "members": _MEMBER.findall(body),
-        }
+    schemas = _SCHEMA.findall(text) or [("microsoft.graph", text)]
+    for namespace, block in schemas:
+        for kind, name, attrs, body in _TYPE.findall(block):
+            body = body or ""
+            base = _BASE.search(attrs)
+            entry: dict[str, object] = {
+                "kind": kind, "namespace": namespace,
+                "properties": dict(_PROPERTY.findall(body)),
+            }
+            if base:
+                entry["base"] = qualify(base.group(1), namespace)
+            if 'OpenType="true"' in attrs:
+                entry["open"] = True
+            out[f"{namespace}.{name}"] = entry
+        for name, _attrs, body in _ENUM.findall(block):
+            out[f"{namespace}.{name}"] = {
+                "kind": "EnumType", "namespace": namespace,
+                "members": _MEMBER.findall(body or ""),
+            }
     return out
 
 
-def qualify(type_name: str) -> str:
-    """``graph.tiAction`` and ``tiAction`` alike → ``microsoft.graph.tiAction``.
+def qualify(type_name: str, namespace: str = "microsoft.graph") -> str:
+    """Spell a type reference in full, from where it was written.
 
-    The clean metadata spells the namespace as the alias ``graph``; the
-    reduction spells it in full, as the rest of ``data/vendor-specs`` does.
+    The clean metadata spells the main namespace as the alias ``graph`` and
+    a schema's own namespace as ``self``; anything else is already written
+    out. ``namespace`` is the schema the reference appears in, which is what
+    ``self`` means.
     """
-    return "microsoft.graph." + type_name.rsplit(".", 1)[-1]
+    head, _, name = type_name.rpartition(".")
+    if head in ("", "self"):
+        return f"{namespace}.{name}"
+    if head == "graph":
+        return f"microsoft.graph.{name}"
+    return type_name
 
 
 def closure(reduced: dict, roots: list[str]) -> dict:
     """``roots`` and every type reachable from their properties."""
-    wanted, queue = set(), [qualify(r) for r in roots]
+    # A root may be given short (`tiIndicator`) or in full
+    # (`microsoft.graph.security.deviceEvidence`).
+    wanted, queue = set(), [r if "." in r else qualify(r) for r in roots]
     while queue:
         name = queue.pop()
         entry = reduced.get(name)
         if name in wanted or not isinstance(entry, dict):
             continue
         wanted.add(name)
+        namespace = str(entry.get("namespace") or "microsoft.graph")
         queue.extend(
-            qualify(re.sub(r"^Collection\(|\)$", "", t))
+            qualify(re.sub(r"^Collection\(|\)$", "", t), namespace)
             for t in (entry.get("properties") or {}).values()
         )
         if entry.get("base"):
-            queue.append(qualify(str(entry["base"])))
+            queue.append(str(entry["base"]))
     return {k: v for k, v in reduced.items() if k in wanted}
 
 
