@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A suppression that stopped suppressing.**
+`main.py` binds the mock on `0.0.0.0` on purpose and said so with a
+`# nosec B104` on the `uvicorn.run(` line. bandit 1.9.4 attributes the
+finding to the argument rather than to the call, so the marker no longer
+covered it and CI's SAST step failed on every push. The marker sits on the
+`host=` line now, where the finding is.
+
 **Work assigned to people the tenant does not employ, on two more products.**
 The same defect as the Cortex incidents: a Falcon detection was assigned to a
 `fake.email()` under an unrelated `fake.name()`, an incident to another

@@ -1290,6 +1290,13 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
 def _cli() -> None:
     """CLI entrypoint for ``mockdr`` command."""
     import uvicorn
-    uvicorn.run(  # nosec B104
-        "main:app", host="0.0.0.0", port=8001, reload=True, server_header=False,
+    uvicorn.run(
+        "main:app",
+        # A mock others reach over the network: bound on purpose, and the
+        # marker sits on the argument bandit points at rather than on the
+        # call, which it stopped attributing the finding to.
+        host="0.0.0.0",  # nosec B104
+        port=8001,
+        reload=True,
+        server_header=False,
     )
