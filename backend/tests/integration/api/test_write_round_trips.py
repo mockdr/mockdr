@@ -1102,3 +1102,53 @@ class TestUriSearch:
         answer = client.get("/elastic/zzz-uri/_search", headers=self.ES,
                             params={"size": "zzz"})
         assert answer.status_code == 400
+
+
+class TestUriQueryOnTheOtherRoutes:
+    """`q` narrows a count and a delete, not only a search.
+
+    The delete is the one that mattered: `_delete_by_query?q=name:zzz`
+    emptied the index here and deleted nothing on a cluster, so a targeted
+    deletion became a wipe — reported as a 200 whose numbers nobody reads.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+
+    @pytest.fixture(autouse=True)
+    def _documents(self, client: TestClient) -> None:
+        for doc_id, name in ((1, "alpha"), (2, "beta"), (3, "gamma")):
+            client.put(f"/elastic/zzz-del-q/_doc/{doc_id}", headers=self.ES,
+                       params={"refresh": "true"}, json={"name": name})
+
+    def _count(self, client: TestClient, **params: str) -> int:
+        return client.get("/elastic/zzz-del-q/_count", headers=self.ES,
+                          params=params).json()["count"]
+
+    def test_count_honours_q(self, client: TestClient) -> None:
+        assert self._count(client) == 3
+        assert self._count(client, q="name:beta") == 1
+        assert self._count(client, q="name:zzz") == 0
+
+    def test_a_delete_that_matches_nothing_deletes_nothing(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.post("/elastic/zzz-del-q/_delete_by_query", headers=self.ES,
+                             params={"q": "name:zzz", "refresh": "true"}).json()
+        assert answer["deleted"] == 0
+        assert answer["total"] == 0
+        assert self._count(client) == 3
+
+    def test_a_delete_that_matches_one_deletes_one(self, client: TestClient) -> None:
+        answer = client.post("/elastic/zzz-del-q/_delete_by_query", headers=self.ES,
+                             params={"q": "name:beta", "refresh": "true"}).json()
+        assert answer["deleted"] == 1
+        assert self._count(client) == 2
+
+    def test_update_by_query_is_narrowed_the_same_way(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.post("/elastic/zzz-del-q/_update_by_query", headers=self.ES,
+                             params={"q": "name:zzz", "refresh": "true"},
+                             json={"script": {"source": "ctx._source.n = 1"}}).json()
+        assert answer["updated"] == 0

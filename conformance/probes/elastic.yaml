@@ -2942,3 +2942,41 @@ probes:
       content: '{"size": 3, "query": {"match_all": {}}, "sort": ["_doc"]}'
       headers: {Content-Type: application/json}
       auth: basic
+
+  - id: es-uri-count-q
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `_count?q=…` counts what the query matches, not the whole index.
+    request:
+      method: GET
+      path: /${seed_index}/_count
+      query: {q: 'sev:99'}
+      auth: basic
+
+  - id: es-uri-count-q-no-match
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      And a query nothing matches counts nothing.
+    request:
+      method: GET
+      path: /${seed_index}/_count
+      query: {q: 'sev:12345'}
+      auth: basic
+
+  - id: es-uri-delete-by-query-no-match
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      The one that mattered most: `q` narrows what a delete-by-query
+      deletes. mockdr ignored it and emptied the index — a targeted deletion
+      became a wipe, with a 200 that said so in numbers nobody reads.
+    request:
+      method: POST
+      path: /${seed_index}/_delete_by_query
+      query: {q: 'sev:12345', refresh: 'true'}
+      auth: basic

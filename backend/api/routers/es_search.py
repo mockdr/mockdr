@@ -278,12 +278,16 @@ def _with_uri_params(body: dict, query: Mapping[str, str]) -> dict:
 @router.get("/_count", operation_id="es_count_all_get")
 @router.post("/_count", operation_id="es_count_all_post")
 def es_count_all(
+    request: Request,
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Count across every index; the route was missing, like ``/_search`` was."""
-    return search_queries.es_count("_all", body, ignore_unavailable=ignore_unavailable)
+    return search_queries.es_count(
+        "_all", _with_uri_params(body, request.query_params),
+        ignore_unavailable=ignore_unavailable,
+    )
 
 
 @router.get("/_mget", operation_id="es_mget_all_get")
@@ -459,6 +463,7 @@ def clear_scroll(body: dict = Body(default={}), _: dict = Depends(require_es_aut
 @router.post("/{index}/_count", operation_id="es_count_post")
 def es_count(
     index: str,
+    request: Request,
     body: dict = Body(default={}),
     ignore_unavailable: bool = Query(default=False),
     _: dict = Depends(require_es_auth),
@@ -466,7 +471,8 @@ def es_count(
     """Return a document count without the hits."""
     try:
         return search_queries.es_count(
-            index, body, ignore_unavailable=ignore_unavailable,
+            index, _with_uri_params(body, request.query_params),
+            ignore_unavailable=ignore_unavailable,
         )
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
@@ -591,13 +597,15 @@ def update_doc(
 @router.post("/{index}/_update_by_query", operation_id="es_update_by_query")
 def update_by_query(
     index: str,
+    request: Request,
     body: dict | None = Body(default=None),
     _refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Apply a script to every document a query matches."""
     try:
-        return search_queries.es_update_by_query(index, body or {})
+        return search_queries.es_update_by_query(
+            index, _with_uri_params(body or {}, request.query_params))
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
     except PainlessError as exc:
@@ -609,13 +617,20 @@ def update_by_query(
 @router.post("/{index}/_delete_by_query", operation_id="es_delete_by_query")
 def delete_by_query(
     index: str,
+    request: Request,
     body: dict | None = Body(default=None),
     _refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Delete every document a query matches."""
+    """Delete every document a query matches.
+
+    ``q`` in the query string narrows what is deleted, and reading it was
+    not optional: ``_delete_by_query?q=name:zzz`` emptied the index here and
+    deleted nothing on a cluster.
+    """
     try:
-        return search_queries.es_delete_by_query(index, body or {})
+        return search_queries.es_delete_by_query(
+            index, _with_uri_params(body or {}, request.query_params))
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
 
