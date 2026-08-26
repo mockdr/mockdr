@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
 
 from api.auth import require_admin, require_write
@@ -9,6 +9,7 @@ from application.alerts import queries as alert_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from utils.documented_params import documented_openapi, documented_params
 from utils.pagination import build_list_response
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Alerts"])
 
@@ -102,6 +103,18 @@ def list_star_rules(
         definition="v2_1.rules.schemas_RuleViewSchema_many_200",
         strict=True,
     )
+
+
+@router.delete("/cloud-detection/rules")
+def delete_star_rules(body: dict, _: dict = Depends(require_admin)) -> dict:
+    """Delete the STAR rules the body's ``filter`` selects."""
+    try:
+        return alert_commands.delete_star_rules(body.get("filter") or {})
+    except alert_commands.UnfilterableError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
 
 
 @router.post("/cloud-detection/rules")

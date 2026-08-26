@@ -280,6 +280,10 @@ _RAW_COLLECTIONS = {
     "cs_oauth_tokens",
     # Elastic Security
     "es_api_keys",
+    # The management console's own settings, which `PUT /system/configuration`
+    # changes: a console that forgot them on restart would answer a client
+    # its own change had never happened.
+    "system_config",
     # Cortex XDR: the tenant's user directory, keyed by mail address, is who
     # its incidents are assigned to — losing it on restart would leave every
     # assignee pointing at nobody again.

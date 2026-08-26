@@ -87,6 +87,30 @@ def update_group_policy(
     return _shaped(result, "policies_schemas_EnrichedPolicySchema_200")
 
 
+@router.put("/accounts/{account_id}/policy")
+def update_account_policy(
+    account_id: str,
+    body: PolicyUpdateBody,
+    current_user: dict = Depends(require_admin),
+) -> dict:
+    """Apply partial updates to the account-level policy.
+
+    The account has to exist, as it does on the GET beside this one: the
+    2.1 API answers 404 for an id it does not have, and confirming a policy
+    change against an account nobody has is the worst way to say no.
+    """
+    if account_queries.get_account(account_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_vendor_error(
+                "sentinelone", 404, f"Account {account_id} not found"),
+        )
+    result = policy_commands.update_policy(
+        None, None, body.model_dump(), current_user.get("userId")
+    )
+    return _shaped(result, "policies_schemas_EnrichedPolicySchema_200")
+
+
 @router.put("/tenant/policy")
 def update_tenant_policy(
     body: PolicyUpdateBody,

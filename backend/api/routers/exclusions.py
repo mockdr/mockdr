@@ -19,6 +19,7 @@ from utils.pagination import (
     build_single_response,
     paginate,
 )
+from utils.s1_fixtures import restrict_s1
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Exclusions & Blocklist"])
@@ -29,6 +30,33 @@ _BLOCKLIST_SPECS = [
 ]
 
 _BLOCKLIST_INTERNAL = {"siteId"}
+
+#: What the 2.1 swagger requires inside `data` on both update routes. The
+#: record to change is named in the body, not in the path — this is how a
+#: real client updates an exclusion or a blocklist entry.
+_UPDATE_REQUIRED = ("id", "osType", "type")
+
+#: The blocklist fields an update may set. `id` names the record and
+#: `hashId`, `userId`, `createdAt` and the scope belong to the service.
+_RESTRICTION_UPDATABLE = ("description", "osType", "source", "value", "sha256Value", "type")
+
+
+def _update_payload(body: dict) -> dict:
+    """The `data` object of an update body, refused if it is not complete."""
+    data = body.get("data")
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinelone", 400, "data is required"),
+        )
+    missing = [name for name in _UPDATE_REQUIRED if not data.get(name)]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error(
+                "sentinelone", 400, f"data.{missing[0]} is required"),
+        )
+    return data
 
 
 @router.get("/exclusions", openapi_extra=documented_openapi("/exclusions"))
@@ -83,6 +111,28 @@ def create_exclusion(body: dict, current_user: dict = Depends(require_admin)) ->
             status_code=400,
             detail=build_vendor_error("sentinelone", 400, str(exc)),
         ) from exc
+
+
+@router.put("/exclusions")
+def update_exclusion_by_body(body: dict, current_user: dict = Depends(require_admin)) -> dict:
+    """Update the exclusion named by ``data.id``.
+
+    The 2.1 API updates by body here, and answers the list shape rather than
+    the single one — mockdr served the by-id path it invented and answered
+    405 to the call a real client makes.
+    """
+    data = _update_payload(body)
+    result = exclusion_commands.update_exclusion(
+        str(data["id"]), {"data": data}, current_user.get("userId"),
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_vendor_error("sentinelone", 404, "Exclusion not found"),
+        )
+    return restrict_s1(
+        {"data": [result["data"]]}, "exclusions.schemas_ExclusionSchema_many_200",
+    )
 
 
 @router.put("/exclusions/{exclusion_id}")
@@ -173,6 +223,28 @@ def create_blocklist_entry(body: dict, current_user: dict = Depends(require_admi
     }
     blocklist_repo.save_raw(bid, record)
     return build_single_response(record)
+
+
+@router.put("/restrictions")
+def update_blocklist_entry(body: dict, _: dict = Depends(require_admin)) -> dict:
+    """Update the blocklist entry named by ``data.id``."""
+    data = _update_payload(body)
+    entry_id = str(data["id"])
+    record = blocklist_repo.get(entry_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_vendor_error("sentinelone", 404, "Blocklist entry not found"),
+        )
+    updated = dict(record)
+    for key in _RESTRICTION_UPDATABLE:
+        if key in data:
+            updated[key] = data[key]
+    updated["updatedAt"] = utc_now()
+    blocklist_repo.save_raw(entry_id, updated)
+    return restrict_s1(
+        {"data": [updated]}, "exclusions.schemas_RestrictionSchema_many_200",
+    )
 
 
 @router.delete("/restrictions")

@@ -38,12 +38,25 @@ def update_policy(
             policy_repo.save_for_group(group_id, p)
 
     else:
-        return None
+        # The tenant policy, which `PUT /tenant/policy` and
+        # `PUT /accounts/{id}/policy` change. Returning None here meant both
+        # answered 200 with `data: null` and changed nothing — an update
+        # that reports neither success nor failure.
+        policy = policy_repo.get_for_tenant()
+
+        def save_fn(p: Policy) -> None:
+            policy_repo.save_for_tenant(p)
 
     if not policy:
         return None
 
-    for field, value in updates.items():
+    # The 2.1 API wraps a policy change in `data`, and every one of these
+    # routes passed the wrapper straight in: `hasattr(policy, "data")` is
+    # false, so nothing was ever set and all three answered 200 with the
+    # policy unchanged.
+    wrapped = updates.get("data")
+    changes: dict = wrapped if isinstance(wrapped, dict) else updates
+    for field, value in changes.items():
         if hasattr(policy, field):
             setattr(policy, field, value)
     policy.updatedAt = utc_now()

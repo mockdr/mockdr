@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every policy update answered 200 and changed nothing.**
+`PUT /sites/{id}/policy`, `PUT /groups/{id}/policy` and `PUT /tenant/policy`
+passed the request body in whole to a routine that assigns each of its keys
+to the policy — but the 2.1 API wraps a change in `data`, and a policy has no
+field of that name, so every update set nothing and answered the unchanged
+policy back with a 200. The tenant scope was worse: it resolved to no policy
+at all, so `PUT /tenant/policy` answered `{"data": null}`, which is neither a
+success nor a failure. Both are fixed, and the round trip is pinned.
+
+**A tag with no key and no value, created and confirmed.**
+`POST /tag-manager` requires `key`, `value` and `type` inside `data`, and
+mockdr defaulted every one of them: a body that named none of them — a client
+sending its fields flat, which is the easy mistake — created a tag with an
+empty key and an empty value and answered 200 with it. Nothing can be found
+by that tag afterwards. The three required members are required now.
+
 **A route the mock publishes and nothing could reach.**
 Starlette matches in registration order and stops at the first hit, so a
 literal path declared after a sibling pattern that covers it never runs.
@@ -40,6 +56,21 @@ of the snapshot, so it survives a restart along with the incidents that point
 into it.
 
 ### Added
+
+**Six documented calls that answered 405, and what implementing them found.**
+`param_drift.py` compared the parameters of operations both sides describe,
+which meant it could not see an operation only one side has: a method the
+swagger documents on a path mockdr already serves was skipped in silence.
+There were six, and five are how a real client writes — SentinelOne updates
+an exclusion and a blocklist entry by body (`PUT /exclusions`,
+`PUT /restrictions`, `data.id` naming the record), and deletes rules and tags
+by filter (`DELETE /cloud-detection/rules`, `DELETE /tag-manager`) — so an
+integration doing the ordinary thing got a 405 from a route that was, on
+paper, implemented. `PUT /accounts/{id}/policy` and
+`PUT /system/configuration` complete the set. The two delete-by-filter routes
+refuse an empty filter, which describes every record there is, and a filter
+whose members this install cannot answer, which would delete a different set
+than the one asked for. The audit reports the difference now, and it is zero.
 
 **A sweep for code nothing can reach, and the invented numbers it found.**
 `unread_params.py` reads the source for a parameter a handler never looks at;

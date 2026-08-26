@@ -99,3 +99,75 @@ def set_incident_status(status: str, ids: list[str], actor_user_id: str | None =
         webhook_commands.fire_event(ALERT_UPDATED, record_dict(alert))
         affected += 1
     return {"data": {"affected": affected}}
+
+
+class UnfilterableError(ValueError):
+    """A delete filter this install cannot answer, refused rather than guessed."""
+
+
+#: Delete-filter member -> the filter the rule list already answers. The
+#: delete body names them in the plural where the list route takes the
+#: singular, and the rest carry the same names on both.
+_RULE_FILTER_ALIASES = {
+    "statuses": "status",
+    "severities": "severity",
+    "queryTypes": "queryType",
+    "s1qlSubstring": "s1ql__contains",
+    "descriptionSubstring": "description__contains",
+}
+
+#: Members the rule list answers under their own name.
+_RULE_FILTER_DIRECT = (
+    "name__contains", "description__contains", "expirationMode", "expired",
+    "scopeId", "siteIds", "accountIds", "s1ql__contains",
+)
+
+
+def delete_star_rules(filter_obj: dict) -> dict:
+    """Delete the STAR rules a filter selects, and report how many.
+
+    The 2.1 API deletes rules by filter — there is no ids member and no
+    per-rule path — so a caller says which rules by describing them. Two
+    things this route will not do: delete on an empty filter, which
+    describes every rule the install has, and delete on a filter whose only
+    members this install cannot answer, which would delete a different set
+    than the one asked for. Both are refused.
+
+    Args:
+        filter_obj: The body's ``filter`` object.
+
+    Returns:
+        ``{"data": {"affected": n}}``.
+
+    Raises:
+        UnfilterableError: The filter is empty, or names nothing answerable.
+    """
+    from application.alerts.queries import filter_star_rules  # noqa: PLC0415
+    from repository.store import store  # noqa: PLC0415 - avoids an import cycle
+
+    params = _rule_filter_params(filter_obj)
+    matched = filter_star_rules(params)
+    for rule in matched:
+        store.delete("star_rules", str(rule["id"]))
+    return {"data": {"affected": len(matched)}}
+
+
+def _rule_filter_params(filter_obj: dict) -> dict:
+    """A delete filter as the parameters the rule list already understands."""
+    if not filter_obj:
+        msg = "filter is required"
+        raise UnfilterableError(msg)
+
+    params: dict = {}
+    for name, value in filter_obj.items():
+        target = _RULE_FILTER_ALIASES.get(name, name if name in _RULE_FILTER_DIRECT else None)
+        if target is None or value in (None, "", [], {}):
+            continue
+        params[target] = (
+            ",".join(str(item) for item in value) if isinstance(value, list) else str(value)
+        )
+    if not params:
+        named = ", ".join(sorted(filter_obj))
+        msg = f"this install cannot select rules by {named}"
+        raise UnfilterableError(msg)
+    return params

@@ -10,6 +10,10 @@ from utils.id_gen import new_id
 from utils.serde import record_dict
 
 
+class InvalidTagError(ValueError):
+    """A tag the 2.1 API would refuse to create."""
+
+
 def _resolve_scope(filter_obj: dict) -> tuple[str, str, str]:
     """Determine scope level, scope ID, and scope path from the filter object.
 
@@ -54,6 +58,12 @@ def _resolve_scope(filter_obj: dict) -> tuple[str, str, str]:
 def create_tag(body: dict, user_name: str = "", user_id: str = "") -> dict:
     """Create a new tag definition.
 
+    The 2.1 swagger requires `key`, `value` and `type` inside `data`. A body
+    that carries none of them used to create a tag with an empty key and an
+    empty value and answer 200 with it — a tag nothing can be found by, and
+    a client that sent its fields flat rather than under `data` had no way
+    to tell.
+
     Args:
         body: Request body with ``data`` and ``filter`` keys.
         user_name: Display name of the creating user.
@@ -61,8 +71,15 @@ def create_tag(body: dict, user_name: str = "", user_id: str = "") -> dict:
 
     Returns:
         Single-item response envelope.
+
+    Raises:
+        InvalidTagError: A required member is missing.
     """
-    data = body.get("data", {})
+    data = body.get("data") or {}
+    missing = [name for name in ("key", "value", "type") if not str(data.get(name) or "").strip()]
+    if missing:
+        msg = f"data.{missing[0]} is required"
+        raise InvalidTagError(msg)
     filter_obj = body.get("filter", {})
     scope_level, scope_id, scope_path = _resolve_scope(filter_obj)
 
@@ -149,3 +166,60 @@ def delete_tag(tag_id: str) -> dict:
             agent.tags = updated
 
     return {"data": {"affected": 1 if deleted else 0}}
+
+
+class UnfilterableError(ValueError):
+    """A delete filter this install cannot answer, refused rather than guessed."""
+
+
+def delete_tags(filter_obj: dict) -> dict:
+    """Delete the tag definitions a filter selects, and report how many.
+
+    The 2.1 API deletes tags by filter rather than by path. `tagIds` names
+    them outright; `query` is the free-text search the UI sends, over key,
+    value and description; a scope member selects the tags defined at that
+    scope. An empty filter selects every tag this install has, which the
+    route refuses rather than acts on.
+
+    Args:
+        filter_obj: The body's ``filter`` object.
+
+    Returns:
+        ``{"data": {"affected": n}}``.
+
+    Raises:
+        UnfilterableError: The filter is empty, or names nothing answerable.
+    """
+    if not filter_obj:
+        msg = "filter is required"
+        raise UnfilterableError(msg)
+
+    tag_ids = filter_obj.get("tagIds") or []
+    if isinstance(tag_ids, str):
+        tag_ids = [t for t in tag_ids.split(",") if t]
+    excluded = set(filter_obj.get("tagIdsExcluded") or [])
+    query = str(filter_obj.get("query") or "").lower()
+    scope_level, scope_id, _ = _resolve_scope(filter_obj)
+    scoped = any(
+        filter_obj.get(name) for name in ("tenant", "groupIds", "siteIds", "accountIds")
+    )
+
+    if not tag_ids and not query and not scoped:
+        named = ", ".join(sorted(filter_obj))
+        msg = f"this install cannot select tags by {named}"
+        raise UnfilterableError(msg)
+
+    affected = 0
+    for tag in list(tag_repo.list_all()):
+        if tag.id in excluded:
+            continue
+        if tag_ids and tag.id not in tag_ids:
+            continue
+        if query and query not in " ".join(
+            str(part or "").lower() for part in (tag.key, tag.value, tag.description)
+        ):
+            continue
+        if scoped and not tag_ids and (tag.scopeLevel, tag.scopeId) != (scope_level, scope_id):
+            continue
+        affected += int(delete_tag(tag.id)["data"]["affected"])
+    return {"data": {"affected": affected}}

@@ -41,7 +41,9 @@ def _create_tag(
 ) -> dict:
     """Helper to create a tag via the API."""
     payload = {
-        "data": {"key": key, "value": value, "description": description},
+        "data": {
+            "key": key, "value": value, "type": "agents", "description": description,
+        },
         "filter": {"tenant": True, **filter_overrides},
     }
     return client.post(TAG_MANAGER, headers=auth_headers, json=payload).json()
@@ -56,7 +58,10 @@ class TestCreateTag:
     def test_create_returns_200(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.post(
             TAG_MANAGER, headers=auth_headers,
-            json={"data": {"key": "K", "value": "V"}, "filter": {"tenant": True}},
+            json={
+                "data": {"key": "K", "value": "V", "type": "agents"},
+                "filter": {"tenant": True},
+            },
         )
         assert resp.status_code == 200
 
@@ -116,12 +121,45 @@ class TestCreateTag:
         assert after == before + 1
 
     def test_create_requires_auth(self, client: TestClient) -> None:
-        resp = client.post(TAG_MANAGER, json={"data": {"key": "K", "value": "V"}})
+        resp = client.post(
+            TAG_MANAGER, json={"data": {"key": "K", "value": "V", "type": "agents"}},
+        )
         assert resp.status_code == 401
 
-    def test_create_defaults_type_to_agents(self, client: TestClient, auth_headers: dict) -> None:
+    def test_the_type_is_the_one_that_was_asked_for(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
         body = _create_tag(client, auth_headers)
         assert body["data"]["type"] == "agents"
+
+    def test_a_body_missing_a_required_member_is_refused(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """The 2.1 swagger requires `key`, `value` and `type` inside `data`.
+
+        A body with none of them created a tag with an empty key and an
+        empty value and answered 200 with it — nothing can be found by that
+        tag, and a client that sent its fields flat rather than under `data`
+        had no way to tell.
+        """
+        for data in ({"value": "V", "type": "agents"},
+                     {"key": "K", "type": "agents"},
+                     {"key": "K", "value": "V"},
+                     {}):
+            resp = client.post(
+                TAG_MANAGER, headers=auth_headers,
+                json={"data": data, "filter": {"tenant": True}},
+            )
+            assert resp.status_code == 400, data
+
+    def test_fields_sent_flat_are_refused_rather_than_dropped(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        resp = client.post(
+            TAG_MANAGER, headers=auth_headers,
+            json={"key": "K", "value": "V", "type": "agents"},
+        )
+        assert resp.status_code == 400
 
 
 # ── PUT /tag-manager/{id} ────────────────────────────────────────────────────

@@ -78,6 +78,26 @@ def _undocumented_routes(spec: dict, mock: dict) -> list[str]:
     ]
 
 
+def _unserved_methods(spec: dict, mock: dict) -> list[str]:
+    """Every documented method on a path this mock serves with other verbs.
+
+    The per-route comparison below skips these silently — it can only compare
+    an operation both sides describe — and a 405 on a documented call is
+    invisible to every audit that reads answers. Six were found this way:
+    `PUT /exclusions`, which is how a real client updates one, and the
+    update and delete-by-filter calls beside it.
+    """
+    return [
+        f"{method.upper()} {path}"
+        for path, operations in sorted(spec["paths"].items())
+        if path in mock["paths"]
+        for method in sorted(
+            {m for m in operations if m in _METHODS}
+            - {m for m in mock["paths"][path] if m in _METHODS}
+        )
+    ]
+
+
 def main() -> int:
     """Report the parameter difference for every route both sides describe."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -125,6 +145,7 @@ def main() -> int:
                     print(f"      mock-only: {', '.join(mock_only)}")
 
     undocumented = _undocumented_routes(spec, mock)
+    unserved = _unserved_methods(spec, mock)
     print(
         f"\n=== PARAMETER DRIFT === {routes} routes compared\n"
         f"  {ignored_total} documented parameter(s) this mock does not take\n"
@@ -132,6 +153,9 @@ def main() -> int:
         f"  {len(undocumented)} route(s) this mock serves that the swagger does not publish"
     )
     for route in undocumented:
+        print(f"      {route}")
+    print(f"  {len(unserved)} documented method(s) answered 405 on a path this mock serves")
+    for route in unserved:
         print(f"      {route}")
     if args.max_mock_only is not None and mock_only_total > args.max_mock_only:
         print(f"  FAIL: more than {args.max_mock_only} undocumented parameters")
