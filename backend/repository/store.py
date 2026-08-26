@@ -112,6 +112,7 @@ class InMemoryStore:
             "xdr_audit_logs": {},
             "xdr_distributions": {},
             "xdr_api_keys": {},
+            "xdr_users": {},
             "xdr_hash_exceptions": {},
             "xdr_xql_queries": {},
             # ── Splunk SIEM collections ─────────────────────────────────────

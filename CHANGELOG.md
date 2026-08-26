@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+**Cortex XDR assigned its incidents to people the tenant did not employ.**
+`rbac/get_users` answered three canned role accounts, while every incident
+drew a fresh `fake.name()` for `assigned_user_pretty_name` and built a mail
+address from it — so the intersection of "who has incidents" and "who this
+tenant has" was empty. A client that read an incident's `assigned_user_mail`
+and looked the person up in the user directory found nobody, every time; a
+SOAR playbook routing by assignee had nothing to route to. There is a seeded
+directory now (the three role accounts plus eight analysts), incidents are
+assigned out of it, and `rbac/get_users` reads it back. The directory is part
+of the snapshot, so it survives a restart along with the incidents that point
+into it.
+
 ### Added
 
 **A sweep that reseeded the world under itself.**

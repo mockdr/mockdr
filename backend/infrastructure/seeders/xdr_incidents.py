@@ -18,12 +18,17 @@ from repository.xdr_endpoint_repo import xdr_endpoint_repo
 from repository.xdr_incident_repo import xdr_incident_repo
 
 
-def seed_xdr_incidents(fake: Faker, endpoint_ids: list[str]) -> list[str]:
+def seed_xdr_incidents(
+    fake: Faker, endpoint_ids: list[str], directory: list[dict] | None = None,
+) -> list[str]:
     """Generate ~20 XDR incident records linked to endpoints.
 
     Args:
         fake: Shared Faker instance (seeded externally).
         endpoint_ids: Available endpoint IDs to link incidents to.
+        directory:    The tenant's user directory; an incident is assigned
+                      to somebody in it, because a client that reads an
+                      assignee looks them up there.
 
     Returns:
         List of ``incident_id`` strings.
@@ -61,9 +66,10 @@ def seed_xdr_incidents(fake: Faker, endpoint_ids: list[str]) -> list[str]:
         # Assigned user for non-new incidents
         assigned_mail = ""
         assigned_name = ""
-        if status != "new":
-            assigned_name = fake.name()
-            assigned_mail = f"{assigned_name.lower().replace(' ', '.')}@acmecorp.internal"
+        if status != "new" and directory:
+            assignee = random.choice(directory)
+            assigned_name = str(assignee["pretty_name"])
+            assigned_mail = str(assignee["user_email"])
 
         xdr_incident_repo.save(XdrIncident(
             incident_id=iid,

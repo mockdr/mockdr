@@ -280,6 +280,10 @@ _RAW_COLLECTIONS = {
     "cs_oauth_tokens",
     # Elastic Security
     "es_api_keys",
+    # Cortex XDR: the tenant's user directory, keyed by mail address, is who
+    # its incidents are assigned to — losing it on restart would leave every
+    # assignee pointing at nobody again.
+    "xdr_users",
     # Microsoft Defender
     "mde_oauth_tokens",
     # None of these were registered, so an issued token, an open Splunk

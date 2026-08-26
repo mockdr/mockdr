@@ -89,6 +89,7 @@ from infrastructure.seeders.xdr_endpoints import seed_xdr_endpoints
 from infrastructure.seeders.xdr_hash_exceptions import seed_xdr_hash_exceptions
 from infrastructure.seeders.xdr_incidents import seed_xdr_incidents
 from infrastructure.seeders.xdr_iocs import seed_xdr_iocs
+from infrastructure.seeders.xdr_rbac import seed_xdr_users
 from infrastructure.seeders.xdr_scripts import seed_xdr_scripts
 from repository.store import store
 from utils import id_gen
@@ -163,8 +164,10 @@ def generate_all() -> None:
 
     # ── Cortex XDR seeders ───────────────────────────────────────────────────
     seed_xdr_api_keys()
+    # The directory first: incidents are assigned to people in it.
+    xdr_users = seed_xdr_users(fake)
     xdr_endpoint_ids = seed_xdr_endpoints(fake)
-    xdr_incident_ids = seed_xdr_incidents(fake, xdr_endpoint_ids)
+    xdr_incident_ids = seed_xdr_incidents(fake, xdr_endpoint_ids, xdr_users)
     seed_xdr_alerts(fake, xdr_incident_ids, xdr_endpoint_ids)
     seed_xdr_scripts()
     seed_xdr_iocs(fake)

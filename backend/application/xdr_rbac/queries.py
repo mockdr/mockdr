@@ -1,45 +1,23 @@
 """Cortex XDR RBAC query handlers (read-only)."""
 from __future__ import annotations
 
+from infrastructure.seeders.xdr_rbac import XDR_USERS_COLLECTION
+from repository.store import store
 from utils.xdr_response import build_xdr_reply
 
 
 def get_users() -> dict:
-    """Return a synthetic list of XDR users.
+    """Return the tenant's user directory.
+
+    It was three canned role accounts while every incident was assigned to a
+    freshly invented name, so a client that read an incident's
+    `assigned_user_mail` and looked the person up here found nobody — every
+    time. The directory is seeded now, and incidents are assigned within it.
 
     Returns:
-        XDR list reply with canned user records.
+        XDR list reply with the tenant's users.
     """
-    users = [
-        {
-            "user_email": "admin@acmecorp.internal",
-            "user_first_name": "Admin",
-            "user_last_name": "User",
-            "role": "admin",
-            "status": "active",
-            "pretty_name": "Admin User",
-            "groups": ["XDR Admins"],
-        },
-        {
-            "user_email": "analyst@acmecorp.internal",
-            "user_first_name": "SOC",
-            "user_last_name": "Analyst",
-            "role": "analyst",
-            "status": "active",
-            "pretty_name": "SOC Analyst",
-            "groups": ["SOC Team"],
-        },
-        {
-            "user_email": "viewer@acmecorp.internal",
-            "user_first_name": "Viewer",
-            "user_last_name": "User",
-            "role": "viewer",
-            "status": "active",
-            "pretty_name": "Viewer User",
-            "groups": ["Read Only"],
-        },
-    ]
-    return build_xdr_reply(users)  # recorded: a bare list in reply
+    return build_xdr_reply(list(store.get_all(XDR_USERS_COLLECTION)))
 
 
 def get_user_groups(group_names: list[str] | None = None) -> dict:

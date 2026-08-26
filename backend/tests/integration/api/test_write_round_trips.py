@@ -4020,3 +4020,60 @@ class TestGraphHuntsTheSameDataDefenderDoes:
                              headers=self._headers(client, "mde"))
         assert machine.status_code == 200
         assert machine.json()["id"] == row["DeviceId"]
+
+
+class TestAnAssigneeIsSomebodyTheTenantHas:
+    """Cortex incidents were assigned to people the tenant had never heard of.
+
+    `rbac/get_users` answered three canned role accounts while every incident
+    drew a fresh invented name for its assignee — so a client that read an
+    incident's `assigned_user_mail` and looked the person up in the tenant's
+    own directory found nobody, every time, and could not tell whether the
+    incident was assigned to a colleague or to nothing.
+    """
+
+    XDR = {"x-xdr-auth-id": "1", "Authorization": "xdr-admin-secret"}
+
+    def _users(self, client: TestClient) -> list[dict]:
+        return list(client.post("/xdr/public_api/v1/rbac/get_users/",
+                                headers=self.XDR,
+                                json={"request_data": {}}).json()["reply"])
+
+    def _incidents(self, client: TestClient) -> list[dict]:
+        reply = client.post("/xdr/public_api/v1/incidents/get_incidents/",
+                            headers=self.XDR,
+                            json={"request_data": {}}).json()["reply"]
+        return list(reply["incidents"] if isinstance(reply, dict) else reply)
+
+    def test_every_assignee_is_in_the_directory(
+        self, client: TestClient,
+    ) -> None:
+        directory = {u["user_email"] for u in self._users(client)}
+        assigned = {
+            i["assigned_user_mail"] for i in self._incidents(client)
+            if i.get("assigned_user_mail")
+        }
+        assert assigned, "some incidents are assigned"
+        assert assigned <= directory
+
+    def test_the_directory_is_more_than_the_role_accounts(
+        self, client: TestClient,
+    ) -> None:
+        """A tenant that assigns work has people to assign it to."""
+        assert len(self._users(client)) > 3
+
+    def test_an_assignee_carries_the_name_the_directory_gives(
+        self, client: TestClient,
+    ) -> None:
+        by_mail = {u["user_email"]: u["pretty_name"] for u in self._users(client)}
+        for incident in self._incidents(client):
+            mail = incident.get("assigned_user_mail")
+            if mail:
+                assert incident["assigned_user_pretty_name"] == by_mail[mail]
+
+    def test_the_role_accounts_are_still_there(
+        self, client: TestClient,
+    ) -> None:
+        mails = {u["user_email"] for u in self._users(client)}
+        assert {"admin@acmecorp.internal", "analyst@acmecorp.internal",
+                "viewer@acmecorp.internal"} <= mails
