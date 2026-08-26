@@ -556,6 +556,105 @@ probes:
       query: {status: exploded}
       auth: basic
 
+  - id: kbn-item-create-empty
+    endpoint: kibana
+    why: An exception item with nothing in it, which used to be created.
+    request:
+      method: POST
+      path: /api/exception_lists/items
+      json: {}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-item-create-unknown-list
+    endpoint: kibana
+    why: An exception item on a list that does not exist.
+    request:
+      method: POST
+      path: /api/exception_lists/items
+      json: {list_id: conformance-no-such-list, name: n, description: d,
+             type: simple,
+             entries: [{field: a, operator: included, type: match, value: b}]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-item-create-bad-entry
+    endpoint: kibana
+    why: An entry that satisfies no branch of the entry union.
+    request:
+      method: POST
+      path: /api/exception_lists/items
+      json: {list_id: conformance-no-such-list, name: n, description: d,
+             type: simple, entries: [{nope: 1}]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-item-create-unknown-member
+    endpoint: kibana
+    why: An exception item body carrying a member the codec has no definition for.
+    request:
+      method: POST
+      path: /api/exception_lists/items
+      json: {list_id: conformance-no-such-list, name: n, description: d,
+             type: simple, nonsense_member: 1,
+             entries: [{field: a, operator: included, type: match, value: b}]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-item-update-no-identifier
+    endpoint: kibana
+    why: An item update naming no item — a 404 here, not a 400.
+    request:
+      method: PUT
+      path: /api/exception_lists/items
+      json: {name: n, description: d, type: simple,
+             entries: [{field: a, operator: included, type: match, value: b}]}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-item-get-no-identifier
+    endpoint: kibana
+    why: Reading an item without saying which.
+    request:
+      method: GET
+      path: /api/exception_lists/items
+      auth: basic
+
+  - id: kbn-item-get-missing
+    endpoint: kibana
+    why: Reading an item that does not exist, named by the id that addressed it.
+    request:
+      method: GET
+      path: /api/exception_lists/items
+      query: {item_id: conformance-no-such-item, namespace_type: single}
+      auth: basic
+
+  - id: kbn-item-get-bad-namespace
+    endpoint: kibana
+    why: A namespace_type Kibana does not have — a query error, not an empty result.
+    request:
+      method: GET
+      path: /api/exception_lists/items
+      query: {item_id: conformance-no-such-item, namespace_type: nope}
+      auth: basic
+
+  - id: kbn-item-delete-no-identifier
+    endpoint: kibana
+    why: Deleting an item without saying which — worded unlike the read.
+    request:
+      method: DELETE
+      path: /api/exception_lists/items
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-items-find-no-list
+    endpoint: kibana
+    why: Listing items without a list_id, which used to answer with all of them.
+    request:
+      method: GET
+      path: /api/exception_lists/items/_find
+      auth: basic
+
   - id: kbn-cases-bulk-get-public-path
     endpoint: kibana
     why: _bulk_get under /api, where Kibana keeps it only under /internal.

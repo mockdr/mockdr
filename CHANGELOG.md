@@ -696,6 +696,25 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**An exception item nothing checked.**
+Every write to `/api/exception_lists/items` was accepted: an empty body
+created an item, so did one naming a list that does not exist, and so did an
+entry whose `operator` Kibana has never had — each reported as a success. An
+exception with no entries matches nothing, so a rule carrying it behaves as
+though the exception were not there, and the client had just been told it
+was. Twenty error paths are compared against Kibana 8.15 byte for byte now,
+including the entry union: an entry is checked against four branches, and
+one that satisfies none of them is reported branch by branch, each distinct
+failure once. Listing items without a `list_id` was the same class in the
+other direction — it answered with every item mockdr held, across every
+list, as though they were that list's.
+
+**And the exceptions mockdr ships used an operator no Kibana emits.**
+The seeded items were written with `operator: "is"`; the vocabulary is
+`included` and `excluded`. A client reading an exception and writing it back
+the way it read it is exactly what the new validation answers 400 to — which
+is how the fixture was found.
+
 **Nine members a rule was told it had, and one it was not.**
 A rule created with the required fields alone carries none of
 `building_block_type`, `filters`, `investigation_fields`, `license`, `meta`,

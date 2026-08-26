@@ -44,59 +44,59 @@ _EXCEPTION_ITEMS: list[list[dict]] = [
     # Trusted Security Scanners
     [
         {"name": "Nessus Scanner", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "/opt/nessus/sbin/nessusd"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "/opt/nessus/sbin/nessusd"},
         ]},
         {"name": "Qualys Agent", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "C:\\Program Files\\Qualys\\QualysAgent\\QualysAgent.exe"},
         ]},
         {"name": "Nmap Scanner", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "/usr/bin/nmap"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "/usr/bin/nmap"},
         ]},
     ],
     # IT Admin Tools
     [
         {"name": "PsExec Remote Admin", "entries": [
-            {"field": "process.name", "operator": "is", "type": "match", "value": "psexec.exe"},
-            {"field": "process.parent.name", "operator": "is", "type": "match", "value": "cmd.exe"},
+            {"field": "process.name", "operator": "included", "type": "match", "value": "psexec.exe"},
+            {"field": "process.parent.name", "operator": "included", "type": "match", "value": "cmd.exe"},
         ]},
         {"name": "SCCM Client", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "C:\\Windows\\CCM\\CcmExec.exe"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "C:\\Windows\\CCM\\CcmExec.exe"},
         ]},
     ],
     # Development Build Servers
     [
         {"name": "Jenkins Build Agent", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "/opt/jenkins/agent.jar"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "/opt/jenkins/agent.jar"},
         ]},
         {"name": "GitHub Actions Runner", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "/opt/actions-runner/run.sh"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "/opt/actions-runner/run.sh"},
         ]},
         {"name": "Docker Build Process", "entries": [
-            {"field": "process.name", "operator": "is", "type": "match", "value": "dockerd"},
+            {"field": "process.name", "operator": "included", "type": "match", "value": "dockerd"},
         ]},
         {"name": "Maven Build", "entries": [
-            {"field": "process.name", "operator": "is", "type": "match", "value": "mvn"},
+            {"field": "process.name", "operator": "included", "type": "match", "value": "mvn"},
         ]},
     ],
     # Endpoint Trusted Applications
     [
         {"name": "CrowdStrike Falcon", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "C:\\Program Files\\CrowdStrike\\CSFalconService.exe"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "C:\\Program Files\\CrowdStrike\\CSFalconService.exe"},
         ]},
         {"name": "Carbon Black Agent", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "C:\\Program Files\\Confer\\RepMgr.exe"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "C:\\Program Files\\Confer\\RepMgr.exe"},
         ]},
     ],
     # Endpoint Backup Agents
     [
         {"name": "Veeam Backup Agent", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "C:\\Program Files\\Veeam\\Endpoint Backup\\VeeamAgent.exe"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "C:\\Program Files\\Veeam\\Endpoint Backup\\VeeamAgent.exe"},
         ]},
         {"name": "Commvault Agent", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "/opt/commvault/Base/cvd"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "/opt/commvault/Base/cvd"},
         ]},
         {"name": "Veritas NetBackup", "entries": [
-            {"field": "process.executable", "operator": "is", "type": "match", "value": "/usr/openv/netbackup/bin/bpcd"},
+            {"field": "process.executable", "operator": "included", "type": "match", "value": "/usr/openv/netbackup/bin/bpcd"},
         ]},
     ],
 ]

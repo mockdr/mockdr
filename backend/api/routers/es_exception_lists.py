@@ -13,8 +13,10 @@ from application.es_exception_lists import commands as exc_commands
 from application.es_exception_lists import queries as exc_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
 from utils.kibana_validation import (
+    EXCEPTION_NAMESPACES,
     ExceptionListError,
     validate_exception_find_query,
+    validate_exception_item_body,
     validate_exception_list_body,
 )
 
@@ -157,7 +159,17 @@ def find_items(
     per_page: int = Query(20, ge=0, le=1000),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Find exception items with optional filters and pagination."""
+    """Find exception items with optional filters and pagination.
+
+    ``list_id`` is not optional: without it Kibana refuses the query, where
+    mockdr answered with every item it held across every list — a client
+    reading one list's exceptions was handed all of them and told they were
+    that list's.
+    """
+    if not list_id:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, '[request query]: Invalid value "undefined" supplied to "list_id"',
+        ))
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     try:
         return exc_queries.find_items(
@@ -177,26 +189,27 @@ def find_items(
 def get_item(
     item_id: str = Query(None),
     id: str = Query(None),
+    namespace_type: str = Query(None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Get a single exception item by item_id or id."""
+    if namespace_type is not None and namespace_type not in EXCEPTION_NAMESPACES:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400,
+            f'[request query]: Invalid value "{namespace_type}" '
+            'supplied to "namespace_type"',
+        ))
     lookup = item_id or id
     if not lookup:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(
-                400,
-                "Either item_id or id query parameter is required",
-            ),
+            detail=build_security_solution_error(400, "id or item_id required"),
         )
     result = exc_queries.get_item(lookup)
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(
-                404,
-                f"Exception item {lookup} not found",
-            ),
+            detail=build_security_solution_error(404, _no_such_item(item_id, id)),
         )
     return result
 
@@ -206,7 +219,23 @@ def create_item(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Create a new exception item."""
+    """Create a new exception item.
+
+    Nothing here was checked: an empty body created an item, and so did one
+    naming a list that does not exist — an exception nothing could ever
+    apply, reported as a success.
+    """
+    _validated_item(body)
+    list_id = str(body.get("list_id", ""))
+    if exc_queries.get_list(list_id) is None:
+        raise HTTPException(status_code=404, detail=build_security_solution_error(
+            404, f'exception list id: "{list_id}" does not exist',
+        ))
+    item_id = body.get("item_id")
+    if item_id and exc_queries.get_item(str(item_id)) is not None:
+        raise HTTPException(status_code=409, detail=build_security_solution_error(
+            409, f'exception list item id: "{item_id}" already exists',
+        ))
     return exc_commands.create_item(body)
 
 
@@ -215,14 +244,24 @@ def update_item(
     body: dict = Body(...),
     _: dict = Depends(require_es_write),
 ) -> dict:
-    """Update an existing exception item."""
+    """Update an existing exception item.
+
+    An update that names no item is a 404 here rather than a 400 — the route
+    looks the item up first and reports what it could not find, which is what
+    a client parses.
+    """
+    _validated_item(body, update=True)
+    if not body.get("id") and not body.get("item_id"):
+        raise HTTPException(status_code=404, detail=build_security_solution_error(
+            404, "either id or item_id need to be defined",
+        ))
     result = exc_commands.update_item(body)
     if result is None:
         raise HTTPException(
             status_code=404,
             detail=build_security_solution_error(
                 404,
-                "Exception item not found",
+                _no_such_item(body.get("item_id"), body.get("id")),
             ),
         )
     return result
@@ -241,17 +280,14 @@ def delete_item(
             status_code=400,
             detail=build_security_solution_error(
                 400,
-                "Either item_id or id query parameter is required",
+                'Either "item_id" or "id" needs to be defined in the request',
             ),
         )
     deleted = exc_commands.delete_item(lookup)
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=build_security_solution_error(
-                404,
-                f"Exception item {lookup} not found",
-            ),
+            detail=build_security_solution_error(404, _no_such_item(item_id, id)),
         )
     return {}
 
@@ -268,3 +304,20 @@ def _require_iots(body: dict, fields: tuple[str, ...]) -> None:
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
             400, ",".join(f'Invalid value "undefined" supplied to "{f}"' for f in missing),
         ))
+
+
+def _validated_item(body: dict, *, update: bool = False) -> None:
+    """Refuse an item body the way Kibana refuses it."""
+    try:
+        validate_exception_item_body(body, update=update)
+    except ExceptionListError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_kbn_error_response(400, str(exc)),
+        ) from exc
+
+
+def _no_such_item(item_id: object, internal_id: object) -> str:
+    """Name the item that could not be found, by whichever id addressed it."""
+    if item_id:
+        return f'exception list item item_id: "{item_id}" does not exist'
+    return f'exception list item id: "{internal_id}" does not exist'

@@ -628,3 +628,128 @@ def _numeric(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return float(value)
+
+
+# ---------------------------------------------------------------------------
+# Exception items
+# ---------------------------------------------------------------------------
+
+#: What an exception *item* can be. The list's own vocabulary does not apply.
+EXCEPTION_ITEM_TYPES: frozenset[str] = frozenset({"simple"})
+
+#: The members an item body may carry. Kibana refuses any other by name.
+_ITEM_BODY_KEYS: frozenset[str] = frozenset({
+    "list_id", "item_id", "id", "name", "description", "type", "entries",
+    "namespace_type", "tags", "meta", "comments", "os_types", "expire_time",
+    "_version",
+})
+
+#: Reported in this order when they are missing, which is the order the codec
+#: declares them in.
+_ITEM_REQUIRED_CREATE: tuple[str, ...] = (
+    "description", "entries", "list_id", "name", "type",
+)
+_ITEM_REQUIRED_UPDATE: tuple[str, ...] = ("description", "entries", "name", "type")
+
+_ENTRY_OPERATORS: frozenset[str] = frozenset({"included", "excluded"})
+
+#: The union an entry is checked against, branch by branch. io-ts reports
+#: every branch it tried, so one malformed entry produces a message per
+#: member each branch could not satisfy — including the `list` and `entries`
+#: members of the two branches this one was never going to be.
+_ENTRY_BRANCHES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("match", ("field", "operator", "type", "value")),
+    ("match_any", ("field", "operator", "type", "value")),
+    ("list", ("field", "operator", "type", "list")),
+    ("nested", ("field", "type", "entries")),
+)
+
+
+def _entry_member_ok(entry: Mapping[str, object], branch: str, member: str) -> bool:
+    """Whether one member of an entry satisfies one branch of the union."""
+    value = entry.get(member, _MISSING)
+    if value is _MISSING:
+        return False
+    if member == "field":
+        return isinstance(value, str)
+    if member == "operator":
+        return value in _ENTRY_OPERATORS
+    if member == "type":
+        return value == branch
+    if member == "list":
+        return isinstance(value, dict)
+    if member == "entries":
+        return isinstance(value, list)
+    # `value` — a string for `match`, a list of them for `match_any`.
+    return isinstance(value, list) if branch == "match_any" else isinstance(value, str)
+
+
+_MISSING = object()
+
+
+def _entry_problems(entry: Mapping[str, object]) -> list[str]:
+    """Every message one entry produces, in the order Kibana reports them.
+
+    A union is satisfied by any one of its branches, so an entry that matches
+    one produces nothing at all. Only when every branch failed does io-ts
+    report them — each distinct failure once, however many branches ran into
+    it.
+    """
+    problems: list[str] = []
+    for branch, members in _ENTRY_BRANCHES:
+        failures = [member for member in members
+                    if not _entry_member_ok(entry, branch, member)]
+        if not failures:
+            return []
+        for member in failures:
+            supplied = entry.get(member, _MISSING)
+            shown = "undefined" if supplied is _MISSING else _shown(supplied)
+            message = f'Invalid value "{shown}" supplied to "entries,{member}"'
+            if message not in problems:
+                problems.append(message)
+    return problems
+
+
+def _shown(value: object) -> str:
+    """How a supplied value appears inside an io-ts message."""
+    return value if isinstance(value, str) else str(value)
+
+
+def validate_exception_item_body(
+    body: Mapping[str, object], *, update: bool = False,
+) -> None:
+    """Refuse an exception-item body the way Kibana refuses it.
+
+    Nothing was refused here at all: an empty body created an item, and so
+    did one naming a list that does not exist. An item with no `entries`
+    matches nothing, and a client that had just been told it created one had
+    no way to find that out.
+
+    Raises:
+        ExceptionListError: Carrying Kibana's own message.
+    """
+    problems: list[str] = []
+    required = _ITEM_REQUIRED_UPDATE if update else _ITEM_REQUIRED_CREATE
+    for field in required:
+        if field not in body:
+            problems.append(f'Invalid value "undefined" supplied to "{field}"')
+    entries = body.get("entries")
+    if entries is not None and not isinstance(entries, list):
+        problems.append(f'Invalid value "{_shown(entries)}" supplied to "entries"')
+    for field, allowed in (("type", EXCEPTION_ITEM_TYPES),
+                           ("namespace_type", EXCEPTION_NAMESPACES)):
+        value = body.get(field)
+        if value is not None and value not in allowed:
+            problems.append(_invalid(field, str(value)))
+    if isinstance(entries, list):
+        for entry in entries:
+            problems.extend(
+                _entry_problems(entry) if isinstance(entry, Mapping)
+                else [f'Invalid value "{_shown(entry)}" supplied to "entries"'],
+            )
+    if problems:
+        raise ExceptionListError(_BODY_PREFIX + ",".join(problems))
+
+    unknown = [key for key in body if key not in _ITEM_BODY_KEYS]
+    if unknown:
+        raise ExceptionListError(f'{_BODY_PREFIX}invalid keys "{",".join(unknown)}"')

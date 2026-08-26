@@ -2180,3 +2180,159 @@ class TestWhatAWriteCountsAsAChange:
         assert response.status_code == 404
         assert response.json() == {
             "message": 'rule_id: "no-such-rule" not found', "status_code": 404}
+
+
+class TestAnExceptionItemIsChecked:
+    """Measured on Kibana 8.15, twenty error paths compared byte for byte.
+
+    Nothing was checked here at all: an empty body created an item, a body
+    naming a list that does not exist created one on that list, and a client
+    was told each time that it had succeeded. An exception with no entries
+    matches nothing, so a rule carrying it behaves as though the exception
+    were not there — and the client had been told it was.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    ENTRY = {"field": "a", "operator": "included", "type": "match", "value": "b"}
+
+    def _list_id(self, client: TestClient) -> str:
+        found = client.get("/kibana/api/exception_lists/_find", headers=self.KBN,
+                           params={"per_page": 1}).json()
+        return str(found["data"][0]["list_id"])
+
+    def _item(self, client: TestClient, **extra: object) -> dict:
+        body = {"list_id": self._list_id(client), "name": "n", "description": "d",
+                "type": "simple", "entries": [self.ENTRY]}
+        body.update(extra)
+        return body
+
+    def _post(self, client: TestClient, body: dict):
+        return client.post("/kibana/api/exception_lists/items",
+                           headers=self.KBN, json=body)
+
+    def test_an_empty_body_names_every_member_it_wanted(
+        self, client: TestClient,
+    ) -> None:
+        response = self._post(client, {})
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            '[request body]: Invalid value "undefined" supplied to "description",'
+            'Invalid value "undefined" supplied to "entries",'
+            'Invalid value "undefined" supplied to "list_id",'
+            'Invalid value "undefined" supplied to "name",'
+            'Invalid value "undefined" supplied to "type"')
+
+    def test_a_list_that_does_not_exist(self, client: TestClient) -> None:
+        response = self._post(client, self._item(client, list_id="no-such-list"))
+        assert response.status_code == 404
+        assert response.json() == {
+            "message": 'exception list id: "no-such-list" does not exist',
+            "status_code": 404}
+
+    def test_a_member_the_codec_has_no_definition_for(
+        self, client: TestClient,
+    ) -> None:
+        response = self._post(client, self._item(client, nonsense_member=1))
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            '[request body]: invalid keys "nonsense_member"')
+
+    def test_an_entry_reports_every_branch_of_the_union(
+        self, client: TestClient,
+    ) -> None:
+        """An entry is a union, and io-ts reports each branch it tried."""
+        response = self._post(client, self._item(client, entries=[{"nope": 1}]))
+        assert response.json()["message"] == (
+            '[request body]: Invalid value "undefined" supplied to "entries,field",'
+            'Invalid value "undefined" supplied to "entries,operator",'
+            'Invalid value "undefined" supplied to "entries,type",'
+            'Invalid value "undefined" supplied to "entries,value",'
+            'Invalid value "undefined" supplied to "entries,list",'
+            'Invalid value "undefined" supplied to "entries,entries"')
+
+    def test_an_operator_kibana_does_not_have(self, client: TestClient) -> None:
+        response = self._post(client, self._item(client, 
+            entries=[{"field": "a", "operator": "is", "type": "match",
+                      "value": "b"}]))
+        assert response.status_code == 400
+        assert response.json()["message"].startswith(
+            '[request body]: Invalid value "is" supplied to "entries,operator"')
+
+    def test_a_match_any_entry_is_a_branch_of_its_own(
+        self, client: TestClient,
+    ) -> None:
+        ok = self._post(client, self._item(client, 
+            item_id="zzz-any",
+            entries=[{"field": "a", "operator": "included", "type": "match_any",
+                      "value": ["b"]}]))
+        assert ok.status_code == 200
+
+    def test_the_seeded_items_are_ones_kibana_would_accept(
+        self, client: TestClient,
+    ) -> None:
+        """The fixture used an operator no Kibana emits.
+
+        A client reading mockdr's exceptions saw `is`, and writing one back
+        the way it was read is exactly what a 400 answers.
+        """
+        found = client.get(
+            "/kibana/api/exception_lists/items/_find", headers=self.KBN,
+            params={"list_id": self._list_id(client), "per_page": 100},
+        ).json()["data"]
+        assert found
+        operators = {e["operator"] for item in found for e in item["entries"]}
+        assert operators <= {"included", "excluded"}
+
+    def test_a_duplicate_item_id(self, client: TestClient) -> None:
+        self._post(client, self._item(client, item_id="zzz-dup"))
+        again = self._post(client, self._item(client, item_id="zzz-dup"))
+        assert again.status_code == 409
+        assert again.json() == {
+            "message": 'exception list item id: "zzz-dup" already exists',
+            "status_code": 409}
+
+    def test_an_update_naming_no_item_is_a_404(self, client: TestClient) -> None:
+        response = client.put("/kibana/api/exception_lists/items",
+                              headers=self.KBN,
+                              json={"name": "n", "description": "d",
+                                    "type": "simple", "entries": [self.ENTRY]})
+        assert response.status_code == 404
+        assert response.json() == {
+            "message": "either id or item_id need to be defined",
+            "status_code": 404}
+
+    def test_a_listing_without_a_list_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        """It used to answer with every item across every list."""
+        response = client.get("/kibana/api/exception_lists/items/_find",
+                              headers=self.KBN)
+        assert response.status_code == 400
+        assert response.json()["message"] == (
+            '[request query]: Invalid value "undefined" supplied to "list_id"')
+
+    def test_a_missing_item_is_named_by_the_id_that_addressed_it(
+        self, client: TestClient,
+    ) -> None:
+        by_item_id = client.get("/kibana/api/exception_lists/items",
+                                headers=self.KBN, params={"item_id": "nope"})
+        by_id = client.get("/kibana/api/exception_lists/items",
+                           headers=self.KBN, params={"id": "nope"})
+        assert by_item_id.json()["message"] == (
+            'exception list item item_id: "nope" does not exist')
+        assert by_id.json()["message"] == (
+            'exception list item id: "nope" does not exist')
+
+    def test_the_two_missing_argument_messages_are_not_the_same(
+        self, client: TestClient,
+    ) -> None:
+        """Kibana words them differently, and a client matching on one of them
+        must not find the other."""
+        read = client.get("/kibana/api/exception_lists/items", headers=self.KBN)
+        removed = client.request("DELETE", "/kibana/api/exception_lists/items",
+                                 headers=self.KBN)
+        assert read.json()["message"] == "id or item_id required"
+        assert removed.json()["message"] == (
+            'Either "item_id" or "id" needs to be defined in the request')

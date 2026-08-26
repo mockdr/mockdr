@@ -210,7 +210,10 @@ class TestUpdateList:
         resp = client.put(
             "/kibana/api/exception_lists",
             headers=KBN_WRITE_HEADERS,
-            json={"id": "nonexistent-id", "name": "Ghost"},
+            json={"id": "nonexistent-id", "name": "Ghost", "description": "d",
+                  "type": "simple",
+                  "entries": [{"field": "a", "operator": "included",
+                               "type": "match", "value": "b"}]},
         )
         assert resp.status_code == 404
 
@@ -351,7 +354,7 @@ class TestCreateItem:
                 "description": "Integration test item.",
                 "type": "simple",
                 "entries": [
-                    {"field": "process.name", "operator": "is", "type": "match", "value": "test.exe"},
+                    {"field": "process.name", "operator": "included", "type": "match", "value": "test.exe"},
                 ],
             },
         )
@@ -366,7 +369,9 @@ class TestCreateItem:
             json={
                 "list_id": exc_list["list_id"],
                 "name": "ID Check Item",
-                "entries": [{"field": "process.name", "operator": "is", "type": "match", "value": "check.exe"}],
+                "description": "Integration test item.",
+                "type": "simple",
+                "entries": [{"field": "process.name", "operator": "included", "type": "match", "value": "check.exe"}],
             },
         ).json()
         assert "id" in body
@@ -397,7 +402,11 @@ class TestUpdateItem:
         resp = client.put(
             "/kibana/api/exception_lists/items",
             headers=KBN_WRITE_HEADERS,
-            json={"id": item["id"], "name": "Renamed Item"},
+            # An item update carries the whole item: Kibana's codec requires
+            # description, entries, name and type however little is changing.
+            json={"id": item["id"], "name": "Renamed Item",
+                  "description": item["description"], "type": item["type"],
+                  "entries": item["entries"]},
         )
         assert resp.status_code == 200
         assert resp.json()["name"] == "Renamed Item"
@@ -407,7 +416,10 @@ class TestUpdateItem:
         resp = client.put(
             "/kibana/api/exception_lists/items",
             headers=KBN_WRITE_HEADERS,
-            json={"id": "nonexistent-id", "name": "Ghost"},
+            json={"id": "nonexistent-id", "name": "Ghost", "description": "d",
+                  "type": "simple",
+                  "entries": [{"field": "a", "operator": "included",
+                               "type": "match", "value": "b"}]},
         )
         assert resp.status_code == 404
 
