@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A comment nobody wrote, at a time that was not there.**
+An incident comment named `MockDR` as its author whoever had called, and
+answered `lastModifiedTimeUtc` — a `date-time` the service fills in, per
+`IncidentCommentProperties` — as an empty string. Editing one changed its
+text and left both timestamps as they were, so a client re-reading a comment
+saw new words under the old times. The caller is recorded now, the way
+Sentinel's `ClientInfo` records an app-only one (the application names
+itself, `email` and `userPrincipalName` stay empty because there is no
+signed-in user), and an edit moves the modification time and nothing else.
+
 **A page starting before the beginning.**
 `$top` was bounded on all 37 routes that take it and `$skip` on none, so
 `$skip=-5` was accepted: an empty page on one mount, a shifted one on the

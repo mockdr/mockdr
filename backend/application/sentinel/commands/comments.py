@@ -12,6 +12,7 @@ def create_or_update_comment(
     incident_id: str,
     comment_id: str,
     message: str,
+    author: str = "",
 ) -> SentinelIncidentComment:
     """Create or update an incident comment.
 
@@ -19,6 +20,9 @@ def create_or_update_comment(
         incident_id: Parent incident ID.
         comment_id:  Comment resource name.
         message:     Comment text.
+        author:      The client that made the comment — the application the
+                     token was issued to, which is what Sentinel records for
+                     an app-only caller.
 
     Returns:
         The created/updated comment.
@@ -28,6 +32,7 @@ def create_or_update_comment(
 
     if existing:
         existing.message = message
+        existing.last_modified_time_utc = now
         existing.etag = uuid.uuid4().hex[:8]
         sentinel_incident_comment_repo.save(existing)
         return existing
@@ -36,7 +41,10 @@ def create_or_update_comment(
         comment_id=comment_id,
         incident_id=incident_id,
         message=message,
+        author_name=author,
+        author_object_id=author,
         created_time_utc=now,
+        last_modified_time_utc=now,
         etag=uuid.uuid4().hex[:8],
     )
     sentinel_incident_comment_repo.save(comment)

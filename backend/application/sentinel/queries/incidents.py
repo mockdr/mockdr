@@ -175,7 +175,8 @@ def get_incident_comments(incident_id: str) -> dict:
     for c in comments:
         items.append(build_arm_resource("incidentComments", c.comment_id, {
             "message": c.message,
-            "author": {"name": c.author_name, "email": c.author_email},
+            "author": client_info(c),
+            "lastModifiedTimeUtc": c.last_modified_time_utc,
             "createdTimeUtc": c.created_time_utc,
         }, etag=c.etag))
     return build_arm_list(items)
@@ -227,3 +228,17 @@ def _odata_to_attr(field: str) -> str:
         "incidentNumber": "incident_number",
     }
     return mapping.get(field, field)
+
+
+def client_info(comment: object) -> dict:
+    """Who made a comment, as Sentinel's `ClientInfo` records it.
+
+    An app-only token has no signed-in user, so the two user fields are empty
+    and the application names itself.
+    """
+    return {
+        "name": getattr(comment, "author_name", ""),
+        "email": getattr(comment, "author_email", ""),
+        "objectId": getattr(comment, "author_object_id", ""),
+        "userPrincipalName": "",
+    }

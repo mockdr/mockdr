@@ -207,11 +207,14 @@ async def create_or_update_comment(
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
     message = body.get("properties", {}).get("message", "")
-    comment = comment_cmds.create_or_update_comment(incident_id, comment_id, message)
+    comment = comment_cmds.create_or_update_comment(
+        incident_id, comment_id, message, str(_auth.get("client_id", "")),
+    )
     return build_arm_resource("incidentComments", comment.comment_id, {
         "message": comment.message,
-        "author": {"name": comment.author_name, "email": comment.author_email},
+        "author": incident_queries.client_info(comment),
         "createdTimeUtc": comment.created_time_utc,
+        "lastModifiedTimeUtc": comment.last_modified_time_utc,
     }, etag=comment.etag)
 
 

@@ -1,4 +1,5 @@
 """Integration tests for Sentinel incident endpoints."""
+import pytest
 from fastapi.testclient import TestClient
 
 SENTINEL_PREFIX = "/sentinel"
@@ -202,3 +203,70 @@ class TestIncidentSubResources:
             headers=headers,
         )
         assert resp.status_code == 200
+
+
+class TestWhoCommentedAndWhen:
+    """`IncidentCommentProperties` carries an author and two timestamps.
+
+    The author was the constant `MockDR` whoever called, and
+    `lastModifiedTimeUtc` — a `date-time` the service fills in — was answered
+    as an empty string. Editing a comment then changed its text and left both
+    timestamps as they were, so a client re-reading it saw new words under
+    the old times.
+    """
+
+    def _incident(self, client: TestClient) -> str:
+        listing = client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents", headers=_auth(client),
+            params={"api-version": "2024-03-01"},
+        ).json()
+        return str(listing["value"][0]["name"])
+
+    def test_the_caller_is_named_as_the_author(self, client: TestClient) -> None:
+        incident = self._incident(client)
+        created = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{incident}/comments/author-check",
+            headers=_auth(client), params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "first look"}},
+        )
+        assert created.status_code == 200
+        author = created.json()["properties"]["author"]
+        # An app-only token has no signed-in user: the application names
+        # itself, and the two user fields stay empty.
+        assert author["name"] == "sentinel-mock-client-id"
+        assert author["objectId"] == "sentinel-mock-client-id"
+        assert author["email"] == ""
+        assert author["userPrincipalName"] == ""
+
+    def test_both_timestamps_are_answered(self, client: TestClient) -> None:
+        incident = self._incident(client)
+        body = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{incident}/comments/times-check",
+            headers=_auth(client), params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "when"}},
+        ).json()["properties"]
+        assert body["createdTimeUtc"]
+        assert body["lastModifiedTimeUtc"] == body["createdTimeUtc"]
+
+    def test_editing_moves_the_modification_time_only(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        incident = self._incident(client)
+        path = f"{SENTINEL_PREFIX}{_WS}/incidents/{incident}/comments/edit-check"
+        first = client.put(
+            path, headers=_auth(client), params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "before"}},
+        ).json()["properties"]
+
+        from application.sentinel.commands import comments as comment_cmds
+
+        later = "2099-01-01T00:00:00.000Z"
+        monkeypatch.setattr(comment_cmds, "utc_now", lambda: later)
+        edited = client.put(
+            path, headers=_auth(client), params={"api-version": "2024-03-01"},
+            json={"properties": {"message": "after"}},
+        ).json()["properties"]
+
+        assert edited["message"] == "after"
+        assert edited["createdTimeUtc"] == first["createdTimeUtc"]
+        assert edited["lastModifiedTimeUtc"] == later
