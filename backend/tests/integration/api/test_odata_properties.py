@@ -140,3 +140,37 @@ class TestDefenderRefusesAnUnknownProperty:
         )
         assert resp.status_code == 200
         assert all(m["healthStatus"] == "Active" for m in resp.json()["value"])
+
+
+class TestSkipIsANonNegativeInteger:
+    """OData v4 §11.2.6.4: the value of `$skip` MUST be a non-negative integer.
+
+    `$top` was bounded on all 37 routes that take it and `$skip` on none, so
+    `$skip=-5` was accepted and paged from a position no collection has —
+    answering an empty page on one mount and a shifted one on another, both
+    with a 200.
+    """
+
+    def test_graph_refuses_a_negative_skip(
+        self, client: TestClient, graph: dict,
+    ) -> None:
+        resp = client.get("/graph/v1.0/users", headers=graph, params={"$skip": "-5"})
+        assert resp.status_code == 400
+
+    def test_defender_refuses_a_negative_skip(
+        self, client: TestClient, defender: dict,
+    ) -> None:
+        resp = client.get("/mde/api/machines", headers=defender, params={"$skip": "-5"})
+        assert resp.status_code == 400
+
+    def test_zero_and_upwards_still_page(
+        self, client: TestClient, graph: dict,
+    ) -> None:
+        everyone = client.get("/graph/v1.0/users", headers=graph).json()["value"]
+        skipped = client.get(
+            "/graph/v1.0/users", headers=graph, params={"$skip": "1"},
+        ).json()["value"]
+        assert len(skipped) == len(everyone) - 1
+        assert client.get(
+            "/graph/v1.0/users", headers=graph, params={"$skip": "0"},
+        ).status_code == 200

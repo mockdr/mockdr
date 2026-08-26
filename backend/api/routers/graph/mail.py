@@ -15,7 +15,7 @@ router = APIRouter(tags=["Graph Mail"])
 async def list_messages(
     user_id: str,
     top: int = Query(25, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List mail messages for a user (inbox by default)."""

@@ -17,7 +17,7 @@ async def list_managed_devices(
     request: Request,
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     select: str = Query(None, alias="$select"),
     count: bool = Query(False, alias="$count"),
     _: dict = Depends(require_graph_feature("deviceManagement")),
@@ -53,7 +53,7 @@ async def get_managed_device(
 async def list_detected_apps(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:

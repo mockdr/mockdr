@@ -14,7 +14,7 @@ router = APIRouter(tags=["Graph Identity Protection"])
 async def list_risky_users(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("identityProtection")),
 ) -> dict:
     """List risky users flagged by Identity Protection."""
@@ -45,7 +45,7 @@ async def get_risky_user(
 async def list_risk_detections(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("identityProtection")),
 ) -> dict:
     """List risk detection events from Identity Protection."""

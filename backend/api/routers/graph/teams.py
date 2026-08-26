@@ -54,7 +54,7 @@ async def list_channel_messages(
     team_id: str,
     channel_id: str,
     top: int = Query(25, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List messages in a channel."""

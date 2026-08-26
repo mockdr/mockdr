@@ -13,7 +13,7 @@ router = APIRouter(tags=["Graph Service Principals"])
 async def list_service_principals(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_auth),

@@ -16,7 +16,7 @@ router = APIRouter(tags=["Graph Security"])
 async def list_alerts_v2(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_feature("security/alerts_v2")),
@@ -71,7 +71,7 @@ async def update_alert_v2(
 async def list_incidents(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     expand: str = Query(None, alias="$expand"),
@@ -119,7 +119,7 @@ async def run_hunting_query(
 @router.get("/v1.0/security/secureScores")
 async def list_secure_scores(
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("security/secureScores")),
 ) -> dict:
     """List secure score snapshots."""
@@ -132,7 +132,7 @@ async def list_secure_scores(
 async def list_ti_indicators(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("security/tiIndicators")),
 ) -> dict:
     """List threat intelligence indicators."""

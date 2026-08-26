@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A page starting before the beginning.**
+`$top` was bounded on all 37 routes that take it and `$skip` on none, so
+`$skip=-5` was accepted: an empty page on one mount, a shifted one on the
+other, both with a `200`. OData v4 §11.2.6.4 says the value of `$skip` MUST
+be a non-negative integer, and every route that takes one now says so.
+
 **A query naming a property that does not exist, answered as if it did.**
 On both OData mounts, `$select=notAField` answered a page of empty objects,
 `$filter=notAField eq 'x'` an empty collection and `$orderby=notAField` an

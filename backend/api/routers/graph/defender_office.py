@@ -14,7 +14,7 @@ router = APIRouter(tags=["Graph Defender for Office 365"])
 @router.get("/v1.0/security/attackSimulation/simulations")
 async def list_attack_simulations(
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("attackSimulation")),
 ) -> dict:
     """List attack simulations."""
@@ -26,7 +26,7 @@ async def list_attack_simulations(
 @router.get("/v1.0/informationProtection/threatAssessmentRequests")
 async def list_threat_assessments(
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List threat assessment requests."""

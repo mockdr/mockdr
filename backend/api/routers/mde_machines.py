@@ -41,7 +41,7 @@ def software_inventory_export(
 def list_machines(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(50, alias="$top", ge=1, le=1000),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     count: bool = Query(False, alias="$count"),

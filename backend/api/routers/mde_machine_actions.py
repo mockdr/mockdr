@@ -18,7 +18,7 @@ router = APIRouter(tags=["MDE Machine Actions"])
 def list_machine_actions(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(50, alias="$top", ge=1, le=1000),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     _: dict = Depends(require_mde_auth),
 ) -> dict:

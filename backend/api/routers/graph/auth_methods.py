@@ -13,7 +13,7 @@ router = APIRouter(tags=["Graph Auth Methods"])
 async def list_user_registration_details(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_auth),
 ) -> dict:

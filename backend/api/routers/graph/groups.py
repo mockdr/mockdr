@@ -14,7 +14,7 @@ router = APIRouter(tags=["Graph Groups"])
 async def list_groups(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     search: str = Query(None, alias="$search"),

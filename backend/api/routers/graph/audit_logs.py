@@ -13,7 +13,7 @@ router = APIRouter(tags=["Graph Audit Logs"])
 async def list_sign_in_logs(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_feature("auditLogs/signIns")),
@@ -29,7 +29,7 @@ async def list_sign_in_logs(
 async def list_directory_audits(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_feature("auditLogs/directoryAudits")),

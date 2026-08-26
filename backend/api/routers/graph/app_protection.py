@@ -12,7 +12,7 @@ router = APIRouter(tags=["Graph App Protection"])
 @router.get("/v1.0/deviceAppManagement/managedAppPolicies")
 async def list_app_protection_policies(
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
     """List Intune app protection (MAM) policies."""
@@ -23,7 +23,7 @@ async def list_app_protection_policies(
 async def list_mobile_apps(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip"),
+    skip: int = Query(0, alias="$skip", ge=0),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
