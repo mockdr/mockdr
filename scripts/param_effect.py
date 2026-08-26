@@ -20,7 +20,9 @@ Each parameter is sent a value whose effect is not a matter of taste:
 * `$select=id` must not answer with every field;
 * `$count=true` must add a count;
 * a sort asked for in both directions must not answer with the same order
-  twice, when the collection holds two different values to order by.
+  twice, when the collection holds two different values to order by — asked
+  once per field the vendor documents as sortable, because guessing one from
+  the record's top level misses every collection whose records are nested.
 
 A route whose collection is already empty is skipped — there is nothing to
 filter — as is one that refuses the baseline request. Exit status 1 when
@@ -196,19 +198,64 @@ def probe_value(name, kind):
     return None, ""
 
 
-def sortable_field(items):
-    """A field the collection actually varies on, or None."""
-    for name in ("id", "name", "displayName", "hostname", "createdAt", "created_at"):
-        values = [item.get(name) for item in items if isinstance(item, dict)]
-        distinct = {v for v in values if isinstance(v, (str, int, float))}
-        if len(distinct) > 1:
-            return name
-    for name in items[0]:
-        values = [item.get(name) for item in items if isinstance(item, dict)]
-        distinct = {v for v in values if isinstance(v, (str, int, float))}
-        if len(distinct) > 1:
-            return name
+#: The vendor's own list of what a collection can be ordered by. mockdr
+#: declares `sortBy` as a plain string, so the enum lives only in the
+#: swagger — and without it this fell back to guessing a field from the
+#: record's top level, which is empty of sortable members on every
+#: collection whose records are nested.
+_SWAGGER = Path(__file__).resolve().parents[1] / "data" / "swagger_2_1.json"
+
+
+def documented_sort_fields():
+    """`(path, parameter) -> [field]`, from the swagger if it is there."""
+    if not _SWAGGER.exists():
+        return {}
+    spec = json.loads(_SWAGGER.read_text())
+    out = {}
+    for path, operations in spec.get("paths", {}).items():
+        for parameter in (operations.get("get") or {}).get("parameters", []):
+            if parameter.get("enum") and parameter.get("name") in _SORTERS:
+                out[(path, parameter["name"])] = parameter["enum"]
+    return out
+
+
+def _anywhere(item, name):
+    """The value of *name* on this record, top level or one level in."""
+    if not isinstance(item, dict):
+        return None
+    if name in item:
+        return item[name]
+    for value in item.values():
+        if isinstance(value, dict) and name in value:
+            return value[name]
     return None
+
+
+def varies(items, name):
+    """Whether a field is worth ordering by: at least two distinct values."""
+    distinct = {
+        v for v in (_anywhere(i, name) for i in items)
+        if isinstance(v, (str, int, float))
+    }
+    return len(distinct) > 1
+
+
+def sortable_fields(items, declared):
+    """The fields to ask this collection to order by.
+
+    The names the *vendor* documents come first: guessing one from the
+    record's own top level missed every collection whose records are nested,
+    and a threat keeps everything worth sorting on inside `threatInfo` — so
+    fifteen documented sort fields could be asked for and ignored without
+    this ever looking at one of them.
+    """
+    documented = [name for name in declared if varies(items, name)]
+    if documented:
+        return documented
+    for name in ("id", "name", "displayName", "hostname", "createdAt", "created_at"):
+        if varies(items, name):
+            return [name]
+    return [name for name in items[0] if varies(items, name)][:1]
 
 
 def judge(kind, base_items, probe_items, probe_body):
@@ -281,6 +328,9 @@ def undeclared():
     return flags, checked
 
 
+DOCUMENTED_SORTS = documented_sort_fields()
+
+
 def main():
     wanted = sys.argv[1:]
     flags = []
@@ -338,29 +388,30 @@ def main():
         declared = {p["name"] for p in parameters}
         for name in declared & set(_SORTERS):
             partner, template, ascending, descending = _SORTERS[name]
-            field = sortable_field(base_items)
-            if field is None:
-                continue
-            checked += 1
-            one = client.get(url, headers=headers, params={
-                name: template.format(field=field),
-                **({partner: ascending} if partner else {}),
-            })
-            other = client.get(url, headers=headers, params={
-                name: template.format(field=field).replace(".asc", ".desc")
-                                                   .replace(" asc", " desc"),
-                **({partner: descending} if partner else {}),
-            })
-            if one.status_code != 200 or other.status_code != 200:
-                continue
-            try:
-                first, second = collection(one.json()), collection(other.json())
-            except ValueError:
-                continue
-            if not first or not second or len(first) < 2:
-                continue
-            if [i.get(field) for i in first] == [i.get(field) for i in second]:
-                flags.append((mount, path, name, "sort", len(first), len(second)))
+            values = DOCUMENTED_SORTS.get((path, name), [])
+            for field in sortable_fields(base_items, values):
+                checked += 1
+                one = client.get(url, headers=headers, params={
+                    name: template.format(field=field),
+                    **({partner: ascending} if partner else {}),
+                })
+                other = client.get(url, headers=headers, params={
+                    name: template.format(field=field).replace(".asc", ".desc")
+                                                       .replace(" asc", " desc"),
+                    **({partner: descending} if partner else {}),
+                })
+                if one.status_code != 200 or other.status_code != 200:
+                    continue
+                try:
+                    first, second = collection(one.json()), collection(other.json())
+                except ValueError:
+                    continue
+                if not first or not second or len(first) < 2:
+                    continue
+                if ([_anywhere(i, field) for i in first]
+                        == [_anywhere(i, field) for i in second]):
+                    flags.append((mount, f"{path} [{field}]", name, "sort",
+                                  len(first), len(second)))
 
     found, count = undeclared()
     flags += [f for f in found if not wanted or f[0] in wanted]

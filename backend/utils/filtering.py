@@ -206,7 +206,9 @@ def _compare_dt(field_val: Any, target: datetime, op: str) -> bool:
     return parsed <= target
 
 
-def apply_query_options(records: list, params: dict) -> list:
+def apply_query_options(
+    records: list, params: dict, specs: list[FilterSpec] | None = None,
+) -> list:
     """Apply the sorting and offset options every S1 list endpoint accepts.
 
     ``sortBy``, ``sortOrder`` and ``skip`` are documented on every list
@@ -217,6 +219,9 @@ def apply_query_options(records: list, params: dict) -> list:
     Args:
         records: Records already narrowed by :func:`apply_filters`.
         params:  Raw URL query parameters.
+        specs:   The filter specs for this route, which already say where a
+                 documented name lives on the record — the same knowledge a
+                 documented `sortBy` needs.
 
     Returns:
         The records, sorted and offset as requested.
@@ -224,12 +229,73 @@ def apply_query_options(records: list, params: dict) -> list:
     sort_by = str(params.get("sortBy") or "").strip()
     if sort_by:
         descending = str(params.get("sortOrder") or "asc").lower() == "desc"
-        records = sorted(records, key=_sort_key(sort_by), reverse=descending)
+        field = _sort_path(records, sort_by, specs or [])
+        records = sorted(records, key=_sort_key(field), reverse=descending)
 
     skip = _as_int(params.get("skip"))
     if skip > 0:
         records = records[skip:]
     return records
+
+
+def _sort_path(records: list, name: str, specs: list[FilterSpec]) -> str:
+    """Where a documented sort field lives on these records.
+
+    The vendor documents `sortBy=createdAt` for a threat whose record keeps
+    that member inside `threatInfo`, so looking only at the top level found
+    nothing, every key compared equal, and `sortOrder=asc` came back
+    identical to `desc` — a client asking for an order got whatever order
+    the store held, and was told nothing.
+
+    Three ways to find it, in order of how much they are worth: the member
+    itself, a documented filter that already names its path, and — for a
+    name no filter mentions — the one nested object these records keep it
+    in. An ambiguous name is left alone rather than guessed at.
+    """
+    first = records[0] if records else None
+    if first is None or _get_field(first, name) is not None:
+        return name
+    for spec in specs:
+        if spec.param.split("__")[0] == name:
+            return spec.field
+    for spec in specs:
+        # A search spec names several fields at once (`a|b|c`); it says where
+        # a term is looked for, not where one member lives.
+        if "|" in spec.field:
+            continue
+        if spec.field == name or spec.field.endswith(f".{name}"):
+            return spec.field
+    holder = _nested_holder(records, name)
+    return f"{holder}.{name}" if holder else name
+
+
+def _nested_holder(records: list, name: str) -> str | None:
+    """Which nested member carries *name*, when the records agree on one.
+
+    A threat keeps `siteName` in both `agentRealtimeInfo` and
+    `agentDetectionInfo`, so "the one nested object" needs deciding: a holder
+    that is empty on every record is not one, and where the remaining
+    holders carry the same value on every record the choice cannot change
+    the order. Only a name whose holders genuinely disagree is left alone.
+    """
+    first = records[0]
+    members = first if isinstance(first, dict) else getattr(first, "__dict__", {})
+    holders: list[str] = [
+        str(key) for key, value in members.items()
+        if isinstance(value, dict) and name in value
+    ]
+    holders = [
+        h for h in holders
+        if any(_get_field(r, f"{h}.{name}") is not None for r in records)
+    ]
+    if not holders:
+        return None
+    reference = holders[0]
+    for other in holders[1:]:
+        if any(_get_field(r, f"{reference}.{name}") != _get_field(r, f"{other}.{name}")
+               for r in records):
+            return None
+    return reference
 
 
 def _as_int(value: Any) -> int:

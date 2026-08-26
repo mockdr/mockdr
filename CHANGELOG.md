@@ -714,6 +714,23 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**Fifteen documented sort fields that ordered nothing.**
+The vendor documents `sortBy=createdAt` for a threat whose record keeps that
+member inside `threatInfo`, and `sortBy=severity` for a cloud alert that
+keeps it in `alertInfo` — and the sorter looked only at the top level, so
+every key compared equal and `sortOrder=asc` came back identical to `desc`.
+A client that asked for an order got whatever order the store held, and was
+told nothing. A documented name is now resolved where the record actually
+keeps it: the member itself, or the documented filter that already names its
+path, or — for a name no filter mentions — the one nested object these
+records keep it in. A name whose holders genuinely disagree is left alone
+rather than guessed at, and so is one nothing carries.
+
+`param_effect.py` could not see any of this: it guessed a sort field from
+the record's top level, which is empty of sortable members on exactly the
+collections that were broken. It asks once per field the vendor documents as
+sortable now — 450 parameters exercised where 341 were before.
+
 **Three states that never left `pending`.**
 A playbook contains a host, isolates an endpoint, and then waits for the
 action to finish. Falcon's host stayed `containment_pending` for ever,

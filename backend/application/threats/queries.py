@@ -59,7 +59,8 @@ def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
         FILTER_SPECS + DOCUMENTED_FILTERS.get("/threats", []),
     )
     filtered.sort(key=lambda t: get_nested(t, "threatInfo.createdAt") or "", reverse=True)
-    filtered = apply_query_options(filtered, params)
+    filtered = apply_query_options(
+        filtered, params, FILTER_SPECS + DOCUMENTED_FILTERS.get("/threats", []))
     page, next_cursor, total = paginate(filtered, cursor, limit, THREAT_CURSOR)
     return build_list_response(
         [public_threat(record_dict(t)) for t in page],

@@ -2909,3 +2909,63 @@ class TestAnActionThatSettles:
                              headers=self.KBN,
                              params={"agent_ids": agent}).json()["data"][0]
         assert settled["pending_actions"] == {}
+
+
+class TestSortingByWhatTheVendorDocuments:
+    """From the 2.1 swagger's own `sortBy` enum.
+
+    Fifteen documented sort fields were accepted and ignored, because the
+    records keep them one level down — a threat's `createdAt` lives in
+    `threatInfo`, its `agentVersion` in `agentDetectionInfo` — and the
+    sorter only looked at the top level. Every key compared equal, so
+    `sortOrder=asc` came back identical to `desc`: a client that asked for
+    an order got whatever order the store held, and was told nothing.
+    """
+
+    S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+
+    def _both_ways(self, client: TestClient, path: str, field: str):
+        pages = []
+        for order in ("asc", "desc"):
+            pages.append(client.get(path, headers=self.S1, params={
+                "limit": 50, "sortBy": field, "sortOrder": order,
+            }).json()["data"])
+        return pages
+
+    @pytest.mark.parametrize("field", [
+        "createdAt", "updatedAt", "agentVersion", "agentMachineType",
+        "siteId", "siteName", "agentComputerName", "filePath",
+        "collectionId", "classification",
+    ])
+    def test_a_threat_sort_field_orders_the_list(
+        self, client: TestClient, field: str,
+    ) -> None:
+        ascending, descending = self._both_ways(
+            client, "/web/api/v2.1/threats", field)
+        assert ascending != descending
+
+    @pytest.mark.parametrize("field", [
+        "machineType", "osName", "incidentStatus", "analystVerdict", "severity",
+    ])
+    def test_a_cloud_alert_sort_field_orders_the_list(
+        self, client: TestClient, field: str,
+    ) -> None:
+        ascending, descending = self._both_ways(
+            client, "/web/api/v2.1/cloud-detection/alerts", field)
+        assert ascending != descending
+
+    def test_the_order_is_the_one_asked_for(self, client: TestClient) -> None:
+        ascending, descending = self._both_ways(
+            client, "/web/api/v2.1/threats", "createdAt")
+        dates = [t["threatInfo"]["createdAt"] for t in ascending]
+        assert dates == sorted(dates)
+        assert [t["threatInfo"]["createdAt"] for t in descending] == sorted(
+            dates, reverse=True)
+
+    def test_a_name_the_records_do_not_carry_leaves_the_order_alone(
+        self, client: TestClient,
+    ) -> None:
+        """Rather than reordering by nothing."""
+        ascending, descending = self._both_ways(
+            client, "/web/api/v2.1/threats", "zzz-no-such-field")
+        assert ascending == descending
