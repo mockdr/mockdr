@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.sentinel_auth import require_sentinel_auth
-from application.sentinel.queries.log_analytics import query_logs
+from application.sentinel.queries.log_analytics import UnknownTableError, query_logs
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Log Analytics"])
@@ -33,4 +33,13 @@ async def run_query(
                 "sentinel", 400, "The request had some invalid properties: query is required",
             ),
         )
-    return query_logs(kql)
+    try:
+        return query_logs(kql)
+    except UnknownTableError as exc:
+        # Log Analytics answers a query naming no table it has with a bad
+        # argument, not with an empty result set.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error(
+                "sentinel", 400, f"The request had some invalid properties: {exc}"),
+        ) from exc

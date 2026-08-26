@@ -91,3 +91,52 @@ class TestKQLQuery:
             headers=_auth(client),
         )
         assert resp.status_code == 200
+
+
+class TestATableTheWorkspaceDoesNotHave:
+    """A query naming no table of this workspace is refused, not answered.
+
+    `MicrosoftDefender_CL` is a name a client can plausibly type — the
+    connector's table is `SecurityAlert` — and the workspace answered it 200
+    with an empty `PrimaryResult`. "No such table" and "nothing matched" are
+    different answers, and only one of them tells a detection engineer that
+    their query is wrong. Defender's own hunting on this mock already
+    refuses an unknown table.
+    """
+
+    def test_an_unknown_table_is_a_400(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/v1/workspaces/mockdr-workspace/query",
+            json={"query": "MicrosoftDefender_CL | count"},
+            headers=_auth(client),
+        )
+        assert resp.status_code == 400
+        message = resp.json()["error"]["message"]
+        assert "MicrosoftDefender_CL" in message
+        # The refusal names what this workspace does have.
+        assert "SecurityAlert" in message
+
+    def test_the_advertised_connector_tables_still_answer(
+        self, client: TestClient,
+    ) -> None:
+        """The four tables the data connectors advertise are the four that
+        answer, under the spelling the connectors use."""
+        for table in ("SentinelOne_CL", "CrowdStrikeFalcon_CL",
+                      "ElasticSecurity_CL", "PaloAltoCortexXDR_CL"):
+            resp = client.post(
+                f"{SENTINEL_PREFIX}/v1/workspaces/mockdr-workspace/query",
+                json={"query": f"{table} | take 1"},
+                headers=_auth(client),
+            )
+            assert resp.status_code == 200, table
+            assert resp.json()["tables"][0]["rows"], f"{table} answered no rows"
+
+    def test_a_second_table_in_a_union_is_checked_too(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/v1/workspaces/mockdr-workspace/query",
+            json={"query": "union SecurityAlert, NoSuchTable_CL | count"},
+            headers=_auth(client),
+        )
+        assert resp.status_code == 400

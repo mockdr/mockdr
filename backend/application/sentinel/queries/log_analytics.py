@@ -21,12 +21,34 @@ _TABLE_REGISTRY: dict[str, tuple] = {}
 #: client that read the connector list and ran the query it was given
 #: learned that a connector this workspace says is ingesting has ingested
 #: nothing.
+#: How each connector's table is spelled where a client writes it.
+_ADVERTISED: tuple[str, ...] = (
+    "SentinelOne_CL",
+    "CrowdStrikeFalcon_CL",
+    "ElasticSecurity_CL",
+    "PaloAltoCortexXDR_CL",
+)
+
 _CUSTOM_TABLES: dict[str, tuple[str, ...]] = {
     "sentinelone_cl": ("sentinelone:",),
     "crowdstrikefalcon_cl": ("CrowdStrike:",),
     "elasticsecurity_cl": ("elastic:",),
     "paloaltocortexxdr_cl": ("pan:xdr:",),
 }
+
+
+class UnknownTableError(ValueError):
+    """A table this workspace does not have, named by a query."""
+
+
+#: The tables this workspace answers for. A query naming anything else is an
+#: error, the way Defender's hunting already refuses one here — answering
+#: `200` with no rows told a client "nothing matched" when the truth was
+#: "there is no such table", and a mistyped connector name looked like a
+#: quiet day.
+def table_names() -> tuple[str, ...]:
+    """Every table a query may name, in the spelling the connectors use."""
+    return ("SecurityIncident", "SecurityAlert", *_ADVERTISED)
 
 
 def query_logs(kql: str) -> dict:
@@ -107,7 +129,11 @@ def _get_table_data(table: str) -> list[dict]:
             if event.sourcetype.startswith(prefixes)
         ]
 
-    return []
+    msg = (
+        f"Failed to resolve table or column expression named '{table}'. "
+        f"Tables in this workspace: {', '.join(table_names())}"
+    )
+    raise UnknownTableError(msg)
 
 
 def _event_to_row(event: object) -> dict:

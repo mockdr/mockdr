@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A Log Analytics table this workspace does not have, answered with silence.**
+`MicrosoftDefender_CL | count` — a name a client can plausibly type, where
+the connector's table is `SecurityAlert` — was answered `200` with an empty
+`PrimaryResult`. "No such table" and "nothing matched" are different answers,
+and a detection engineer reading the second one has no reason to look at
+their query. The workspace refuses a table it does not have now, naming the
+ones it does, which is what Defender's hunting on this same mock already did.
+
 **Six of seven writes never reached the SIEM the mock bridges them to.**
 ADR-009 says that after an EDR command returns, the corresponding Splunk
 event already exists. The bridge subscribes to ten event types, and four of
