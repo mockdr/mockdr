@@ -2839,6 +2839,36 @@ probes:
       headers: {kbn-xsrf: "true"}
       auth: basic
 
+  - id: kbn-comment-patch-with-a-stale-version
+    endpoint: kibana
+    needs_seed: true
+    compare: values
+    why: >
+      A comment carries an optimistic-concurrency token like its case, and
+      mockdr never checked it: two people editing one comment both
+      succeeded, and the second silently replaced the first. The refusal
+      names the *case*, which is Kibana's own wording.
+    request:
+      method: PATCH
+      path: /api/cases/${seed_case}/comments
+      json: {id: "${seed_comment}", version: "WzAsMF0=",
+             type: user, comment: zzz-stale, owner: securitySolution}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-comment-that-is-not-there
+    endpoint: kibana
+    needs_seed: true
+    compare: values
+    why: >
+      And a comment that does not exist is named as the saved object Kibana
+      could not load, not as the thing a reader would call it.
+    request:
+      method: DELETE
+      path: /api/cases/${seed_case}/comments/00000000-0000-0000-0000-000000000001
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
   - id: kbn-case-comment-delete
     endpoint: kibana
     needs_seed: true

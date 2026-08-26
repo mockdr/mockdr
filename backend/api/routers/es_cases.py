@@ -100,7 +100,9 @@ def get_case(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+            detail=build_kbn_error_response(
+                404, f"Saved object [cases/{case_id}] not found",
+            ),
         )
     return result
 
@@ -171,7 +173,9 @@ def update_cases(
         if current is None:
             raise HTTPException(
                 status_code=404,
-                detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+                detail=build_kbn_error_response(
+                404, f"Saved object [cases/{case_id}] not found",
+            ),
             )
         if current.get("version") != version:
             raise HTTPException(
@@ -247,7 +251,9 @@ def get_case_comments(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+            detail=build_kbn_error_response(
+                404, f"Saved object [cases/{case_id}] not found",
+            ),
         )
     return result
 
@@ -263,7 +269,9 @@ def add_comment(
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=build_kbn_error_response(404, f"Case {case_id} not found"),
+            detail=build_kbn_error_response(
+                404, f"Saved object [cases/{case_id}] not found",
+            ),
         )
     return result
 
@@ -279,13 +287,18 @@ def update_comment(
     The request body must include ``id`` (comment ID) and the updated fields.
     """
     comment_id = body.get("id", "")
-    result = case_commands.update_comment(case_id, comment_id, body)
+    try:
+        result = case_commands.update_comment(case_id, comment_id, body)
+    except case_commands.CaseVersionConflictError as exc:
+        raise HTTPException(
+            status_code=409, detail=build_kbn_error_response(409, str(exc)),
+        ) from exc
     if result is None:
         raise HTTPException(
             status_code=404,
             detail=build_kbn_error_response(
                 404,
-                f"Comment {comment_id} not found on case {case_id}",
+                f"Saved object [cases-comments/{comment_id}] not found",
             ),
         )
     return result
@@ -311,7 +324,7 @@ def delete_comment(
             status_code=404,
             detail=build_kbn_error_response(
                 404,
-                f"Comment {comment_id} not found on case {case_id}",
+                f"Saved object [cases-comments/{comment_id}] not found",
             ),
         )
     return Response(status_code=204)

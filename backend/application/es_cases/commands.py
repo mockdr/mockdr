@@ -44,6 +44,18 @@ def create_case(data: dict) -> dict:
     return serialise_case(record_dict(case))
 
 
+class CaseVersionConflictError(Exception):
+    """A write whose ``version`` is no longer the current one."""
+
+    def __init__(self, case_id: str) -> None:
+        """Carry Kibana's own wording, which names the case."""
+        self.case_id = case_id
+        super().__init__(
+            "This case has been updated. Please refresh before saving "
+            "additional updates.",
+        )
+
+
 def _next_version(current: str) -> str:
     """Issue the next opaque version token for a case.
 
@@ -175,11 +187,19 @@ def update_comment(case_id: str, comment_id: str, data: dict) -> dict | None:
     if not comment or comment.case_id != case_id:
         return None
 
+    # The same optimistic-concurrency guard the case itself has, which the
+    # comment carried a token for and never checked: two people editing one
+    # comment both succeeded, and the second silently replaced the first.
+    # Kibana's message names the *case*, not the comment.
+    if data.get("version") != comment.version:
+        raise CaseVersionConflictError(case_id)
+
     now = utc_now()
     if "comment" in data:
         comment.comment = data["comment"]
     comment.updated_at = now
     comment.updated_by = data.get("updated_by", dict(KIBANA_USER))
+    comment.version = _next_version(comment.version)
 
     es_case_comment_repo.save(comment)
     # As with the add: the answer is the case, not the comment.

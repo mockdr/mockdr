@@ -1474,3 +1474,66 @@ class TestTwoClientsWritingTheSameDocument:
                              json={"doc": {"v": 1}}).json()
         assert answer["result"] == "noop"
         assert answer["_seq_no"] == written["_seq_no"]
+
+
+class TestTwoPeopleEditingOneComment:
+    """A case comment carries a version token, and it has to mean something.
+
+    Measured on Kibana 8.15: a PATCH whose ``version`` is no longer the
+    current one is a 409, and the message names the *case*.
+    """
+
+    KBN = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode(), "kbn-xsrf": "true"}
+
+    def _case_with_comment(self, client: TestClient) -> tuple[str, dict]:
+        case = client.post("/kibana/api/cases", headers=self.KBN, json={
+            "title": "zzz-versions", "description": "d", "tags": [],
+            "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
+            "settings": {"syncAlerts": False}, "owner": "securitySolution",
+        }).json()
+        body = client.post(f"/kibana/api/cases/{case['id']}/comments", headers=self.KBN,
+                           json={"type": "user", "comment": "one",
+                                 "owner": "securitySolution"}).json()
+        return case["id"], body["comments"][-1]
+
+    def _patch(self, client: TestClient, case_id: str, comment: dict,
+               version: str, text: str) -> object:
+        return client.patch(f"/kibana/api/cases/{case_id}/comments", headers=self.KBN,
+                            json={"id": comment["id"], "version": version,
+                                  "type": "user", "comment": text,
+                                  "owner": "securitySolution"})
+
+    def test_the_current_version_is_accepted(self, client: TestClient) -> None:
+        case_id, comment = self._case_with_comment(client)
+        answer = self._patch(client, case_id, comment, comment["version"], "two")
+        assert answer.status_code == 200
+
+    def test_the_version_moves_on_every_write(self, client: TestClient) -> None:
+        case_id, comment = self._case_with_comment(client)
+        answer = self._patch(client, case_id, comment, comment["version"], "two")
+        after = next(c for c in answer.json()["comments"] if c["id"] == comment["id"])
+        assert after["version"] != comment["version"]
+
+    def test_the_second_of_two_editors_is_refused(self, client: TestClient) -> None:
+        case_id, comment = self._case_with_comment(client)
+        self._patch(client, case_id, comment, comment["version"], "two")
+        loser = self._patch(client, case_id, comment, comment["version"], "three")
+        assert loser.status_code == 409
+        assert loser.json() == {
+            "statusCode": 409, "error": "Conflict",
+            "message": "This case has been updated. Please refresh before "
+                       "saving additional updates.",
+        }
+
+    def test_a_missing_saved_object_is_named_as_one(self, client: TestClient) -> None:
+        """Kibana names the saved object it could not load, not the concept."""
+        case_id, _ = self._case_with_comment(client)
+        answer = client.delete(f"/kibana/api/cases/{case_id}/comments/no-such-comment",
+                               headers=self.KBN)
+        assert answer.status_code == 404
+        assert answer.json()["message"] == (
+            "Saved object [cases-comments/no-such-comment] not found")
+
+        missing = client.get("/kibana/api/cases/no-such-case", headers=self.KBN)
+        assert missing.json()["message"] == "Saved object [cases/no-such-case] not found"
