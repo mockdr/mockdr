@@ -121,3 +121,51 @@ class TestNotableUpdate:
         notable = results[0]
         for field in required_fields:
             assert field in notable, f"Notable missing required field '{field}'"
+
+
+class TestTheTwoEncodingsAgree:
+    """The same update, form-encoded and as JSON, has to do the same thing.
+
+    The JSON body was validated against a DTO whose fields were all `str`,
+    and any failure was swallowed into an empty parameter set — so a status
+    sent as the number it is discarded the whole request and answered
+    `success: false, "No event IDs provided"` for a request that named
+    three. The form path, on the same route, coerced everything to a string
+    and went through.
+    """
+
+    def test_a_numeric_status_updates_the_notable(self, client: TestClient) -> None:
+        notable_id = _get_notable_ids(client)[0]
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/notable_update",
+            json={"ruleUIDs": [notable_id], "status": 2},
+            headers=_auth(),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+    def test_form_and_json_report_the_same(self, client: TestClient) -> None:
+        notable_ids = _get_notable_ids(client)
+        as_form = client.post(
+            f"{SPLUNK_PREFIX}/services/notable_update",
+            data={"ruleUIDs": notable_ids[0], "status": "2", "comment": "form"},
+            headers=_auth(),
+        ).json()
+        as_json = client.post(
+            f"{SPLUNK_PREFIX}/services/notable_update",
+            json={"ruleUIDs": [notable_ids[0]], "status": "2", "comment": "json"},
+            headers=_auth(),
+        ).json()
+        assert as_form["success"] == as_json["success"] is True
+        assert as_form.get("updated") == as_json.get("updated")
+
+    def test_a_body_that_is_not_an_object_is_still_refused(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/notable_update",
+            json=["not", "an", "object"],
+            headers=_auth(),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is False

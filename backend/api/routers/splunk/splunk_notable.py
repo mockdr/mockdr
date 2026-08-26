@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
-from api.dto.splunk.requests import NotableUpdateRequest
 from api.splunk_auth import require_splunk_ingest
 from application.splunk.commands.notable import update_notable
 
@@ -37,12 +36,14 @@ async def notable_update(
         if rule_uids_str:
             params["ruleUIDs"] = [uid.strip() for uid in rule_uids_str.split(";") if uid.strip()]
     else:
-        try:
-            raw = await request.json()
-            dto = NotableUpdateRequest(**raw)
-            params = dto.model_dump()
-        except Exception:
-            params = {}
+        # Validating the JSON body against a DTO of `str` fields and falling
+        # back to `{}` meant one field of the wrong type discarded the whole
+        # request: `{"ruleUIDs": [...], "status": 3}` — a status code, which
+        # is a number — was answered `success: false, No event IDs provided`,
+        # while `status=3` form-encoded on this same route went through. The
+        # body is read the way the form is read instead: scalars as the
+        # strings splunkd receives, `ruleUIDs` as the list it is.
+        params = _json_params(await _raw_json(request))
 
     rule_uids = params.get("ruleUIDs", [])
     if isinstance(rule_uids, str):
@@ -55,3 +56,22 @@ async def notable_update(
         newOwner=params.get("newOwner", ""),
         comment=params.get("comment", ""),
     )
+
+
+async def _raw_json(request: Request) -> object:
+    """The JSON body, or `None` when there is none to read."""
+    try:
+        return await request.json()
+    except ValueError:
+        return None
+
+
+def _json_params(raw: object) -> dict:
+    """A JSON body as the parameter set the form path would have produced."""
+    if not isinstance(raw, dict):
+        return {}
+    params: dict = {}
+    for key, value in raw.items():
+        # A form carries strings and repeated keys, and nothing else.
+        params[key] = [str(item) for item in value] if isinstance(value, list) else str(value)
+    return params

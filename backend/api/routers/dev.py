@@ -18,7 +18,6 @@ DELETE /_dev/playbooks/cancel        — cancel active execution
 POST   /_dev/playbooks               — create a custom playbook
 PUT    /_dev/playbooks/{id}          — update a playbook
 DELETE /_dev/playbooks/{id}          — delete a playbook
-GET    /_dev/webhooks/deliveries     — recent webhook delivery log
 GET    /_dev/fault-injection         — get current fault injection config
 POST   /_dev/fault-injection         — update fault injection config
 DELETE /_dev/fault-injection         — reset fault injection to defaults
@@ -216,18 +215,6 @@ def delete_playbook(playbook_id: str) -> dict:
     ``{"data": {"affected": 0}}`` if the ID was not found.
     """
     return playbook_commands.delete_playbook(playbook_id)
-
-
-# ── Webhook Delivery Log ─────────────────────────────────────────────────────
-
-@router.get("/_dev/webhooks/deliveries")
-def list_webhook_deliveries() -> dict:
-    """Return recent webhook delivery log entries (newest first).
-
-    Capped at 100 entries.  Useful for debugging webhook delivery
-    and retry behaviour.
-    """
-    return webhook_queries.list_deliveries()
 
 
 # ── Fault Injection ──────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 GET    /web/api/v2.1/_dev/webhooks          — list subscriptions
 POST   /web/api/v2.1/_dev/webhooks          — create subscription
+GET    /web/api/v2.1/_dev/webhooks/deliveries — delivery log
 GET    /web/api/v2.1/_dev/webhooks/{id}     — get single subscription
 DELETE /web/api/v2.1/_dev/webhooks/{id}     — delete subscription
 """
@@ -113,3 +114,26 @@ class TestDeleteWebhook:
         resp = client.delete("/web/api/v2.1/_dev/webhooks/does-not-exist", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()["data"]["affected"] == 0
+
+
+class TestDeliveryLogIsReachable:
+    """`deliveries` is a sibling of `{id}`, and lost to it for a while.
+
+    The log was declared in another router that is included after this one,
+    so `/{webhook_id}` matched first and every request for the log was
+    answered by a lookup for a subscription named "deliveries" — a 404 for a
+    route that exists.
+    """
+
+    def test_the_log_answers_rather_than_404(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        resp = client.get("/web/api/v2.1/_dev/webhooks/deliveries", headers=auth_headers)
+        assert resp.status_code == 200
+        assert isinstance(resp.json()["data"], list)
+
+    def test_an_unknown_subscription_is_still_a_404(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        resp = client.get("/web/api/v2.1/_dev/webhooks/deliverie", headers=auth_headers)
+        assert resp.status_code == 404

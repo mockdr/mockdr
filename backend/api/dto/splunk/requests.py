@@ -36,17 +36,3 @@ class HecEventRequest(BaseModel):
     index: str = ""
     host: str = "mockdr"
     time: float | None = None
-
-
-class NotableUpdateRequest(BaseModel):
-    """Notable event update request (``POST /services/notable_update``).
-
-    The router accepts both form-encoded and JSON bodies to match the
-    real Splunk API.  This DTO is used for JSON body validation.
-    """
-
-    ruleUIDs: list[str] = Field(default_factory=list)
-    newUrgency: str = ""
-    status: str = ""
-    newOwner: str = ""
-    comment: str = ""

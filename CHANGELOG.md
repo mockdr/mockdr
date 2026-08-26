@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A route the mock publishes and nothing could reach.**
+Starlette matches in registration order and stops at the first hit, so a
+literal path declared after a sibling pattern that covers it never runs.
+`GET /_dev/webhooks/deliveries` was declared in `dev.py`, which is included
+after `webhooks.py`, so `/_dev/webhooks/{id}` matched first: every request
+for the delivery log was answered by a search for a subscription called
+"deliveries", and a route the mock publishes returned 404. It is declared
+ahead of the by-id route now, and `scripts/shadowed_routes.py` walks all 689
+routes in match order so the next one cannot hide.
+
+**One field of the wrong type discarded a whole Splunk notable update.**
+`POST /services/notable_update` validated a JSON body against a DTO whose
+fields were all `str` and swallowed any failure into an empty parameter set,
+so `{"ruleUIDs": [...], "status": 2}` — a status code, which is a number —
+was answered `success: false, "No event IDs provided"` for a request that
+named three of them. The same route form-encoded coerced everything to a
+string and went through. The JSON body is read the way the form is read now,
+and the two encodings are pinned against each other.
+
 **Cortex XDR assigned its incidents to people the tenant did not employ.**
 `rbac/get_users` answered three canned role accounts, while every incident
 drew a fresh `fake.name()` for `assigned_user_pretty_name` and built a mail

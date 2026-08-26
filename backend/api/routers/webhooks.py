@@ -2,6 +2,7 @@
 
 GET    /web/api/v2.1/webhooks          — list all subscriptions
 POST   /web/api/v2.1/webhooks          — create a new subscription
+GET    /web/api/v2.1/webhooks/deliveries — recent delivery log
 GET    /web/api/v2.1/webhooks/{id}     — get a single subscription
 DELETE /web/api/v2.1/webhooks/{id}     — delete a subscription
 """
@@ -31,6 +32,20 @@ def create_webhook(body: WebhookCreateBody, _: dict = Depends(require_admin)) ->
         return webhook_commands.create_webhook(body.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# Before `/{webhook_id}`: routes match in registration order, and the log
+# lived in another router that is included later — so every request for it
+# was answered by the by-id handler looking for a subscription called
+# "deliveries", and the delivery log was unreachable.
+@router.get("/_dev/webhooks/deliveries")
+def list_webhook_deliveries() -> dict:
+    """Return recent webhook delivery log entries (newest first).
+
+    Capped at 100 entries.  Useful for debugging webhook delivery
+    and retry behaviour.
+    """
+    return webhook_queries.list_deliveries()
 
 
 @router.get("/_dev/webhooks/{webhook_id}")
