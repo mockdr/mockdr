@@ -7,7 +7,7 @@ from repository.store import store
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.nested import get_nested
-from utils.pagination import AGENT_CURSOR, build_list_response, build_single_response, paginate
+from utils.pagination import AGENT_CURSOR, build_list_response, paginate
 from utils.s1_fixtures import restrict_item
 from utils.serde import record_dict
 from utils.strip import strip_fields
@@ -141,44 +141,6 @@ def list_passphrases(params: dict, cursor: str | None, limit: int) -> dict:
         definition="agents.schemas_AgentPassphraseSchema_many_200",
         strict=True,
     )
-
-
-def get_agent(agent_id: str) -> dict | None:
-    """Return a single agent by ID with internal fields stripped, or None."""
-    agent = agent_repo.get(agent_id)
-    if not agent:
-        return None
-    return build_single_response(strip_fields(record_dict(agent), AGENT_INTERNAL_FIELDS))
-
-
-def get_agent_passphrase(agent_id: str) -> dict | None:
-    """Return the disk-encryption passphrase for a given agent, or None."""
-    agent = agent_repo.get(agent_id)
-    if not agent:
-        return None
-    return {"data": {"passphrase": agent.passphrase}}
-
-
-def get_agent_processes(agent_id: str, cursor: str | None, limit: int) -> dict | None:
-    """Return a paginated list of running processes for the given agent, or None."""
-    if not agent_repo.exists(agent_id):
-        return None
-    processes = generate_processes_for_agent(agent_id)
-    page, next_cursor, total = paginate(processes, cursor, limit)
-    return {
-        "data": [restrict_item(i, "agents.schemas_AgentProcessesSchema_many_200") for i in page]
-    }
-
-
-def get_agent_applications(agent_id: str, cursor: str | None, limit: int) -> dict | None:
-    """Return a paginated list of installed applications for the given agent, or None."""
-    if not agent_repo.exists(agent_id):
-        return None
-    apps = [r for r in store.get_all("installed_apps") if r.get("agentId") == agent_id]
-    page, next_cursor, total = paginate(apps, cursor, limit)
-    return {
-        "data": [restrict_item(i, "agents.schemas_AgentApplicationsSchema_many_200") for i in page]
-    }
 
 
 def list_applications_for_agents(

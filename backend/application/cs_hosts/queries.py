@@ -197,18 +197,3 @@ def list_hidden_hosts(filter_fql: str | None, offset: int, limit: int,
     records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
     page, total = paginate_cs(records, offset, limit)
     return build_cs_list_response([_public(h) for h in page], total, offset, limit)
-
-
-def get_host_count(filter_fql: str | None) -> dict:
-    """Count hosts matching FQL filter.
-
-    Args:
-        filter_fql: FQL filter string, or None for all hosts.
-
-    Returns:
-        CS entity response with a single resource containing the count.
-    """
-    records = _visible_hosts()
-    if filter_fql:
-        records = apply_fql(records, filter_fql)
-    return build_cs_entity_response([{"count": len(records)}])

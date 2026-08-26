@@ -3,7 +3,7 @@ from application.documented_filters import DOCUMENTED_FILTERS
 from repository.threat_repo import threat_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.nested import get_nested
-from utils.pagination import THREAT_CURSOR, build_list_response, build_single_response, paginate
+from utils.pagination import THREAT_CURSOR, build_list_response, paginate
 from utils.serde import record_dict
 from utils.strip import strip_fields
 
@@ -68,14 +68,6 @@ def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
         total,
         definition="threats.schemas_ThreatSchema_many_200",
     )
-
-
-def get_threat(threat_id: str) -> dict | None:
-    """Return a single threat by ID with internal fields stripped, or None."""
-    threat = threat_repo.get(threat_id)
-    if not threat:
-        return None
-    return build_single_response(public_threat(record_dict(threat)))
 
 
 def get_threat_timeline(threat_id: str) -> dict | None:

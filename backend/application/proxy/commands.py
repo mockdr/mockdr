@@ -94,32 +94,6 @@ def set_config(
     return _state._config
 
 
-def set_vendor_config(vendor_name: str, cfg: dict[str, object]) -> VendorProxyConfig:
-    """Add or update config for a single vendor without replacing others.
-
-    Args:
-        vendor_name: One of the known vendor keys.
-        cfg: Dict with ``base_url``, ``auth``, ``enabled``.
-
-    Returns:
-        The new ``VendorProxyConfig``.
-
-    Raises:
-        ValueError: If *vendor_name* is not recognized.
-    """
-    if vendor_name not in VENDOR_NAMES:
-        raise ValueError(f"Unknown vendor '{vendor_name}'. Must be one of: {sorted(VENDOR_NAMES)}")
-    auth = _parse_auth(cfg.get("auth", {}))
-    vc = VendorProxyConfig(
-        vendor=vendor_name,
-        base_url=str(cfg.get("base_url", "")).rstrip("/"),
-        auth=auth,
-        enabled=bool(cfg.get("enabled", True)),
-    )
-    _state._config.vendors[vendor_name] = vc
-    return vc
-
-
 def add_recording(recording: ProxyRecording) -> None:
     """Append a new recording to the in-memory list."""
     _state._recordings.append(recording)

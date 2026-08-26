@@ -285,14 +285,3 @@ BUILTIN_PLAYBOOKS = [
         ],
     },
 ]
-
-def get_playbook(playbook_id: str) -> dict | None:
-    """Look up a built-in playbook by ID.
-
-    Args:
-        playbook_id: The playbook identifier string.
-
-    Returns:
-        The matching playbook dict, or ``None`` if not found.
-    """
-    return next((p for p in BUILTIN_PLAYBOOKS if p["id"] == playbook_id), None)

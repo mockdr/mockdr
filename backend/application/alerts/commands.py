@@ -75,18 +75,6 @@ def create_star_rule(body: dict, user_id: str | None) -> dict:
     return {"data": rule}
 
 
-def list_star_rules() -> dict:
-    """List all STAR custom detection rules.
-
-    Implements GET /cloud-detection/rules.
-
-    Returns:
-        Dict with ``data`` containing all rules.
-    """
-    rules = store.get_all("star_rules")
-    return {"data": rules}
-
-
 def set_incident_status(status: str, ids: list[str], actor_user_id: str | None = None) -> dict:
     """Set the incident status on a list of alerts.
 

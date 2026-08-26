@@ -58,28 +58,6 @@ def get_file_stats(file_hash: str) -> dict:
     }
 
 
-def get_domain_info(domain: str) -> dict:
-    """Get synthetic domain information.
-
-    Args:
-        domain: Domain name to look up.
-
-    Returns:
-        Domain info dict matching MDE ``/api/domains/{domain}`` response.
-    """
-    return {
-        "host": domain,
-        "organizationPrevalence": "Medium",
-        "orgFirstSeen": "2024-03-01T12:00:00Z",
-        "orgLastSeen": utc_now(),
-        "registrar": "GoDaddy.com, LLC",
-        "registrant": "REDACTED FOR PRIVACY",
-        "firstSeenDateTime": "2024-03-01T12:00:00Z",
-        "lastSeenDateTime": utc_now(),
-        "isInOrgWhitelist": False,
-    }
-
-
 def get_domain_stats(domain: str) -> dict:
     """Get synthetic domain statistics.
 
@@ -98,27 +76,6 @@ def get_domain_stats(domain: str) -> dict:
             {"deviceId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "deviceName": "ws-fin-001"},
             {"deviceId": "b2c3d4e5-f6a7-8901-bcde-f12345678901", "deviceName": "srv-dc-01"},
         ],
-    }
-
-
-def get_ip_info(ip: str) -> dict:
-    """Get synthetic IP address information.
-
-    Args:
-        ip: IPv4 or IPv6 address to look up.
-
-    Returns:
-        IP info dict matching MDE ``/api/ips/{ip}`` response.
-    """
-    return {
-        "ipAddress": ip,
-        "organizationPrevalence": "Low",
-        "orgFirstSeen": "2024-04-01T14:00:00Z",
-        "orgLastSeen": utc_now(),
-        "firstSeenDateTime": "2024-04-01T14:00:00Z",
-        "lastSeenDateTime": utc_now(),
-        "countryCode": "US",
-        "autonomousSystem": "AS13335 Cloudflare, Inc.",
     }
 
 

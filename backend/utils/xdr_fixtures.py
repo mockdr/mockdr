@@ -64,12 +64,6 @@ def deep_complete(defaults: Any, actual: Any) -> Any:
     return actual
 
 
-def complete_xdr(reply: Any, slug: str) -> Any:
-    """The ``reply`` of route ``slug`` (``incidents_get_incidents``) completed."""
-    defaults = _fixture(slug)
-    return deep_complete(defaults, reply) if defaults and isinstance(reply, dict) else reply
-
-
 def xdr_shape(slug: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorate a handler so its ``{"reply": …}`` is completed to the recorded shape."""
 

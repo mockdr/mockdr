@@ -45,44 +45,6 @@ def create_indicator(body: dict) -> dict:
     return to_mde_resource(record_dict(indicator), "indicatorId")
 
 
-def update_indicator(indicator_id: str, body: dict) -> dict | None:
-    """Update an existing indicator (PATCH semantics).
-
-    Args:
-        indicator_id: GUID of the indicator to update.
-        body:         Dict with fields to update.
-
-    Returns:
-        Updated indicator dict, or None if not found.
-    """
-    indicator = mde_indicator_repo.get(indicator_id)
-    if not indicator:
-        return None
-
-    if "action" in body:
-        indicator.action = body["action"]
-    if "severity" in body:
-        indicator.severity = body["severity"]
-    if "title" in body:
-        indicator.title = body["title"]
-    if "description" in body:
-        indicator.description = body["description"]
-    if "expirationTime" in body:
-        indicator.expirationTime = body["expirationTime"]
-    if "recommendedActions" in body:
-        indicator.recommendedActions = body["recommendedActions"]
-    if "rbacGroupNames" in body:
-        indicator.rbacGroupNames = body["rbacGroupNames"]
-    if "generateAlert" in body:
-        indicator.generateAlert = body["generateAlert"]
-
-    indicator.lastUpdatedBy = body.get("updatedBy", "analyst@acmecorp.internal")
-    indicator.lastUpdateTime = utc_now()
-
-    mde_indicator_repo.save(indicator)
-    return to_mde_resource(record_dict(indicator), "indicatorId")
-
-
 def delete_indicator(indicator_id: str) -> bool:
     """Delete an indicator by its ID.
 

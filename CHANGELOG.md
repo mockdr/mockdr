@@ -22,6 +22,23 @@ into it.
 
 ### Added
 
+**A sweep for code nothing can reach, and the invented numbers it found.**
+`unread_params.py` reads the source for a parameter a handler never looks at;
+`unreachable_code.py` reads it for the layer below — a query or command
+handler no router calls, nothing imports and no test names. Twenty-seven of
+them, and two were the reason to look: `cs_iocs.device_count_for_ioc`
+answered how many devices had seen an indicator with `(hash(value) % 10) + 1`
+— a number Python randomises per process and that has nothing to do with any
+device this install holds — and the same file's `processes_ran_on` invented
+process ids the same way. Neither was wired to a route, so neither had ever
+served anybody; wiring one up would have been enough to make the mock answer
+a confident count that came out differently after a restart. Both are gone,
+along with twenty-five superseded handlers (`get_agent_passphrase` for one
+agent, where SentinelOne publishes `/agents/passphrases` for all of them) and
+three modules that held nothing else. Neither Cortex reference documents a
+read route for the hash blocklist or allowlist, so the readers that had been
+written for one went too — no evidence, no route.
+
 **A sweep that reseeded the world under itself.**
 `body_audit.py` probed mockdr's own `_dev` control surface along with the
 mocked ones, and posting to `_dev/scenario` reseeds the install — which

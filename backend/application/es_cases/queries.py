@@ -131,30 +131,6 @@ def get_case_comments(case_id: str) -> list[dict] | None:
     return [serialise_comment(record_dict(c)) for c in comments]
 
 
-def get_case_activity(case_id: str) -> list[dict] | None:
-    """Return case comments as an activity feed.
-
-    Each activity entry includes the comment fields plus an ``action``
-    key derived from the comment type.
-
-    Args:
-        case_id: The UUID of the case.
-
-    Returns:
-        List of activity dicts, or None if the case does not exist.
-    """
-    case = es_case_repo.get(case_id)
-    if not case:
-        return None
-    comments = es_case_comment_repo.get_by_case_id(case_id)
-    activities = []
-    for c in comments:
-        entry = record_dict(c)
-        entry["action"] = "comment" if c.type == "user" else c.type
-        activities.append(entry)
-    return activities
-
-
 def get_tags() -> list[str]:
     """Return all unique tags across all cases.
 

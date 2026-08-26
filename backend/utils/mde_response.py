@@ -43,18 +43,6 @@ def build_mde_list_response(
     return resp
 
 
-def build_mde_entity_response(entity: dict) -> dict:
-    """Return a single MDE entity (no envelope — bare dict).
-
-    Args:
-        entity: The entity dict to return.
-
-    Returns:
-        The entity dict unchanged.
-    """
-    return entity
-
-
 def build_mde_error_response(code: str, message: str, target: str | None = None) -> dict:
     """Build an MDE-style error response.
 

@@ -330,12 +330,6 @@ def build_splunk_envelope(
     return envelope
 
 
-def build_splunk_single(name: str, content: dict) -> dict:
-    """Build a Splunk envelope with a single entry."""
-    entry = build_splunk_entry(name, content)
-    return build_splunk_envelope([entry], total=1)
-
-
 # ---------------------------------------------------------------------------
 # Search results envelope (used by /search/v2/jobs/{sid}/results)
 # ---------------------------------------------------------------------------

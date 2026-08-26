@@ -617,11 +617,6 @@ def _missing_target(index: str) -> str | None:
     return None
 
 
-def known_index_prefixes() -> tuple[str, ...]:
-    """Return the index prefixes this mock serves, for docs and diagnostics."""
-    return _KNOWN_PREFIXES
-
-
 #: Sort keys that name a document's position or score rather than a field.
 #: `_shard_doc` is the tiebreaker a point-in-time search adds of its own.
 _SORT_METADATA = frozenset({"_doc", "_score", "_id", "_index", "_shard_doc"})

@@ -22,7 +22,7 @@ from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from utils.splunk.spl_expr import Node, SPLExprError, parse_search, parse_where
+from utils.splunk.spl_expr import Node, SPLExprError, parse_search
 
 __all__ = [
     "KNOWN_COMMANDS",
@@ -383,11 +383,6 @@ def _split_top_level_terms(clause: str) -> list[str]:
     if current:
         terms.append("".join(current))
     return terms
-
-
-def parse_where_expr(arg: str) -> Node | None:
-    """Parse a ``where`` argument, re-exported for the executor."""
-    return parse_where(arg)
 
 
 def current_time() -> float:

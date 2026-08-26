@@ -4,7 +4,7 @@ from __future__ import annotations
 from repository.cs_case_repo import cs_case_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
-from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.cs_response import build_cs_id_response
 from utils.serde import record_dict
 
 
@@ -38,20 +38,3 @@ def query_case_ids(
     page, total = paginate_cs(records, offset, limit)
     ids = [r["id"] for r in page]
     return build_cs_id_response(ids, total, offset, limit)
-
-
-def get_case_entities(ids: list[str]) -> dict:
-    """Get case entities by ID list.
-
-    Args:
-        ids: List of case IDs to retrieve.
-
-    Returns:
-        CS entity response envelope containing full case dicts.
-    """
-    entities: list[dict] = []
-    for case_id in ids:
-        case = cs_case_repo.get(case_id)
-        if case:
-            entities.append(record_dict(case))
-    return build_cs_entity_response(entities)

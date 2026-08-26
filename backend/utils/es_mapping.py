@@ -244,15 +244,3 @@ def _name_matches(name: str, pattern: str) -> bool:
     if pattern.endswith("*"):
         return name.startswith(pattern[:-1])
     return name == pattern
-
-
-def is_aggregatable(properties: dict, field: str) -> bool | None:
-    """Whether a ``terms``-style aggregation can read this field.
-
-    Returns None when the mapping says nothing about it, which is how a
-    caller tells "not aggregatable" from "not mapped".
-    """
-    spec = flatten_properties(properties).get(field)
-    if spec is None:
-        return None
-    return str(spec.get("type", "object")) in _AGGREGATABLE
