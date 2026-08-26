@@ -99,7 +99,7 @@ jobs:
 
       - name: Start the backend
         run: |
-          uvicorn main:app --host 127.0.0.1 --port 8001 --no-access-log &
+          uvicorn main:app --host 127.0.0.1 --port 8001 --no-access-log --no-server-header &
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:8001/web/api/v2.1/system/status >/dev/null && break
             sleep 1

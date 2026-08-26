@@ -174,6 +174,21 @@ def _drop_lines(text: str, count: int) -> str:
     return text.split("\n", count)[-1] if count else text
 
 
+def _field_set(value: str) -> str:
+    """A header whose value is an unordered list of field names.
+
+    `accept-encoding` is dropped with the order: whether an answer varies on
+    it says only that *this* body was large enough for that product to
+    compress, and the two installs hold different amounts of data. What the
+    answer depends on — the cookie, the credential — is the part that says
+    something about the server.
+    """
+    return ", ".join(sorted(
+        name for name in (p.strip().lower() for p in value.split(",") if p.strip())
+        if name != "accept-encoding"
+    ))
+
+
 def compare(
     probe_id: str,
     mock: Response,
@@ -197,6 +212,12 @@ def compare(
             # What matters is that the header is there at all.
             mock_value = "<present>" if mock_value else ""
             real_value = "<present>" if real_value else ""
+        elif name == "vary":
+            # RFC 9110 §12.5.5: a list of field names, and a list has no
+            # order. Comparing the string reported a finding for two servers
+            # that agree about what their answer depends on.
+            mock_value = _field_set(mock_value)
+            real_value = _field_set(real_value)
         # A header absent from both is agreement, not a finding.
         if mock_value != real_value and (mock_value or real_value):
             findings.append(Finding(

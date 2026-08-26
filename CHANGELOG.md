@@ -714,6 +714,36 @@ against Splunk 10.4.2, and four seeded probes compare the bytes.
 
 ### Fixed
 
+**splunkd's own headers, and the caching it publishes.**
+`Server: uvicorn` was on every answer, which is the plainest way there is to
+tell a mock from the thing it mocks. Under it, measured on 10.4.2 header by
+header: splunkd says what each answer depends on (`Vary: Cookie,
+Authorization` — or `Authorization` alone for a session token it cannot
+resolve, which is refused before its cookie handler, and nothing at all for
+a collector token read from the query string); it says how each answer may
+be kept (`no-store` with its own already-expired `Expires` of October 1978,
+`private` for a credential it refused and for a mode it could not read); and
+for the one family it serves as cacheable — `data/indexes`, on a successful
+read only — it publishes a weak `ETag` and answers a matching
+`If-None-Match` with `304 Not Modified`. mockdr answered the whole
+collection every time, so a client revalidating a cached read never learnt
+that what it held was current.
+
+**And none of the three runnable products' compression.**
+All three compress when a client offers gzip and mockdr compressed nothing —
+a difference in every byte on the wire. They disagree about the details, so
+one compressor for all of them gets two wrong: Elasticsearch compresses a
+74-byte answer and publishes no `Vary`; Kibana, in the same distribution,
+leaves an 828-byte answer alone and names the encoding when it does
+compress; splunkd leaves a 127-byte refusal alone, and its event collector
+never compresses at all. Each mount follows its own product now, and the six
+with no runnable product are left uncompressed rather than guessed at.
+
+The harness compares `vary` as the unordered list it is, and without
+`accept-encoding`: whether *this* answer was compressed depends on how much
+data each install holds, where the rest of the list says what the server
+consults.
+
 **The header every Elasticsearch client checks for, which mockdr never sent.**
 `X-elastic-product: Elasticsearch` is not decoration: every official client
 since 7.14 — Python, JavaScript, Java, Go — reads it off the first response

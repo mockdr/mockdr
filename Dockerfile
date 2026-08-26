@@ -42,4 +42,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
 USER appuser
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5001"]
+# `--no-server-header`: uvicorn adds `Server: uvicorn` after the app has
+# answered, and the mounts that name their own server cannot remove it
+# from inside. Splunkd calls itself Splunkd; Elasticsearch and Kibana
+# name no server at all.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5001", "--no-server-header"]

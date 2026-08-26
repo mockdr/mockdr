@@ -136,7 +136,10 @@ class SplunkOutputModeMiddleware:
         query = parse_qs(scope.get("query_string", b"").decode("latin-1"), keep_blank_values=True)
         refusal = _refusal(path, query)
         if refusal is not None:
-            await _send_refusal(send, *refusal)
+            await _send_refusal(
+                send, *refusal,
+                unreadable=refusal[0].startswith(_UNREADABLE_MODE),
+            )
             return
         mode = _values(query, "output_mode").lower()
         if not mode and path.rstrip("/") == _CSV_DEFAULT_PATH:
@@ -188,6 +191,10 @@ class SplunkOutputModeMiddleware:
         )
 
 
+#: The refusal splunkd answers `Cache-Control: private` to.
+_UNREADABLE_MODE = "Invalid output mode specified"
+
+
 def _refusal(
     path: str, query: dict[str, list[str]],
 ) -> tuple[str, bool, str] | None:
@@ -222,6 +229,7 @@ def _refusal(
                 f"Output mode '{modes[0]}' is not supported for this endpoint.",
                 False, "WARN",
             )
+        # The one refusal from the layer that chooses the renderer.
         return f"Invalid output mode specified ({modes[0]}).", False, "ERROR"
 
     as_json = _values(query, "output_mode").lower() == "json"
@@ -247,9 +255,16 @@ def _refusal(
 
 
 async def _send_refusal(
-    send: Send, message: str, as_json: bool, level: str,
+    send: Send, message: str, as_json: bool, level: str, *, unreadable: bool = False,
 ) -> None:
-    """Answer with splunkd's refusal, in the shape the caller asked for."""
+    """Answer with splunkd's refusal, in the shape the caller asked for.
+
+    `unreadable` marks the one refusal splunkd answers `Cache-Control:
+    private` to — a mode it could not read, refused by the layer that would
+    have chosen the renderer, the same layer that refuses a credential. Its
+    other refusals come from the handler and are `no-store` like any other
+    answer.
+    """
     if as_json:
         body = splunk_json({"messages": [{"type": level, "text": message}]})
         content_type = b"application/json; charset=UTF-8"
@@ -262,7 +277,11 @@ async def _send_refusal(
         content_type = b"text/xml; charset=UTF-8"
     await send({
         "type": "http.response.start", "status": 400,
+        # `private` and no expiry: splunkd answers a mode it could not read
+        # from the same layer that answers a refused credential, and both
+        # say only that the answer is not shared.
         "headers": [(b"content-type", content_type),
+                    *([(b"cache-control", b"private")] if unreadable else []),
                     (b"content-length", str(len(body)).encode())],
     })
     await send({"type": "http.response.body", "body": body})

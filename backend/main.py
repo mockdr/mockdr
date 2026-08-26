@@ -18,6 +18,7 @@ from api.auth import require_admin, require_auth
 from api.documented_body import require_documented_body
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
+from api.middleware.compression import CompressionMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
@@ -28,6 +29,7 @@ from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.request_logging import RequestLoggingMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
 from api.middleware.splunk_field_filter import SplunkFieldFilterMiddleware
+from api.middleware.splunk_headers import SplunkHeadersMiddleware
 from api.middleware.splunk_namespace import SplunkNamespaceMiddleware
 from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
 from api.middleware.splunk_paging import SplunkPagingMiddleware
@@ -425,6 +427,7 @@ app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the 
 app.add_middleware(JsonCharsetMiddleware)      # each product names the charset its own way
 app.add_middleware(TokenCacheMiddleware)       # RFC 6749 §5.1 — a token answer is never cached
 app.add_middleware(ElasticHeadersMiddleware)   # the header every Elasticsearch client checks for
+app.add_middleware(SplunkHeadersMiddleware)    # Server/Vary/caching, and 304 on a fresh read
 # Path rewriting must happen before routing, so this is added last (outermost).
 app.add_middleware(SplunkNamespaceMiddleware)  # /servicesNS/{owner}/{app} -> /services
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last
@@ -435,6 +438,10 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
+# Compression sits outside everything that rewrites a body, and outside the
+# Splunk headers so their ETag is a validator for the entity rather than for
+# one of its encodings — which is what makes it stable across them.
+app.add_middleware(CompressionMiddleware)  # each product's own gzip policy
 app.add_middleware(BodyLimitMiddleware)    # outermost: 413 before any body is read
 app.add_middleware(MetricsMiddleware)         # outermost — runs first, captures all timings
 
@@ -1281,4 +1288,6 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
 def _cli() -> None:
     """CLI entrypoint for ``mockdr`` command."""
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)  # nosec B104
+    uvicorn.run(  # nosec B104
+        "main:app", host="0.0.0.0", port=8001, reload=True, server_header=False,
+    )

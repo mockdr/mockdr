@@ -79,7 +79,7 @@ runs:
         SEED_COUNT_ALERTS: ${{ inputs.seed-count-alerts }}
       run: |
         cd ${{ github.action_path }}/backend
-        PYTHONPATH=. nohup python -m uvicorn main:app --host 0.0.0.0 --port ${{ inputs.port }} &
+        PYTHONPATH=. nohup python -m uvicorn main:app --host 0.0.0.0 --port ${{ inputs.port }} --no-server-header &
         echo "base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
         echo "s1-base-url=http://localhost:${{ inputs.port }}/web/api/v2.1" >> "$GITHUB_OUTPUT"
         echo "cs-base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"

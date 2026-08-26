@@ -182,7 +182,7 @@ jobs:
 
       - name: Start backend server
         run: |
-          cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8001 &
+          cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8001 --no-server-header &
           # Wait for server to be ready
           for i in $(seq 1 30); do
             if curl -s http://localhost:8001/web/api/v2.1/system/status > /dev/null 2>&1; then

@@ -46,9 +46,13 @@ _VOLATILE: tuple[tuple[str, re.Pattern[str]], ...] = (
 #: because a header no probe compares is a header no probe can miss.
 #: `kbn-name` and `kbn-license-sig` are how Kibana names itself on every
 #: answer, and its `cache-control` keeps those answers out of every cache.
+#: `server`, `vary` and `etag` join them for the same reason: splunkd names
+#: itself on every answer, says what its answer depends on, and publishes a
+#: validator for the one family it serves as cacheable.
 SIGNIFICANT_HEADERS: frozenset[str] = frozenset({
     "content-type", "www-authenticate", "x-elastic-product",
     "kbn-name", "kbn-license-sig", "cache-control",
+    "server", "vary", "etag",
 })
 
 #: Headers whose *presence* is the behaviour and whose value names the
@@ -56,7 +60,7 @@ SIGNIFICANT_HEADERS: frozenset[str] = frozenset({
 #: signature is a digest of a licence only that install holds. Comparing
 #: those values would report one finding per probe for ever and say nothing.
 PRESENCE_ONLY_HEADERS: frozenset[str] = frozenset({
-    "kbn-name", "kbn-license-sig",
+    "kbn-name", "kbn-license-sig", "etag",
 })
 
 

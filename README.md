@@ -73,7 +73,7 @@ Free tier -- no credit card required. Deploys the Docker image with default seed
 # Backend
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-PYTHONPATH=. .venv/bin/uvicorn main:app --port 8001 --reload
+PYTHONPATH=. .venv/bin/uvicorn main:app --port 8001 --reload --no-server-header
 
 # Frontend (separate terminal)
 cd frontend

@@ -3256,3 +3256,178 @@ class TestTheElasticProductsNameThemselves:
         """A client reading both must not see two Kibanas."""
         status = client.get("/kibana/api/status", headers=self.KBN)
         assert status.headers["kbn-name"] == status.json()["name"]
+
+
+class TestSplunkdNamesItselfAndItsCaching:
+    """Measured on 10.4.2, header by header.
+
+    `Server: uvicorn` is the plainest way there is to tell the two apart, and
+    it was there on every answer. Under it: splunkd says what each answer
+    depends on, says how it may be kept, and publishes a validator for the
+    one family it serves as cacheable — `data/indexes` — which it then
+    answers `304 Not Modified` for. mockdr said none of it, so a client
+    revalidating a cached read was handed the whole collection every time.
+    """
+
+    SPLUNK = {"Authorization": "Basic " + base64.b64encode(
+        b"admin:mockdr-admin").decode()}
+    UNCACHEABLE = "no-store, no-cache, must-revalidate, max-age=0"
+
+    def test_the_server_is_splunkd(self, client: TestClient) -> None:
+        response = client.get("/splunk/services/server/info", headers=self.SPLUNK)
+        assert response.headers["server"] == "Splunkd"
+
+    def test_a_read_says_what_it_depends_on(self, client: TestClient) -> None:
+        response = client.get("/splunk/services/saved/searches",
+                              headers=self.SPLUNK)
+        # The test client offers gzip, so the encoding joins what a
+        # compressed answer varies on; who asked is the part that is always
+        # there.
+        named = {p.strip().lower() for p in response.headers["vary"].split(",")}
+        assert {"cookie", "authorization"} <= named
+
+    def test_a_session_token_is_refused_before_the_cookie(
+        self, client: TestClient,
+    ) -> None:
+        """splunkd never reaches its cookie handler for one it cannot resolve."""
+        response = client.get("/splunk/services/data/indexes",
+                              headers={"Authorization": "Splunk zzz-not-a-key"})
+        assert response.headers["vary"] == "Authorization"
+
+    def test_the_collector_varies_on_the_credential_alone(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post("/splunk/services/collector/event",
+                               headers={"Authorization": "Splunk zzz"},
+                               json={"event": "x"})
+        assert response.headers["vary"] == "Authorization"
+
+    def test_a_token_in_the_query_never_reaches_the_header(
+        self, client: TestClient,
+    ) -> None:
+        response = client.post("/splunk/services/collector/event",
+                               params={"token": "zzz"}, json={"event": "x"})
+        assert "vary" not in response.headers
+
+    def test_almost_nothing_is_cacheable(self, client: TestClient) -> None:
+        response = client.get("/splunk/services/saved/searches",
+                              headers=self.SPLUNK)
+        assert response.headers["cache-control"] == self.UNCACHEABLE
+        assert response.headers["expires"] == "Thu, 26 Oct 1978 00:00:00 GMT"
+
+    def test_the_index_family_is(self, client: TestClient) -> None:
+        response = client.get("/splunk/services/data/indexes",
+                              headers=self.SPLUNK,
+                              params={"output_mode": "json"})
+        assert response.headers["cache-control"] == (
+            "must-revalidate, private, max-age=1800")
+        assert response.headers["etag"].startswith('W/"')
+
+    def test_only_when_the_read_succeeded(self, client: TestClient) -> None:
+        """A 404 under the same family carries no validator."""
+        response = client.get("/splunk/services/data/indexes/zzz-no-such",
+                              headers=self.SPLUNK, params={"output_mode": "json"})
+        assert response.status_code == 404
+        assert response.headers["cache-control"] == self.UNCACHEABLE
+        assert "etag" not in response.headers
+
+    def test_a_fresh_read_is_answered_304(self, client: TestClient) -> None:
+        first = client.get("/splunk/services/data/indexes", headers=self.SPLUNK,
+                           params={"output_mode": "json"})
+        again = client.get(
+            "/splunk/services/data/indexes",
+            headers={**self.SPLUNK, "If-None-Match": first.headers["etag"]},
+            params={"output_mode": "json"})
+
+        assert again.status_code == 304
+        assert again.content == b""
+        assert again.headers["etag"] == first.headers["etag"]
+
+    def test_a_stale_validator_gets_the_collection(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get(
+            "/splunk/services/data/indexes",
+            headers={**self.SPLUNK, "If-None-Match": 'W/"zzz-not-the-etag"'},
+            params={"output_mode": "json"})
+        assert response.status_code == 200
+        assert response.json()["entry"]
+
+    def test_a_refused_credential_says_only_that_it_is_not_shared(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/splunk/services/data/indexes")
+        assert response.status_code == 401
+        assert response.headers["cache-control"] == "private"
+        assert "expires" not in response.headers
+
+    def test_a_mode_it_could_not_read_says_the_same(
+        self, client: TestClient,
+    ) -> None:
+        """That refusal comes from the layer that would have chosen the
+        renderer — the same layer that refuses a credential."""
+        response = client.get("/splunk/services/data/indexes",
+                              headers=self.SPLUNK,
+                              params={"output_mode": "zzz-not-a-mode"})
+        assert response.status_code == 400
+        assert response.headers["cache-control"] == "private"
+
+
+class TestEachProductCompressesItsOwnWay:
+    """Measured on all three runnable products, which do not agree.
+
+    mockdr compressed nothing, which a client sees in every byte on the
+    wire. Elasticsearch compresses a 74-byte answer and publishes no `Vary`;
+    Kibana leaves an 828-byte answer alone; splunkd leaves a 127-byte refusal
+    alone and names the encoding in the `Vary` it already sends.
+    """
+
+    ES = {"Authorization": "Basic " + base64.b64encode(
+        b"elastic:mock-elastic-password").decode()}
+    GZIP = {"Accept-Encoding": "gzip"}
+
+    def test_elasticsearch_compresses_and_says_nothing(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/elastic/_cluster/health",
+                              headers={**self.ES, **self.GZIP})
+        assert response.headers["content-encoding"] == "gzip"
+        assert "vary" not in response.headers
+
+    def test_kibana_compresses_and_says_so(self, client: TestClient) -> None:
+        response = client.get("/kibana/api/cases/_find",
+                              headers={**self.ES, **self.GZIP, "kbn-xsrf": "true"},
+                              params={"perPage": 20})
+        assert len(response.content) > 0
+        assert response.headers["content-encoding"] == "gzip"
+        assert "accept-encoding" in response.headers["vary"].lower()
+
+    def test_kibana_leaves_a_small_answer_alone(
+        self, client: TestClient,
+    ) -> None:
+        """Measured: an 828-byte answer is not compressed, a 1546-byte one is."""
+        response = client.get("/kibana/api/zzz-no-such-route",
+                              headers={**self.ES, **self.GZIP, "kbn-xsrf": "true"})
+        assert "content-encoding" not in response.headers
+
+    def test_a_client_that_does_not_ask_is_not_given(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/elastic/_cluster/health",
+                              headers={**self.ES, "Accept-Encoding": "identity"})
+        assert "content-encoding" not in response.headers
+
+    def test_the_collector_never_compresses(self, client: TestClient) -> None:
+        response = client.post(
+            "/splunk/services/collector/event",
+            headers={"Authorization": "Splunk zzz", **self.GZIP},
+            json={"event": "x" * 4000})
+        assert "content-encoding" not in response.headers
+
+    def test_a_mount_with_no_measured_product_is_left_alone(
+        self, client: TestClient,
+    ) -> None:
+        response = client.get("/web/api/v2.1/agents", headers={
+            "Authorization": "ApiToken admin-token-0000-0000-000000000001",
+            **self.GZIP})
+        assert "content-encoding" not in response.headers
