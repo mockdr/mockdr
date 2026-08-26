@@ -23,6 +23,11 @@ from api.middleware.json_rewrite import rewrite_json_body
 
 _SPLUNK_PREFIX = "/splunk/services"
 _DEFAULT_COUNT = 30
+#: What splunkd reports as the page size for `count=0`, which means "all":
+#: its own maximum, not the number of entries that happened to come back
+#: (measured on 10.4.2 — the same 10000000 whether the collection holds
+#: fourteen entries or none).
+_UNLIMITED_PER_PAGE = 10000000
 
 
 class SplunkPagingMiddleware:
@@ -86,4 +91,4 @@ def _apply_paging(payload: dict, offset: int, count: int) -> None:
     if isinstance(paging, dict):
         paging["total"] = paging.get("total", total)
         paging["offset"] = offset
-        paging["perPage"] = count if count > 0 else total
+        paging["perPage"] = count if count > 0 else _UNLIMITED_PER_PAGE

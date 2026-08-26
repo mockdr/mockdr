@@ -250,6 +250,30 @@ def build_splunk_entry(
     return entry
 
 
+def _origin_of(entries: list[dict]) -> str:
+    """The collection an envelope's entries belong to.
+
+    splunkd names the collection here — ``…/services/data/indexes`` — and
+    mockdr named ``…/services`` for every one of them, so a client reading
+    `origin` to find out what it had asked for learned nothing. The entries
+    know: their ids are that collection plus a name, and the namespaced form
+    is reduced back to the plain one, which is what `origin` carries.
+    """
+    if not entries:
+        return f"{_BASE_URL}/services"
+    first = entries[0].get("id", "") if isinstance(entries[0], dict) else ""
+    if not isinstance(first, str) or "/services" not in first:
+        return f"{_BASE_URL}/services"
+    path = first.split("/services", 1)[1]
+    if path.startswith("NS/"):
+        # /servicesNS/{owner}/{app}/{collection}/{name}
+        parts = path[len("NS/"):].split("/")[2:]
+    else:
+        parts = path.lstrip("/").split("/")
+    return f"{_BASE_URL}/services/" + "/".join(parts[:-1]) if len(parts) > 1 else (
+        f"{_BASE_URL}/services")
+
+
 def build_splunk_envelope(
     entries: list[dict],
     *,
@@ -288,7 +312,7 @@ def build_splunk_envelope(
         "links": (
             {"create": "/services", "_reload": "/services/_reload"} if links is None else links
         ),
-        "origin": origin or f"{_BASE_URL}/services",
+        "origin": origin or _origin_of(entries),
         "updated": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
         "generator": {"build": _SPLUNK_BUILD, "version": _SPLUNK_VERSION},
         "entry": entries,

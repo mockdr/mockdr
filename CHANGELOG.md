@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**Narrowing a Splunk collection, and three things its envelope was saying wrongly.**
+Every ``/services`` collection takes ``search``, and splunkd reads it two
+ways: ``search=name=main`` is an exact match on one field, and a bare term
+is matched as a substring against the entry's own fields *and* every value
+in its content — broader than it looks, since ``search=main`` matches every
+index, each carrying ``defaultDatabase: main``. mockdr declared the
+parameter and ignored it, so a client narrowing a collection was handed all
+of it, with a ``paging.total`` that agreed with the answer rather than with
+the question. The new middleware runs inside the sorting and paging ones, so
+what is ordered, sliced and counted is what the search selected.
+
+Two more differences the probes then showed, both measured:
+
+* ``origin`` names the collection — ``…/services/data/indexes`` — and mockdr
+  answered ``…/services`` for every one of them, so a client reading it to
+  find out what it had asked for learned nothing.
+* ``count=0`` means "all", and splunkd reports ``perPage: 10000000``, its
+  own maximum, not the number of entries that came back.
+
 **A collection that came back in no order at all.**
 splunkd sorts every ``/services`` collection by ``name`` ascending when the
 request says nothing, and by ``sort_key``/``sort_dir`` when it does. mockdr

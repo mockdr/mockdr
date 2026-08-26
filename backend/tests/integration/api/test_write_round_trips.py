@@ -913,3 +913,72 @@ class TestAnIndexIsDisabledThroughItsOwnLink:
         answer = client.post("/splunk/services/data/indexes/zzz_arg", headers=FORM,
                              params=JSON_OUT, data={"disabled": "1"})
         assert answer.status_code == 400
+
+
+class TestACollectionCanBeNarrowed:
+    """``search`` on a collection, measured on Splunk 10.4.2.
+
+    mockdr declared the parameter and ignored it, so a client narrowing a
+    collection was handed all of it — with a ``paging.total`` that agreed
+    with the answer rather than with the question.
+    """
+
+    def _indexes(self, client: TestClient, **params: str) -> dict:
+        return client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "0", **params}).json()
+
+    def test_a_field_match_selects_one(self, client: TestClient) -> None:
+        body = self._indexes(client, search="name=main")
+        assert [e["name"] for e in body["entry"]] == ["main"]
+        assert body["paging"]["total"] == 1
+
+    def test_a_term_nothing_matches_answers_an_empty_collection(
+        self, client: TestClient,
+    ) -> None:
+        body = self._indexes(client, search="zzz-no-such-index")
+        assert body["entry"] == []
+        assert body["paging"]["total"] == 0
+
+    def test_a_bare_term_matches_content_and_not_only_the_name(
+        self, client: TestClient,
+    ) -> None:
+        """`search=main` matches every index: each carries `defaultDatabase: main`."""
+        assert len(self._indexes(client, search="main")["entry"]) > 1
+
+    def test_the_search_happens_before_the_page_is_cut(
+        self, client: TestClient,
+    ) -> None:
+        body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "1", "search": "name=main"}).json()
+        assert [e["name"] for e in body["entry"]] == ["main"]
+        assert body["paging"]["total"] == 1
+
+    def test_the_search_route_is_left_alone(self, client: TestClient) -> None:
+        """There, `search` is the search string, not a filter over a collection."""
+        answer = client.post("/splunk/services/search/jobs", headers=FORM,
+                             params=JSON_OUT,
+                             data={"search": "search index=main | head 1",
+                                   "exec_mode": "oneshot", "output_mode": "json"})
+        assert answer.status_code in (200, 201)
+
+
+class TestTheEnvelopeSaysWhereItCameFrom:
+    """``origin`` names the collection, and ``perPage`` its page size."""
+
+    def test_origin_names_the_collection(self, client: TestClient) -> None:
+        for collection in ("data/indexes", "saved/searches", "authentication/users"):
+            body = client.get(f"/splunk/services/{collection}", headers=SPLUNK_AUTH,
+                              params={**JSON_OUT, "count": "1"}).json()
+            assert body["origin"].endswith(f"/services/{collection}"), collection
+
+    def test_count_zero_reports_splunkds_own_maximum(self, client: TestClient) -> None:
+        """`count=0` means "all", and splunkd reports 10000000 — not the count."""
+        body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "0"}).json()
+        assert body["paging"]["perPage"] == 10000000
+        assert body["paging"]["total"] == len(body["entry"])
+
+    def test_a_real_page_size_is_reported_as_itself(self, client: TestClient) -> None:
+        body = client.get("/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+                          params={**JSON_OUT, "count": "3"}).json()
+        assert body["paging"]["perPage"] == 3

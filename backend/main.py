@@ -27,6 +27,7 @@ from api.middleware.splunk_field_filter import SplunkFieldFilterMiddleware
 from api.middleware.splunk_namespace import SplunkNamespaceMiddleware
 from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
 from api.middleware.splunk_paging import SplunkPagingMiddleware
+from api.middleware.splunk_search import SplunkSearchMiddleware
 from api.middleware.splunk_sort import SplunkSortMiddleware
 from api.middleware.tenant_scope import TenantScopeMiddleware
 from api.routers import (
@@ -397,8 +398,9 @@ app.add_middleware(
 # Middleware registration order: last added = outermost wrapper.
 # RequestLoggingMiddleware runs first (outermost), then RateLimit, Security, Audit, Proxy innermost.
 # Paging runs inside XML rendering, so the sliced entries are what gets rendered.
-# Sorting runs innermost of the three, so the collection is ordered before
-# `f` narrows it and before paging slices it.
+# Searching runs innermost of the four, so what is ordered, narrowed, sliced
+# and counted is what the search selected.
+app.add_middleware(SplunkSearchMiddleware)     # search= on Atom collections
 app.add_middleware(SplunkSortMiddleware)       # sort_key/sort_dir, name asc by default
 app.add_middleware(SplunkFieldFilterMiddleware)  # f= on Atom entry content
 app.add_middleware(SplunkPagingMiddleware)     # count/offset on Atom collections

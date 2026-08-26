@@ -61,6 +61,13 @@ volatile_fields:
   # The envelope's own bookkeeping, which is the run and not the answer.
   - init_offset
   - preview
+  # And the install's own identity, which an Atom entry carries and a search
+  # result does not: the host and port in an id or an origin, the build and
+  # version of the splunkd that answered, and when it answered.
+  - id
+  - origin
+  - generator
+  - updated
   - post_process_count
 
 significant_keys:
@@ -2909,4 +2916,30 @@ probes:
       method: GET
       path: /services/data/indexes
       query: {output_mode: json, count: '3', sort_key: zzzNoSuchKey, f: datatype}
+      auth: basic
+
+  - id: spl-collection-search-by-field
+    endpoint: management
+    compare: values
+    why: >
+      `search=name=main` selects one entry by an exact field match. mockdr
+      declared the parameter and ignored it, so a client narrowing a
+      collection was handed all of it — with a `paging.total` that agreed
+      with the answer rather than with the question.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, count: '0', search: 'name=main', f: datatype}
+      auth: basic
+
+  - id: spl-collection-search-no-match
+    endpoint: management
+    compare: values
+    why: >
+      And a term nothing matches answers an empty collection, counted as
+      empty.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, count: '0', search: zzz-no-such-index, f: datatype}
       auth: basic
