@@ -1,10 +1,12 @@
 """Cortex XDR Alert query handlers (read-only)."""
 from __future__ import annotations
 
+import json
+
 from repository.xdr_alert_repo import xdr_alert_repo
 from utils.serde import record_dict
 from utils.xdr_filters import apply_xdr_filters, apply_xdr_sort
-from utils.xdr_response import build_xdr_list_reply
+from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
 
 #: Filter fields this endpoint supports, mapped to the stored record key.
 #: Only severity, alert_source and creation_time used to be read; every other
@@ -58,21 +60,35 @@ def get_alerts(request_data: dict) -> dict:
 
 
 def get_original_alerts(alert_ids: list[str]) -> dict:
-    """Return full alert data for specific alert IDs.
+    """Return the raw alert each id names, as it was ingested.
+
+    The clue is in the route's name: Cortex answers the *original* alert, and
+    its recorded reply carries exactly two members per row — `internal_id`
+    and `original_alert_json`, the raw event as a JSON string. mockdr
+    answered the parsed alert record instead, wrapped in the paginated
+    envelope with a `total_count` and a `result_count` this route has
+    neither of. A client reading `original_alert_json` — which is the whole
+    point of calling this rather than `get_alerts` — found nothing there.
 
     Args:
         alert_ids: List of alert identifiers to retrieve.
 
     Returns:
-        XDR list reply with matching alerts.
+        XDR reply with one row per alert found.
     """
-    alerts = []
+    rows = []
     for aid in alert_ids:
         alert = xdr_alert_repo.get(aid)
-        if alert:
-            alerts.append(record_dict(alert))
+        if not alert:
+            continue
+        record = record_dict(alert)
+        internal = str(record.get("internal_id") or "")
+        rows.append({
+            "internal_id": int(internal) if internal.isdigit() else internal,
+            "original_alert_json": json.dumps(record, default=str),
+        })
 
-    return build_xdr_list_reply(alerts, total_count=len(alerts), key="alerts")
+    return build_xdr_reply({"alerts": rows})
 
 
 #: The alert fields ``get_alerts_multi_events`` carries at the top level

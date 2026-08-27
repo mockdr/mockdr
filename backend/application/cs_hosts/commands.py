@@ -4,9 +4,6 @@ from __future__ import annotations
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_response import build_cs_action_response
 from utils.dt import utc_now
-from utils.internal_fields import CS_HOST_INTERNAL_FIELDS
-from utils.serde import record_dict
-from utils.strip import strip_fields
 
 
 def contain_host(ids: list[str]) -> dict:
@@ -103,18 +100,30 @@ def _set_hidden(ids: list[str], *, hidden: bool) -> dict:
 def tag_hosts(ids: list[str], tags: list[str], action: str) -> dict:
     """Add or remove FalconGroupingTags from hosts.
 
+    `UpdateDeviceTags` answers one result per device — gofalcon declares
+    `resources[*].code`, `.device_id`, `.error` and `.updated`, and nothing
+    else. mockdr answered the whole device document instead: seventy-one
+    fields the vendor never declares for this route, and none of the four it
+    does, so a client reading `updated` to see whether its tag took found
+    nothing there. A device id this tenant does not have was skipped in
+    silence; it gets a row of its own now, saying it was not updated.
+
     Args:
         ids:    List of device IDs to update.
         tags:   List of tag strings to add or remove.
         action: ``"add"`` to append tags, ``"remove"`` to strip them.
 
     Returns:
-        CS action response with updated host resources.
+        CS action response with one result per requested device.
     """
-    affected: list[dict] = []
+    results: list[dict] = []
     for device_id in ids:
         host = cs_host_repo.get(device_id)
         if not host:
+            results.append({
+                "code": 404, "device_id": device_id,
+                "error": "Device not found", "updated": False,
+            })
             continue
         current_tags = list(host.tags)
         if action == "add":
@@ -127,5 +136,7 @@ def tag_hosts(ids: list[str], tags: list[str], action: str) -> dict:
         host.tags = current_tags
         host.modified_timestamp = utc_now()
         cs_host_repo.save(host)
-        affected.append(strip_fields(record_dict(host), CS_HOST_INTERNAL_FIELDS))
-    return build_cs_action_response(affected)
+        results.append({
+            "code": 200, "device_id": device_id, "error": "", "updated": True,
+        })
+    return build_cs_action_response(results)

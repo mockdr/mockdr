@@ -1767,18 +1767,43 @@ class TestHidingAHostIsSomethingFalconCanUndo:
         assert "hidden" not in record
 
     def test_tagging_is_its_own_route(self, client: TestClient, cs: dict) -> None:
-        """``DeviceapiUpdateDeviceTagsRequestV1``: action, device_ids, tags."""
+        """``DeviceapiUpdateDeviceTagsRequestV1``: action, device_ids, tags.
+
+        `UpdateDeviceTags` answers one result per device — gofalcon declares
+        `resources[*].code`, `.device_id`, `.error` and `.updated` — not the
+        device document. Whether the tag took is read from the device.
+        """
         device = self._device(client, cs)
         answer = client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
                               json={"action": "add", "device_ids": [device],
                                     "tags": ["zzz-tag"]})
         assert answer.status_code == 200
-        assert "zzz-tag" in answer.json()["resources"][0]["tags"]
+        assert answer.json()["resources"] == [
+            {"code": 200, "device_id": device, "error": "", "updated": True},
+        ]
+        assert "zzz-tag" in self._host(client, cs, device)["tags"]
 
-        removed = client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
-                               json={"action": "remove", "device_ids": [device],
-                                     "tags": ["zzz-tag"]})
-        assert "zzz-tag" not in removed.json()["resources"][0]["tags"]
+        client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
+                     json={"action": "remove", "device_ids": [device],
+                           "tags": ["zzz-tag"]})
+        assert "zzz-tag" not in self._host(client, cs, device)["tags"]
+
+    def test_a_device_the_tenant_lacks_is_named_in_the_result(
+        self, client: TestClient, cs: dict,
+    ) -> None:
+        """It used to be skipped in silence, so a 200 covered a typo."""
+        answer = client.patch("/cs/devices/entities/devices/tags/v1", headers=cs,
+                              json={"action": "add", "device_ids": ["no-such-device"],
+                                    "tags": ["zzz-tag"]})
+        assert answer.json()["resources"] == [
+            {"code": 404, "device_id": "no-such-device",
+             "error": "Device not found", "updated": False},
+        ]
+
+    @staticmethod
+    def _host(client: TestClient, cs: dict, device: str) -> dict:
+        return dict(client.post("/cs/devices/entities/devices/v2", headers=cs,
+                                json={"ids": [device]}).json()["resources"][0])
 
     @pytest.mark.parametrize("missing", ["action", "device_ids", "tags"])
     def test_all_three_members_are_required(

@@ -42,16 +42,19 @@ def get_action_status(action_id: str) -> dict | None:
         xdr_action_repo.save(action)
 
     status = _WIRE_STATUS.get(action.status, "COMPLETED_SUCCESSFULLY")
-    reply: dict = {"data": {action.endpoint_id: status}}
+    # Every endpoint the action covers, not just the first: an action created
+    # from a `filters` block names as many as the filter selected.
+    covered = list(action.endpoint_ids or [action.endpoint_id])
+    reply: dict = {"data": dict.fromkeys(covered, status)}
     if status == "FAILED":
         # Only the endpoints that failed carry a reason, and only then does
         # the member appear at all.
-        reply["errorReasons"] = {action.endpoint_id: {
+        reply["errorReasons"] = {endpoint: {
             "errorData": "",
             "terminated_by": "",
             "errorDescription": "",
             "terminate_result": [],
-        }}
+        } for endpoint in covered}
     return build_xdr_reply(reply)
 
 

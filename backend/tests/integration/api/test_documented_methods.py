@@ -332,3 +332,107 @@ class TestAMachineIsChangedWhereItIsRead:
             headers=headers, json={"deviceValue": "Low"},
         )
         assert resp.status_code == 404
+
+
+class TestCortexNamesItsTargetsTheWayCortexDoes:
+    """The endpoint action routes take a `filters` block, not an id.
+
+    `scripts/schema_drift.py` recorded eight Cortex routes as "skipped: HTTP
+    500" and still printed `0 drift findings`, so the audit's own summary hid
+    them. Three of those routes — `file_retrieval`, `quarantine` and `scan` —
+    have no `endpoint_id` in the body Cortex documents at all, and the
+    handlers read nothing else: every well-formed call answered
+    `500 XDR internal server error / Endpoint  not found`. `isolate` and
+    `unisolate` document both spellings and accepted only one.
+    """
+
+    @staticmethod
+    def _auth() -> dict:
+        import hashlib
+        import secrets
+        import time
+
+        nonce = secrets.token_hex(32)
+        stamp = str(int(time.time() * 1000))
+        digest = hashlib.sha256(("xdr-admin-secret" + nonce + stamp).encode()).hexdigest()
+        return {
+            "x-xdr-auth-id": "1", "x-xdr-nonce": nonce,
+            "x-xdr-timestamp": stamp, "Authorization": digest,
+        }
+
+    def _endpoints(self, client: TestClient) -> list[str]:
+        reply = client.post(
+            "/xdr/public_api/v1/endpoints/get_endpoint/", headers=self._auth(),
+            json={"request_data": {}},
+        ).json()["reply"]
+        return [e["endpoint_id"] for e in reply["endpoints"]]
+
+    @staticmethod
+    def _filters(ids: list[str]) -> list[dict]:
+        return [{"field": "endpoint_id_list", "operator": "in", "value": ids}]
+
+    def test_file_retrieval_takes_the_documented_body(
+        self, client: TestClient,
+    ) -> None:
+        endpoint = self._endpoints(client)[0]
+        resp = client.post(
+            "/xdr/public_api/v1/endpoints/file_retrieval/", headers=self._auth(),
+            json={"request_data": {
+                "files": {"windows": ["C:\\temp\\evidence.txt"]},
+                "filters": self._filters([endpoint]),
+            }},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["reply"]["action_id"]
+
+    def test_quarantine_takes_the_documented_body(self, client: TestClient) -> None:
+        endpoint = self._endpoints(client)[0]
+        resp = client.post(
+            "/xdr/public_api/v1/endpoints/quarantine/", headers=self._auth(),
+            json={"request_data": {
+                "file_path": "/tmp/malware", "file_hash": "a" * 64,
+                "filters": self._filters([endpoint]),
+            }},
+        )
+        assert resp.status_code == 200
+
+    def test_isolate_takes_either_spelling(self, client: TestClient) -> None:
+        endpoint = self._endpoints(client)[0]
+        by_id = client.post(
+            "/xdr/public_api/v1/endpoints/isolate", headers=self._auth(),
+            json={"request_data": {"endpoint_id": endpoint}},
+        )
+        by_filter = client.post(
+            "/xdr/public_api/v1/endpoints/isolate", headers=self._auth(),
+            json={"request_data": {"filters": self._filters([endpoint])}},
+        )
+        assert by_id.status_code == 200
+        assert by_filter.status_code == 200
+
+    def test_an_action_covers_every_endpoint_the_filter_selected(
+        self, client: TestClient,
+    ) -> None:
+        """`get_action_status` keys its answer by endpoint, and a playbook
+        waits for *its* endpoint to appear there."""
+        first, second = self._endpoints(client)[:2]
+        scan = client.post(
+            "/xdr/public_api/v1/endpoints/scan/", headers=self._auth(),
+            json={"request_data": {"filters": self._filters([first, second])}},
+        ).json()["reply"]
+        assert scan["endpoints_count"] == "2"
+
+        status = client.post(
+            "/xdr/public_api/v1/actions/get_action_status/", headers=self._auth(),
+            json={"request_data": {"group_action_id": scan["action_id"]}},
+        ).json()["reply"]
+        assert set(status["data"]) == {first, second}
+
+    def test_a_request_naming_nobody_is_still_refused(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            "/xdr/public_api/v1/endpoints/isolate", headers=self._auth(),
+            json={"request_data": {}},
+        )
+        assert resp.status_code == 500
+        assert resp.json()["reply"]["err_code"] == 500

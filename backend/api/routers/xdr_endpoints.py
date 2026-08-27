@@ -35,12 +35,13 @@ def isolate_endpoint(
 ) -> dict:
     """Isolate an endpoint from the network."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.isolate_endpoint(endpoint_id)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.isolate_endpoint(targets)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result
 
@@ -53,12 +54,13 @@ def unisolate_endpoint(
 ) -> dict:
     """Release an endpoint from network isolation."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.unisolate_endpoint(endpoint_id)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.unisolate_endpoint(targets)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result
 
@@ -71,12 +73,13 @@ def scan_endpoint(
 ) -> dict:
     """Initiate a scan on an endpoint."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.scan_endpoint(endpoint_id)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.scan_endpoint(targets)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result
 
@@ -153,12 +156,13 @@ def quarantine_file(
 ) -> dict:
     """Quarantine a file on an endpoint."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.quarantine_file(endpoint_id, request_data)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.quarantine_file(targets, request_data)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result
 
@@ -171,12 +175,13 @@ def restore_file(
 ) -> dict:
     """Restore a quarantined file on an endpoint."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.restore_file(endpoint_id, request_data)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.restore_file(targets, request_data)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result
 
@@ -189,11 +194,12 @@ def file_retrieval(
 ) -> dict:
     """Retrieve a file from an endpoint."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.file_retrieval(endpoint_id, request_data)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.file_retrieval(targets, request_data)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result

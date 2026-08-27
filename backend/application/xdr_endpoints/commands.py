@@ -15,12 +15,27 @@ def _epoch_ms() -> int:
     return int(datetime.now(UTC).timestamp() * 1000)
 
 
-def _create_action(endpoint_id: str, action_type: str) -> XdrAction:
+def _count(covered: list[str]) -> str:
+    """How many endpoints an action covers, in the type the recording has.
+
+    `scripts/gen_xdr_fixtures.py` writes a type-correct blank per field, and
+    the recorded `endpoints_count` is `""` — a string, not a number. The
+    field was answered blank on every call; it says how many now, without
+    changing what a client parses.
+    """
+    return str(len(covered))
+
+
+def _create_action(
+    endpoint_id: str, action_type: str, endpoint_ids: list[str] | None = None,
+) -> XdrAction:
     """Create and persist an XDR action record.
 
     Args:
-        endpoint_id: Target endpoint identifier.
-        action_type: Action type string.
+        endpoint_id:  Target endpoint identifier.
+        action_type:  Action type string.
+        endpoint_ids: Every endpoint the action covers, when a `filters`
+                      block selected more than one.
 
     Returns:
         The newly created action.
@@ -30,72 +45,107 @@ def _create_action(endpoint_id: str, action_type: str) -> XdrAction:
         action_type=action_type,
         status="pending",
         endpoint_id=endpoint_id,
+        endpoint_ids=list(endpoint_ids or [endpoint_id]),
         creation_time=_epoch_ms(),
     )
     xdr_action_repo.save(action)
     return action
 
 
-def isolate_endpoint(endpoint_id: str) -> dict | None:
-    """Isolate an endpoint from the network.
+def endpoints_named_by(request_data: dict) -> list[str]:
+    """Every endpoint a request names, by id or by filter.
+
+    Cortex names the target of `file_retrieval`, `quarantine` and `scan` with
+    a `filters` block and nothing else; `isolate` and `unisolate` take either.
+    These handlers read `endpoint_id` alone, so the body Cortex documents was
+    answered `500 Endpoint  not found` — for the three that have no
+    `endpoint_id` at all, every well-formed call failed.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        request_data: The `request_data` dict from the POST body.
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        The endpoint ids the request names, in listing order.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
-        return None
+    from application.xdr_endpoints.queries import select_endpoints  # noqa: PLC0415
 
-    endpoint.is_isolated = "isolated"
-    endpoint.isolated_date = _epoch_ms()
-    xdr_endpoint_repo.save(endpoint)
-
-    action = _create_action(endpoint_id, "isolate")
-    return build_xdr_reply({"action_id": action.action_id})
+    single = str(request_data.get("endpoint_id") or "")
+    if single:
+        return [single]
+    if not (request_data.get("filters") or request_data.get("endpoint_id_list")):
+        return []
+    return [str(e.endpoint_id) for e in select_endpoints(request_data)]
 
 
-def unisolate_endpoint(endpoint_id: str) -> dict | None:
-    """Release an endpoint from network isolation.
+def isolate_endpoint(endpoint_ids: list[str]) -> dict | None:
+    """Isolate every endpoint the request named.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        endpoint_ids: The endpoints to isolate.
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    endpoints = [e for e in (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not endpoints:
         return None
 
-    endpoint.is_isolated = "unisolated"
-    endpoint.isolated_date = None
-    xdr_endpoint_repo.save(endpoint)
+    for endpoint in endpoints:
+        endpoint.is_isolated = "isolated"
+        endpoint.isolated_date = _epoch_ms()
+        xdr_endpoint_repo.save(endpoint)
 
-    action = _create_action(endpoint_id, "unisolate")
-    return build_xdr_reply({"action_id": action.action_id})
+    covered = [str(e.endpoint_id) for e in endpoints]
+    action = _create_action(covered[0], "isolate", covered)
+    return build_xdr_reply({"action_id": action.action_id, "endpoints_count": _count(covered)})
 
 
-def scan_endpoint(endpoint_id: str) -> dict | None:
-    """Initiate a scan on an endpoint.
+def unisolate_endpoint(endpoint_ids: list[str]) -> dict | None:
+    """Release every endpoint the request named from isolation.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        endpoint_ids: The endpoints to release.
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    endpoints = [e for e in (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not endpoints:
         return None
 
-    endpoint.scan_status = "in_progress"
-    xdr_endpoint_repo.save(endpoint)
+    for endpoint in endpoints:
+        endpoint.is_isolated = "unisolated"
+        endpoint.isolated_date = None
+        xdr_endpoint_repo.save(endpoint)
 
-    action = _create_action(endpoint_id, "scan")
-    return build_xdr_reply({"action_id": action.action_id})
+    covered = [str(e.endpoint_id) for e in endpoints]
+    action = _create_action(covered[0], "unisolate", covered)
+    return build_xdr_reply({"action_id": action.action_id, "endpoints_count": _count(covered)})
+
+
+def scan_endpoint(endpoint_ids: list[str]) -> dict | None:
+    """Start a scan on every endpoint the request named.
+
+    Args:
+        endpoint_ids: The endpoints to scan.
+
+    Returns:
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
+    """
+    endpoints = [e for e in (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not endpoints:
+        return None
+
+    for endpoint in endpoints:
+        endpoint.scan_status = "in_progress"
+        xdr_endpoint_repo.save(endpoint)
+
+    covered = [str(e.endpoint_id) for e in endpoints]
+    action = _create_action(covered[0], "scan", covered)
+    return build_xdr_reply({"action_id": action.action_id, "endpoints_count": _count(covered)})
 
 
 def delete_endpoints(endpoint_ids: list[str]) -> dict:
@@ -159,64 +209,73 @@ def terminate_process(endpoint_id: str, params: dict) -> dict | None:
     return build_xdr_reply({"action_id": action.action_id})
 
 
-def quarantine_file(endpoint_id: str, params: dict) -> dict | None:
-    """Create a quarantine-file action on an endpoint.
+def quarantine_file(endpoint_ids: list[str], params: dict) -> dict | None:
+    """Quarantine a file on every endpoint the request named.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        endpoint_ids: The endpoints to act on.
         params: Dict with file details (``file_path``, ``file_hash``).
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    covered = [str(e.endpoint_id) for e in
+               (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not covered:
         return None
 
-    action = _create_action(endpoint_id, "quarantine")
+    action = _create_action(covered[0], "quarantine", covered)
     action.result = {"file_path": params.get("file_path"), "file_hash": params.get("file_hash")}
     xdr_action_repo.save(action)
-    return build_xdr_reply({"action_id": action.action_id})
+    return build_xdr_reply({"action_id": action.action_id, "endpoints_count": _count(covered)})
 
 
-def restore_file(endpoint_id: str, params: dict) -> dict | None:
-    """Create a restore-file action on an endpoint.
+def restore_file(endpoint_ids: list[str], params: dict) -> dict | None:
+    """Restore a quarantined file on every endpoint the request named.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        endpoint_ids: The endpoints to act on.
         params: Dict with file details (``file_hash``).
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    covered = [str(e.endpoint_id) for e in
+               (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not covered:
         return None
 
-    action = _create_action(endpoint_id, "restore")
+    action = _create_action(covered[0], "restore", covered)
     action.result = {"file_hash": params.get("file_hash")}
     xdr_action_repo.save(action)
-    return build_xdr_reply({"action_id": action.action_id})
+    return build_xdr_reply({"action_id": action.action_id, "endpoints_count": _count(covered)})
 
 
-def file_retrieval(endpoint_id: str, params: dict) -> dict | None:
-    """Create a file-retrieval action on an endpoint.
+def file_retrieval(endpoint_ids: list[str], params: dict) -> dict | None:
+    """Retrieve files from every endpoint the request named.
+
+    Cortex names the files per platform — `files.windows`, `files.linux`,
+    `files.macos` — and names the endpoints with a `filters` block.
 
     Args:
-        endpoint_id: The endpoint identifier.
-        params: Dict with file details (``file_path``).
+        endpoint_ids: The endpoints to act on.
+        params: The request data, carrying `files`.
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    covered = [str(e.endpoint_id) for e in
+               (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not covered:
         return None
 
-    action = _create_action(endpoint_id, "file_retrieval")
-    action.result = {"file_path": params.get("file_path")}
+    action = _create_action(covered[0], "file_retrieval", covered)
+    action.result = {"files": params.get("files") or {}}
     xdr_action_repo.save(action)
-    return build_xdr_reply({"action_id": action.action_id})
+    return build_xdr_reply({"action_id": action.action_id, "endpoints_count": _count(covered)})
 
 
 def tag_endpoints(body: dict, *, assign: bool) -> dict:

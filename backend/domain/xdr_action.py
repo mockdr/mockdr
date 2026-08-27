@@ -14,6 +14,12 @@ class XdrAction:
     # pending / in_progress / completed / failed / canceled
 
     endpoint_id: str = ""
+    #: Every endpoint this action covers. Cortex takes a `filters` block on
+    #: most action routes and answers one `action_id` for the set, and
+    #: `get_action_status` keys its answer by endpoint — so an action that
+    #: named only one of them left the others out of the status a playbook
+    #: polls.
+    endpoint_ids: list[str] | None = None
     result: dict | None = None
     creation_time: int = 0  # epoch ms
 

@@ -4,6 +4,7 @@ Verifies alert listing, filtering, original alert retrieval,
 alert insertion (parsed and CEF), and alert updates.
 """
 import hashlib
+import json
 import secrets
 import time
 
@@ -120,9 +121,14 @@ class TestGetOriginalAlerts:
             headers=_xdr_headers(),
         )
         assert resp.status_code == 200
+        # Cortex answers the *original* alert here: `internal_id` and the raw
+        # event as a JSON string, which is the whole reason to call this
+        # rather than `get_alerts`.
         returned = resp.json()["reply"]["alerts"]
-        returned_ids = {a["alert_id"] for a in returned}
-        assert set(alert_ids) == returned_ids
+        assert len(returned) == len(alert_ids)
+        assert {"internal_id", "original_alert_json"} == set(returned[0])
+        raw = json.loads(returned[0]["original_alert_json"])
+        assert {a["alert_id"] for a in [raw]} <= set(alert_ids)
 
     def test_nonexistent_alert_returns_empty(self, client: TestClient) -> None:
         resp = client.post(

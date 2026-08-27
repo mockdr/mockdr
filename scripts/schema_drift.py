@@ -261,6 +261,29 @@ def declared_opaque(doc: dict, schema, prefix: str = "", depth: int = 0) -> set[
     return out
 
 
+#: A path segment that is a record id rather than a property name: a hex
+#: id of sixteen digits or more, a UUID, or one of the prefixed ids the
+#: vendors mint (`EP_…`, `AUD_…`).
+_ID_SEGMENT = re.compile(
+    r"^(?:[0-9a-fA-F]{16,}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}|[A-Z]{2,5}_[0-9a-zA-Z]{8,})$",
+)
+
+
+def _is_id_keyed(path: str) -> bool:
+    """Whether any segment of a path is a record id rather than a name."""
+    return any(_ID_SEGMENT.match(segment) for segment in path.split("."))
+
+
+def _map_parent(path: str) -> str:
+    """The path up to the first id segment: `reply.data.<id>.x` -> `reply.data`."""
+    kept = []
+    for segment in path.split("."):
+        if _ID_SEGMENT.match(segment):
+            break
+        kept.append(segment)
+    return ".".join(kept)
+
+
 def _under(path: str, prefixes: set[str]) -> bool:
     return any(path == o or path.startswith(o + ".") or path.startswith(o + "[") for o in prefixes)
 
@@ -320,6 +343,29 @@ def _cs_prepare(client: TestClient, headers: dict) -> dict:
         r = client.get(url, headers=headers, params={"limit": 3})
         resources = r.json().get("resources", []) if r.status_code == 200 else []
         ctx[name] = [x["id"] if isinstance(x, dict) else x for x in resources][:3]
+
+    # Singular forms, for the routes that name one record rather than a list.
+    for plural, single in (
+        ("device_ids", "device_id"), ("ioc_ids", "ioc_id"),
+        ("case_ids", "case_id"), ("group_ids", "group_id"),
+    ):
+        values = ctx.get(plural) or []
+        ctx[single] = values[0] if values else ""
+
+    # A process id comes from a detection's behaviour, not from a queries
+    # route of its own.
+    detections = client.post(
+        "/cs/alerts/entities/alerts/v2", headers=headers,
+        json={"composite_ids": ctx.get("alert_ids") or []},
+    )
+    processes: list[str] = []
+    if detections.status_code == 200:
+        for alert in detections.json().get("resources", []):
+            for behaviour in alert.get("behaviors") or []:
+                pid = behaviour.get("triggering_process_graph_id")
+                if pid:
+                    processes.append(str(pid))
+    ctx["process_ids"] = processes[:3]
     return ctx
 
 
@@ -339,7 +385,32 @@ def _xdr_prepare(client: TestClient, headers: dict) -> dict:
         "incident_id": incidents[0]["incident_id"] if incidents else "1",
         "endpoint_id": endpoints[0]["endpoint_id"] if endpoints else "x",
         "script_uid": scripts[0]["script_uid"] if scripts else "x",
+        "distribution_id": _first_distribution(client, headers),
+        "action_id": _an_action(client, headers),
     }
+
+
+def _first_distribution(client: TestClient, headers: dict) -> str:
+    """A distribution this install has, for the two status routes."""
+    from repository.xdr_distribution_repo import xdr_distribution_repo  # noqa: PLC0415
+
+    records = xdr_distribution_repo.list_all()
+    return str(getattr(records[0], "distribution_id", "")) if records else "x"
+
+
+def _an_action(client: TestClient, headers: dict) -> str:
+    """An action id, made by isolating an endpoint — actions are not seeded."""
+    endpoints = client.post(
+        "/xdr/public_api/v1/endpoints/get_endpoint/", headers=headers,
+        json={"request_data": {}},
+    ).json().get("reply", {}).get("endpoints", [])
+    if not endpoints:
+        return "x"
+    reply = client.post(
+        "/xdr/public_api/v1/endpoints/isolate", headers=headers,
+        json={"request_data": {"endpoint_id": endpoints[0]["endpoint_id"]}},
+    ).json().get("reply", {})
+    return str(reply.get("action_id", "x"))
 
 
 PLATFORMS = {
@@ -363,11 +434,76 @@ PLATFORMS = {
             "POST /quarantine/entities/quarantined-files/GET/v1": {
                 "json": {"ids": "{quarantine_ids}"}
             },
+            # Fourteen routes below were answered 400 and recorded as
+            # "skipped", because the audit sent the empty default body that
+            # each of them rightly refuses — so "0 drift findings" covered
+            # nineteen routes and said nothing about these. Each request here
+            # is what the route documents.
+            "POST /oauth2/token": {
+                "data": {
+                    "client_id": "cs-mock-admin-client",
+                    "client_secret": "cs-mock-admin-secret",
+                },
+            },
+            "GET /devices/queries/host-group-members/v1": {
+                "params": {"id": "{group_ids}"},
+            },
+            "GET /processes/entities/processes/v1": {"params": {"ids": "{process_ids}"}},
+            "POST /devices/entities/devices-actions/v2": {
+                "params": {"action_name": "contain"},
+                "json": {"ids": "{device_ids}"},
+            },
+            "PATCH /devices/entities/devices/tags/v1": {
+                "json": {
+                    "action": "add",
+                    "device_ids": "{device_ids}",
+                    "tags": ["FalconGroupingTags/drift"],
+                },
+            },
+            "POST /devices/entities/host-groups/v1": {
+                "json": {"resources": [{"name": "drift-probe", "group_type": "static"}]},
+            },
+            "PATCH /devices/entities/host-groups/v1": {
+                "json": {"resources": [{"id": "{group_id}", "description": "drift"}]},
+            },
+            "POST /devices/entities/host-group-actions/v1": {
+                "params": {"action_name": "add-hosts"},
+                "json": {
+                    "ids": "{group_id}",
+                    "action_parameters": [
+                        {"name": "filter", "value": "(device_id:['{device_id}'])"},
+                    ],
+                },
+            },
+            "POST /iocs/entities/indicators/v1": {
+                "json": {"indicators": [{"type": "domain", "value": "drift.example.test",
+                                         "action": "detect", "platforms": ["windows"]}]},
+            },
+            "PATCH /iocs/entities/indicators/v1": {
+                "json": {"indicators": [{"id": "{ioc_id}", "description": "drift"}]},
+            },
+            "PATCH /alerts/entities/alerts/v3": {
+                "json": {
+                    "composite_ids": "{alert_ids}",
+                    "action_parameters": [{"name": "update_status", "value": "in_progress"}],
+                },
+            },
+            "POST /cases/entities/case-tags/v1": {
+                "json": {"id": "{case_id}", "tags": ["drift"]},
+            },
+            "POST /message-center/entities/cases/GET/v1": {"json": {"ids": "{case_ids}"}},
+            "PATCH /quarantine/entities/quarantined-files/v1": {
+                "json": {"ids": "{quarantine_ids}", "action": "release", "comment": "drift"},
+            },
         },
     },
     "xdr": {
         "kind": "paths",
         "missing_only": True,
+        # `errorReasons` is on the recorded reply because the recording is of
+        # a *failed* action; Cortex carries the member only then, and so does
+        # this mock.
+        "envelope": ["reply.errorReasons"],
         "mount": "/xdr",
         "reduced": SPECS / "xdr_samples_reduced.json",
         # Response shapes transcribed from the official reference (see
@@ -411,6 +547,46 @@ PLATFORMS = {
                         ]
                     }
                 }
+            },
+            # Eight routes here were answered 500 and recorded as "skipped":
+            # the audit sent ids and filters that name nothing, and Cortex
+            # answers a missing entity with a 500 of its own. Each request
+            # below names something this install has.
+            "POST /public_api/v1/actions/get_action_status/": {
+                "json": {"request_data": {"group_action_id": "{action_id}"}}
+            },
+            "POST /public_api/v1/actions/file_retrieval_details/": {
+                "json": {"request_data": {"group_action_id": "{action_id}"}}
+            },
+            "POST /public_api/v1/distributions/get_status/": {
+                "json": {"request_data": {"distribution_id": "{distribution_id}"}}
+            },
+            "POST /public_api/v1/distributions/get_dist_url/": {
+                "json": {"request_data": {
+                    "distribution_id": "{distribution_id}", "package_type": "sh",
+                }}
+            },
+            "POST /public_api/v1/endpoints/get_policy/": {
+                "json": {"request_data": {"endpoint_id": "{endpoint_id}"}}
+            },
+            "POST /public_api/v1/endpoints/quarantine/": {
+                "json": {"request_data": {
+                    "file_path": "/var/tmp/drift", "file_hash": "d" * 64,  # noqa: S108
+                    "filters": [{"field": "endpoint_id_list", "operator": "in",
+                                 "value": ["{endpoint_id}"]}],
+                }}
+            },
+            "POST /public_api/v1/endpoints/restore/": {
+                "json": {"request_data": {
+                    "endpoint_id": "{endpoint_id}", "file_hash": "d" * 64,
+                }}
+            },
+            "POST /public_api/v1/endpoints/file_retrieval/": {
+                "json": {"request_data": {
+                    "files": {"windows": ["C:\\temp\\drift.txt"]},
+                    "filters": [{"field": "endpoint_id_list", "operator": "in",
+                                 "value": ["{endpoint_id}"]}],
+                }}
             },
             "POST /public_api/v1/scripts/get_script_metadata/": {
                 "json": {"request_data": {"script_uid": "{script_uid}"}}
@@ -668,7 +844,13 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
         real_route = mock[(method, route)]
         route = real_route
         url = _fill(client, real_route, headers, cfg.get("params", {}), cfg.get("fill", {}), mount)
-        req = _substitute(cfg.get("requests", {}).get(key, {}), ctx)
+        # Both reduced references are vendored, and they spell a Cortex route
+        # with and without its trailing slash; a request keyed under one
+        # spelling was silently unused under the other, and the route came
+        # out "skipped".
+        table = cfg.get("requests", {})
+        entry = table.get(key) or table.get(key.rstrip("/")) or table.get(key + "/") or {}
+        req = _substitute(entry, ctx)
         params = {**cfg.get("params", {}), **req.get("params", {})}
         body = req.get("json", cfg.get("default_body") if method != "GET" else None)
         try:
@@ -693,6 +875,14 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
                 declared |= {("value[*]." if is_list else "") + p for p in entities[entity]}
         seen = observed(payload)
         unobservable = observed_opaque(payload)
+        # A map keyed by record ids is not a set of property names. Cortex
+        # keys `reply.data` by endpoint, and the recorded reply carries three
+        # endpoints from someone else's install — compared as declared
+        # properties, every one of them read as "missing" and this install's
+        # own endpoint as "undocumented", for ever.
+        declared |= {_map_parent(p) for p in declared if _is_id_keyed(p)}
+        declared = {p for p in declared if not _is_id_keyed(p)}
+        seen = {p for p in seen if not _is_id_keyed(p)}
         # A declared container with no declared children (a docs table names
         # ``ipAddresses`` but not its members) is opaque: its members are
         # neither missing nor extra.

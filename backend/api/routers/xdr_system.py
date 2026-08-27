@@ -169,22 +169,45 @@ def get_device_control_violations(
     body: dict = Body(default={}),
     _: object = Depends(require_xdr_auth),
 ) -> dict:
-    """List device control violations (canned data)."""
-    violations = [
-        {
-            "violation_id": "viol-001",
-            "endpoint_id": "mock-endpoint-001",
-            "hostname": "ACME-WS-001",
-            "type": "disk_drive",
-            "vendor": "SanDisk",
-            "product": "Cruzer",
-            "serial": "ABC123",
-            "timestamp": _recent_ms(),
-            "ip_address": "10.10.1.100",
-            "violation_type": "blocked",
-        },
+    """List the device-control violations this tenant's endpoints raised.
+
+    Three things were wrong at once, and all three were invisible from a
+    single answer. Cortex answers the rows under `reply.violations` — the
+    OpenAPI document and the recorded sample agree — and mockdr answered them
+    under `reply.data`, so a client reading the documented member found an
+    empty list beside a populated one it had never heard of. The row named
+    the address `ip_address` where Cortex names it `ip`. And the one row was
+    canned: `mock-endpoint-001` on `ACME-WS-001`, an endpoint
+    `get_endpoint` has never listed.
+    """
+    from repository.xdr_endpoint_repo import xdr_endpoint_repo  # noqa: PLC0415
+
+    devices = [
+        ("disk_drive", "SanDisk", "5678", "Cruzer", "0x1234"),
+        ("disk_drive", "Kingston", "0951", "DataTraveler", "0x1666"),
+        ("cd_rom", "Samsung", "04e8", "SE-208", "0x6103"),
     ]
-    return build_xdr_list_reply(violations, total_count=len(violations))
+    violations = []
+    for index, endpoint in enumerate(xdr_endpoint_repo.list_all()[:12]):
+        kind, vendor, vendor_id, product, product_id = devices[index % len(devices)]
+        violations.append({
+            "violation_id": index + 1,
+            "endpoint_id": endpoint.endpoint_id,
+            "hostname": endpoint.endpoint_name,
+            "ip": endpoint.ip[0] if getattr(endpoint, "ip", None) else "",
+            "os_type": endpoint.os_type,
+            "type": kind,
+            "vendor": vendor,
+            "vendor_id": vendor_id,
+            "product": product,
+            "product_id": product_id,
+            "serial": f"SN{endpoint.endpoint_id[-8:].upper()}",
+            "username": endpoint.users[0] if endpoint.users else "",
+            "timestamp": endpoint.last_seen,
+        })
+    return build_xdr_list_reply(
+        violations, total_count=len(violations), key="violations",
+    )
 
 
 # ── Quarantine Status ─────────────────────────────────────────────────────────

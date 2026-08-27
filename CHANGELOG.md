@@ -8,6 +8,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**"0 drift findings" over the routes the audit never asked about.**
+`schema_drift.py` reported zero for CrowdStrike and Cortex XDR while printing,
+two lines above, that fourteen CrowdStrike routes and eight Cortex ones were
+*skipped*: the audit sent the empty default body each of them rightly
+refuses, or ids that name nothing, and recorded the refusal instead of a
+comparison. Its request table names what each route documents now — 28
+CrowdStrike routes compared instead of 19, 47 Cortex instead of 35 — and the
+comparison no longer reads a map keyed by record ids as a set of property
+names, which had every endpoint of the recorded reply counted "missing" and
+this install's own counted "undocumented" for ever. Five real defects were
+behind those skips:
+
+* **Five Cortex action routes refused the body Cortex documents.**
+  `file_retrieval`, `quarantine` and `scan` name their target with a
+  `filters` block and have no `endpoint_id` at all; the handlers read
+  `endpoint_id` alone, so every well-formed call answered `500 XDR internal
+  server error / Endpoint  not found` — those three routes could not be
+  called successfully by a correct client. `isolate` and `unisolate` document
+  both spellings and took only one. All five read either now, an action
+  covers every endpoint its filter selected, and `get_action_status` keys its
+  answer by each of them, which is what a playbook waits on.
+* **`UpdateDeviceTags` answered the whole device document.** gofalcon
+  declares four members per row — `code`, `device_id`, `error`, `updated` —
+  and mockdr answered seventy-one fields of the device, none of them those,
+  so a client reading `updated` to see whether its tag took found nothing.
+  A device id the tenant does not have was skipped in silence; it is named in
+  the result now.
+* **Cortex's management audit log answered every documented field blank.**
+  The route's recorded reply names each field `AUDIT_*`; mockdr answered
+  those keys empty and put the values under the record's own lowercase names
+  beside them. An XSOAR client running `xdr-get-audit-management-logs` read a
+  page of empty rows, with a 200.
+* **Agent reports and device-control violations were canned.** Both answered
+  `mock-endpoint-001` on `ACME-WS-001`, an endpoint `get_endpoint` has never
+  listed, under undocumented field names — and the violations arrived under
+  `reply.data` where Cortex answers `reply.violations`, so a client reading
+  the documented member found an empty list beside a populated one it had
+  never heard of.
+* **`get_original_alerts` answered the parsed alert.** Cortex answers the
+  *original* one: `internal_id` and `original_alert_json`, the raw event as a
+  JSON string, which is the whole reason to call this rather than
+  `get_alerts`.
+
 **A conditional write that was not conditional.**
 ARM's common types declare `If-Match` — "the If-Match header that makes a
 request conditional" — and point at the normal entity-tag convention, which
