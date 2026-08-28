@@ -3362,7 +3362,22 @@ class TestSplunkdNamesItselfAndItsCaching:
         assert response.headers["cache-control"] == self.UNCACHEABLE
         assert "etag" not in response.headers
 
-    def test_a_fresh_read_is_answered_304(self, client: TestClient) -> None:
+    def test_a_fresh_read_is_answered_304(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The validator is over the body, and the feed's own `updated` is
+        the time of the response — on splunkd too, measured: three reads in
+        a row carry three different ETags there as well. So the two reads
+        below are held inside one second, which is the window in which the
+        product itself promises a match.
+        """
+        import time as clock
+
+        from utils.splunk import response as splunk_response
+
+        frozen = clock.gmtime()
+        monkeypatch.setattr(splunk_response.time, "gmtime", lambda *a: frozen)
+
         first = client.get("/splunk/services/data/indexes", headers=self.SPLUNK,
                            params={"output_mode": "json"})
         again = client.get(
@@ -4346,3 +4361,62 @@ class TestFalconGroupsAndTheFilterThatNamesThem:
             params={"limit": 200, "filter": "platform_name:'Windows'"},
         ).json()["meta"]["pagination"]["total"]
         assert answer.json()["meta"]["pagination"]["total"] == plain
+
+
+class TestAnEntryReportsWhenItChanged:
+    """An entry's `updated` is the entity's, not the time of the read.
+
+    Measured on splunkd 10.4.2: every entry's `updated` is stable across
+    reads, and for an entity nothing has changed through the REST layer —
+    `saved/searches`, `apps/local` — it is the epoch. mockdr answered *now*
+    for every entry of every collection, so each read reported that
+    everything had just been updated, and the body changed once a second
+    while nothing in it did. The ETag over that body could never be
+    revalidated by a client that waited.
+    """
+
+    SPLUNK_AUTH = {"Authorization": "Basic YWRtaW46bW9ja2RyLWFkbWlu"}
+    COLLECTIONS = (
+        "/splunk/services/data/indexes",
+        "/splunk/services/saved/searches",
+        "/splunk/services/authentication/users",
+        "/splunk/services/apps/local",
+    )
+
+    def test_two_reads_report_the_same_entry_timestamp(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import time as clock
+
+        from utils.splunk import response as splunk_response
+
+        for path in self.COLLECTIONS:
+            first = client.get(
+                path, headers=self.SPLUNK_AUTH, params={"output_mode": "json"},
+            ).json()["entry"][0]["updated"]
+            # A second later, by the renderer's own clock.
+            later = clock.gmtime(clock.mktime(clock.gmtime()) + 60)
+            monkeypatch.setattr(splunk_response.time, "gmtime", lambda *a, _t=later: _t)
+            second = client.get(
+                path, headers=self.SPLUNK_AUTH, params={"output_mode": "json"},
+            ).json()["entry"][0]["updated"]
+            monkeypatch.undo()
+            assert first == second, path
+
+    def test_an_unchanged_entity_carries_the_epoch(self, client: TestClient) -> None:
+        for path in self.COLLECTIONS:
+            entry = client.get(
+                path, headers=self.SPLUNK_AUTH, params={"output_mode": "json"},
+            ).json()["entry"][0]
+            assert entry["updated"] == "1970-01-01T00:00:00+00:00", path
+
+    def test_the_feed_still_reports_the_time_of_the_read(
+        self, client: TestClient,
+    ) -> None:
+        """splunkd's feed-level `updated` *is* the response time — it changes
+        between two reads there too, which is why the validator over the body
+        does as well."""
+        body = client.get(
+            self.COLLECTIONS[0], headers=self.SPLUNK_AUTH, params={"output_mode": "json"},
+        ).json()
+        assert body["updated"] != "1970-01-01T00:00:00+00:00"

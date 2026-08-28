@@ -190,10 +190,43 @@ def list_hidden_hosts(filter_fql: str | None, offset: int, limit: int,
     Returns:
         CS list response envelope with full host entities.
     """
+    page, total = _hidden_page(filter_fql, offset, limit, sort)
+    return build_cs_list_response([_public(h) for h in page], total, offset, limit)
+
+
+def query_hidden_host_ids(filter_fql: str | None, offset: int, limit: int,
+                          sort: str | None) -> dict:
+    """The ids of the hosts `hide_host` has taken out of the listings.
+
+    Falcon publishes hidden hosts twice, as it does every collection: the
+    documents at `/devices/combined/devices-hidden/v1` and the ids at
+    `/devices/queries/devices-hidden/v1`. Only the first was served, so a
+    client following the ids-then-entities pattern — which is how Falcon's
+    own SDK reads a collection — got a 404 from the half it starts with.
+
+    Args:
+        filter_fql: FQL filter string, or None for all hidden hosts.
+        offset:     Zero-based pagination offset.
+        limit:      Maximum number of ids to return.
+        sort:       Sort string (``field.asc`` or ``field.desc``).
+
+    Returns:
+        CS ID response envelope with the hidden hosts' device ids.
+    """
+    from utils.cs_response import build_cs_id_response  # noqa: PLC0415
+
+    page, total = _hidden_page(filter_fql, offset, limit, sort)
+    return build_cs_id_response(
+        [str(get_nested(h, "device_id")) for h in page], total, offset, limit,
+    )
+
+
+def _hidden_page(filter_fql: str | None, offset: int, limit: int,
+                 sort: str | None) -> tuple[list[dict], int]:
+    """One page of hidden hosts, filtered and sorted, and how many there are."""
     records = _visible_hosts(hidden=True)
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
     records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
-    page, total = paginate_cs(records, offset, limit)
-    return build_cs_list_response([_public(h) for h in page], total, offset, limit)
+    return paginate_cs(records, offset, limit)

@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every entry reported having just been updated.**
+An Atom entry's `updated` is the entity's own last change, and splunkd keeps
+it stable across reads — for an entity nothing has changed through the REST
+layer, `saved/searches` and `apps/local`, it is the epoch. Measured on
+10.4.2. mockdr answered *now* for every entry of every collection, so each
+read said everything had just changed, the body differed once a second while
+nothing in it did, and the ETag over that body could never be revalidated by
+a client that waited. Entries carry the epoch now; the feed's own `updated`
+is still the time of the read, which is what splunkd does — three reads there
+carry three different ETags too.
+
+**The ids of the hidden hosts.**
+Falcon publishes every collection twice, the ids under `queries` and the
+documents under `combined`, and only `/devices/combined/devices-hidden/v1`
+was served. A client following the ids-then-entities pattern — which is how
+Falcon's own SDK reads a collection — met a 404 on the half it starts with.
+
 **A filter Falcon writes with parentheses, which narrowed nothing.**
 FQL groups terms with parentheses — Falcon's own documentation and its
 console write `(device_id:['…'])`, and a host-group action carries that form

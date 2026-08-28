@@ -174,6 +174,10 @@ def complete(content: dict, fixture: str) -> dict:
     return {**_FIXTURE_CACHE[fixture], **content}
 
 
+#: What splunkd sends as an entity's `updated` when nothing has changed it.
+_EPOCH = "1970-01-01T00:00:00+00:00"
+
+
 def build_splunk_entry(
     name: str,
     content: dict,
@@ -203,7 +207,15 @@ def build_splunk_entry(
                     ``authentication/users``. Without it the id defaulted to
                     ``/services/{name}``, so a user entry claimed to live at
                     ``/services/admin`` rather than under its collection.
-        updated:    ISO-8601 timestamp; defaults to now.
+        updated:    ISO-8601 timestamp for the *entity's* last change. It
+                    defaults to the epoch, which is what splunkd sends for an
+                    entity nothing has changed through the REST layer —
+                    measured on 10.4.2 for `saved/searches` and `apps/local`,
+                    while `data/indexes` and `authentication/users` carry a
+                    real one. It used to default to *now*, so every entry
+                    reported having just been updated, on every read: the
+                    body changed once a second while nothing in it did, and
+                    the ETag over it could never be revalidated.
         links:      Which link relations the entry offers. ``_reload`` and
                     ``package`` get their own path suffix, as on splunkd.
         fields:     ``True`` for the empty default block, ``False`` for none,
@@ -216,7 +228,7 @@ def build_splunk_entry(
         A dict matching the Splunk entry structure.
     """
     if not updated:
-        updated = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
+        updated = _EPOCH
     entry_acl = acl if acl is not None else {**_DEFAULT_ACL, **(acl_extra or {})}
     if acl is None and collection:
         entry_acl = _scoped_acl(collection, entry_acl, acl_extra or {})

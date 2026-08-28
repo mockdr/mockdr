@@ -546,3 +546,58 @@ class TestRunningAScriptAndCollectingIt:
                 {spelling: retrieval["action_id"]},
             )
             assert "err_code" not in details["reply"], spelling
+
+
+class TestFalconPublishesHiddenHostsTwice:
+    """Falcon publishes every collection twice: ids, then documents.
+
+    `hide_host` takes a host out of the listings, and the pair that shows
+    what is hidden is `/devices/queries/devices-hidden/v1` (the ids) and
+    `/devices/combined/devices-hidden/v1` (the documents). Only the second
+    was served, so a client following the ids-then-entities pattern — which
+    is how Falcon's own SDK reads a collection — met a 404 on the half it
+    starts with.
+    """
+
+    @staticmethod
+    def _auth(client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "client_id": "cs-mock-admin-client", "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_the_ids_route_answers_what_the_documents_route_lists(
+        self, client: TestClient,
+    ) -> None:
+        cs = self._auth(client)
+        devices = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs, params={"limit": 2},
+        ).json()["resources"]
+        client.post(
+            "/cs/devices/entities/devices-actions/v2", headers=cs,
+            params={"action_name": "hide_host"}, json={"ids": devices},
+        )
+
+        ids = client.get("/cs/devices/queries/devices-hidden/v1", headers=cs)
+        assert ids.status_code == 200
+        assert sorted(ids.json()["resources"]) == sorted(devices)
+        assert ids.json()["meta"]["pagination"]["total"] == len(devices)
+
+        documents = client.get(
+            "/cs/devices/combined/devices-hidden/v1", headers=cs,
+        ).json()["resources"]
+        assert sorted(d["device_id"] for d in documents) == sorted(devices)
+
+    def test_unhiding_empties_it_again(self, client: TestClient) -> None:
+        cs = self._auth(client)
+        devices = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs, params={"limit": 1},
+        ).json()["resources"]
+        for action in ("hide_host", "unhide_host"):
+            client.post(
+                "/cs/devices/entities/devices-actions/v2", headers=cs,
+                params={"action_name": action}, json={"ids": devices},
+            )
+        assert client.get(
+            "/cs/devices/queries/devices-hidden/v1", headers=cs,
+        ).json()["resources"] == []

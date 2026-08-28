@@ -60,6 +60,24 @@ def list_hidden_devices(
     return host_queries.list_hidden_hosts(filter, offset, limit, sort)
 
 
+@router.get("/devices/queries/devices-hidden/v1")
+def query_hidden_devices(
+    filter: str = Query(None),  # noqa: A002 - Falcon's own parameter name
+    offset: int = Query(0),
+    limit: int = Query(100, ge=1, le=5000),
+    sort: str = Query(None),
+    _: dict = Depends(require_cs_auth),
+) -> dict:
+    """Return the ids of the hosts ``hide_host`` has taken out of the listings.
+
+    Falcon publishes every collection twice — the ids under ``queries`` and
+    the documents under ``combined`` — and only the second was served here.
+    A client following the ids-then-entities pattern, which is how Falcon's
+    own SDK reads a collection, met a 404 on the half it starts with.
+    """
+    return host_queries.query_hidden_host_ids(filter, offset, limit, sort)
+
+
 @router.post("/devices/entities/devices/v2")
 def get_hosts(
     body: dict = Body(...),
