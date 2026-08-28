@@ -15,19 +15,32 @@ def _cs_auth(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-_PROCESS_ID_A = "pid:abc123:1234"
-_PROCESS_ID_B = "pid:def456:5678"
+def _devices(client: TestClient, headers: dict[str, str]) -> list[str]:
+    """Two devices this tenant has.
+
+    A Falcon process id names the device it ran on, and the route answers
+    only for a device this install holds — it used to generate a process for
+    any id at all, `pid:abc123:1234` included.
+    """
+    return list(client.get(
+        "/cs/devices/queries/devices/v1", headers=headers, params={"limit": 2},
+    ).json()["resources"])[:2]
 
 
 class TestGetProcessEntities:
     """Tests for GET /cs/processes/entities/processes/v1."""
+
+    @staticmethod
+    def _ids(client: TestClient, headers: dict[str, str]) -> tuple[str, str]:
+        first, second = _devices(client, headers)
+        return f"pid:{first}:1234", f"pid:{second}:5678"
 
     def test_returns_200_for_valid_process_ids(self, client: TestClient) -> None:
         headers = _cs_auth(client)
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": _PROCESS_ID_A},
+            params={"ids": self._ids(client, headers)[0]},
         )
         assert resp.status_code == 200
 
@@ -37,7 +50,7 @@ class TestGetProcessEntities:
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": _PROCESS_ID_A},
+            params={"ids": self._ids(client, headers)[0]},
         )
         body = resp.json()
         assert "meta" in body
@@ -53,7 +66,7 @@ class TestGetProcessEntities:
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": _PROCESS_ID_A},
+            params={"ids": self._ids(client, headers)[0]},
         )
         resources = resp.json()["resources"]
         assert len(resources) == 1
@@ -64,7 +77,7 @@ class TestGetProcessEntities:
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": f"{_PROCESS_ID_A},{_PROCESS_ID_B}"},
+            params={"ids": ",".join(self._ids(client, headers))},
         )
         resources = resp.json()["resources"]
         assert len(resources) == 2
@@ -75,10 +88,10 @@ class TestGetProcessEntities:
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": f"{_PROCESS_ID_A},{_PROCESS_ID_B}"},
+            params={"ids": ",".join(self._ids(client, headers))},
         )
         returned_ids = {e["process_id"] for e in resp.json()["resources"]}
-        assert returned_ids == {_PROCESS_ID_A, _PROCESS_ID_B}
+        assert returned_ids == set(self._ids(client, headers))
 
     def test_entity_has_all_expected_fields(self, client: TestClient) -> None:
         """Each process entity must expose the full set of documented fields."""
@@ -86,22 +99,26 @@ class TestGetProcessEntities:
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": _PROCESS_ID_A},
+            params={"ids": self._ids(client, headers)[0]},
         )
         entity = resp.json()["resources"][0]
+        # `ProcessesapiProcessDetail` declares these and no others; the five
+        # that used to be answered beside them — `parent_process_id`,
+        # `user_name`, `user_sid`, `sha256`, `md5` — are not members Falcon
+        # carries on this route.
         expected_fields = [
             "process_id",
             "device_id",
             "command_line",
             "file_name",
             "start_timestamp",
-            "parent_process_id",
-            "user_name",
-            "sha256",
-            "md5",
+            "stop_timestamp",
+            "process_id_local",
         ]
         for field in expected_fields:
             assert field in entity, f"Expected field '{field}' missing from process entity"
+        for invented in ("parent_process_id", "user_name", "user_sid", "sha256", "md5"):
+            assert invented not in entity, invented
 
     def test_device_id_extracted_from_process_id(self, client: TestClient) -> None:
         """device_id must be the middle segment of the pid:<device_id>:<num> format."""
@@ -109,23 +126,23 @@ class TestGetProcessEntities:
         resp = client.get(
             "/cs/processes/entities/processes/v1",
             headers=headers,
-            params={"ids": _PROCESS_ID_A},
+            params={"ids": self._ids(client, headers)[0]},
         )
         entity = resp.json()["resources"][0]
-        assert entity["device_id"] == "abc123"
+        assert entity["device_id"] == _devices(client, headers)[0]
 
     def test_output_is_deterministic_for_same_id(self, client: TestClient) -> None:
         """Calling the endpoint twice with the same ID must return identical entity data."""
         headers = _cs_auth(client)
         url = "/cs/processes/entities/processes/v1"
-        params = {"ids": _PROCESS_ID_A}
+        params = {"ids": self._ids(client, headers)[0]}
 
         first = client.get(url, headers=headers, params=params).json()["resources"][0]
         second = client.get(url, headers=headers, params=params).json()["resources"][0]
 
         # trace_id is always different; compare entity fields only
         for field in ("process_id", "device_id", "command_line", "file_name",
-                      "sha256", "md5", "user_name", "parent_process_id"):
+                      "start_timestamp", "process_id_local"):
             assert first[field] == second[field], (
                 f"Field '{field}' differed between calls: {first[field]!r} vs {second[field]!r}"
             )
@@ -134,6 +151,6 @@ class TestGetProcessEntities:
         """Requests without an Authorization header must be rejected with HTTP 401."""
         resp = client.get(
             "/cs/processes/entities/processes/v1",
-            params={"ids": _PROCESS_ID_A},
+            params={"ids": "pid:any-device:1"},
         )
         assert resp.status_code == 401

@@ -601,3 +601,64 @@ class TestFalconPublishesHiddenHostsTwice:
         assert client.get(
             "/cs/devices/queries/devices-hidden/v1", headers=cs,
         ).json()["resources"] == []
+
+
+class TestAProcessIsWhatFalconDeclares:
+    """`ProcessesapiProcessDetail` declares ten members, and no others.
+
+    mockdr answered five beside them — `sha256`, `md5`, `user_name`,
+    `user_sid`, `parent_process_id` — none of which Falcon's model carries
+    on this route, so a client built against the mock's process would break
+    against the real product. It also generated a process for *any* id,
+    including one naming a device this tenant does not have.
+    """
+
+    DECLARED = {
+        "process_id", "device_id", "command_line", "file_name",
+        "process_id_local", "start_timestamp", "stop_timestamp",
+    }
+
+    @staticmethod
+    def _auth(client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "client_id": "cs-mock-admin-client", "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_a_process_carries_only_declared_members(self, client: TestClient) -> None:
+        cs = self._auth(client)
+        device = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs, params={"limit": 1},
+        ).json()["resources"][0]
+        process = client.get(
+            "/cs/processes/entities/processes/v1", headers=cs,
+            params={"ids": f"pid:{device}:1"},
+        ).json()["resources"][0]
+        assert set(process) <= self.DECLARED
+        assert process["device_id"] == device
+
+    def test_a_device_this_tenant_lacks_has_no_processes(
+        self, client: TestClient,
+    ) -> None:
+        answer = client.get(
+            "/cs/processes/entities/processes/v1", headers=self._auth(client),
+            params={"ids": "pid:no-such-device:1"},
+        )
+        assert answer.status_code == 200
+        assert answer.json()["resources"] == []
+
+    def test_processes_are_not_all_dated_the_same_instant(
+        self, client: TestClient,
+    ) -> None:
+        cs = self._auth(client)
+        devices = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs, params={"limit": 3},
+        ).json()["resources"]
+        starts = {
+            client.get(
+                "/cs/processes/entities/processes/v1", headers=cs,
+                params={"ids": f"pid:{d}:1"},
+            ).json()["resources"][0]["start_timestamp"]
+            for d in devices
+        }
+        assert len(starts) == len(devices)

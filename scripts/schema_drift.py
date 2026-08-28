@@ -366,7 +366,34 @@ def _cs_prepare(client: TestClient, headers: dict) -> dict:
                 if pid:
                     processes.append(str(pid))
     ctx["process_ids"] = processes[:3]
+    ctx.update(_disposable(client, headers))
     return ctx
+
+
+def _disposable(client: TestClient, headers: dict) -> dict:
+    """A host group and an IOC made for the delete routes to delete.
+
+    Pointing the deletes at seeded records would empty the collections the
+    rest of the run reads.
+    """
+    group = client.post(
+        "/cs/devices/entities/host-groups/v1", headers=headers,
+        json={"resources": [{"name": "drift-disposable", "group_type": "static"}]},
+    )
+    ioc = client.post(
+        "/cs/iocs/entities/indicators/v1", headers=headers,
+        json={"indicators": [{"type": "domain", "value": "drift-disposable.example.test",
+                              "action": "detect", "platforms": ["windows"]}]},
+    )
+
+    def first_id(response) -> str:
+        if response.status_code >= 300:
+            return "x"
+        resources = response.json().get("resources") or []
+        found = resources[0] if resources else {}
+        return str(found.get("id", found) if isinstance(found, dict) else found)
+
+    return {"disposable_group_id": first_id(group), "disposable_ioc_id": first_id(ioc)}
 
 
 def _xdr_prepare(client: TestClient, headers: dict) -> dict:
@@ -475,6 +502,14 @@ PLATFORMS = {
             # each of them rightly refuses — so "0 drift findings" covered
             # nineteen routes and said nothing about these. Each request here
             # is what the route documents.
+            # Both deletes act on a record this audit made for the purpose,
+            # so a run does not empty the collections the other routes read.
+            "DELETE /devices/entities/host-groups/v1": {
+                "params": {"ids": "{disposable_group_id}"},
+            },
+            "DELETE /iocs/entities/indicators/v1": {
+                "params": {"ids": "{disposable_ioc_id}"},
+            },
             "POST /oauth2/token": {
                 "data": {
                     "client_id": "cs-mock-admin-client",
@@ -484,7 +519,10 @@ PLATFORMS = {
             "GET /devices/queries/host-group-members/v1": {
                 "params": {"id": "{group_ids}"},
             },
-            "GET /processes/entities/processes/v1": {"params": {"ids": "{process_ids}"}},
+            # A Falcon process id names the device it ran on.
+            "GET /processes/entities/processes/v1": {
+                "params": {"ids": "pid:{device_id}:1"},
+            },
             "POST /devices/entities/devices-actions/v2": {
                 "params": {"action_name": "contain"},
                 "json": {"ids": "{device_ids}"},
@@ -505,7 +543,7 @@ PLATFORMS = {
             "POST /devices/entities/host-group-actions/v1": {
                 "params": {"action_name": "add-hosts"},
                 "json": {
-                    "ids": "{group_id}",
+                    "ids": "{group_ids}",
                     "action_parameters": [
                         {"name": "filter", "value": "(device_id:['{device_id}'])"},
                     ],
@@ -805,6 +843,32 @@ def _first_id(client: TestClient, collection_url: str, headers: dict, params: di
     return ids[0] if ids else None
 
 
+def _reason(response) -> str:
+    """The first thing the answer says about why it refused."""
+    try:
+        body = response.json()
+    except ValueError:
+        return (response.text or "").strip()[:90] or "no body"
+    for path in (
+        ("errors", 0, "message"), ("error", "message"), ("reply", "err_msg"),
+        ("detail",), ("message",), ("messages", 0, "text"),
+    ):
+        node = body
+        for step in path:
+            if isinstance(node, dict) and step in node:
+                node = node[step]
+            elif isinstance(node, list) and isinstance(step, int) and len(node) > step:
+                node = node[step]
+            else:
+                node = None
+                break
+        if isinstance(node, str) and node:
+            return node[:90]
+        if isinstance(node, dict) and node.get("message"):
+            return str(node["message"])[:90]
+    return str(body)[:90]
+
+
 def _fill(
     client: TestClient, route: str, headers: dict, params: dict, fill: dict, mount: str = ""
 ) -> str:
@@ -843,12 +907,22 @@ def _oauth(client: TestClient, url: str, client_id: str, secret: str, scope: str
 
 
 def _substitute(value, ctx: dict):
-    """Fill ``{name}`` placeholders from ctx; a list placeholder stays a list."""
+    """Fill ``{name}`` placeholders from ctx; a list placeholder stays a list.
+
+    A placeholder standing alone keeps the context's type — a list stays a
+    list — and one embedded in a longer string is filled in place, which is
+    what an FQL filter value needs: `(device_id:['{device_id}'])` was sent
+    with the braces still in it and matched nothing.
+    """
     if isinstance(value, str):
         m = re.fullmatch(r"\{(\w+)\}", value)
         if m:
             return ctx.get(m.group(1), value)
-        return value
+        return re.sub(
+            r"\{(\w+)\}",
+            lambda hit: str(ctx.get(hit.group(1), hit.group(0))),
+            value,
+        )
     if isinstance(value, dict):
         return {k: _substitute(v, ctx) for k, v in value.items()}
     if isinstance(value, list):
@@ -901,13 +975,27 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
         # with and without its trailing slash; a request keyed under one
         # spelling was silently unused under the other, and the route came
         # out "skipped".
+        # Both reduced references are vendored, and they spell a route with
+        # and without its trailing slash and in either case — gofalcon
+        # records `/cases/get/v1` where Falcon serves `/cases/GET/v1`. A
+        # request keyed under one spelling went unused under the other, and
+        # the route came out "skipped" with the audit reporting no findings.
         table = cfg.get("requests", {})
-        entry = table.get(key) or table.get(key.rstrip("/")) or table.get(key + "/") or {}
+        folded = {k.lower().rstrip("/"): v for k, v in table.items()}
+        entry = folded.get(key.lower().rstrip("/"), {})
         req = _substitute(entry, ctx)
         params = {**cfg.get("params", {}), **req.get("params", {})}
         body = req.get("json", cfg.get("default_body") if method != "GET" else None)
         try:
-            r = client.request(method, mount + url, headers=headers, params=params, json=body)
+            # A token endpoint takes a form, not JSON, and `data` was
+            # ignored: the request went out with the empty default body and
+            # the route was recorded as skipped.
+            form = req.get("data")
+            r = (
+                client.request(method, mount + url, headers=headers, params=params, data=form)
+                if form
+                else client.request(method, mount + url, headers=headers, params=params, json=body)
+            )
         except Exception as exc:  # noqa: BLE001 — the crash is the finding
             findings += 1
             print(f"  {method} {route}\n      crash    {type(exc).__name__}: {exc}")
@@ -915,7 +1003,12 @@ def _compare_paths(platform: str, cfg: dict, client: TestClient, headers: dict, 
         if r.status_code >= 300 or not r.headers.get("content-type", "").startswith(
             "application/json"
         ):
-            print(f"  -  {method} {route}: HTTP {r.status_code} (skipped)")
+            # Say what the mock said. "HTTP 400 (skipped)" hid the reason, and
+            # the reason is usually this audit's own request: an id list sent
+            # as a string, a body the route requires and the table does not
+            # carry. Twenty-two routes sat behind such a line while the run
+            # reported zero findings.
+            print(f"  -  {method} {route}: HTTP {r.status_code} (skipped) — {_reason(r)}")
             continue
         payload = r.json()
         checked += 1

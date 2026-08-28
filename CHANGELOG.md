@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A process for a device the tenant does not have, with five fields Falcon has not.**
+`ProcessesapiProcessDetail` declares ten members; mockdr answered five more
+beside them — `sha256`, `md5`, `user_name`, `user_sid`, `parent_process_id` —
+so anything built against the mock's process breaks against the real product.
+The route also generated a process for *any* id, including one naming a
+device this install has never held, where Falcon resolves nothing and answers
+an empty list. And every process it invented started at the same instant of
+January 2025.
+
 **Every entry reported having just been updated.**
 An Atom entry's `updated` is the entity's own last change, and splunkd keeps
 it stable across reads — for an entity nothing has changed through the REST
@@ -265,6 +274,19 @@ of the snapshot, so it survives a restart along with the incidents that point
 into it.
 
 ### Added
+
+**Why a route was skipped, and four reasons it should not have been.**
+`schema_drift.py` printed `HTTP 400 (skipped)` and no more, so twenty-two
+routes sat behind that line while the run reported zero findings. Each skip
+now says what the mock said — `query.ids: Field required`, `ids must be an
+array` — and the reasons were the audit's own: a placeholder inside a longer
+string went out with its braces intact, so an FQL filter matched nothing; a
+list placeholder was written in the singular and sent as a string; a
+form-encoded token request was sent as JSON because the runner ignored
+`data`; and the request table was matched case-sensitively while gofalcon
+records `/cases/get/v1` where Falcon serves `/cases/GET/v1`. CrowdStrike is
+compared over 36 routes now with none skipped — this morning it was 19 with
+14 skipped, and Cortex 35 with 8.
 
 **An audit for two spellings of one filter.**
 `param_effect.py` asks whether a filter narrows and `filter_effect.py` asks
