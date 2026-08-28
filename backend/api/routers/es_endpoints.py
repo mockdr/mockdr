@@ -138,7 +138,12 @@ def unisolate_endpoint(
     return result
 
 
-@router.post("/api/endpoint/kill_process", dependencies=[Depends(require_kbn_xsrf)])
+# Kibana 8.15 serves the response actions under `/api/endpoint/action/…`
+# and answers 404 for the bare `/api/endpoint/kill_process` and
+# `/api/endpoint/scan` — measured, along with `suspend_process`,
+# `running_procs`, `get_file` and `execute`. Only `isolate` is served under
+# both spellings. Serving the short forms let a client build against paths
+# the product does not have.
 @router.post("/api/endpoint/action/kill_process", dependencies=[Depends(require_kbn_xsrf)])
 def kill_process(
     body: dict = Body(...),
@@ -152,7 +157,7 @@ def kill_process(
             status_code=400,
             detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
-    params = body.get("parameters", {})
+    params = _require_parameters(body, "kill_process")
     result = endpoint_commands.kill_process(agent_id, params)
     if result is None:
         raise HTTPException(
@@ -162,7 +167,6 @@ def kill_process(
     return result
 
 
-@router.post("/api/endpoint/scan", dependencies=[Depends(require_kbn_xsrf)])
 @router.post("/api/endpoint/action/scan", dependencies=[Depends(require_kbn_xsrf)])
 def scan_endpoint(
     body: dict = Body(...),
@@ -176,6 +180,7 @@ def scan_endpoint(
             status_code=400,
             detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
+    _require_parameters(body, "scan")
     comment = body.get("comment", "")
     result = endpoint_commands.scan_endpoint(agent_id, comment)
     if result is None:
@@ -212,6 +217,49 @@ def get_action(
             detail=build_kbn_error_response(404, f"Action with id '{action_id}' not found."),
         )
     return result
+
+
+#: What each response action requires inside `parameters`, and how Kibana
+#: says so. Measured on 8.15: `scan` and `get_file` name a `path`, `execute`
+#: a `command`, and the two process actions ask only that the block carry
+#: something. mockdr accepted a scan with no parameters at all and answered
+#: 200, so a client that had forgotten the one member the action is about
+#: was told the scan had started.
+_ACTION_PARAMETERS = {
+    "scan": ("path", "[request body.parameters.path]: expected value of type "
+                     "[string] but got [undefined]"),
+    "get_file": ("path", "[request body.parameters.path]: expected value of type "
+                         "[string] but got [undefined]"),
+    "execute": ("command", "[request body.parameters.command]: expected value of type "
+                           "[string] but got [undefined]"),
+}
+_PARAMETERS_REQUIRED = (
+    "[request body.parameters]: expected at least one defined value but got [undefined]"
+)
+
+
+def _require_parameters(body: dict, action: str) -> dict:
+    """The `parameters` block an action needs, refused the way Kibana refuses it.
+
+    Raises:
+        HTTPException: 400, in Kibana's own wording.
+    """
+    params = body.get("parameters")
+    if not isinstance(params, dict):
+        params = {}
+    # An action with a member of its own names that member whether the block
+    # is absent or merely incomplete; the two process actions ask only that
+    # the block carry something. Measured on 8.15.
+    named = _ACTION_PARAMETERS.get(action)
+    if named:
+        if not params.get(named[0]):
+            raise HTTPException(status_code=400, detail=build_kbn_error_response(400, named[1]))
+        return params
+    if not params:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, _PARAMETERS_REQUIRED,
+        ))
+    return params
 
 
 def _validate_action_body(body: dict) -> None:

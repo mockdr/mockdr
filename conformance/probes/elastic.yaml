@@ -3817,3 +3817,62 @@ probes:
       path: /_search/scroll
       json: {scroll_id: ["${seed_scroll}"]}
       auth: basic
+
+  # ── The response actions (2.3.1) ──────────────────────────────────────
+  #
+  # Measured on Kibana 8.15, with the endpoint pages behind a licence this
+  # install does not have — so a routed action answers 403 rather than
+  # acting, and that is enough to tell a routed path from one that is not
+  # there. `isolate` is served under both spellings; every other action only
+  # under `/api/endpoint/action/…`, and the bare forms are 404.
+  #
+  # `/api/endpoint/unisolate` is the exception this suite does *not*
+  # imitate: it answers a 308 to `/api/endpoint/action/unisolate`, which
+  # 8.15 then answers 404 for. mockdr serves the action instead of a
+  # redirect into nothing, because a mock that cannot release an endpoint is
+  # useless to the playbook that isolated it.
+
+  - id: kbn-endpoint-scan-short-path
+    endpoint: kibana
+    why: The bare spelling of a response action, which 8.15 does not route.
+    request:
+      method: POST
+      path: /api/endpoint/scan
+      json: {endpoint_ids: ["probe"], parameters: {path: "/tmp/probe"}}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-kill-process-short-path
+    endpoint: kibana
+    why: The same, for the process action.
+    request:
+      method: POST
+      path: /api/endpoint/kill_process
+      json: {endpoint_ids: ["probe"], parameters: {pid: 42}}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-scan-without-a-path
+    endpoint: kibana
+    why: >
+      The one member a scan is about. Kibana's schema refuses the body
+      before it looks at the endpoint; mockdr answered 200 and reported a
+      scan it had started on nothing.
+    request:
+      method: POST
+      path: /api/endpoint/action/scan
+      json: {endpoint_ids: ["probe"], comment: "conformance-probe"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-endpoint-kill-process-without-parameters
+    endpoint: kibana
+    why: >
+      A process action with no `parameters` block at all, which names
+      neither a pid nor an entity id.
+    request:
+      method: POST
+      path: /api/endpoint/action/kill_process
+      json: {endpoint_ids: ["probe"], comment: "conformance-probe"}
+      headers: {kbn-xsrf: "true"}
+      auth: basic

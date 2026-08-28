@@ -185,7 +185,8 @@ class TestEndpointActions:
         monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
         agent = self._agent(client)
         client.post(
-            "/kibana/api/endpoint/kill_process", headers=ES_AUTH,
+            # 8.15 serves this only under `/action/` — measured.
+            "/kibana/api/endpoint/action/kill_process", headers=ES_AUTH,
             json={"endpoint_ids": [agent], "parameters": {"pid": 42}},
         )
         pending = client.get(

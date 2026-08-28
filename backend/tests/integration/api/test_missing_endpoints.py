@@ -369,20 +369,60 @@ class TestEndpointExtras:
         ).json()
         assert values
 
-    @pytest.mark.parametrize(
-        "action", ["isolate", "unisolate", "kill_process", "scan"],
-    )
-    def test_response_actions_are_served_at_kibanas_path(
+    @pytest.mark.parametrize("action", ["isolate", "unisolate"])
+    def test_the_two_actions_kibana_serves_at_the_short_path(
         self, client: TestClient, action: str,
     ) -> None:
-        # Kibana serves these at /api/endpoint/{action}; the mock had them only
-        # under /api/endpoint/action/{action}, which is the listing path.
+        """Measured on 8.15: `isolate` is routed under both spellings, and
+        `unisolate` answers at the short path (as a redirect there, which
+        this mock does not imitate — see the conformance probes)."""
         resp = client.post(
             f"/kibana/api/endpoint/{action}",
             json={"endpoint_ids": [self._agent_id(client)]},
             headers=ES_AUTH,
         )
         assert resp.status_code == 200
+
+    @pytest.mark.parametrize("action", ["kill_process", "scan"])
+    def test_the_actions_kibana_serves_only_under_action(
+        self, client: TestClient, action: str,
+    ) -> None:
+        """8.15 answers 404 for the bare `/api/endpoint/{action}` on every
+        response action but `isolate` — measured. Serving the short form let
+        a client build against a path the product does not have."""
+        agent = self._agent_id(client)
+        parameters = {"path": "/tmp/probe"} if action == "scan" else {"pid": 42}
+        assert client.post(
+            f"/kibana/api/endpoint/{action}",
+            json={"endpoint_ids": [agent], "parameters": parameters},
+            headers=ES_AUTH,
+        ).status_code == 404
+        assert client.post(
+            f"/kibana/api/endpoint/action/{action}",
+            json={"endpoint_ids": [agent], "parameters": parameters},
+            headers=ES_AUTH,
+        ).status_code == 200
+
+    @pytest.mark.parametrize(
+        "action,parameters,named", [
+            ("scan", {"comment": "c"}, "body.parameters.path"),
+            ("scan", {"parameters": {"x": 1}}, "body.parameters.path"),
+            ("kill_process", {"comment": "c"}, "body.parameters"),
+        ],
+    )
+    def test_an_action_needs_the_parameters_it_is_about(
+        self, client: TestClient, action: str, parameters: dict, named: str,
+    ) -> None:
+        """Kibana's schema refuses the body before it looks at the endpoint,
+        and names the member it wanted — measured. mockdr accepted a scan
+        with no parameters at all and reported one it had started."""
+        resp = client.post(
+            f"/kibana/api/endpoint/action/{action}",
+            json={"endpoint_ids": [self._agent_id(client)], **parameters},
+            headers=ES_AUTH,
+        )
+        assert resp.status_code == 400
+        assert named in resp.json()["message"]
 
 
 class TestExceptionListSummary:

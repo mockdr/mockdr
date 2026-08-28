@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Two response-action paths Kibana does not route, and the parameters it demands.**
+Measured across the whole action matrix on 8.15: `isolate` is served under
+both `/api/endpoint/isolate` and `/api/endpoint/action/isolate`; every other
+response action only under `/action/…`, with the bare spelling answering 404
+— `scan`, `kill_process`, `suspend_process`, `running_procs`, `get_file`,
+`execute` alike. mockdr served `/api/endpoint/scan` and
+`/api/endpoint/kill_process`, so a client could build against paths the
+product does not have. And Kibana's schema refuses the body before it looks
+at the endpoint: a scan without `parameters.path` is a 400 naming that
+member, a process action without a `parameters` block at all is a 400 saying
+so. mockdr accepted a scan with no parameters and answered 200 with a scan it
+had started on nothing.
+
+`/api/endpoint/unisolate` is the one thing here left deliberately unimitated:
+8.15 answers it with a 308 to `/api/endpoint/action/unisolate`, which it then
+answers 404 for. A mock that cannot release an endpoint is useless to the
+playbook that isolated it, so this one keeps working — recorded in the probe
+file beside the measurement.
+
 **A scroll cursor the cluster cannot read is a refusal from the security layer.**
 The bootstrap can open a scroll and dispatch a search now, so the six routes
 addressed by a cursor or a sid — which nothing had ever compared — are
