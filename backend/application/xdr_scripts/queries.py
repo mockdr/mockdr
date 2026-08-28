@@ -66,6 +66,13 @@ def get_script_metadata(script_id: str) -> dict | None:
 def get_execution_status(action_id: str) -> dict | None:
     """Return the execution status for a script run action.
 
+    Cortex answers a tally: how many endpoints are pending, in progress,
+    completed, failed. This answered the stored action record instead, whose
+    field names are none of those — so the recorded shape filled the reply
+    with zeros and a playbook polling
+    `endpoints_completed_successfully == 2` waited for ever on a run that had
+    finished.
+
     Auto-promotes status from ``pending`` to ``completed`` to simulate
     asynchronous execution.
 
@@ -73,7 +80,7 @@ def get_execution_status(action_id: str) -> dict | None:
         action_id: The action identifier.
 
     Returns:
-        XDR reply with action status, or None if not found.
+        XDR reply with the tally, or None if not found.
     """
     action = xdr_action_repo.get(action_id)
     if not action:
@@ -84,32 +91,70 @@ def get_execution_status(action_id: str) -> dict | None:
         action.status = "completed"
         xdr_action_repo.save(action)
 
-    return build_xdr_reply(record_dict(action))
+    covered = list(action.endpoint_ids or [action.endpoint_id])
+    done = action.status == "completed"
+    return build_xdr_reply({
+        "general_status": "COMPLETED_SUCCESSFULLY" if done else "IN_PROGRESS",
+        "endpoints_completed_successfully": len(covered) if done else 0,
+        "endpoints_in_progress": 0 if done else len(covered),
+        "endpoints_pending": 0,
+        "endpoints_failed": 0,
+        "endpoints_expired": 0,
+        "endpoints_canceled": 0,
+        "endpoints_aborted": 0,
+        "endpoints_pending_abort": 0,
+        "endpoints_timeout": 0,
+        "error_message": "",
+    })
 
 
 def get_execution_results(action_id: str) -> dict | None:
-    """Return canned execution results for a script run action.
+    """Return the results of a script run, one row per endpoint it ran on.
+
+    The row was canned — one endpoint called `xdr-endpoint`, whatever the run
+    covered — and named its members `status` and `return_value` where Cortex
+    names them `execution_status` and `standard_output`, beside a
+    `script_name` and a `date_created` the reply left blank. The run knows
+    all of it.
 
     Args:
         action_id: The action identifier.
 
     Returns:
-        XDR reply with execution results, or None if not found.
+        XDR reply with the results, or None if not found.
     """
+    from repository.xdr_endpoint_repo import xdr_endpoint_repo  # noqa: PLC0415
+
     action = xdr_action_repo.get(action_id)
     if not action:
         return None
 
-    results = [
-        {
-            "endpoint_id": action.endpoint_id,
-            "endpoint_name": "xdr-endpoint",
-            "status": "COMPLETED_SUCCESSFULLY",
-            "return_value": "Script executed successfully",
+    detail = action.result or {}
+    script = xdr_script_repo.get(str(detail.get("script_uid") or ""))
+    results = []
+    for endpoint_id in action.endpoint_ids or [action.endpoint_id]:
+        endpoint = xdr_endpoint_repo.get(endpoint_id)
+        results.append({
+            "endpoint_id": endpoint_id,
+            "endpoint_name": endpoint.endpoint_name if endpoint else "",
+            "endpoint_ip_address": (
+                endpoint.ip[0] if endpoint and endpoint.ip else ""
+            ),
+            "endpoint_status": endpoint.endpoint_status if endpoint else "",
+            "domain": endpoint.domain if endpoint else "",
+            "execution_status": "COMPLETED_SUCCESSFULLY",
             "standard_output": "OK\n",
-            "standard_error": "",
+            "retrieved_files": 0,
+            "failed_files": 0,
             "retention_date": None,
-        },
-    ]
+        })
 
-    return build_xdr_list_reply(results, total_count=len(results))
+    return build_xdr_reply({
+        "script_name": script.name if script else "",
+        "script_description": script.description if script else "",
+        "script_parameters": detail.get("parameters") or [],
+        "date_created": action.creation_time,
+        "error_message": "",
+        "scope": "all",
+        "results": results,
+    })

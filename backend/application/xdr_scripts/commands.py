@@ -11,43 +11,48 @@ from utils.xdr_response import build_xdr_reply
 
 
 def run_script(endpoint_ids: list[str], script_id: str, params: dict) -> dict | None:
-    """Execute a script on one or more endpoints.
+    """Run a script on every endpoint the request named.
 
-    Creates a pending action record for each endpoint.
+    Two things were broken, and together they broke the whole pattern a
+    playbook uses — run a script, poll for its result. The route read
+    `endpoint_id_list` where Cortex requires a `filters` block, so a
+    documented call selected nobody, created no action at all, and still
+    answered an `action_id`; polling that id then answered
+    `500 Action … not found`. And for more than one endpoint the records were
+    keyed `<action_id>_<endpoint>` while the reply carried the bare id, so
+    that id named nothing either. One action covers the set now, which is
+    what Cortex answers and what `get_script_execution_status` needs to find.
 
     Args:
-        endpoint_ids: List of target endpoint identifiers.
+        endpoint_ids: Target endpoints, resolved from the request.
         script_id: The script identifier to run.
         params: Additional parameters for the script execution.
 
     Returns:
-        XDR reply with action ID, or None if script not found.
+        XDR reply with the action id, or None if the script or the endpoints
+        are not this tenant's.
     """
     script = xdr_script_repo.get(script_id)
-    if not script:
+    if not script or not endpoint_ids:
         return None
 
-    action_id = str(uuid.uuid4())
-    now_ms = int(datetime.now(UTC).timestamp() * 1000)
-
-    # Create one action per endpoint, all sharing the same action_id prefix
-    for eid in endpoint_ids:
-        action = XdrAction(
-            action_id=f"{action_id}_{eid}" if len(endpoint_ids) > 1 else action_id,
-            action_type="script_run",
-            status="pending",
-            endpoint_id=eid,
-            creation_time=now_ms,
-            result={
-                "script_uid": script_id,
-                "script_name": script.name,
-                "parameters": params.get("parameters", {}),
-                "timeout": params.get("timeout", 600),
-            },
-        )
-        xdr_action_repo.save(action)
+    action = XdrAction(
+        action_id=str(uuid.uuid4()),
+        action_type="script_run",
+        status="pending",
+        endpoint_id=endpoint_ids[0],
+        endpoint_ids=list(endpoint_ids),
+        creation_time=int(datetime.now(UTC).timestamp() * 1000),
+        result={
+            "script_uid": script_id,
+            "script_name": script.name,
+            "parameters": params.get("parameters", {}),
+            "timeout": params.get("timeout", 600),
+        },
+    )
+    xdr_action_repo.save(action)
 
     return build_xdr_reply({
-        "action_id": action_id,
-        "endpoints_count": len(endpoint_ids),
+        "action_id": action.action_id,
+        "endpoints_count": str(len(endpoint_ids)),
     })

@@ -56,7 +56,8 @@ def endpoints_named_by(request_data: dict) -> list[str]:
     """Every endpoint a request names, by id or by filter.
 
     Cortex names the target of `file_retrieval`, `quarantine` and `scan` with
-    a `filters` block and nothing else; `isolate` and `unisolate` take either.
+    a `filters` block and nothing else; `isolate` and `unisolate` take either,
+    and the XSOAR integration spells it `agent_id` on `terminate_process`.
     These handlers read `endpoint_id` alone, so the body Cortex documents was
     answered `500 Endpoint  not found` — for the three that have no
     `endpoint_id` at all, every well-formed call failed.
@@ -69,7 +70,7 @@ def endpoints_named_by(request_data: dict) -> list[str]:
     """
     from application.xdr_endpoints.queries import select_endpoints  # noqa: PLC0415
 
-    single = str(request_data.get("endpoint_id") or "")
+    single = str(request_data.get("endpoint_id") or request_data.get("agent_id") or "")
     if single:
         return [single]
     if not (request_data.get("filters") or request_data.get("endpoint_id_list")):
@@ -189,24 +190,34 @@ def update_agent_name(request_data: dict, alias: str) -> dict | None:
     return build_xdr_reply(True)
 
 
-def terminate_process(endpoint_id: str, params: dict) -> dict | None:
-    """Create a terminate-process action on an endpoint.
+def terminate_process(endpoint_ids: list[str], params: dict) -> dict | None:
+    """Terminate a process on every endpoint the request named.
+
+    The connector's recorded reply carries `group_action_id`, and the request
+    names its target the way its siblings do — which this read as
+    `endpoint_id` alone.
 
     Args:
-        endpoint_id: The endpoint identifier.
+        endpoint_ids: The endpoints to act on.
         params: Dict with process details (``pid``, ``process_name``).
 
     Returns:
-        XDR reply with action ID, or None if endpoint not found.
+        XDR reply with the action id and how many endpoints it covers, or
+        None when the request named no endpoint this tenant has.
     """
-    endpoint = xdr_endpoint_repo.get(endpoint_id)
-    if not endpoint:
+    covered = [str(e.endpoint_id) for e in
+               (xdr_endpoint_repo.get(i) for i in endpoint_ids) if e]
+    if not covered:
         return None
 
-    action = _create_action(endpoint_id, "terminate_process")
+    action = _create_action(covered[0], "terminate_process", covered)
     action.result = {"pid": params.get("pid"), "process_name": params.get("process_name")}
     xdr_action_repo.save(action)
-    return build_xdr_reply({"action_id": action.action_id})
+    return build_xdr_reply({
+        "action_id": action.action_id,
+        "group_action_id": action.action_id,
+        "endpoints_count": _count(covered),
+    })
 
 
 def quarantine_file(endpoint_ids: list[str], params: dict) -> dict | None:

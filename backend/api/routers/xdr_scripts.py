@@ -53,7 +53,9 @@ def run_script(
 ) -> dict:
     """Execute a script on one or more endpoints."""
     request_data = require_request_data(body)
-    endpoint_ids = request_data.get("endpoint_id_list", [])
+    from application.xdr_endpoints.commands import endpoints_named_by  # noqa: PLC0415
+
+    endpoint_ids = endpoints_named_by(request_data)
     script_id = request_data.get("script_uid") or request_data.get("script_id", "")
     result = script_commands.run_script(endpoint_ids, script_id, request_data)
     if result is None:

@@ -138,12 +138,13 @@ def terminate_process(
 ) -> dict:
     """Terminate a process on an endpoint."""
     request_data = require_request_data(body)
-    endpoint_id = request_data.get("endpoint_id", "")
-    result = endpoint_commands.terminate_process(endpoint_id, request_data)
+    targets = endpoint_commands.endpoints_named_by(request_data)
+    result = endpoint_commands.terminate_process(targets, request_data)
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(500, XDR_ERR_INTERNAL, f"Endpoint {endpoint_id} not found"),
+            detail=build_xdr_error(
+                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
         )
     return result
 

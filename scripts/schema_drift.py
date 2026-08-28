@@ -387,6 +387,42 @@ def _xdr_prepare(client: TestClient, headers: dict) -> dict:
         "script_uid": scripts[0]["script_uid"] if scripts else "x",
         "distribution_id": _first_distribution(client, headers),
         "action_id": _an_action(client, headers),
+        **_action_ids(client, headers, endpoints, scripts),
+    }
+
+
+def _action_ids(client: TestClient, headers: dict, endpoints: list, scripts: list) -> dict:
+    """Ids for the routes that report on something that has to be started.
+
+    A file retrieval, a script run and an XQL query each answer an id, and the
+    route that reports on it cannot be compared without one.
+    """
+    if not endpoints:
+        return {"retrieval_action_id": "x", "script_action_id": "x", "xql_query_id": "x"}
+    endpoint = endpoints[0]["endpoint_id"]
+    selects = [{"field": "endpoint_id_list", "operator": "in", "value": [endpoint]}]
+
+    def reply(path: str, request: dict) -> dict:
+        answer = client.post(
+            "/xdr/public_api/v1" + path, headers=headers, json={"request_data": request},
+        ).json()
+        got = answer.get("reply")
+        return got if isinstance(got, dict) else {}
+
+    retrieval = reply(
+        "/endpoints/file_retrieval/",
+        {"files": {"windows": ["C:\\drift.txt"]}, "filters": selects},
+    )
+    run = reply(
+        "/scripts/run_script/",
+        {"script_uid": scripts[0]["script_uid"] if scripts else "", "timeout": 600,
+         "filters": selects},
+    )
+    query = reply("/xql/start_xql_query/", {"query": "dataset = xdr_data | limit 5"})
+    return {
+        "retrieval_action_id": str(retrieval.get("action_id", "x")),
+        "script_action_id": str(run.get("action_id", "x")),
+        "xql_query_id": str(query.get("query_id", "x")),
     }
 
 
@@ -555,9 +591,6 @@ PLATFORMS = {
             "POST /public_api/v1/actions/get_action_status/": {
                 "json": {"request_data": {"group_action_id": "{action_id}"}}
             },
-            "POST /public_api/v1/actions/file_retrieval_details/": {
-                "json": {"request_data": {"group_action_id": "{action_id}"}}
-            },
             "POST /public_api/v1/distributions/get_status/": {
                 "json": {"request_data": {"distribution_id": "{distribution_id}"}}
             },
@@ -587,6 +620,26 @@ PLATFORMS = {
                     "filters": [{"field": "endpoint_id_list", "operator": "in",
                                  "value": ["{endpoint_id}"]}],
                 }}
+            },
+            # Five more that were answered 500 and recorded as "skipped":
+            # each needs an id this install has, which is made by running the
+            # thing the route reports on.
+            "POST /public_api/v1/actions/file_retrieval_details/": {
+                "json": {"request_data": {"group_action_id": "{retrieval_action_id}"}}
+            },
+            "POST /public_api/v1/endpoints/terminate_process/": {
+                "json": {"request_data": {
+                    "agent_id": "{endpoint_id}", "process_id": 4242,
+                }}
+            },
+            "POST /public_api/v1/scripts/get_script_execution_status/": {
+                "json": {"request_data": {"action_id": "{script_action_id}"}}
+            },
+            "POST /public_api/v1/scripts/get_script_execution_results": {
+                "json": {"request_data": {"action_id": "{script_action_id}"}}
+            },
+            "POST /public_api/v1/xql/get_query_results": {
+                "json": {"request_data": {"query_id": "{xql_query_id}"}}
             },
             "POST /public_api/v1/scripts/get_script_metadata/": {
                 "json": {"request_data": {"script_uid": "{script_uid}"}}

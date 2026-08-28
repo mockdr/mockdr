@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Running a script and collecting its result, which never worked.**
+Five more Cortex routes were recorded "skipped: HTTP 500" by the audit and
+so were never compared. `run_script` read `endpoint_id_list` where Cortex
+requires a `filters` block: a documented call selected nobody, created no
+action record at all, and still answered an `action_id` — polling which
+answered `500 Action … not found`. So the loop every playbook runs, start a
+script and wait for its result, could not close. Where it did resolve, the
+status was a tally of zeros while the run had finished, and the result was
+one canned row for an endpoint called `xdr-endpoint`. One action covers the
+set now, the tally counts the endpoints it ran on, and the rows name them
+with the members Cortex declares (`execution_status`, `standard_output`,
+`endpoint_ip_address`). `terminate_process` takes the target its siblings
+take, and `file_retrieval_details` the `group_action_id` its own retrieval
+answered. Cortex is compared over 52 routes now, with none skipped — this
+morning it was 35 compared and 8 skipped.
+
 **"0 drift findings" over the routes the audit never asked about.**
 `schema_drift.py` reported zero for CrowdStrike and Cortex XDR while printing,
 two lines above, that fourteen CrowdStrike routes and eight Cortex ones were

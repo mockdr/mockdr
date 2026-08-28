@@ -436,3 +436,113 @@ class TestCortexNamesItsTargetsTheWayCortexDoes:
         )
         assert resp.status_code == 500
         assert resp.json()["reply"]["err_code"] == 500
+
+
+class TestRunningAScriptAndCollectingIt:
+    """Start a script, poll it, read the result — the whole pattern.
+
+    `run_script` read `endpoint_id_list` where Cortex requires `filters`, so
+    a documented call selected nobody, created no action record, and still
+    answered an `action_id`. Polling that id answered
+    `500 Action … not found`, so the loop a playbook runs never closed. When
+    it did resolve, the status was a tally of zeros — a client waiting for
+    `endpoints_completed_successfully` to reach its endpoint count waited for
+    ever — and the result was one canned row for an endpoint called
+    `xdr-endpoint`.
+    """
+
+    @staticmethod
+    def _auth() -> dict:
+        import hashlib
+        import secrets
+        import time
+
+        nonce = secrets.token_hex(32)
+        stamp = str(int(time.time() * 1000))
+        digest = hashlib.sha256(("xdr-admin-secret" + nonce + stamp).encode()).hexdigest()
+        return {
+            "x-xdr-auth-id": "1", "x-xdr-nonce": nonce,
+            "x-xdr-timestamp": stamp, "Authorization": digest,
+        }
+
+    def _post(self, client: TestClient, path: str, request: dict) -> dict:
+        return dict(client.post(
+            f"/xdr/public_api/v1{path}", headers=self._auth(),
+            json={"request_data": request},
+        ).json())
+
+    def _run(self, client: TestClient) -> tuple[dict, list[str]]:
+        endpoints = [
+            e["endpoint_id"] for e in
+            self._post(client, "/endpoints/get_endpoint/", {})["reply"]["endpoints"][:2]
+        ]
+        script = self._post(client, "/scripts/get_scripts/", {})["reply"]["scripts"][0]
+        run = self._post(client, "/scripts/run_script/", {
+            "script_uid": script["script_uid"], "timeout": 600,
+            "filters": [{"field": "endpoint_id_list", "operator": "in", "value": endpoints}],
+        })["reply"]
+        return run, endpoints
+
+    def test_the_run_answers_an_action_that_exists(self, client: TestClient) -> None:
+        run, endpoints = self._run(client)
+        assert run["endpoints_count"] == str(len(endpoints))
+        status = self._post(
+            client, "/scripts/get_script_execution_status/", {"action_id": run["action_id"]},
+        )
+        assert "err_code" not in status["reply"]
+
+    def test_the_status_counts_the_endpoints_it_ran_on(self, client: TestClient) -> None:
+        run, endpoints = self._run(client)
+        status = self._post(
+            client, "/scripts/get_script_execution_status/", {"action_id": run["action_id"]},
+        )["reply"]
+        assert status["endpoints_completed_successfully"] == len(endpoints)
+        assert status["general_status"] == "COMPLETED_SUCCESSFULLY"
+
+    def test_the_results_name_the_endpoints_it_ran_on(self, client: TestClient) -> None:
+        run, endpoints = self._run(client)
+        results = self._post(
+            client, "/scripts/get_script_execution_results", {"action_id": run["action_id"]},
+        )["reply"]
+        assert results["script_name"]
+        assert [row["endpoint_id"] for row in results["results"]] == endpoints
+        # Cortex names these `execution_status` and `standard_output`.
+        assert results["results"][0]["execution_status"] == "COMPLETED_SUCCESSFULLY"
+        assert results["results"][0]["endpoint_name"]
+
+    def test_terminate_process_takes_the_target_its_siblings_take(
+        self, client: TestClient,
+    ) -> None:
+        endpoint = self._post(
+            client, "/endpoints/get_endpoint/", {},
+        )["reply"]["endpoints"][0]["endpoint_id"]
+        by_agent = self._post(
+            client, "/endpoints/terminate_process/",
+            {"agent_id": endpoint, "process_id": 4242},
+        )["reply"]
+        assert by_agent["group_action_id"] == by_agent["action_id"]
+
+        by_filter = self._post(
+            client, "/endpoints/terminate_process/",
+            {"process_id": 4242,
+             "filters": [{"field": "endpoint_id_list", "operator": "in",
+                          "value": [endpoint]}]},
+        )["reply"]
+        assert by_filter["action_id"]
+
+    def test_retrieval_details_take_the_id_the_retrieval_answered(
+        self, client: TestClient,
+    ) -> None:
+        endpoint = self._post(
+            client, "/endpoints/get_endpoint/", {},
+        )["reply"]["endpoints"][0]["endpoint_id"]
+        retrieval = self._post(client, "/endpoints/file_retrieval/", {
+            "files": {"windows": ["C:\\temp\\x.txt"]},
+            "filters": [{"field": "endpoint_id_list", "operator": "in", "value": [endpoint]}],
+        })["reply"]
+        for spelling in ("action_id", "group_action_id"):
+            details = self._post(
+                client, "/actions/file_retrieval_details/",
+                {spelling: retrieval["action_id"]},
+            )
+            assert "err_code" not in details["reply"], spelling

@@ -46,7 +46,12 @@ def get_file_retrieval_details(
 ) -> dict:
     """Get file retrieval download details for an action."""
     request_data = require_request_data(body)
-    action_id = request_data.get("action_id", "")
+    # `get_action_status` beside this one is called with `group_action_id`,
+    # and so is this by the XSOAR integration; reading only `action_id` meant
+    # the id the caller had just been handed named nothing.
+    action_id = str(
+        request_data.get("action_id") or request_data.get("group_action_id") or "",
+    )
     result = action_queries.get_file_retrieval_details(action_id)
     if result is None:
         raise HTTPException(
