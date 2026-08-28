@@ -365,12 +365,17 @@ def case_reporters(
         author = case.get("created_by") or {}
         username = str(author.get("username", ""))
         if username and username not in seen:
-            seen[username] = {
+            reporter = {
                 "username": username,
                 "full_name": author.get("full_name"),
                 "email": author.get("email"),
-                "profile_uid": author.get("profile_uid"),
             }
+            # Kibana 8.15 carries `profile_uid` only for an author that has
+            # one; it is absent otherwise, not null — measured. A client
+            # asking whether the key is there was told yes, always.
+            if author.get("profile_uid"):
+                reporter["profile_uid"] = author["profile_uid"]
+            seen[username] = reporter
     return sorted(seen.values(), key=lambda r: str(r["username"]))
 
 

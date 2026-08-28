@@ -3657,3 +3657,77 @@ probes:
         size: 2
         sort: [{definitely_not_a_field: {order: "asc", unmapped_type: "long"}}]
       auth: basic
+
+  # ── Routes the coverage map found nothing comparing (2.3.1) ───────────
+  #
+  # `scripts/audit_coverage.py` counts what watches each route rather than
+  # what it found, and reported 49 routes on these mounts resting on
+  # mockdr's own tests alone while the real product runs beside them. These
+  # take no precondition and answer a document, so there is no reason not to
+  # compare them.
+
+  - id: kbn-cases-status
+    endpoint: kibana
+    why: The counts the Cases overview reads.
+    request: {method: GET, path: /api/cases/status, auth: basic}
+
+  - id: kbn-cases-tags
+    endpoint: kibana
+    why: The tag list a case editor offers.
+    request: {method: GET, path: /api/cases/tags, auth: basic}
+
+  - id: kbn-cases-reporters
+    endpoint: kibana
+    why: Who has filed a case, as the filter drop-down reads it.
+    request: {method: GET, path: /api/cases/reporters, auth: basic}
+
+  - id: kbn-detection-engine-tags
+    endpoint: kibana
+    why: Every tag any rule carries.
+    request: {method: GET, path: /api/detection_engine/tags, auth: basic}
+
+  - id: kbn-detection-engine-index
+    endpoint: kibana
+    why: >
+      Whether the signals index exists, which the Security Solution asks
+      before it will show anything at all.
+    request: {method: GET, path: /api/detection_engine/index, auth: basic}
+
+  - id: kbn-prepackaged-status
+    endpoint: kibana
+    why: >
+      How many prebuilt rules are installed and how many wait — the panel
+      every fresh install shows first.
+    request:
+      method: GET
+      path: /api/detection_engine/rules/prepackaged/_status
+      auth: basic
+
+  - id: kbn-signals-tags
+    endpoint: kibana
+    why: The tags an analyst can put on a signal.
+    request: {method: GET, path: /api/detection_engine/signals/tags, auth: basic}
+
+  - id: es-resolve-index
+    endpoint: search
+    why: >
+      What a name resolves to — index, alias or data stream — which every
+      Kibana data view asks before it queries.
+    request: {method: GET, path: /_resolve/index/logs-*, auth: basic}
+
+  - id: es-cluster-health-of-one-index
+    endpoint: search
+    why: The per-index form of the health a client polls after writing.
+    request:
+      method: GET
+      path: /_cluster/health/${seed_index}
+      auth: basic
+    needs_seed: true
+    ignore_paths:
+      - $.number_of_nodes
+      - $.number_of_data_nodes
+      - $.active_shards
+      - $.active_primary_shards
+      - $.unassigned_shards
+      - $.delayed_unassigned_shards
+      - $.active_shards_percent_as_number

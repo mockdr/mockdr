@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Two answers the real products do not give, found by comparing routes nothing compared.**
+The coverage map named 49 routes resting on this repo's own tests while a
+real product runs beside them; nine of the cheapest — those that take no
+precondition and answer a document — now have conformance probes, and two
+of the nine differed. Kibana 8.15 carries `profile_uid` on a case reporter
+only for an author that has one and omits it otherwise, where mockdr
+answered `null`, so a client asking whether the key is there was told yes,
+always. And `GET /_cluster/health/{index}` answers the health *of* that
+index, not a body naming it: mockdr added an `index` member no cluster
+sends.
+
 **Three Deep Visibility routes that had never been compared.**
 `/dv/query-status`, `/dv/events` and `/dv/events/{type}` all take the
 `queryId` that `POST /dv/init-query` answers, and the drift audit could not

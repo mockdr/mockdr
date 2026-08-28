@@ -921,7 +921,13 @@ def es_cat_indices() -> list[dict]:
 
 
 def es_cluster_health(index: str = "") -> dict:
-    """Return the ``_cluster/health`` body."""
+    """Return the ``_cluster/health`` body.
+
+    The per-index form answers the same document as the cluster-wide one —
+    the health *of* that index, not a body naming it. 8.15 carries no
+    `index` member here, measured; mockdr added one, which is a member a
+    client could branch on and a real cluster never sends.
+    """
     return {
         "cluster_name": "mockdr-elastic",
         "status": "green",
@@ -938,7 +944,6 @@ def es_cluster_health(index: str = "") -> dict:
         "number_of_in_flight_fetch": 0,
         "task_max_waiting_in_queue_millis": 0,
         "active_shards_percent_as_number": 100.0,
-        **({"index": index} if index else {}),
     }
 
 
