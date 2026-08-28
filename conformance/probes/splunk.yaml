@@ -3116,3 +3116,63 @@ probes:
       path: /services/data/props/extractions
       params: {output_mode: json}
       auth: basic
+
+  # ── The versioned spellings of the collector (2.3.1) ──────────────────
+  #
+  # The coverage map found five collector paths this suite never sent
+  # anything to. splunkd serves the same endpoint under each, and a client
+  # library picks whichever its version string was built with.
+
+  - id: hec-versioned-event-path
+    endpoint: hec
+    why: >
+      `/services/collector/event/1.0` is what several SDKs post to. The
+      answer must be the plain endpoint's answer.
+    request:
+      method: POST
+      path: /services/collector/event/1.0
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {event: conformance-probe}
+
+  - id: hec-versioned-root-path
+    endpoint: hec
+    why: >
+      There is no version suffix on the bare collector path: splunkd answers
+      404 for `/services/collector/1.0` while serving `/event/1.0` and
+      `/raw/1.0`. mockdr accepted it, so a client could post to a path the
+      product does not have.
+    request:
+      method: POST
+      path: /services/collector/1.0
+      headers: {Authorization: "Splunk ${hec_token}"}
+      json: {event: conformance-probe}
+
+  - id: hec-versioned-raw-path
+    endpoint: hec
+    why: >
+      The raw endpoint's versioned spelling — the body is the event, and no
+      JSON envelope is read at all.
+    request:
+      method: POST
+      path: /services/collector/raw/1.0
+      headers: {Authorization: "Splunk ${hec_token}"}
+      content: conformance-probe-raw-line
+
+  - id: hec-versioned-health
+    endpoint: hec
+    why: >
+      The health of the collector, which a client polls before it trusts a
+      pipeline. Unauthenticated on purpose: splunkd answers it to anyone.
+    request:
+      method: GET
+      path: /services/collector/health/1.0
+
+  - id: hec-versioned-event-without-a-token
+    endpoint: hec
+    why: >
+      The versioned path must refuse the same way the plain one does — a
+      version suffix is not a way around the credential.
+    request:
+      method: POST
+      path: /services/collector/event/1.0
+      json: {event: conformance-probe}

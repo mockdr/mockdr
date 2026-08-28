@@ -70,10 +70,14 @@ def _ingest(text: str, hec_info: dict, channel: str | None, use_ack: bool) -> di
     return result
 
 
+# splunkd serves `/services/collector`, `/services/collector/event` and
+# `/services/collector/event/1.0`, and answers 404 for
+# `/services/collector/1.0` — measured on 10.4.2. The version suffix belongs
+# to the named endpoints, not to the bare one; accepting it here let a client
+# post to a path the product does not have.
 @router.post("/services/collector/event", response_model=None)
 @router.post("/services/collector/event/1.0", response_model=None)
 @router.post("/services/collector", response_model=None)
-@router.post("/services/collector/1.0", response_model=None)
 async def hec_event(
     request: Request,
     useACK: str = Query(default=""),  # noqa: N803 - HEC's own parameter name

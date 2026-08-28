@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A collector path splunkd does not have, and the 404 it answers with.**
+Five probes went to the versioned spellings of the event collector, which
+nothing had ever sent anything to. `/services/collector/event/1.0` and
+`/raw/1.0` are splunkd's; `/services/collector/1.0` is not — 10.4.2 answers
+404 there, measured, and mockdr accepted it. Removing it exposed the next
+difference: the collector answers on its own port and its not-found body is
+the web server's — `{"text": "The requested URL was not found on this
+server.", "code": 404}` — where the management port answers
+`{"messages": [{"type": "ERROR", "text": "Not Found"}]}`, and it names no
+`Vary` at all, where the collector's own answers do.
+
 **Three more differences, on routes that had never been compared.**
 Ten further probes went to the routes the coverage map named, and three of
 them differed from the real products:

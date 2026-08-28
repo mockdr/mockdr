@@ -147,14 +147,13 @@ class TestRawEndpoint:
 
 
 class TestVersionedPaths:
-    """The 1.0-suffixed aliases real HEC serves."""
+    """The 1.0-suffixed aliases real HEC serves — and the one it does not."""
 
     @pytest.mark.parametrize(
         "path",
         [
             "/services/collector/event/1.0",
             "/services/collector/raw/1.0",
-            "/services/collector/1.0",
         ],
     )
     def test_alias_is_served(self, client: TestClient, hec_auth: dict, path: str) -> None:
@@ -162,6 +161,26 @@ class TestVersionedPaths:
             f"{SPLUNK_PREFIX}{path}", content='{"event":"x"}', headers=hec_auth,
         )
         assert resp.status_code == 200
+
+    def test_the_bare_path_has_no_version_suffix(
+        self, client: TestClient, hec_auth: dict,
+    ) -> None:
+        """splunkd 10.4.2 answers 404 for `/services/collector/1.0` while
+        serving `/event/1.0` and `/raw/1.0` — measured. The suffix belongs to
+        the named endpoints, not to the bare one, and accepting it let a
+        client post to a path the product does not have."""
+        resp = client.post(
+            f"{SPLUNK_PREFIX}/services/collector/1.0",
+            content='{"event":"x"}', headers=hec_auth,
+        )
+        assert resp.status_code == 404
+        # The collector answers on its own port, and its not-found body is
+        # the web server's rather than splunkd's REST one.
+        assert resp.json() == {
+            "text": "The requested URL was not found on this server.",
+            "code": 404,
+        }
+        assert "vary" not in resp.headers
 
     def test_health_alias(self, client: TestClient) -> None:
         resp = client.get(f"{SPLUNK_PREFIX}/services/collector/health/1.0")

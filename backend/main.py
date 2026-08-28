@@ -1254,15 +1254,25 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
                         "error": {"root_cause": [dict(detail)], **detail}, "status": 400,
                     })
                 return JSONResponse(status_code=404, content=build_es_index_not_found(name))
-        if vendor == "splunk":
+        if vendor in ("splunk", "splunk_hec"):
             # Two 404s, measured on 10.4.2: the search service has its own
             # dispatcher and refuses an unknown path under it as FATAL
             # "Unknown endpoint."; everywhere else splunkd says ERROR "Not
             # Found". Neither carries the method or path mockdr used to add.
-            if re.search(r"/services/search/jobs/[^/]+/", path):
+            if "/services/collector" in path:
+                # The collector answers on its own port, and its 404 is the
+                # web server's rather than splunkd's REST one: measured on
+                # 10.4.2, `{"text": "The requested URL was not found on this
+                # server.", "code": 404}` where the management port answers
+                # `{"messages": [{"type": "ERROR", "text": "Not Found"}]}`.
+                content: dict = {
+                    "text": "The requested URL was not found on this server.",
+                    "code": 404,
+                }
+            elif re.search(r"/services/search/jobs/[^/]+/", path):
                 # Anything under a job is resolved by sid first; an unknown
                 # sid is reported before the sub-resource is looked at.
-                content: dict = {"messages": [{"type": "FATAL", "text": "Unknown sid."}]}
+                content = {"messages": [{"type": "FATAL", "text": "Unknown sid."}]}
             elif "/services/search/" in path:
                 content = {"messages": [{"type": "FATAL", "text": "Unknown endpoint."}]}
             else:

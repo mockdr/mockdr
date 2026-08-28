@@ -114,7 +114,12 @@ class SplunkHeadersMiddleware:
                 # validator.
                 cacheable = in_family and message["status"] == 200
                 if not cacheable:
-                    _stamp(message, vary, cacheable=False, hec=hec, login=login)
+                    # A path the collector does not have is answered by the
+                    # web server in front of it, which names no `Vary` at all
+                    # — measured on 10.4.2, where the collector's own answers
+                    # do name one.
+                    stamped = "" if hec and message["status"] == 404 else vary
+                    _stamp(message, stamped, cacheable=False, hec=hec, login=login)
                     await send(message)
                 return
             if message["type"] != "http.response.body":
