@@ -93,6 +93,16 @@ recognised only beside `source`, and alone reads as unknown.
 segment of `/_cat/indices/{pattern}`, and sharing one handler with the bare
 route made it a query parameter there — one the cluster does not know.
 
+The routes that *write* refuse it too now — twenty-one of them, measured the
+same way and just as safely, because the refusal precedes the action: a
+`DELETE` carrying an unrecognised parameter leaves the document where it
+was. mockdr did not, so a client with a typo could empty an index here that
+a real cluster would have refused to touch. `es_param_audit.py` covers all
+43 routes in both directions, 4859 questions, and it earned its keep a
+second time: its own candidate list had left out `index` and `name` — which
+nearly every route takes as an alias for its path segment — so mockdr was
+inventing a 400 on twenty-one of them.
+
 The sweep also found `/{index}/_mget` answering `{"docs": []}` to a request
 that named no documents at all — an empty result reported as a successful
 lookup of nothing. 8.15 tells the two empties apart: no body is a

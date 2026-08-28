@@ -4299,3 +4299,83 @@ probes:
       path: /api/endpoint/action/execute
       json: {endpoint_ids: ["probe-agent"], parameters: {command: "ls", timeout: "soon"}}
       auth: basic
+
+  # The same refusal on the routes that write. It precedes the action — a
+  # `DELETE` carrying an unrecognised parameter leaves the document where it
+  # was, measured — which is what mockdr did not do: a client with a typo
+  # could delete data here that a real cluster refuses to touch.
+
+  - id: es-delete-by-query-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    why: The sharpest of them — it emptied nothing, and mockdr emptied.
+    request:
+      method: POST
+      path: /${seed_index}/_delete_by_query
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-delete-index-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: DELETE
+      path: /${seed_index}
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-delete-doc-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: DELETE
+      path: /${seed_index}/_doc/a
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-post-search-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-update-by-query-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_update_by_query
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-refresh-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_refresh
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-put-index-refuses-an-unknown-parameter
+    endpoint: search
+    why: >
+      And the index is not created: the refusal precedes the action on every
+      one of these.
+    request:
+      method: PUT
+      path: /mockdr-probe-never-created
+      query: {zzzqqq: "1"}
+      auth: basic
+
+  - id: es-forcemerge-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_forcemerge
+      query: {zzzqqq: "1"}
+      auth: basic

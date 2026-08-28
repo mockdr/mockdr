@@ -202,6 +202,40 @@ Security headers are deliberately not compared: mockdr sets
 mockdr being stricter than the thing it mocks — not a defect to be fixed by
 removing the header.
 
+## Measuring against a live product
+
+Ad-hoc measurement against the real containers is how most of this repo's
+findings were found, and it is not free of consequence: these are real
+products with real state.
+
+**Before sending any request that could write, establish that the refusal you
+are measuring precedes the action.** For an unknown query parameter,
+Elasticsearch and Kibana and splunkd all refuse before doing anything —
+provable in one request:
+
+```bash
+curl -u … -XDELETE "$ES/an-index/_doc/an-id?zzzqqq=1"   # 400, unrecognized parameter
+curl -u … "$ES/an-index/_doc/an-id"                     # 200, the document is still there
+```
+
+That check is cheap and it is not optional. Skipping it once emptied
+splunkd's user database: `DELETE /services/authorization/roles/admin` is not
+a refusal to measure, it is a deletion to perform, and afterwards every
+request to that container answered `No users exist. Please set up a user.`
+Recovery is a `user-seed.conf` in `/opt/splunk/etc/system/local` and a
+restart, and everything the container had learned since it was built is gone.
+
+Rules that follow from it:
+
+- Aim destructive probing at a throwaway object you create and drop yourself,
+  never at the seeded index, the admin user, or anything the harness needs.
+  `scripts/es_param_audit.py` makes and drops `mockdr-param-probe` for this.
+- Order a sweep so anything destructive runs last. A sweep that deletes the
+  index it is iterating over reports every later route as missing — which
+  reads as a mock defect and is not one.
+- Clean up after a sweep that creates: a HEC token, a saved search, an index.
+- Identity and authorisation endpoints are not probing surface at all.
+
 ## Findings, ranked
 
 `status` and `value` first, because they are what a client branches on.

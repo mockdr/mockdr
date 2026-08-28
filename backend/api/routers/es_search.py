@@ -49,9 +49,9 @@ _SEARCH_PARAMS = (
     "batched_reduce_size", "ccs_minimize_roundtrips", "default_operator", "df",
     "docvalue_fields", "expand_wildcards", "explain", "force_synthetic_source",
     "from", "ignore_throttled", "ignore_unavailable", "include_named_queries_score",
-    "lenient", "max_concurrent_shard_requests", "min_compatible_shard_node",
-    "pre_filter_shard_size", "preference", "q", "request_cache",
-    "rest_total_hits_as_int", "routing", "scroll", "search_type",
+    "index", "lenient", "max_concurrent_shard_requests",
+    "min_compatible_shard_node", "pre_filter_shard_size", "preference", "q",
+    "request_cache", "rest_total_hits_as_int", "routing", "scroll", "search_type",
     "seq_no_primary_term", "size", "sort", "stats", "stored_fields",
     "suggest_field", "suggest_mode", "suggest_size", "suggest_text",
     "terminate_after", "timeout", "track_scores", "track_total_hits", "typed_keys",
@@ -59,20 +59,20 @@ _SEARCH_PARAMS = (
 )
 _COUNT_PARAMS = (
     "allow_no_indices", "analyze_wildcard", "analyzer", "default_operator", "df",
-    "expand_wildcards", "ignore_throttled", "ignore_unavailable", "lenient",
-    "min_score", "preference", "q", "routing", "terminate_after",
+    "expand_wildcards", "ignore_throttled", "ignore_unavailable", "index",
+    "lenient", "min_score", "preference", "q", "routing", "terminate_after",
 )
 #: The index form takes exactly the same members as the cluster-wide one.
 _CLUSTER_HEALTH_PARAMS = (
     "allow_no_indices", "expand_wildcards", "ignore_throttled",
-    "ignore_unavailable", "level", "local", "master_timeout", "timeout",
+    "ignore_unavailable", "index", "level", "local", "master_timeout", "timeout",
     "wait_for_active_shards", "wait_for_events", "wait_for_no_initializing_shards",
     "wait_for_no_relocating_shards", "wait_for_nodes", "wait_for_status",
 )
 _CAT_INDICES_PARAMS = (
     "allow_no_indices", "bytes", "expand_wildcards", "h", "health", "help",
-    "ignore_throttled", "ignore_unavailable", "include_unloaded_segments", "local",
-    "master_timeout", "pri", "s", "size", "time", "ts", "v",
+    "ignore_throttled", "ignore_unavailable", "include_unloaded_segments", "index",
+    "local", "master_timeout", "pri", "s", "size", "time", "ts", "v",
 )
 _CAT_HEALTH_PARAMS = (
     "bytes", "h", "help", "pri", "s", "size", "time", "ts", "v",
@@ -81,46 +81,155 @@ _SCROLL_PARAMS = ("rest_total_hits_as_int", "scroll", "scroll_id")
 #: `/_alias/{alias}` and `/{index}/_alias` take the same members.
 _ALIAS_PARAMS = (
     "allow_no_indices", "expand_wildcards", "ignore_throttled",
-    "ignore_unavailable", "local",
+    "ignore_unavailable", "index", "local", "name",
 )
 _RESOLVE_PARAMS = (
-    "allow_no_indices", "expand_wildcards", "ignore_throttled", "ignore_unavailable",
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "name",
 )
 _INDEX_PARAMS = (
     "allow_no_indices", "expand_wildcards", "features", "flat_settings",
-    "ignore_throttled", "ignore_unavailable", "include_defaults", "local",
+    "ignore_throttled", "ignore_unavailable", "include_defaults", "index", "local",
     "master_timeout",
 )
 _FIELD_CAPS_PARAMS = (
     "allow_no_indices", "expand_wildcards", "fields", "filters", "ignore_throttled",
-    "ignore_unavailable", "include_empty_fields", "include_unmapped", "types",
+    "ignore_unavailable", "include_empty_fields", "include_unmapped", "index",
+    "types",
 )
 _MAPPING_PARAMS = (
     "allow_no_indices", "expand_wildcards", "ignore_throttled",
-    "ignore_unavailable", "local", "master_timeout",
+    "ignore_unavailable", "index", "local", "master_timeout",
 )
 _FIELD_MAPPING_PARAMS = (
     "allow_no_indices", "expand_wildcards", "fields", "ignore_throttled",
-    "ignore_unavailable", "include_defaults",
+    "ignore_unavailable", "include_defaults", "index",
 )
 _SETTINGS_PARAMS = (
     "allow_no_indices", "expand_wildcards", "flat_settings", "ignore_throttled",
-    "ignore_unavailable", "include_defaults", "local", "master_timeout",
+    "ignore_unavailable", "include_defaults", "index", "local", "master_timeout",
+    "name",
 )
 _STATS_PARAMS = (
     "allow_no_indices", "completion_fields", "expand_wildcards", "fielddata_fields",
     "fields", "forbid_closed_indices", "groups", "ignore_throttled",
     "ignore_unavailable", "include_segment_file_sizes", "include_unloaded_segments",
-    "level", "metric",
+    "index", "level", "metric",
 )
 _DOC_PARAMS = (
     "_source", "_source_excludes", "_source_includes", "fields",
-    "force_synthetic_source", "preference", "realtime", "refresh", "routing",
-    "stored_fields", "version", "version_type",
+    "force_synthetic_source", "index", "preference", "realtime", "refresh",
+    "routing", "stored_fields", "version", "version_type",
 )
 _DOC_SOURCE_PARAMS = (
-    "_source", "_source_excludes", "_source_includes", "preference", "realtime",
-    "refresh", "routing",
+    "_source", "_source_excludes", "_source_includes", "index", "preference",
+    "realtime", "refresh", "routing",
+)
+
+#: What the routes that *write* accept. Measured the same way and just as
+#: safely: a cluster refuses an unrecognised parameter before it acts, so a
+#: `DELETE` carrying one leaves the document where it was — which is what
+#: mockdr did not do, and why a client with a typo could delete data here
+#: that a real cluster would have refused to touch.
+_SEARCH_POST_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "allow_no_indices",
+    "allow_partial_search_results", "analyze_wildcard", "analyzer",
+    "batched_reduce_size", "ccs_minimize_roundtrips", "default_operator", "df",
+    "docvalue_fields", "expand_wildcards", "explain", "force_synthetic_source",
+    "from", "ignore_throttled", "ignore_unavailable", "include_named_queries_score",
+    "index", "lenient", "max_concurrent_shard_requests",
+    "min_compatible_shard_node", "pre_filter_shard_size", "preference", "q",
+    "request_cache", "rest_total_hits_as_int", "routing", "scroll", "search_type",
+    "seq_no_primary_term", "size", "sort", "stats", "stored_fields",
+    "suggest_field", "suggest_mode", "suggest_size", "suggest_text",
+    "terminate_after", "timeout", "track_scores", "track_total_hits", "typed_keys",
+    "version",
+)
+_COUNT_POST_PARAMS = (
+    "allow_no_indices", "analyze_wildcard", "analyzer", "default_operator", "df",
+    "expand_wildcards", "ignore_throttled", "ignore_unavailable", "index",
+    "lenient", "min_score", "preference", "q", "routing", "terminate_after",
+)
+_CACHE_CLEAR_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "fields", "ignore_throttled",
+    "ignore_unavailable", "index",
+)
+_FIELD_CAPS_POST_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "fields", "filters", "ignore_throttled",
+    "ignore_unavailable", "include_empty_fields", "include_unmapped", "index",
+    "types",
+)
+_FLUSH_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "force", "ignore_throttled",
+    "ignore_unavailable", "index", "wait_if_ongoing",
+)
+_FORCEMERGE_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "flush", "ignore_throttled",
+    "ignore_unavailable", "index", "max_num_segments", "only_expunge_deletes",
+    "wait_for_completion",
+)
+_PIT_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "index", "keep_alive", "max_concurrent_shard_requests",
+    "preference", "routing",
+)
+_REFRESH_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "index",
+)
+_VALIDATE_QUERY_PARAMS = (
+    "all_shards", "allow_no_indices", "expand_wildcards", "explain",
+    "ignore_throttled", "ignore_unavailable", "index", "q", "rewrite",
+)
+_UPDATE_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "if_primary_term",
+    "if_seq_no", "index", "refresh", "retry_on_conflict", "routing", "timeout",
+    "version", "version_type", "wait_for_active_shards",
+)
+_UPDATE_BY_QUERY_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "allow_no_indices",
+    "allow_partial_search_results", "analyze_wildcard", "analyzer",
+    "batched_reduce_size", "ccs_minimize_roundtrips", "conflicts",
+    "default_operator", "df", "docvalue_fields", "expand_wildcards", "explain",
+    "force_synthetic_source", "from", "ignore_throttled", "ignore_unavailable",
+    "include_named_queries_score", "index", "lenient",
+    "max_concurrent_shard_requests", "max_docs", "pipeline",
+    "pre_filter_shard_size", "preference", "q", "refresh", "request_cache",
+    "requests_per_second", "rest_total_hits_as_int", "routing", "scroll",
+    "scroll_size", "search_type", "seq_no_primary_term", "size", "slices", "sort",
+    "stats", "stored_fields", "suggest_field", "suggest_mode", "suggest_size",
+    "suggest_text", "terminate_after", "timeout", "track_scores",
+    "track_total_hits", "version", "wait_for_active_shards", "wait_for_completion",
+)
+_DELETE_BY_QUERY_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "allow_no_indices",
+    "allow_partial_search_results", "analyze_wildcard", "analyzer",
+    "batched_reduce_size", "ccs_minimize_roundtrips", "conflicts",
+    "default_operator", "df", "docvalue_fields", "expand_wildcards", "explain",
+    "force_synthetic_source", "from", "ignore_throttled", "ignore_unavailable",
+    "include_named_queries_score", "index", "lenient",
+    "max_concurrent_shard_requests", "max_docs", "pre_filter_shard_size",
+    "preference", "q", "refresh", "request_cache", "requests_per_second",
+    "rest_total_hits_as_int", "routing", "scroll", "scroll_size", "search_type",
+    "seq_no_primary_term", "size", "slices", "sort", "stats", "stored_fields",
+    "suggest_field", "suggest_mode", "suggest_size", "suggest_text",
+    "terminate_after", "timeout", "track_scores", "track_total_hits", "version",
+    "wait_for_active_shards", "wait_for_completion",
+)
+_PUT_INDEX_PARAMS = (
+    "index", "master_timeout", "timeout", "wait_for_active_shards",
+)
+_ALIAS_WRITE_PARAMS = (
+    "index", "master_timeout", "name", "timeout",
+)
+_SCROLL_DELETE_PARAMS = ("scroll_id",)
+_DOC_DELETE_PARAMS = (
+    "if_primary_term", "if_seq_no", "index", "refresh", "routing", "timeout",
+    "version", "version_type", "wait_for_active_shards",
+)
+_DELETE_INDEX_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "index", "master_timeout", "timeout",
 )
 
 
@@ -375,7 +484,11 @@ def authenticate(
     operation_id="es_search_all_get",
     dependencies=[es_refuses_unknown(*_SEARCH_PARAMS)],
 )
-@router.post("/_search", operation_id="es_search_all_post")
+@router.post(
+    "/_search",
+    operation_id="es_search_all_post",
+    dependencies=[es_refuses_unknown(*_SEARCH_POST_PARAMS)],
+)
 def es_search_all(
     request: Request,
     body: dict = Body(default={}),
@@ -518,7 +631,11 @@ def _checked_count_body(body: dict) -> dict:
     operation_id="es_count_all_get",
     dependencies=[es_refuses_unknown(*_COUNT_PARAMS)],
 )
-@router.post("/_count", operation_id="es_count_all_post")
+@router.post(
+    "/_count",
+    operation_id="es_count_all_post",
+    dependencies=[es_refuses_unknown(*_COUNT_POST_PARAMS)],
+)
 def es_count_all(
     request: Request,
     body: dict = Body(default={}),
@@ -716,7 +833,11 @@ def _bulk_parse_error(line: str, exc: json.JSONDecodeError, line_no: int) -> dic
     operation_id="es_search_get",
     dependencies=[es_refuses_unknown(*_SEARCH_PARAMS)],
 )
-@router.post("/{index:esindex}/_search", operation_id="es_search_post")
+@router.post(
+    "/{index:esindex}/_search",
+    operation_id="es_search_post",
+    dependencies=[es_refuses_unknown(*_SEARCH_POST_PARAMS)],
+)
 def es_search(
     index: str,
     request: Request,
@@ -741,7 +862,11 @@ def es_search(
     return page
 
 
-@router.post("/{index:esindex}/_pit", operation_id="es_open_pit")
+@router.post(
+    "/{index:esindex}/_pit",
+    operation_id="es_open_pit",
+    dependencies=[es_refuses_unknown(*_PIT_PARAMS)],
+)
 def open_pit(
     index: str,
     _keep_alive: str | None = Query(default=None, alias="keep_alive"),
@@ -759,7 +884,11 @@ def close_pit(body: dict = Body(...), _: dict = Depends(require_es_auth)) -> dic
     return search_queries.close_context(str(body.get("id", "")))
 
 
-@router.post("/_search/scroll", operation_id="es_scroll")
+@router.post(
+    "/_search/scroll",
+    operation_id="es_scroll",
+    dependencies=[es_refuses_unknown(*_SCROLL_PARAMS)],
+)
 @router.get(
     "/_search/scroll",
     operation_id="es_scroll_get",
@@ -807,7 +936,11 @@ def scroll_search(
         }, "status": 404}) from exc
 
 
-@router.delete("/_search/scroll", operation_id="es_clear_scroll")
+@router.delete(
+    "/_search/scroll",
+    operation_id="es_clear_scroll",
+    dependencies=[es_refuses_unknown(*_SCROLL_DELETE_PARAMS)],
+)
 def clear_scroll(body: dict = Body(default={}), _: dict = Depends(require_es_auth)) -> dict:
     """Free a scroll the client is done with."""
     return search_queries.close_context(str(body.get("scroll_id", "")))
@@ -818,7 +951,11 @@ def clear_scroll(body: dict = Body(default={}), _: dict = Depends(require_es_aut
     operation_id="es_count_get",
     dependencies=[es_refuses_unknown(*_COUNT_PARAMS)],
 )
-@router.post("/{index:esindex}/_count", operation_id="es_count_post")
+@router.post(
+    "/{index:esindex}/_count",
+    operation_id="es_count_post",
+    dependencies=[es_refuses_unknown(*_COUNT_POST_PARAMS)],
+)
 def es_count(
     index: str,
     request: Request,
@@ -916,7 +1053,11 @@ def put_mapping(
     operation_id="es_field_caps_get",
     dependencies=[es_refuses_unknown(*_FIELD_CAPS_PARAMS)],
 )
-@router.post("/{index:esindex}/_field_caps", operation_id="es_field_caps_post")
+@router.post(
+    "/{index:esindex}/_field_caps",
+    operation_id="es_field_caps_post",
+    dependencies=[es_refuses_unknown(*_FIELD_CAPS_POST_PARAMS)],
+)
 def field_caps(
     index: str,
     fields: str | None = Query(default=None),
@@ -936,7 +1077,11 @@ def field_caps(
         raise _missing_index(exc) from exc
 
 
-@router.post("/{index:esindex}/_update/{doc_id}", operation_id="es_update_doc")
+@router.post(
+    "/{index:esindex}/_update/{doc_id}",
+    operation_id="es_update_doc",
+    dependencies=[es_refuses_unknown(*_UPDATE_PARAMS, source=False)],
+)
 def update_doc(
     index: str,
     doc_id: str,
@@ -965,7 +1110,11 @@ def update_doc(
     return JSONResponse(status_code=201 if created else 200, content=result)
 
 
-@router.post("/{index:esindex}/_update_by_query", operation_id="es_update_by_query")
+@router.post(
+    "/{index:esindex}/_update_by_query",
+    operation_id="es_update_by_query",
+    dependencies=[es_refuses_unknown(*_UPDATE_BY_QUERY_PARAMS)],
+)
 def update_by_query(
     index: str,
     request: Request,
@@ -985,7 +1134,11 @@ def update_by_query(
         )) from exc
 
 
-@router.post("/{index:esindex}/_delete_by_query", operation_id="es_delete_by_query")
+@router.post(
+    "/{index:esindex}/_delete_by_query",
+    operation_id="es_delete_by_query",
+    dependencies=[es_refuses_unknown(*_DELETE_BY_QUERY_PARAMS)],
+)
 def delete_by_query(
     index: str,
     request: Request,
@@ -1035,10 +1188,26 @@ def get_source(
 _SHARD_ACK = {"_shards": {"total": 2, "successful": 1, "failed": 0}}
 
 
-@router.post("/{index:esindex}/_refresh", operation_id="es_refresh")
-@router.post("/{index:esindex}/_flush", operation_id="es_flush")
-@router.post("/{index:esindex}/_forcemerge", operation_id="es_forcemerge")
-@router.post("/{index:esindex}/_cache/clear", operation_id="es_cache_clear")
+@router.post(
+    "/{index:esindex}/_refresh",
+    operation_id="es_refresh",
+    dependencies=[es_refuses_unknown(*_REFRESH_PARAMS, source=False)],
+)
+@router.post(
+    "/{index:esindex}/_flush",
+    operation_id="es_flush",
+    dependencies=[es_refuses_unknown(*_FLUSH_PARAMS, source=False)],
+)
+@router.post(
+    "/{index:esindex}/_forcemerge",
+    operation_id="es_forcemerge",
+    dependencies=[es_refuses_unknown(*_FORCEMERGE_PARAMS, source=False)],
+)
+@router.post(
+    "/{index:esindex}/_cache/clear",
+    operation_id="es_cache_clear",
+    dependencies=[es_refuses_unknown(*_CACHE_CLEAR_PARAMS, source=False)],
+)
 def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
     """Answer the maintenance calls that follow a write."""
     try:
@@ -1121,7 +1290,11 @@ def put_settings(
         raise _missing_index(exc) from exc
 
 
-@router.put("/{index:esindex}/_alias/{alias}", operation_id="es_put_alias")
+@router.put(
+    "/{index:esindex}/_alias/{alias}",
+    operation_id="es_put_alias",
+    dependencies=[es_refuses_unknown(*_ALIAS_WRITE_PARAMS, source=False)],
+)
 def put_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> dict:
     """Point an alias at an index."""
     try:
@@ -1130,7 +1303,11 @@ def put_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> di
         raise _missing_index(exc) from exc
 
 
-@router.delete("/{index:esindex}/_alias/{alias}", operation_id="es_delete_alias")
+@router.delete(
+    "/{index:esindex}/_alias/{alias}",
+    operation_id="es_delete_alias",
+    dependencies=[es_refuses_unknown(*_ALIAS_WRITE_PARAMS, source=False)],
+)
 def delete_alias(index: str, alias: str, _: dict = Depends(require_es_write)) -> dict:
     """Take an alias off an index."""
     try:
@@ -1224,7 +1401,11 @@ def analyze(
         )) from exc
 
 
-@router.post("/{index:esindex}/_validate/query", operation_id="es_validate_query")
+@router.post(
+    "/{index:esindex}/_validate/query",
+    operation_id="es_validate_query",
+    dependencies=[es_refuses_unknown(*_VALIDATE_QUERY_PARAMS)],
+)
 def validate_query(
     index: str,
     body: dict = Body(default={}),
@@ -1343,7 +1524,11 @@ def _forced_refresh(refresh: str | None) -> bool:
         )) from exc
 
 
-@router.put("/{index:esindex}", operation_id="es_create_index")
+@router.put(
+    "/{index:esindex}",
+    operation_id="es_create_index",
+    dependencies=[es_refuses_unknown(*_PUT_INDEX_PARAMS, source=False)],
+)
 def create_index(
     index: str,
     body: dict | None = Body(default=None),
@@ -1397,7 +1582,11 @@ async def get_index(request: Request, index: str) -> Response:
     return JSONResponse(content=described)
 
 
-@router.delete("/{index:esindex}", operation_id="es_delete_index")
+@router.delete(
+    "/{index:esindex}",
+    operation_id="es_delete_index",
+    dependencies=[es_refuses_unknown(*_DELETE_INDEX_PARAMS, source=False)],
+)
 def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
     """Delete an index and everything written to it."""
     if index.startswith("_"):
@@ -1410,7 +1599,10 @@ def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
     return result
 
 
-@router.delete("/{index:esindex}/_doc/{doc_id}")
+@router.delete(
+    "/{index:esindex}/_doc/{doc_id}",
+    dependencies=[es_refuses_unknown(*_DOC_DELETE_PARAMS, source=False)],
+)
 def delete_doc(
     index: str,
     doc_id: str,

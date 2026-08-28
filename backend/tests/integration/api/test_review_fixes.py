@@ -605,6 +605,35 @@ class TestAnUnknownClusterParameterIsRefused:
         )
         assert beside.status_code == 200
 
+    def test_a_write_is_refused_before_it_acts(self, client: TestClient) -> None:
+        """The sharpest shape of it: mockdr deleted on a request the cluster
+        refuses, so a client with a typo lost data here that production keeps."""
+        index = "mockdr-refusal-probe"
+        client.put(f"/elastic/{index}", headers=self.ES, json={})
+        client.put(f"/elastic/{index}/_doc/a", headers=self.ES,
+                   json={"host": "probe"}, params={"refresh": "true"})
+
+        refused = client.request(
+            "DELETE", f"/elastic/{index}/_doc/a", headers=self.ES,
+            params={"zzzqqq": "1"},
+        )
+
+        assert refused.status_code == 400
+        assert "unrecognized parameter" in refused.json()["error"]["reason"]
+        # And the document is still there, which is the half that matters.
+        assert client.get(f"/elastic/{index}/_doc/a", headers=self.ES).status_code == 200
+        client.request("DELETE", f"/elastic/{index}", headers=self.ES)
+
+    def test_the_index_survives_a_refused_delete(self, client: TestClient) -> None:
+        index = "mockdr-refusal-probe-2"
+        client.put(f"/elastic/{index}", headers=self.ES, json={})
+
+        assert client.request(
+            "DELETE", f"/elastic/{index}", headers=self.ES, params={"zzzqqq": "1"},
+        ).status_code == 400
+        assert client.get(f"/elastic/{index}", headers=self.ES).status_code == 200
+        client.request("DELETE", f"/elastic/{index}", headers=self.ES)
+
     def test_the_cat_pattern_is_a_path_segment_not_a_parameter(
         self, client: TestClient,
     ) -> None:
