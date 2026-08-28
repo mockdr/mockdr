@@ -126,6 +126,34 @@ def _extract_values(value_portion: str, operator: str) -> list[str]:
     return [_unquote(value_portion)]
 
 
+def _ungrouped(raw: str) -> str:
+    """A term with its enclosing parentheses removed.
+
+    Falcon groups FQL terms with parentheses — its own documentation and its
+    console write `(device_id:['…'])`, and a host-group action carries that
+    form verbatim. Neither the splitter nor this parser knew the character:
+    a lone group was refused as an invalid expression, and a group beside
+    another term was dropped in silence, so
+    `(status:'normal')+platform_name:'Windows'` answered every Windows host
+    rather than the normal ones — a wider set than the caller asked for,
+    with a 200.
+    """
+    text = raw.strip()
+    while text.startswith("(") and text.endswith(")"):
+        depth = 0
+        for index, ch in enumerate(text):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                # The opening bracket closes before the end: the parentheses
+                # are not enclosing the whole term (`(a),(b)`).
+                if depth == 0 and index != len(text) - 1:
+                    return text
+        text = text[1:-1].strip()
+    return text
+
+
 def _parse_term(raw: str) -> FqlClause | None:
     """Parse a single FQL term string into an ``FqlClause``.
 
@@ -135,7 +163,7 @@ def _parse_term(raw: str) -> FqlClause | None:
     Returns:
         Parsed clause, or ``None`` if the term is unparseable.
     """
-    m = _TERM_RE.match(raw.strip())
+    m = _TERM_RE.match(_ungrouped(raw))
     if not m:
         return None
     fld = m.group(1)
@@ -164,10 +192,10 @@ def _parse_term(raw: str) -> FqlClause | None:
 # ---------------------------------------------------------------------------
 
 def _smart_split(text: str, delimiter: str) -> list[str]:
-    """Split *text* on *delimiter*, respecting single-quotes and brackets.
+    """Split *text* on *delimiter*, respecting quotes, brackets and groups.
 
-    Delimiters inside ``'...'`` or ``[...]`` are treated as literal
-    characters and do not trigger a split.
+    Delimiters inside ``'...'``, ``[...]`` or ``(...)`` are treated as
+    literal characters and do not trigger a split.
 
     Args:
         text:      The string to split.
@@ -180,6 +208,7 @@ def _smart_split(text: str, delimiter: str) -> list[str]:
     current: list[str] = []
     in_quote = False
     in_bracket = False
+    depth = 0
 
     for ch in text:
         if ch == "'" and not in_bracket:
@@ -191,7 +220,13 @@ def _smart_split(text: str, delimiter: str) -> list[str]:
         elif ch == "]" and not in_quote:
             in_bracket = False
             current.append(ch)
-        elif ch == delimiter and not in_quote and not in_bracket:
+        elif ch == "(" and not in_quote and not in_bracket:
+            depth += 1
+            current.append(ch)
+        elif ch == ")" and not in_quote and not in_bracket:
+            depth = max(0, depth - 1)
+            current.append(ch)
+        elif ch == delimiter and not in_quote and not in_bracket and depth == 0:
             parts.append("".join(current))
             current = []
         else:

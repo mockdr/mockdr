@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_host_groups import commands as group_commands
 from application.cs_host_groups import queries as group_queries
+from utils.cs_fql import FqlError, parse_fql
 from utils.cs_response import build_cs_error_response, require_list
 
 router = APIRouter(tags=["CrowdStrike Host Groups"])
@@ -138,13 +139,20 @@ def group_action(
     params = require_list(body, "action_parameters")
     host_ids: list[str] = []
     for p in params:
-        if p.get("name") == "filter":
-            raw_filter: str = p.get("value", "")
-            # Parse "device_id:['id1','id2']" style filter values.
-            if "device_id:" in raw_filter:
-                inner = raw_filter.split("device_id:", 1)[1]
-                inner = inner.strip("[] '\"")
-                host_ids = [h.strip().strip("'\"") for h in inner.split(",") if h.strip()]
+        if p.get("name") != "filter":
+            continue
+        # The filter is FQL, and this cut it apart by hand: Falcon's own
+        # form — `(device_id:['id'])`, parentheses and all — came out as the
+        # id with `'])` still attached, so it matched no host and the action
+        # answered 200 having done nothing. The mount's own FQL parser reads
+        # it now.
+        try:
+            clauses = parse_fql(str(p.get("value", "")))
+        except FqlError:
+            continue
+        for clause in clauses:
+            if clause.field == "device_id":
+                host_ids.extend(str(v) for v in clause.values)
 
     results: list[dict] = []
     for gid in group_ids:

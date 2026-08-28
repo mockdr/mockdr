@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A filter Falcon writes with parentheses, which narrowed nothing.**
+FQL groups terms with parentheses — Falcon's own documentation and its
+console write `(device_id:['…'])`, and a host-group action carries that form
+verbatim. The action route cut the filter apart by hand and came out with
+the id and `'])` still attached, so it matched no host: `add-hosts` answered
+`200` with an empty `resources` list, the host never joined the group, and
+the device's own `groups` stayed empty. The mount's FQL parser did not know
+the character either — a lone group was refused as invalid, and a group
+beside another term was dropped in silence, so
+`(status:'normal')+platform_name:'Windows'` answered every Windows host
+rather than the normal ones. Thirty-five where thirty-three were asked for,
+with a 200, on every CrowdStrike route that filters.
+
 **Running a script and collecting its result, which never worked.**
 Five more Cortex routes were recorded "skipped: HTTP 500" by the audit and
 so were never compared. `run_script` read `endpoint_id_list` where Cortex

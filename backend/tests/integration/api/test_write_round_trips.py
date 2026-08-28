@@ -4250,3 +4250,99 @@ class TestFalconAssignsWorkToItsOwnUsers:
             assert case["assigner"]["email_address"] in addresses
             # gofalcon's case entity carries `assigner` and no `assignee`.
             assert "assignee" not in case
+
+
+class TestFalconGroupsAndTheFilterThatNamesThem:
+    """FQL groups terms with parentheses, and Falcon's own form used them.
+
+    `(device_id:['…'])` — what Falcon's documentation and its console write,
+    and what a host-group action carries — was cut apart by hand into an id
+    with `'])` still attached. It matched no host, so `add-hosts` answered
+    `200` with an empty `resources` list and the host was not in the group.
+    The mount's FQL parser did not know parentheses either: a lone group was
+    refused, and a group beside another term was dropped in silence, so
+    `(status:'normal')+platform_name:'Windows'` answered every Windows host
+    instead of the normal ones — a wider set than the caller asked for.
+    """
+
+    @staticmethod
+    def _auth(client: TestClient) -> dict:
+        token = client.post("/cs/oauth2/token", data={
+            "client_id": "cs-mock-admin-client", "client_secret": "cs-mock-admin-secret",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    def _members(self, client: TestClient, cs: dict, group: str) -> list[str]:
+        return list(client.get(
+            "/cs/devices/queries/host-group-members/v1", headers=cs, params={"id": group},
+        ).json()["resources"])
+
+    def test_a_host_joins_the_group_the_filter_names(self, client: TestClient) -> None:
+        cs = self._auth(client)
+        device = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs, params={"limit": 1},
+        ).json()["resources"][0]
+        group = client.get(
+            "/cs/devices/combined/host-groups/v1", headers=cs, params={"limit": 1},
+        ).json()["resources"][0]["id"]
+
+        answer = client.post(
+            "/cs/devices/entities/host-group-actions/v1", headers=cs,
+            params={"action_name": "add-hosts"},
+            json={"ids": [group], "action_parameters": [
+                {"name": "filter", "value": f"(device_id:['{device}'])"},
+            ]},
+        )
+        assert answer.status_code == 200
+        assert answer.json()["resources"] == [{"id": device}]
+        assert device in self._members(client, cs, group)
+
+        # And the device says so, which is where a client looks.
+        entity = client.post(
+            "/cs/devices/entities/devices/v2", headers=cs, json={"ids": [device]},
+        ).json()["resources"][0]
+        assert group in entity["groups"]
+
+    def test_removing_takes_the_same_form(self, client: TestClient) -> None:
+        cs = self._auth(client)
+        device = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs, params={"limit": 1},
+        ).json()["resources"][0]
+        group = client.get(
+            "/cs/devices/combined/host-groups/v1", headers=cs, params={"limit": 1},
+        ).json()["resources"][0]["id"]
+        filters = [{"name": "filter", "value": f"(device_id:['{device}'])"}]
+        client.post("/cs/devices/entities/host-group-actions/v1", headers=cs,
+                    params={"action_name": "add-hosts"},
+                    json={"ids": [group], "action_parameters": filters})
+        client.post("/cs/devices/entities/host-group-actions/v1", headers=cs,
+                    params={"action_name": "remove-hosts"},
+                    json={"ids": [group], "action_parameters": filters})
+        assert device not in self._members(client, cs, group)
+
+    def test_a_grouped_term_still_narrows_the_query(self, client: TestClient) -> None:
+        cs = self._auth(client)
+
+        def total(fql: str) -> int:
+            return int(client.get(
+                "/cs/devices/queries/devices/v1", headers=cs,
+                params={"limit": 200, "filter": fql},
+            ).json()["meta"]["pagination"]["total"])
+
+        bare = total("status:'normal'+platform_name:'Windows'")
+        grouped = total("(status:'normal')+platform_name:'Windows'")
+        assert grouped == bare
+        assert grouped < total("platform_name:'Windows'")
+
+    def test_a_group_on_its_own_is_read_not_refused(self, client: TestClient) -> None:
+        cs = self._auth(client)
+        answer = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs,
+            params={"limit": 200, "filter": "(platform_name:'Windows')"},
+        )
+        assert answer.status_code == 200
+        plain = client.get(
+            "/cs/devices/queries/devices/v1", headers=cs,
+            params={"limit": 200, "filter": "platform_name:'Windows'"},
+        ).json()["meta"]["pagination"]["total"]
+        assert answer.json()["meta"]["pagination"]["total"] == plain
