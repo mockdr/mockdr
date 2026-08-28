@@ -743,6 +743,16 @@ PLATFORMS = {
             "POST /api/alerts/{id}": "alerts",
         },
         "requests": {
+            # The route requires these four; the audit's empty default body
+            # was refused and the route recorded as skipped.
+            "POST /api/indicators": {
+                "json": {
+                    "indicatorValue": "drift.example.test",
+                    "indicatorType": "DomainName",
+                    "action": "Alert",
+                    "title": "drift probe",
+                },
+            },
             "POST /api/machines/{id}/isolate": {
                 "json": {"Comment": "drift", "IsolationType": "Full"}
             },

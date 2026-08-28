@@ -161,7 +161,7 @@ class TestSoftware:
         software_list = list_resp.json()["value"]
         if not software_list:
             return
-        sw_id = software_list[0]["softwareId"]
+        sw_id = software_list[0]["id"]
         resp = client.get(f"/mde/api/software/{sw_id}", headers=headers)
         assert resp.status_code == 200
 
@@ -171,7 +171,7 @@ class TestSoftware:
         software_list = list_resp.json()["value"]
         if not software_list:
             return
-        sw_id = software_list[0]["softwareId"]
+        sw_id = software_list[0]["id"]
         resp = client.get(f"/mde/api/software/{sw_id}/machineReferences", headers=headers)
         assert resp.status_code == 200
         body = resp.json()
@@ -206,7 +206,7 @@ class TestVulnerabilities:
         vulns = list_resp.json()["value"]
         if not vulns:
             return
-        vuln_id = vulns[0]["vulnerabilityId"]
+        vuln_id = vulns[0]["id"]
         resp = client.get(f"/mde/api/vulnerabilities/{vuln_id}", headers=headers)
         assert resp.status_code == 200
 
@@ -216,7 +216,7 @@ class TestVulnerabilities:
         vulns = list_resp.json()["value"]
         if not vulns:
             return
-        vuln_id = vulns[0]["vulnerabilityId"]
+        vuln_id = vulns[0]["id"]
         resp = client.get(
             f"/mde/api/vulnerabilities/{vuln_id}/machineReferences",
             headers=headers,

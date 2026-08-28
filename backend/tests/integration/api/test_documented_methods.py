@@ -14,6 +14,7 @@ missing member does, and what the answer looks like.
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 BASE = "/web/api/v2.1"
@@ -662,3 +663,67 @@ class TestAProcessIsWhatFalconDeclares:
             for d in devices
         }
         assert len(starts) == len(devices)
+
+
+class TestDefenderCollectionsCanBeAddressed:
+    """A listing that gives no id is a collection nothing can be read from.
+
+    `mde_software` and `mde_vulnerabilities` are keyed `softwareId` and
+    `vulnerabilityId` in the store and `id` on the wire, and the rename never
+    happened: all 44 software entries and all 15 vulnerabilities answered
+    `id: ""`. `GET /api/software/{id}` was unreachable for a client that had
+    just listed them, which is the only way it learns an id — and the drift
+    audit could not compare those four routes for the same reason.
+    """
+
+    @staticmethod
+    def _auth(client: TestClient) -> dict:
+        token = client.post("/mde/oauth2/v2.0/token", data={
+            "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "grant_type": "client_credentials",
+            "scope": "https://api.securitycenter.microsoft.com/.default",
+        }).json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    @pytest.mark.parametrize("collection", ["software", "vulnerabilities"])
+    def test_every_entry_can_be_read_by_the_id_it_reports(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        headers = self._auth(client)
+        listing = client.get(f"/mde/api/{collection}", headers=headers).json()["value"]
+        assert listing
+        assert all(entry["id"] for entry in listing)
+
+        first = listing[0]["id"]
+        assert client.get(
+            f"/mde/api/{collection}/{first}", headers=headers,
+        ).status_code == 200
+        references = client.get(
+            f"/mde/api/{collection}/{first}/machineReferences", headers=headers,
+        )
+        assert references.status_code == 200
+        assert references.json()["value"]
+
+    @pytest.mark.parametrize("collection", ["software", "vulnerabilities"])
+    def test_the_stored_key_is_not_answered_beside_it(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        entry = client.get(
+            f"/mde/api/{collection}", headers=self._auth(client),
+        ).json()["value"][0]
+        assert "softwareId" not in entry
+        assert "vulnerabilityId" not in entry
+
+    def test_a_created_indicator_has_the_shape_a_listed_one_has(
+        self, client: TestClient,
+    ) -> None:
+        """The create answer used to carry four members fewer than the very
+        same record does when it is listed."""
+        headers = self._auth(client)
+        created = client.post("/mde/api/indicators", headers=headers, json={
+            "indicatorValue": "shape.example.test", "indicatorType": "DomainName",
+            "action": "Alert", "title": "shape probe",
+        }).json()
+        listed = client.get("/mde/api/indicators", headers=headers).json()["value"][0]
+        assert set(created) == set(listed)

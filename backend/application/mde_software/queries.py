@@ -6,6 +6,7 @@ from repository.mde_software_repo import mde_software_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
+from utils.mde_serde import to_mde_resource
 from utils.serde import record_dict
 
 
@@ -37,9 +38,16 @@ def _machine_refs_for(software_id: str) -> list[dict]:
 
 
 def _with_exposed_count(record: dict) -> dict:
-    """Overwrite ``exposedMachines`` with the real membership count."""
+    """Overwrite ``exposedMachines`` with the real membership count.
+
+    The record is keyed `softwareId` in the store and `id` on the wire, and the
+    rename never happened: every entry of this collection answered `id: ""`,
+    so nothing in it could be addressed. `GET /api/software/{id}` was
+    unreachable for a client that had just listed them, which is the only
+    way it learns an id.
+    """
     record["exposedMachines"] = len(_machine_refs_for(record.get("softwareId", "")))
-    return complete_mde(record, "software")
+    return complete_mde(to_mde_resource(record, "softwareId"), "software")
 
 
 def list_software(

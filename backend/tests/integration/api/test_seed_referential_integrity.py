@@ -87,7 +87,7 @@ class TestExposureCountsMatchMembership:
         headers = _mde_auth(client)
         for software in client.get("/mde/api/software", headers=headers).json()["value"]:
             refs = client.get(
-                f"/mde/api/software/{software['softwareId']}/machineReferences",
+                f"/mde/api/software/{software['id']}/machineReferences",
                 headers=headers,
             ).json()["value"]
             assert software["exposedMachines"] == len(refs), software["name"]
@@ -97,7 +97,7 @@ class TestExposureCountsMatchMembership:
         vulns = client.get("/mde/api/vulnerabilities", headers=headers).json()["value"]
         for vuln in vulns:
             refs = client.get(
-                f"/mde/api/vulnerabilities/{vuln['vulnerabilityId']}/machineReferences",
+                f"/mde/api/vulnerabilities/{vuln['id']}/machineReferences",
                 headers=headers,
             ).json()["value"]
             assert vuln["exposedMachines"] == len(refs), vuln["name"]

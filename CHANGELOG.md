@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Two Defender collections nothing could be read from.**
+`mde_software` and `mde_vulnerabilities` are keyed `softwareId` and
+`vulnerabilityId` in the store and `id` on the wire, and the rename never
+happened: all forty-four software entries and all fifteen vulnerabilities
+answered `id: ""`. Listing them is how a client learns an id, so
+`GET /api/software/{id}` and its `machineReferences` were unreachable —
+which is also why the drift audit had recorded those four routes as
+"Software x not found" and compared nothing.
+
+**A created indicator had a different shape from a listed one.**
+`POST /api/indicators` answered four members fewer than the very same record
+carries when it is listed — `application`, `externalID`, `rbacGroupIds`,
+`sourceType` — so a client reading the create answer saw one shape and got
+another a moment later. Defender is compared over 42 routes now, up from 37,
+with the two remaining skips honest ones: a `204` has no body to compare, and
+an advanced-hunting result's columns are the query's rather than the API's.
+
 **A process for a device the tenant does not have, with five fields Falcon has not.**
 `ProcessesapiProcessDetail` declares ten members; mockdr answered five more
 beside them — `sha256`, `md5`, `user_name`, `user_sid`, `parent_process_id` —
