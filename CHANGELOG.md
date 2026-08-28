@@ -249,6 +249,15 @@ into it.
 
 ### Added
 
+**An audit for two spellings of one filter.**
+`param_effect.py` asks whether a filter narrows and `filter_effect.py` asks
+it of the filters that travel in a body. Both are satisfied by a filter that
+narrows *wrongly*, which is exactly what the parenthesised FQL above did — it
+narrowed, just not to the right set. `scripts/filter_spellings.py` runs each
+filter twice, in the plain spelling and in the one the vendor's own console
+writes, and compares the records that come back. Run against yesterday's
+code it reports four differing pairs; against today's, none.
+
 **A sweep for records that name records this install does not have.**
 The audits that read answers check one answer at a time, and this defect
 needs two. `scripts/dangling_references.py` reads the seeded store instead:
