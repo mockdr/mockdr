@@ -57,21 +57,39 @@ def detection_privileges(
     return {
         "username": username,
         "has_all_requested": can_write,
+        # Kibana 8.15 answers twelve cluster privileges and thirteen per
+        # index — measured. mockdr answered six of each, so a client reading
+        # `cluster.manage_pipeline` or `index[…].view_index_metadata` — which
+        # the Security Solution does, to decide what to offer — got
+        # `undefined` where a boolean belongs.
         "cluster": {
-            "monitor_ml": True,
-            "manage_index_templates": can_write,
-            "manage_api_key": can_write,
-            "monitor": True,
-            "manage": can_write,
             "all": can_write,
+            "manage": can_write,
+            "manage_api_key": can_write,
+            "manage_index_templates": can_write,
+            "manage_ml": can_write,
+            "manage_own_api_key": can_write,
+            "manage_pipeline": can_write,
+            "manage_security": can_write,
+            "manage_transform": can_write,
+            "monitor": True,
+            "monitor_ml": True,
+            "monitor_transform": True,
         },
         "index": {
             ".alerts-security.alerts-default": {
                 "all": can_write,
-                "maintenance": can_write,
-                "read": True,
+                "create": can_write,
+                "create_doc": can_write,
                 "create_index": can_write,
+                "delete": can_write,
+                "delete_index": can_write,
                 "index": can_write,
+                "maintenance": can_write,
+                "manage": can_write,
+                "monitor": True,
+                "read": True,
+                "view_index_metadata": True,
                 "write": can_write,
             },
         },

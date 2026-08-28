@@ -26,7 +26,7 @@ from application.splunk.queries.kvstore import (
     get_records,
     list_collections,
 )
-from utils.splunk.response import build_splunk_entry, build_splunk_envelope
+from utils.splunk.response import build_splunk_entry, build_splunk_envelope, build_splunk_error
 
 _register_convertors()
 
@@ -35,12 +35,44 @@ router = APIRouter(tags=["Splunk KV Store"])
 
 # ── Collection config ──────────────────────────────────────────────────────
 
+#: splunkd serves the KV Store's *configuration* only under the `nobody`
+#: user context: `/servicesNS/admin/search/storage/collections/config` and
+#: the bare `/services/...` form are both refused with this, measured on
+#: 10.4.2. The data routes beside them are not restricted that way.
+_COLLECTION_CONTEXT = (
+    "Must use user context of 'nobody' when interacting with collection "
+    "configurations (used user='{user}')"
+)
+
+
+def _require_nobody(owner: str, current_user: dict) -> None:
+    """Refuse a collection-configuration call outside the `nobody` context.
+
+    Raises:
+        HTTPException: 400, as splunkd answers it.
+    """
+    if owner == "nobody":
+        return
+    raise HTTPException(
+        status_code=400,
+        detail=build_splunk_error(
+            400, _COLLECTION_CONTEXT.format(user=owner or current_user.get("username", "")),
+        ),
+    )
+
+
 @router.get("/services/storage/collections/config")
 def list_all_kv_collections(
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
-    """List every app's KV Store collections, as the app-less namespace does."""
+    """Refuse the app-less form, as splunkd does.
+
+    The bare path resolves to the calling user's own context, and the KV
+    Store's configuration is served only under `nobody` — mockdr answered
+    every collection to anyone who asked here.
+    """
+    _require_nobody("", current_user)
     return list_collections(None)
 
 
@@ -51,7 +83,8 @@ def list_kv_collections(
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
-    """List KV Store collections."""
+    """List KV Store collections, under the one context that may."""
+    _require_nobody(owner, current_user)
     return list_collections(app)
 
 

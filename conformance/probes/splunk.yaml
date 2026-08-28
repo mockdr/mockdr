@@ -3053,3 +3053,66 @@ probes:
       content: '["not an object"]'
       headers: {Content-Type: application/json}
       auth: basic
+
+  # ── Routes the coverage map found nothing comparing (2.3.1) ───────────
+  #
+  # `scripts/audit_coverage.py` counts what watches each route rather than
+  # what it found, and reported forty routes on the mounts that have a real
+  # product beside them resting on mockdr's own tests alone. These six take
+  # no precondition and answer a document.
+
+  - id: splunk-authorization-capabilities
+    endpoint: management
+    why: >
+      Every capability splunkd knows, which a client reads to decide what to
+      offer an operator before it tries anything.
+    request:
+      method: GET
+      path: /services/authorization/capabilities
+      params: {output_mode: json}
+      auth: basic
+
+  - id: splunk-server-settings
+    endpoint: management
+    why: What the instance says about itself — ports, paths, the server name.
+    request:
+      method: GET
+      path: /services/server/settings
+      params: {output_mode: json}
+      auth: basic
+
+  - id: splunk-messages
+    endpoint: management
+    why: The banner messages splunkd raises, which a console polls.
+    request:
+      method: GET
+      path: /services/messages
+      params: {output_mode: json}
+      auth: basic
+
+  - id: splunk-kvstore-collections-config
+    endpoint: management
+    why: The KV Store collections, in the non-namespaced spelling.
+    request:
+      method: GET
+      path: /services/storage/collections/config
+      params: {output_mode: json}
+      auth: basic
+
+  - id: splunk-tcp-raw-inputs
+    endpoint: management
+    why: The raw TCP inputs, beside the HEC ones this suite already compares.
+    request:
+      method: GET
+      path: /services/data/inputs/tcp/raw
+      params: {output_mode: json}
+      auth: basic
+
+  - id: splunk-props-extractions
+    endpoint: management
+    why: The field extractions props.conf defines.
+    request:
+      method: GET
+      path: /services/data/props/extractions
+      params: {output_mode: json}
+      auth: basic

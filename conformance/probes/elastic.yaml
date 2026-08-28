@@ -3731,3 +3731,38 @@ probes:
       - $.unassigned_shards
       - $.delayed_unassigned_shards
       - $.active_shards_percent_as_number
+
+  - id: kbn-detection-engine-privileges
+    endpoint: kibana
+    why: >
+      What the caller may do with rules and signals — the first thing the
+      Security Solution asks, and it hides the whole app if the answer is
+      not shaped as it expects.
+    request: {method: GET, path: /api/detection_engine/privileges, auth: basic}
+    ignore_paths:
+      - $.username
+      - $.has_encryption_key
+      - $.index_name
+
+  - id: kbn-detection-engine-rules-tags
+    endpoint: kibana
+    why: Every tag any rule carries, as the rule filter reads it.
+    request: {method: GET, path: /api/detection_engine/rules/tags, auth: basic}
+
+  - id: kbn-fleet-agents-setup
+    endpoint: kibana
+    why: Whether Fleet is ready, which the endpoint pages ask before loading.
+    request: {method: GET, path: /api/fleet/agents/setup, auth: basic}
+
+  - id: kbn-task-manager-health
+    endpoint: kibana
+    why: >
+      The task manager's own health, which the rule pages read to say
+      whether detections are actually running. Only the envelope is
+      compared: everything under `stats` is this run's own measurements —
+      percentiles that are an `int` when they land on zero and a `float`
+      when they do not — and comparing those compares two clocks.
+    request: {method: GET, path: /api/task_manager/_health, auth: basic}
+    ignore_paths:
+      - $.timestamp
+      - $.stats

@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Three more differences, on routes that had never been compared.**
+Ten further probes went to the routes the coverage map named, and three of
+them differed from the real products:
+
+* **The KV Store's configuration is served only under the `nobody` user
+  context.** splunkd 10.4.2 refuses `/services/storage/collections/config`
+  and `/servicesNS/admin/…/storage/collections/config` alike, with
+  `Must use user context of 'nobody' …` — measured, and the data routes
+  beside them are not restricted that way. mockdr answered every collection
+  to whoever asked.
+* **Kibana's detection privileges were half a document.** 8.15 answers
+  twelve cluster privileges and thirteen per index; mockdr answered six of
+  each, so a client reading `cluster.manage_pipeline` or
+  `index[…].view_index_metadata` — which the Security Solution does, to
+  decide what to offer — found `undefined` where a boolean belongs.
+* **`/api/detection_engine/rules/tags` does not exist.** Kibana 8.15 answers
+  404 there; the route that exists is `/api/detection_engine/tags`, which
+  this mount already serves. The second spelling is gone.
+
 **Two answers the real products do not give, found by comparing routes nothing compared.**
 The coverage map named 49 routes resting on this repo's own tests while a
 real product runs beside them; nine of the cheapest — those that take no

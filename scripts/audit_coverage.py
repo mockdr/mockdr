@@ -133,10 +133,21 @@ def probed():
             named = re.match(r"\s*endpoint:\s*(\S+)", line)
             if named:
                 endpoint = named.group(1)
-            path = re.match(r"\s*path:\s*(\S+)", line)
+            # A probe may be written in flow style — `request: {method: GET,
+            # path: /api/cases/status, auth: basic}` — so `path:` is not at
+            # the start of its line and nine probes written that way counted
+            # as no coverage at all.
+            path = re.search(r"\bpath:\s*([^\s,]+)", line)
             if path:
                 mount = mounts.get(endpoint, "")
-                cleaned = re.sub(r"\$\{[^}]+\}", "{}", path.group(1).strip('"\''))
+                # Flow style ends the value with the mapping's own brace —
+                # `path: /api/cases/status, auth: basic}` — while a
+                # placeholder carries balanced ones. Strip only what is not
+                # closing a `${`.
+                raw = path.group(1).strip('"\'')
+                while raw.endswith("}") and raw.count("{") < raw.count("}"):
+                    raw = raw[:-1]
+                cleaned = re.sub(r"\$\{[^}]+\}", "{}", raw)
                 out.add(shape(mount + cleaned.split("?")[0]))
     return out
 

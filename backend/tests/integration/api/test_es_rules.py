@@ -365,31 +365,6 @@ class TestBulkAction:
         assert resp.status_code == 400
 
 
-class TestRuleTags:
-    """Tests for GET /kibana/api/detection_engine/rules/tags."""
-
-    def test_get_tags_returns_list(self, client: TestClient) -> None:
-        """Tags endpoint should return a sorted list of unique strings."""
-        resp = client.get(
-            "/kibana/api/detection_engine/rules/tags",
-            headers=ES_AUTH,
-        )
-        assert resp.status_code == 200
-        tags = resp.json()
-        assert isinstance(tags, list)
-        assert len(tags) > 0
-        # Should be sorted
-        assert tags == sorted(tags)
-
-    def test_tags_contain_known_values(self, client: TestClient) -> None:
-        """Tags should include at least 'Elastic' — present in all seeded rules."""
-        tags = client.get(
-            "/kibana/api/detection_engine/rules/tags",
-            headers=ES_AUTH,
-        ).json()
-        assert "Elastic" in tags
-
-
 class TestPrepackagedStatus:
     """Tests for GET /kibana/api/detection_engine/rules/prepackaged/_status."""
 

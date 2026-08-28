@@ -292,15 +292,10 @@ def bulk_action(
         ) from exc
 
 
-# ── Tags ─────────────────────────────────────────────────────────────────────
-
-
-@router.get("/api/detection_engine/rules/tags")
-def get_tags(
-    _: dict = Depends(require_es_auth),
-) -> list[str]:
-    """Return all unique tags across all detection rules."""
-    return rule_queries.get_tags()
+# Kibana 8.15 answers 404 for `/api/detection_engine/rules/tags` — measured.
+# The route that exists is `/api/detection_engine/tags`, which this mount
+# serves; keeping a second spelling that the product refuses meant a client
+# could build against a path that is not there.
 
 
 # ── Prepackaged Status ───────────────────────────────────────────────────────
