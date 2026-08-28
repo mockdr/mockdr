@@ -305,6 +305,18 @@ into it.
 
 ### Added
 
+**A map of what nothing is watching.**
+Every audit here reports what it found; none reported what it never looked
+at, and that is where today's defects were — nineteen CrowdStrike routes
+compared while fourteen sat behind a "skipped" line, three Deep Visibility
+routes never compared at all. `scripts/audit_coverage.py` counts coverage
+instead of findings: for each of the 701 routes the mock serves it asks
+whether a vendor reference judges its answer, whether a conformance probe
+compares it against the real product, and whether any test names it. Nothing
+is entirely unwatched — but 113 routes rest on this repo's own tests alone,
+and 49 of those are on the three mounts where a real product runs beside the
+mock and could be compared.
+
 **Why a route was skipped, and four reasons it should not have been.**
 `schema_drift.py` printed `HTTP 400 (skipped)` and no more, so twenty-two
 routes sat behind that line while the run reported zero findings. Each skip
