@@ -164,6 +164,58 @@ jobs:
       - name: Hostile bodies and parameters on every route
         run: python scripts/hostile_probe.py
 
+  # ── Audits ──────────────────────────────────────────────────────────────────
+  audits:
+    name: Audits — the ones that need nothing but the mock
+    runs-on: ubuntu-latest
+    needs: [backend-quality]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      # These have been release tools run by hand, and "by hand" is how a
+      # regression reaches main. The ones needing a real product stay in the
+      # conformance workflow; every one of these reads the mock alone and
+      # fails on what it finds.
+      - name: Every route is watched by something
+        run: python scripts/audit_coverage.py
+
+      - name: Nothing unreachable, shadowed or dangling
+        run: |
+          python scripts/shadowed_routes.py
+          python scripts/unreachable_code.py
+          python scripts/dangling_references.py
+
+      - name: Every declared parameter is read, and has an effect
+        run: |
+          python scripts/unread_params.py
+          python scripts/param_effect.py
+          python scripts/filter_effect.py
+          python scripts/filter_spellings.py
+
+      - name: Answers agree with themselves
+        run: |
+          python scripts/consistency_audit.py
+          python scripts/type_stability_audit.py
+          python scripts/paging_audit.py
+          python scripts/roundtrip_audit.py
+
+      - name: Refusals a client can parse, and rights it must have
+        run: |
+          python scripts/error_envelope_audit.py
+          python scripts/authz_audit.py
+          python scripts/method_drift.py
+          python scripts/enum_drift.py
+          python scripts/body_audit.py
+
   field-drift:
     name: Field drift — swagger spec vs mock responses
     runs-on: ubuntu-latest

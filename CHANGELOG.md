@@ -162,6 +162,17 @@ before it.
 
 ### Changed
 
+**The seventeen audits that need nothing but the mock now run in CI.**
+They have been release tools run by hand, and by hand is how a regression
+reaches main — as two did this round. Every one of them reads the mock alone
+and fails on what it finds, so they belong beside the tests rather than
+beside the release checklist. `audit_coverage.py` gates now too: a route
+nothing watches is a failure, not a number. It also stopped overstating the
+gap in two ways — it compared reference paths letter for letter, so
+Defender's `/api/Software` did not match the `/api/software` mockdr serves,
+and it counted mockdr's own UI API among the routes with nothing to judge
+them, which have no vendor to be judged against at all.
+
 **The conformance harness refuses a probe key it would not read.**
 A probe that wrote `params:` where the loader reads `query:` had its
 parameters dropped in silence and ran against none — and reported the

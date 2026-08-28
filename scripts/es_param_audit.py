@@ -27,6 +27,7 @@ Needs a real Elasticsearch (`ES_URL`, default localhost:19200) and mockdr
 from __future__ import annotations
 
 import base64
+import json
 import os
 import sys
 import urllib.error
@@ -34,14 +35,20 @@ import urllib.request
 
 REAL = os.environ.get("ES_URL", "http://localhost:19200")
 MOCK = os.environ.get("MOCKDR", "http://localhost:5001/elastic")
-INDEX = os.environ.get("ES_PROBE_INDEX", "conformance-seeded")
+#: This script makes and drops its own index: a destructive route asked about
+#: a parameter it *does* take performs the action, so it must never be aimed
+#: at anything the rest of the harness needs.
+INDEX = os.environ.get("ES_PROBE_INDEX", "mockdr-param-probe")
 REAL_AUTH = "Basic " + base64.b64encode(
     f"elastic:{os.environ.get('ES_PASSWORD', 'Probe-Passw0rd!')}".encode()).decode()
 MOCK_AUTH = "Basic " + base64.b64encode(
     f"elastic:{os.environ.get('MOCKDR_PASSWORD', 'mock-elastic-password')}".encode()).decode()
 
 #: Every parameter any of these routes might take. Membership is decided by
-#: measurement; this list only has to be a superset worth asking about.
+#: measurement; this list only has to be a superset worth asking about — and
+#: it has to be a *generous* one. A first version left out `index` and `name`,
+#: which nearly every route takes as an alias for its own path segment, and
+#: the audit reported agreement it had never asked about.
 CANDIDATES = (
     "_source", "_source_excludes", "_source_includes", "allow_no_indices",
     "allow_partial_search_results", "analyze_wildcard", "analyzer",
@@ -63,24 +70,50 @@ CANDIDATES = (
     "types", "typed_keys", "v", "version", "version_type", "wait_for_active_shards",
     "wait_for_events", "wait_for_no_initializing_shards",
     "wait_for_no_relocating_shards", "wait_for_nodes", "wait_for_status",
+    # The two that name what the path already names, and the members the
+    # write routes add on top.
+    "index", "name", "all_shards", "conflicts", "flush", "force", "if_primary_term",
+    "if_seq_no", "keep_alive", "max_docs", "max_num_segments", "only_expunge_deletes",
+    "op_type", "pipeline", "requests_per_second", "retry_on_conflict", "rewrite",
+    "scroll_size", "slices", "source_content_type", "wait_for_completion",
+    "wait_if_ongoing",
 )
 
-#: The GET routes this compares. `{i}` stands for the probe index.
+#: The routes this compares, as (method, path). `{i}` stands for the probe
+#: index. A refusal precedes the action — measured: a `DELETE` of a document
+#: with an unrecognised parameter leaves the document there — so asking a
+#: write route about a parameter it does *not* take is safe. Asking about one
+#: it does take is not, which is why the destructive routes are asked last
+#: and against an index this script makes and drops itself.
 ROUTES = (
-    "/", "/_cat/health", "/_cat/indices", "/_cluster/health", "/_cluster/health/{i}",
-    "/_count", "/_search", "/_search/scroll", "/_security/_authenticate",
-    "/_alias/probe-alias", "/_resolve/index/{i}", "/{i}", "/{i}/_alias",
-    "/{i}/_count", "/{i}/_doc/probe-doc", "/{i}/_field_caps", "/{i}/_mapping",
-    "/{i}/_mapping/field/host", "/{i}/_search", "/{i}/_settings",
-    "/{i}/_source/probe-doc", "/{i}/_stats",
+    ("GET", "/"), ("GET", "/_cat/health"), ("GET", "/_cat/indices"),
+    ("GET", "/_cluster/health"), ("GET", "/_cluster/health/{i}"), ("GET", "/_count"),
+    ("GET", "/_search"), ("GET", "/_search/scroll"), ("GET", "/_security/_authenticate"),
+    ("GET", "/_alias/probe-alias"), ("GET", "/_resolve/index/{i}"), ("GET", "/{i}"),
+    ("GET", "/{i}/_alias"), ("GET", "/{i}/_count"), ("GET", "/{i}/_doc/probe-doc"),
+    ("GET", "/{i}/_field_caps"), ("GET", "/{i}/_mapping"),
+    ("GET", "/{i}/_mapping/field/host"), ("GET", "/{i}/_search"),
+    ("GET", "/{i}/_settings"), ("GET", "/{i}/_source/probe-doc"), ("GET", "/{i}/_stats"),
+    ("POST", "/_count"), ("POST", "/_search"), ("POST", "/_search/scroll"),
+    ("POST", "/{i}/_cache/clear"), ("POST", "/{i}/_count"), ("POST", "/{i}/_field_caps"),
+    ("POST", "/{i}/_flush"), ("POST", "/{i}/_forcemerge"), ("POST", "/{i}/_pit"),
+    ("POST", "/{i}/_refresh"), ("POST", "/{i}/_search"), ("POST", "/{i}/_update/probe-doc"),
+    ("POST", "/{i}/_validate/query"), ("POST", "/{i}/_update_by_query"),
+    ("POST", "/{i}/_delete_by_query"), ("PUT", "/{i}/_alias/probe-alias"),
+    ("DELETE", "/_search/scroll"), ("DELETE", "/{i}/_alias/probe-alias"),
+    ("DELETE", "/{i}/_doc/probe-doc"), ("PUT", "/{i}"), ("DELETE", "/{i}"),
 )
 
 #: What the cluster says about a parameter it does not know.
 _UNRECOGNISED = b"unrecognized parameter"
 
 
-def _ask(base: str, auth: str, path: str, key: str) -> tuple[int, bytes]:
-    req = urllib.request.Request(f"{base}{path}?{key}=1", headers={"Authorization": auth})
+def _ask(
+    base: str, auth: str, path: str, key: str, method: str = "GET",
+) -> tuple[int, bytes]:
+    req = urllib.request.Request(
+        f"{base}{path}?{key}=1", method=method, headers={"Authorization": auth},
+    )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             return resp.status, resp.read()[:300]
@@ -91,34 +124,69 @@ def _ask(base: str, auth: str, path: str, key: str) -> tuple[int, bytes]:
         return 0, str(exc)[:80].encode()
 
 
+#: The routes that act, and so need the probe index put back first.
+_DESTRUCTIVE = frozenset({
+    ("POST", "/{i}/_update_by_query"), ("POST", "/{i}/_delete_by_query"),
+    ("PUT", "/{i}/_alias/probe-alias"), ("DELETE", "/{i}/_alias/probe-alias"),
+    ("DELETE", "/{i}/_doc/probe-doc"), ("PUT", "/{i}"), ("DELETE", "/{i}"),
+})
+
+
+def _write(base: str, auth: str, method: str, path: str, body: object = None) -> None:
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        f"{base}{path}", method=method, data=data,
+        headers={"Authorization": auth, **({"Content-Type": "application/json"} if data else {})},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=25):
+            return
+    except Exception:  # noqa: BLE001, S110 - a release tool; "already gone" is fine
+        pass
+
+
+def _rebuild() -> None:
+    """Put the probe index, its document and its alias back on both sides."""
+    for base, auth in ((REAL, REAL_AUTH), (MOCK, MOCK_AUTH)):
+        _write(base, auth, "DELETE", f"/{INDEX}")
+        _write(base, auth, "PUT", f"/{INDEX}",
+               {"settings": {"number_of_shards": 1, "number_of_replicas": 0}})
+        _write(base, auth, "PUT", f"/{INDEX}/_doc/probe-doc?refresh=true", {"host": "probe"})
+        _write(base, auth, "PUT", f"/{INDEX}/_alias/probe-alias")
+
+
 def main() -> int:
     """Compare every route's accepted parameters, in both directions."""
     invented: list[str] = []
     ignored: list[str] = []
     asked = 0
-    for route in ROUTES:
+    _rebuild()
+    for method, route in ROUTES:
         path = route.replace("{i}", INDEX)
-        known = []
-        for key in CANDIDATES:
-            code, body = _ask(REAL, REAL_AUTH, path, key)
+        destructive = (method, route) in _DESTRUCTIVE
+        for key in (*CANDIDATES, "zzzqqq"):
+            if destructive:
+                _rebuild()
+            code, body = _ask(REAL, REAL_AUTH, path, key, method)
             asked += 1
-            if not (code == 400 and _UNRECOGNISED in body):
-                known.append(key)
-        for key in known:
-            code, body = _ask(MOCK, MOCK_AUTH, path, key)
-            if code == 400 and _UNRECOGNISED in body:
-                invented.append(f"{route}?{key}")
-        code, body = _ask(MOCK, MOCK_AUTH, path, "zzzqqq")
-        if not (code == 400 and _UNRECOGNISED in body):
-            ignored.append(route)
+            theirs = code == 400 and _UNRECOGNISED in body
+            code, body = _ask(MOCK, MOCK_AUTH, path, key, method)
+            ours = code == 400 and _UNRECOGNISED in body
+            if ours and not theirs:
+                invented.append(f"{method} {route}?{key}")
+            elif theirs and not ours:
+                ignored.append(f"{method} {route}?{key}")
 
     print(f"=== ELASTICSEARCH PARAMETERS === {asked} question(s) across "
           f"{len(ROUTES)} route(s)")
     for line in invented:
         print(f"  refused though the cluster accepts it: {line}")
     for line in ignored:
-        print(f"  an unknown parameter is still ignored: {line}")
-    print(f"\n  {len(invented)} invented refusal(s), {len(ignored)} route(s) still ignoring")
+        print(f"  ignored though the cluster refuses it: {line}")
+    print(f"\n  {len(invented)} invented refusal(s), "
+          f"{len(ignored)} parameter(s) ignored that the cluster refuses")
+    for base, auth in ((REAL, REAL_AUTH), (MOCK, MOCK_AUTH)):
+        _write(base, auth, "DELETE", f"/{INDEX}")
     return 1 if invented or ignored else 0
 
 

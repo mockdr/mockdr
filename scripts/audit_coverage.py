@@ -77,7 +77,15 @@ def served():
 
 
 def described():
-    """Every route a vendor reference describes, as `METHOD /mounted/path`."""
+    """Every route a vendor reference describes, as `METHOD /mounted/path`.
+
+    Case-folded as well as written, because a reference need not agree with
+    itself about it: Defender's docs spell the same endpoint `/api/Software`
+    and `/api/software` on different pages, and `schema_drift` has always
+    matched them case-insensitively. Comparing only the written spelling here
+    reported two routes as watched by nothing but this repo's tests when a
+    vendor reference describes them.
+    """
     import schema_drift as drift  # noqa: PLC0415
 
     out: set[str] = set()
@@ -105,7 +113,7 @@ def described():
                     for method in operations:
                         if method.upper() in ("GET", "POST", "PUT", "PATCH", "DELETE"):
                             out.add(f"{method.upper()} {shape(mount + path)}")
-    return out
+    return out | {key.lower() for key in out}
 
 
 def _route_keys(node, found=None):
@@ -168,6 +176,9 @@ def tested():
     return out
 
 
+#: The mounts that are mockdr's own — its UI's API and its health surface.
+_OWN = ("/web/", "/_mock/", "/metrics")
+
 #: How many segments of a literal must line up with a route's tail before it
 #: counts as naming it. Two keeps `/query` from claiming every route that
 #: ends in one.
@@ -206,13 +217,13 @@ def main():
     #: for; the tests that exercise it ask for paths that do not exist.
     catch_all = "/{}"
     unwatched = []
-    tally = {"reference": 0, "probe": 0, "only a test": 0}
+    tally = {"reference": 0, "probe": 0, "only a test": 0, "own": 0}
     for method, path in routes:
         anonymous = shape(path)
         # A test or a probe carries a *concrete* id where the route has a
         # parameter, and usually builds the path from a prefix constant — so
         # the route is matched as a pattern against the tail of each literal.
-        by_reference = f"{method} {anonymous}" in references
+        by_reference = f"{method} {anonymous}".lower() in references
         by_probe = any(names(p, anonymous) or p.startswith(anonymous) for p in probes)
         by_test = any(names(t, anonymous) for t in tests)
         if by_reference:
@@ -220,7 +231,10 @@ def main():
         if by_probe:
             tally["probe"] += 1
         if by_test and not (by_reference or by_probe) and anonymous != catch_all:
-            tally["only a test"] += 1
+            # mockdr's own API has no vendor to be judged against and no real
+            # product to be compared with, so counting it beside the vendor
+            # routes made the gap look two-thirds larger than it is.
+            tally["own" if anonymous.startswith(_OWN) else "only a test"] += 1
         if show_all:
             marks = "".join(
                 letter if seen else "·"
@@ -237,10 +251,15 @@ def main():
         print(
             f"\n  {tally['reference']} judged against a vendor reference"
             f"\n  {tally['probe']} compared against the real product"
-            f"\n  {tally['only a test']} watched by nothing but this repo's own tests"
+            f"\n  {tally['only a test']} vendor route(s) watched by nothing but"
+            " this repo's own tests"
+            f"\n  {tally['own']} of mockdr's own route(s), which have no vendor"
             f"\n  {len(unwatched)} watched by nothing at all",
         )
-    return 0
+    # A route nothing watches is the one thing here that is a failure rather
+    # than a number: it is served, and no reference, no probe and no test
+    # says what it should answer.
+    return 1 if unwatched else 0
 
 
 if __name__ == "__main__":
