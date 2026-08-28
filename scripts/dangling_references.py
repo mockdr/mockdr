@@ -53,6 +53,13 @@ _OPAQUE = {
     # catalogue, which this mock does not serve; the numbers are small
     # enough to collide with a record key elsewhere on some draws.
     "threats.indicators[].ids[]",
+    # Defender's RBAC device group. It names a group in the tenant's own
+    # machine-group configuration, which mockdr does not serve as a
+    # collection, so the number can only ever resolve by collision — and on
+    # one draw in CI it did, against three unrelated collections at once.
+    "mde_machines.rbacGroupId",
+    "splunk_events.fields.rbacGroupId",
+    "graph_security_alerts.evidence[].rbacGroupId",
 }
 
 #: Keys a record is addressed by, beside the key it is stored under.

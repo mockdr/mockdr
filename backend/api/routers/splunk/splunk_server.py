@@ -143,3 +143,28 @@ def server_settings(
         links=("alternate", "edit", "list"), fields=False,
     )
     return build_splunk_envelope([entry], total=1, links={})
+
+
+@router.get("/services/server/settings/settings")
+def server_settings_by_name(
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """The settings entry, addressed by the name the listing gives it.
+
+    The listing named `settings` and nothing would serve it, so a client
+    that listed and then read got 404 for what it had just been shown. A
+    single read also names what the entry accepts.
+    """
+    body = server_settings(output_mode, current_user)
+    body["entry"][0]["fields"] = {
+        "required": [],
+        # Measured on 10.4.2: every member of the entry except the two it
+        # will not be told (`SPLUNK_HOME` and `host_resolved`).
+        "optional": sorted(
+            k for k in body["entry"][0]["content"]
+            if k not in ("SPLUNK_HOME", "host_resolved", "eai:acl")
+        ),
+        "wildcard": [],
+    }
+    return body

@@ -71,6 +71,29 @@ as a number.
 says which listings mockdr serves empty, so its entry was not compared at
 all.
 
+**A listing named four things nothing would serve.**
+splunkd addresses a collection both ways, and splunklib's `.list()` followed
+by `[name]` uses both. mockdr listed roles, the capabilities entry, the
+settings entry and its macros, and reading any one of them back answered 404
+— for something the listing had just named. All four are served now, and a
+single read carries the `fields` block naming what the entry accepts, which
+the listing does not: a client reading `fields.optional` off a user to learn
+what it may write got an empty list. `scripts/unreadable_entries.py` reads
+back every entry each listing names, and says how many listings it could not
+check because they came back empty.
+
+**Two CI failures on main, neither of them the product's.**
+`test_what_is_pending_stops_being_pending` and the four tests beside it
+raced the one-second window an action stays pending in: on a loaded runner
+more than a second passed between the write and the read, so the action had
+already settled and the count was zero. They hold the window open and then
+close it, as the tests beside them already did, and are a second and a half
+faster each for it. And the seed's referential sweep flagged Defender's
+`rbacGroupId` on one draw: it names a group in the tenant's machine-group
+configuration, which mockdr does not serve as a collection, so the number
+can only ever resolve by collision — marked opaque, like the two fields
+before it.
+
 ### Changed
 
 **The conformance harness refuses a probe key it would not read.**

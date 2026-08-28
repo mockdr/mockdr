@@ -69,13 +69,31 @@ def get_user(username: str) -> dict | None:
         "defaultApp": user.default_app,
         "tz": user.tz,
     }
+    # A single read names what the user accepts; the listing does not, and
+    # mockdr sent an empty block for both, so a client reading
+    # `fields.optional` to learn what it may write learned nothing.
     entry = build_splunk_entry(
         user.username,
         complete(content, "users"),
         collection="authentication/users",
         links=("alternate", "edit", "list"),
+        fields=_USER_FIELDS,
     )
     return build_splunk_envelope([entry], total=1)
+
+
+#: What a user accepts, on a single read (measured on 10.4.2).
+_USER_FIELDS = {
+    "required": [],
+    "optional": [
+        "defaultApp", "display_new_search_banner", "email", "force-change-pass",
+        "lang", "locked-out", "oldpassword", "olly_org", "password", "realname",
+        "restart_background_jobs", "roles", "search_assistant",
+        "search_auto_format", "search_line_numbers", "search_syntax_highlighting",
+        "search_use_advanced_editor", "theme", "tz",
+    ],
+    "wildcard": [],
+}
 
 
 def get_current_context(username: str) -> dict:
@@ -104,24 +122,69 @@ def get_current_context(username: str) -> dict:
     )
 
 
+#: The roles this instance knows, and what each may do.
+_ROLES: tuple[dict, ...] = (
+    {"name": "admin", "capabilities": ADMIN_CAPABILITIES},
+    {"name": "sc_admin", "capabilities": SC_ADMIN_CAPABILITIES},
+    {"name": "user", "capabilities": USER_CAPABILITIES},
+)
+
+#: What a role accepts, which splunkd lists on a single-role read and not on
+#: the listing (measured on 10.4.2).
+_ROLE_FIELDS = {
+    "required": [],
+    "optional": [
+        "capabilities", "cumulativeRTSrchJobsQuota", "cumulativeSrchJobsQuota",
+        "defaultApp", "deleteIndexesAllowed", "federatedProviders",
+        "fieldFilterExemption", "grantable_roles", "imported_roles",
+        "kvstore_create.deny_list", "kvstore_create.implicit_deny_list",
+        "kvstore_delete.deny_list", "kvstore_delete.implicit_deny_list",
+        "kvstore_update.deny_list", "kvstore_update.implicit_deny_list",
+        "queuedSearchQuota", "rtSrchJobsQuota", "srchDiskQuota",
+        "srchFederatedProvidersAllowed", "srchFederatedProvidersDefault",
+        "srchFilter", "srchIndexesAllowed", "srchIndexesDefault",
+        "srchIndexesDisallowed", "srchJobsQuota", "srchTimeEarliest",
+        "srchTimeWin",
+    ],
+    "wildcard": [],
+}
+
+_ROLE_TOP_LINKS = {"create": "/services/authorization/roles/_new"}
+
+
+def _role_entry(role: dict, fields: dict | bool) -> dict:
+    """One role, as an entry."""
+    return build_splunk_entry(
+        str(role["name"]),
+        complete({k: v for k, v in role.items() if k != "name"}, "roles"),
+        collection="authorization/roles",
+        links=("alternate", "edit", "list", "remove"),
+        fields=fields,
+    )
+
+
 def list_roles() -> dict:
     """Return available roles."""
-    roles = [
-        {"name": "admin", "capabilities": ADMIN_CAPABILITIES},
-        {"name": "sc_admin", "capabilities": SC_ADMIN_CAPABILITIES},
-        {"name": "user", "capabilities": USER_CAPABILITIES},
-    ]
-    entries = [
-        build_splunk_entry(
-            str(r["name"]),
-            complete({k: v for k, v in r.items() if k != "name"}, "roles"),
-            collection="authorization/roles",
-            links=("alternate", "edit", "list", "remove"),
-            fields=False,
-        )
-        for r in roles
-    ]
-    return build_splunk_envelope(entries, links={"create": "/services/authorization/roles/_new"})
+    return build_splunk_envelope(
+        [_role_entry(r, False) for r in _ROLES], links=_ROLE_TOP_LINKS,
+    )
+
+
+def get_role(name: str) -> dict | None:
+    """Return one role, the way splunkd addresses it.
+
+    The listing named three roles and nothing would serve any of them: a
+    client that listed the roles and then read one — which is what
+    splunklib's `.list()` followed by `[name]` does — got 404 for a role the
+    listing had just named. A single read also carries the `fields` block
+    naming what the role accepts, which the listing does not.
+    """
+    for role in _ROLES:
+        if role["name"] == name:
+            return build_splunk_envelope(
+                [_role_entry(role, _ROLE_FIELDS)], total=1, links=_ROLE_TOP_LINKS,
+            )
+    return None
 
 
 def list_capabilities() -> dict:
@@ -140,3 +203,14 @@ def list_capabilities() -> dict:
     )
     entry["content"]["eai:acl"] = None
     return build_splunk_envelope([entry], links={})
+
+
+def get_capabilities_entry() -> dict:
+    """The capabilities collection's single entry, read by name.
+
+    splunkd addresses it as `authorization/capabilities/capabilities`; the
+    listing named it and nothing would serve it.
+    """
+    body = list_capabilities()
+    body["entry"][0]["fields"] = {"required": [], "optional": [], "wildcard": []}
+    return body

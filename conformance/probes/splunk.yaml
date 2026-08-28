@@ -3225,3 +3225,48 @@ probes:
       path: /services/search/v2/jobs/1234567890.99999
       query: {output_mode: json}
       auth: basic
+
+  # ── The entries a listing names, read back one at a time (2.3.1) ───────
+  #
+  # splunkd addresses a collection both ways, and splunklib's `.list()`
+  # followed by `[name]` uses both. mockdr listed roles, capabilities,
+  # settings and macros that nothing would serve, so the second call
+  # answered 404 for what the first had just named. A single read also
+  # carries the `fields` block naming what the entry accepts, which the
+  # listing does not.
+
+  - id: splunk-one-role
+    endpoint: management
+    why: The role a client reads after listing the roles.
+    request:
+      method: GET
+      path: /services/authorization/roles/admin
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-one-capability-entry
+    endpoint: management
+    request:
+      method: GET
+      path: /services/authorization/capabilities/capabilities
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-settings-by-name
+    endpoint: management
+    request:
+      method: GET
+      path: /services/server/settings/settings
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-one-user
+    endpoint: management
+    why: >
+      And the `fields` block on it: mockdr sent an empty one, so a client
+      reading `fields.optional` to learn what it may write learned nothing.
+    request:
+      method: GET
+      path: /services/authentication/users/admin
+      query: {output_mode: json}
+      auth: basic

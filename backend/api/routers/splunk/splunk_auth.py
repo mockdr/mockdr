@@ -9,7 +9,9 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from api.splunk_auth import require_splunk_auth
 from application.splunk.commands.auth import login
 from application.splunk.queries.users import (
+    get_capabilities_entry,
     get_current_context,
+    get_role,
     get_user,
     list_capabilities,
     list_roles,
@@ -94,6 +96,30 @@ def list_all_roles(
 ) -> dict:
     """List all Splunk roles."""
     return list_roles()
+
+
+@router.get("/services/authorization/roles/{name}")
+def get_single_role(
+    name: str,
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """Get one role by name, which the listing named and nothing served."""
+    result = get_role(name)
+    if not result:
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
+        ]})
+    return result
+
+
+@router.get("/services/authorization/capabilities/capabilities")
+def get_capabilities_by_name(
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """The capabilities entry, addressed by the name the listing gives it."""
+    return get_capabilities_entry()
 
 
 @router.get("/services/authorization/capabilities")

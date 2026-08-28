@@ -471,3 +471,64 @@ class TestAnUnknownQueryMemberIsRefused:
         assert client.get(
             "/kibana/api/endpoint/action", headers=ES_AUTH, params={"agentIds": "x"},
         ).status_code == 200
+
+
+class TestAListingNamesNothingItCannotServe:
+    """splunklib lists a collection and then reads one entry by name."""
+
+    @pytest.mark.parametrize(("collection", "entry"), [
+        ("authorization/roles", "admin"),
+        ("authorization/capabilities", "capabilities"),
+        ("server/settings", "settings"),
+        ("admin/macros", "notable"),
+    ])
+    def test_every_entry_a_listing_names_can_be_read_back(
+        self, client: TestClient, collection: str, entry: str,
+    ) -> None:
+        """Each of these listed something nothing would serve, so the read 404'd."""
+        listed = client.get(
+            f"/splunk/services/{collection}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()
+        assert entry in [e["name"] for e in listed["entry"]]
+
+        one = client.get(
+            f"/splunk/services/{collection}/{entry}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+
+        assert one.status_code == 200
+        assert [e["name"] for e in one.json()["entry"]] == [entry]
+
+    def test_a_single_read_names_what_the_entry_accepts(
+        self, client: TestClient,
+    ) -> None:
+        """The `fields` block belongs to the single read, not to the listing.
+
+        mockdr sent an empty one on both, so a client reading
+        `fields.optional` to learn what it may write learned nothing.
+        """
+        one = client.get(
+            "/splunk/services/authentication/users/admin", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()["entry"][0]
+        listed = client.get(
+            "/splunk/services/authentication/users", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()["entry"][0]
+
+        assert "roles" in one["fields"]["optional"]
+        assert "password" in one["fields"]["optional"]
+        assert "fields" not in listed
+
+    def test_an_entry_that_is_not_there_is_still_a_refusal(
+        self, client: TestClient,
+    ) -> None:
+        """A name nothing defines is 404, not an empty entry list."""
+        for path in ("authorization/roles/nosuch", "admin/macros/nosuch"):
+            resp = client.get(
+                f"/splunk/services/{path}", headers=SPLUNK_AUTH,
+                params={"output_mode": "json"},
+            )
+            assert resp.status_code == 404, path
+            assert "nosuch" in resp.json()["messages"][0]["text"]

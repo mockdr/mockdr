@@ -22,6 +22,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from application.cs_hosts import queries as host_queries
+from application.es_endpoints import commands as endpoint_commands
+
 SPLUNK_AUTH = {"Authorization": "Basic " + base64.b64encode(b"admin:mockdr-admin").decode()}
 FORM = {"Content-Type": "application/x-www-form-urlencoded", **SPLUNK_AUTH}
 JSON_OUT = {"output_mode": "json"}
@@ -2865,26 +2868,34 @@ class TestAnActionThatSettles:
         client.post("/cs/devices/entities/devices-actions/v2", headers=headers,
                     params={"action_name": action}, json={"ids": [host_id]})
 
-    def test_containment_settles(self, client: TestClient) -> None:
+    def test_containment_settles(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         headers = self._falcon(client)
         host_id = self._a_normal_host(client, headers)
 
+        # Held open, then closed, rather than raced: on a loaded runner the
+        # second between the write and the read is not reliably a second.
+        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
         self._act(client, headers, host_id, "contain")
         assert self._host_status(client, headers, host_id) == "containment_pending"
 
-        time.sleep(1.2)
+        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 0.0)
         assert self._host_status(client, headers, host_id) == "contained"
 
-    def test_lifting_containment_settles_too(self, client: TestClient) -> None:
+    def test_lifting_containment_settles_too(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         headers = self._falcon(client)
         host_id = self._a_normal_host(client, headers)
 
+        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
         self._act(client, headers, host_id, "contain")
         self._act(client, headers, host_id, "lift_containment")
         assert self._host_status(client, headers, host_id) == (
             "lift_containment_pending")
 
-        time.sleep(1.2)
+        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 0.0)
         assert self._host_status(client, headers, host_id) == "normal"
 
     def _agent(self, client: TestClient) -> str:
@@ -2892,36 +2903,45 @@ class TestAnActionThatSettles:
                              headers=self.KBN).json()
         return str(listing["data"][0]["metadata"]["agent"]["id"])
 
-    def test_an_isolation_finishes(self, client: TestClient) -> None:
+    def test_an_isolation_finishes(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         agent = self._agent(client)
+        # Hold the window open rather than racing it: a loaded runner spent
+        # more than the settle second between the write and the read, and
+        # read back an action that had already finished.
+        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
         action = client.post("/kibana/api/endpoint/action/isolate",
                              headers=self.KBN,
                              json={"endpoint_ids": [agent], "comment": "x"}).json()
         assert action["status"] == "pending"
         assert action["completed_at"] is None
 
-        time.sleep(1.2)
+        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
         settled = client.get(f"/kibana/api/endpoint/action/{action['id']}",
                              headers=self.KBN).json()
         assert settled["status"] == "successful"
         assert settled["completed_at"]
 
-    def test_the_status_is_one_kibana_validates(self, client: TestClient) -> None:
+    def test_the_status_is_one_kibana_validates(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Measured on 8.15: `statuses` takes `failed`, `pending` and
         `successful`, and refuses anything else."""
         agent = self._agent(client)
         client.post("/kibana/api/endpoint/action/isolate", headers=self.KBN,
                     json={"endpoint_ids": [agent], "comment": "x"})
-        time.sleep(1.2)
+        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
         listing = client.get("/kibana/api/endpoint/action", headers=self.KBN).json()
         assert {a["status"] for a in listing["data"]} <= {
             "failed", "pending", "successful"}
 
     def test_what_is_pending_stops_being_pending(
-        self, client: TestClient,
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """`action_status` counted upwards for ever."""
         agent = self._agent(client)
+        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
         client.post("/kibana/api/endpoint/action/isolate", headers=self.KBN,
                     json={"endpoint_ids": [agent], "comment": "x"})
         pending = client.get("/kibana/api/endpoint/action_status",
@@ -2929,7 +2949,7 @@ class TestAnActionThatSettles:
                              params={"agent_ids": agent}).json()["data"][0]
         assert pending["pending_actions"].get("isolate", 0) >= 1
 
-        time.sleep(1.2)
+        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
         settled = client.get("/kibana/api/endpoint/action_status",
                              headers=self.KBN,
                              params={"agent_ids": agent}).json()["data"][0]

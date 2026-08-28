@@ -19,7 +19,7 @@ a hundred and nineteen.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.splunk_auth import require_splunk_auth
 from repository.splunk.splunk_event_repo import splunk_event_repo
@@ -147,6 +147,40 @@ def macros(
         for name, definition in sorted(_MACROS.items())
     ]
     return _collection(entries, "admin/macros", _knowledge_links("admin/macros"))
+
+
+@router.get("/servicesNS/{_owner}/{_app}/admin/macros/{name}")
+@router.get("/services/admin/macros/{name}")
+def macro(
+    name: str,
+    _owner: str = "nobody", _app: str = "search",
+    _user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """One macro by name.
+
+    The listing named every macro and nothing would serve one, so a client
+    that listed them and then read one got 404 for a macro the listing had
+    just named. splunkd serves it, with the `fields` block a single read
+    carries and the listing does not.
+    """
+    if name not in _MACROS:
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
+        ]})
+    entry = build_splunk_entry(
+        name,
+        complete({"definition": _MACROS[name], "disabled": False}, "macro"),
+        collection="admin/macros",
+        links=("_reload", "alternate", "disable", "edit", "list"),
+        # Measured on 10.4.2: the definition is required, the rest optional.
+        fields={
+            "required": ["definition"],
+            "optional": ["args", "disabled", "errormsg", "iseval", "validation"],
+            "wildcard": [],
+        },
+        acl_extra={"perms": {"read": ["*"], "write": ["admin", "power"]}},
+    )
+    return _collection([entry], "admin/macros", _knowledge_links("admin/macros"))
 
 
 @router.get("/services/saved/sourcetypes")
