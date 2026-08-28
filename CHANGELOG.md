@@ -8,6 +8,80 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A query member Kibana does not know is a refusal, not something to ignore.**
+8.15 checks a route's query schema before the handler runs, and refuses a
+member the route does not declare — in three wordings, one per validator:
+`[request query.zzz]: definition for this key is missing` on the
+config-schema routes, `invalid keys "zzz,qqq"` on the Cases API's io-ts ones,
+and `[request query]: Invalid value {...}, excess properties: [...]` on
+Timeline's. mockdr answered 200 and ignored the member, so a client that
+misspelled a filter read an unfiltered result as a filtered one, and the same
+request 400s against the product. Fourteen routes now refuse it the way each
+one's validator does — each route's accepted members measured key by key
+first, against the 400-versus-not oracle the schema check gives, so nothing
+a route actually reads can be refused by it.
+
+That oracle also found the spelling: `/api/endpoint/action` names its filter
+`agentIds`, and 8.15 refuses `agent_id` outright. mockdr took the snake_case
+one, so a client's filter worked against the mock and 400s in production.
+
+**Three refusals Kibana answers that mockdr answered around.**
+`GET /api/endpoint/policy_response` without `agentId` is a 400 naming that
+member; mockdr answered `404 Endpoint  not found`, which says an endpoint
+with no name does not exist rather than that the caller did not name one.
+`GET /api/endpoint/action_log/{id}` requires `start_date` and then
+`end_date`; mockdr served `{"data": [], "total": 0}`, so a client that had
+forgotten the window was told the endpoint had done nothing.
+`GET /api/exception_lists/summary` refuses with `id or list_id required` —
+the wording the two exception-list routes beside it already used, while this
+one said `list_id: Required`.
+
+**Every job reported the query a fixture had been recorded from.**
+A job's `search`, `request` and `eventSearch` came from
+`search_jobs.json` alone, so a client polling a job it had just dispatched
+read back `search index=_internal | head 5` — somebody else's search, under
+HTTP 200. The job now names its own query, and echoes back the arguments the
+client actually dispatched with and no others, as splunkd does.
+`isGoodSummarizationCandidate` and `reduceSearch` go with them: 10.4.2 sends
+neither, in either exec mode.
+
+**`/events` served neither what splunkd stamps on an event nor what it keeps.**
+Measured against the same seeded event: splunkd returns `_bkt`, `_cd`,
+`_indextime`, `_serial`, `_si`, `_sourcetype`, `linecount` and
+`splunk_server` on every event, and mockdr returned none of them — a client
+de-duplicating on `_cd` or locating an event through `_si` found nothing to
+read, and every event looked identical to every other. What it did return
+was the fields it had parsed *out* of `_raw`, which `/events` does not
+carry: a client reading `/events` to see what was ingested saw mockdr's
+parse of it instead.
+
+**A collection's links pointed at a create target splunkd does not have.**
+Every listing answered `{"create": "/services", "_reload": "/services/_reload"}`.
+Measured across seventeen collections on 10.4.2, the top-level links are
+paths under the collection itself — `/services/messages/_new` — and most
+collections offer no `_reload` at all; `authorization/capabilities`,
+`server/settings` and `search/jobs` offer nothing. The `create` link is now
+derived from the collection, and the four collections that differ from that
+name their own. A listing entry also carries no `fields` block — that
+appears on a single-entity read, where it lists the members the entity
+accepts — and `server/settings` served 6 of its 25 members, with
+`mgmtHostPort` as the string `"0.0.0.0:8089"` where splunkd sends the port
+as a number.
+`scripts/splunk_envelope_audit.py` compares this across every collection and
+says which listings mockdr serves empty, so its entry was not compared at
+all.
+
+### Changed
+
+**The conformance harness refuses a probe key it would not read.**
+A probe that wrote `params:` where the loader reads `query:` had its
+parameters dropped in silence and ran against none — and reported the
+agreement as a pass. Nine Splunk probes had been running that way. The loader
+now refuses an unknown probe or request key, and the nine revived probes
+brought 68 differences with them, which are the entries above. The seeded
+search job is scoped to the run's own sourcetype too: `index=main | head 1`
+took whichever event came first, and the two instances hold different ones.
+
 **Two response-action paths Kibana does not route, and the parameters it demands.**
 Measured across the whole action matrix on 8.15: `isolate` is served under
 both `/api/endpoint/isolate` and `/api/endpoint/action/isolate`; every other

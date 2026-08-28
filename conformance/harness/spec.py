@@ -184,6 +184,31 @@ def _load_credentials(raw: Any, path: Path) -> dict[str, Credential]:
     return out
 
 
+#: What a probe entry and its `request` may name. An unknown key used to be
+#: dropped in silence, so a probe that wrote `params:` for `query:` ran
+#: against no parameters at all and reported that as agreement — the same
+#: silent wrongness this harness exists to catch.
+_PROBE_KEYS = frozenset({
+    "id", "endpoint", "request", "why", "ignore_paths", "needs_seed",
+    "compare", "ignore_leading_lines",
+})
+_REQUEST_KEYS = frozenset({
+    "method", "path", "query", "headers", "json", "content", "auth",
+})
+
+
+def _no_unknown_keys(
+    path: object, probe_id: str, what: str, entry: dict, allowed: frozenset,
+) -> None:
+    """Refuse a key the loader would otherwise drop without reading."""
+    unknown = sorted(set(entry) - allowed)
+    if unknown:
+        raise SpecError(
+            f"{path}: probe {probe_id!r}: unknown {what} key(s) "
+            f"{', '.join(unknown)}; allowed: {', '.join(sorted(allowed))}",
+        )
+
+
 def load_spec(path: Path) -> PlatformSpec:
     """Read and validate one platform's probe file."""
     raw = yaml.safe_load(path.read_text())
@@ -208,6 +233,7 @@ def load_spec(path: Path) -> PlatformSpec:
         probe_id = str(entry.get("id", "<unnamed>"))
         try:
             spec = entry["request"]
+            _no_unknown_keys(path, probe_id, "request", spec, _REQUEST_KEYS)
             request = Request(
                 method=str(spec.get("method", "GET")).upper(),
                 path=str(spec["path"]),
@@ -220,6 +246,7 @@ def load_spec(path: Path) -> PlatformSpec:
         except (KeyError, TypeError) as exc:
             raise SpecError(f"{path}: probe {probe_id!r}: {exc}") from exc
 
+        _no_unknown_keys(path, probe_id, "probe", entry, _PROBE_KEYS)
         if entry.get("endpoint") not in endpoints:
             raise SpecError(
                 f"{path}: probe {probe_id!r} names unknown endpoint "

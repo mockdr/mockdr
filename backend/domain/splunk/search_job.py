@@ -15,6 +15,9 @@ class SearchJob:
     latest_time: str = ""
     status_buckets: int = 0
     exec_mode: str = "normal"  # normal | blocking | oneshot
+    #: The arguments the client dispatched with, verbatim. splunkd echoes
+    #: exactly these back as `request`, and nothing it was not sent.
+    request: dict[str, str] = field(default_factory=dict)
 
     dispatch_state: str = "DONE"
     done_progress: float = 1.0

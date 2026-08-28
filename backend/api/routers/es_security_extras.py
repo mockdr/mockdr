@@ -22,6 +22,7 @@ from application.es_exception_lists import queries as exception_queries
 from application.es_rules import queries as rule_queries
 from repository.es_rule_repo import es_rule_repo
 from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_query import INVALID_KEYS, refuses_unknown
 from utils.kibana_validation import (
     ENDPOINT_ACTION_STATUS_QUERY,
     ConfigSchemaError,
@@ -360,7 +361,10 @@ def _import_payload(body: bytes, content_type: str) -> str:
 # ── Cases ────────────────────────────────────────────────────────────────────
 
 
-@router.get("/api/cases/status")
+@router.get(
+    "/api/cases/status",
+    dependencies=[refuses_unknown("owner", dialect=INVALID_KEYS)],
+)
 def case_status_counts(
     _: dict = Depends(require_es_auth),
 ) -> dict:
@@ -373,7 +377,10 @@ def case_status_counts(
     }
 
 
-@router.get("/api/cases/reporters")
+@router.get(
+    "/api/cases/reporters",
+    dependencies=[refuses_unknown("owner", dialect=INVALID_KEYS)],
+)
 def case_reporters(
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
@@ -528,7 +535,9 @@ def exception_list_summary(
     if not list_id:
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "list_id: Required"),
+            # Kibana's own wording, which the two exception-list routes
+            # beside this one already used: measured on 8.15.
+            detail=build_security_solution_error(400, "id or list_id required"),
         )
     try:
         items = exception_queries.find_items(
@@ -589,14 +598,31 @@ def endpoint_action_status(
     return {"data": data}
 
 
+#: How Kibana's route schema names a query member it wanted and did not get.
+_QUERY_REQUIRED = "[request query.{name}]: expected value of type [string] but got [undefined]"
+
+
 @router.get("/api/endpoint/action_log/{agent_id}")
 def endpoint_action_log(
     agent_id: str,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=1000),
+    start_date: str = Query(default=""),
+    end_date: str = Query(default=""),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Return the actions run against one endpoint, newest first."""
+    """Return the actions run against one endpoint, newest first.
+
+    The window is not optional: 8.15 refuses a request without `start_date`,
+    and then without `end_date`, naming each in turn — measured. mockdr
+    answered an empty log instead, so a client that had forgotten the window
+    was told the endpoint had done nothing.
+    """
+    for name, value in (("start_date", start_date), ("end_date", end_date)):
+        if not value:
+            raise HTTPException(status_code=400, detail=build_kbn_error_response(
+                400, _QUERY_REQUIRED.format(name=name),
+            ))
     # Repository order is insertion order, so serving it unsorted put the
     # *oldest* action on page 1 — the reverse of what this endpoint promises,
     # and the reverse of what an operator checking "what just happened" needs.
@@ -619,7 +645,17 @@ def endpoint_policy_response(
     agent_id: str = Query(default="", alias="agentId"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Report the endpoint's last policy application."""
+    """Report the endpoint's last policy application.
+
+    The endpoint is named by `agentId`, and a request without one is refused
+    by the route's schema before anything is looked up — measured. mockdr
+    answered `Endpoint  not found`, which says an endpoint with no name does
+    not exist rather than that the caller did not name one.
+    """
+    if not agent_id:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, _QUERY_REQUIRED.format(name="agentId"),
+        ))
     endpoint = endpoint_queries.get_endpoint(agent_id) if agent_id else None
     if endpoint is None:
         raise HTTPException(

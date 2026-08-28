@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from api.splunk_auth import require_splunk_auth
-from utils.splunk.response import build_splunk_entry, build_splunk_envelope
+from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
 
 router = APIRouter(tags=["Splunk Server"])
 
@@ -121,16 +121,25 @@ def server_settings(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
     """Return Splunk server settings."""
-    settings = {
+    # splunkd sends 25 members here, and the ports as numbers: `mgmtHostPort`
+    # was the string "0.0.0.0:8089", so a client reading it as the management
+    # port got a host glued to it. The rest come from the recorded entry.
+    settings = complete({
         "SPLUNK_HOME": "/opt/splunk",
         "SPLUNK_DB": "/opt/splunk/var/lib/splunk",
         "host": "mockdr-splunk",
-        "httpport": "8089",
-        "mgmtHostPort": "0.0.0.0:8089",
+        "httpport": 8000,
+        "mgmtHostPort": 8089,
         "enableSplunkWebSSL": False,
-    }
+    }, "server_settings")
     # splunkd names this entry `settings`, under its own collection — the
     # entry carried no collection at all, so it claimed to live at
     # `/services/server-settings`.
-    entry = build_splunk_entry("settings", settings, collection="server/settings")
-    return build_splunk_envelope([entry], total=1)
+    # Settings are edited in place, not created and not removed: splunkd
+    # offers no top-level `create` and no `remove` on the entry, and sends
+    # no `fields` block on a listing at all (measured on 10.4.2).
+    entry = build_splunk_entry(
+        "settings", settings, collection="server/settings",
+        links=("alternate", "edit", "list"), fields=False,
+    )
+    return build_splunk_envelope([entry], total=1, links={})

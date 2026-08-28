@@ -14,6 +14,7 @@ from utils.splunk.response import (
     complete,
     fixture_links,
 )
+from utils.splunk.spl_exec import SPLUNK_SERVER
 
 #: A job's links are its sub-resources, not edit/remove; its ACL has a ttl (a string)
 #: and no can_list/removable; and neither a job nor the job list carries a
@@ -135,6 +136,11 @@ def get_job(sid: str) -> dict | None:
     state, progress, done = _progress(job)
     content = {
         "sid": job.sid,
+        # What this job is, not what the recorded fixture was: these came
+        # from `search_jobs.json` alone, so every job reported the query that
+        # fixture had been recorded from — a client polling a job it had just
+        # dispatched read back somebody else's search.
+        **_search_members(job),
         "dispatchState": state,
         "doneProgress": progress,
         "eventCount": job.event_count,
@@ -178,6 +184,7 @@ def list_jobs() -> dict:
         state, progress, done = _progress(job)
         content = {
             "sid": job.sid,
+            **_search_members(job),
             "dispatchState": state,
             "doneProgress": progress,
             "eventCount": job.event_count,
@@ -270,14 +277,86 @@ def get_events(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     # No fallback to the results: a generating search matched no events, and
     # answering with the rows it produced put documents in `/events` that the
     # search never touched.
-    events = job.events
+    events = [
+        _with_internal_fields(event, offset + n)
+        for n, event in enumerate(_page(job.events, count, offset))
+    ]
     fields = list(events[0].keys()) if events else []
     return build_search_results(
-        _page(events, count, offset),
+        events,
         fields=fields,
         init_offset=offset,
         messages=job.messages,
     )
+
+
+def _search_members(job: SearchJob) -> dict[str, object]:
+    """The members of a job's content that repeat its own search.
+
+    splunkd renders the query several ways: `search` and `request.search`
+    are the client's text verbatim, and `eventSearch`, `optimizedSearch`,
+    `normalizedSearch` and `remoteSearch` are the planner's renderings of
+    it. The renderings here are approximations — mockdr has no planner — but
+    they name *this* job's query, which the fixture's did not.
+    """
+    text = job.search
+    return {
+        "search": text,
+        "request": dict(job.request) or {"search": text},
+        "eventSearch": text,
+        "optimizedSearch": f"| {text}" if text else "",
+        "normalizedSearch": text,
+        "remoteSearch": text,
+        "label": "",
+    }
+
+
+#: The instance a bucket belongs to. splunkd's `_bkt` names it, and a client
+#: that reads a bucket id back apart needs the three parts to line up.
+_BUCKET_GUID = "MOCKDR-SPLUNK-0000-0000-000000000001"
+_BUCKET_ID = 1
+
+#: What splunkd keeps with an event and returns from `/events`, beside the
+#: internal members it stamps on: the raw text, when it happened, and where
+#: it came from. Measured on 10.4.2.
+_INDEXED_MEMBERS = frozenset({"_raw", "_time", "host", "index", "source", "sourcetype"})
+
+
+def _with_internal_fields(event: dict, serial: int) -> dict:
+    """Attach the members splunkd puts on every event it returns.
+
+    `/events` served the indexed members alone: an event came back without
+    `_bkt`, `_cd`, `_indextime`, `_serial`, `_si`, `_sourcetype`, `linecount`
+    or `splunk_server` (measured on 10.4.2 against the same seeded event).
+    A client that de-duplicates on `_cd`, orders on `_serial`, or locates the
+    event's index through `_si` found none of them and had nothing to fall
+    back on — every event looked identical to every other.
+
+    They are strings, as splunkd sends them, and derived from the event so
+    that reading one twice gives the same answer.
+
+    What comes back beside them is the event as it was indexed — `_raw` and
+    the members splunkd keeps with it. mockdr also returned the fields it had
+    parsed *out* of `_raw`, which `/events` does not carry (measured on
+    10.4.2 against the same seeded event): a client reading `/events` to see
+    what was ingested saw mockdr's parse of it instead.
+    """
+    index = str(event.get("index") or "main")
+    raw = str(event.get("_raw") or "")
+    indexed = event.get("_indextime")
+    if indexed is None:
+        indexed = int(float(event.get("_time") or 0))
+    return {
+        "_bkt": f"{index}~{_BUCKET_ID}~{_BUCKET_GUID}",
+        "_cd": f"{_BUCKET_ID}:{serial}",
+        "_indextime": str(int(float(indexed))),
+        "_serial": str(serial),
+        "_si": [SPLUNK_SERVER, index],
+        "_sourcetype": str(event.get("sourcetype") or ""),
+        "linecount": str(raw.count("\n") + 1 if raw else 0),
+        "splunk_server": SPLUNK_SERVER,
+        **{k: v for k, v in event.items() if k in _INDEXED_MEMBERS},
+    }
 
 
 def get_summary(sid: str) -> dict | None:

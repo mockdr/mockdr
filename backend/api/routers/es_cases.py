@@ -14,6 +14,7 @@ from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_cases import commands as case_commands
 from application.es_cases import queries as case_queries
 from utils.es_response import build_kbn_error_response
+from utils.kibana_query import INVALID_KEYS, refuses_unknown
 from utils.kibana_validation import (
     CaseBodyError,
     FindQueryError,
@@ -79,7 +80,10 @@ def find_cases(
     )
 
 
-@router.get("/api/cases/tags")
+@router.get(
+    "/api/cases/tags",
+    dependencies=[refuses_unknown("owner", dialect=INVALID_KEYS)],
+)
 def get_tags(
     _: dict = Depends(require_es_auth),
 ) -> list[str]:

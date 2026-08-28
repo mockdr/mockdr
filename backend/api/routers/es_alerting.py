@@ -26,6 +26,7 @@ from fastapi import APIRouter, Depends, Query
 
 from api.es_auth import require_es_auth
 from config import APP_VERSION
+from utils.kibana_query import refuses_unknown
 
 router = APIRouter(tags=["Kibana Alerting"])
 
@@ -89,7 +90,14 @@ def rule_types(_: dict = Depends(require_es_auth)) -> list[dict]:
     return _RULE_TYPES
 
 
-@router.get("/api/alerting/rules/_find")
+@router.get(
+    "/api/alerting/rules/_find",
+    dependencies=[refuses_unknown(
+        "page", "per_page", "search", "default_search_operator", "search_fields",
+        "sort_field", "sort_order", "has_reference", "fields", "filter",
+        "filter_consumers",
+    )],
+)
 def find_rules(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=10, ge=0, le=1000),
@@ -110,7 +118,10 @@ def list_connectors(_: dict = Depends(require_es_auth)) -> list[dict]:
     return []
 
 
-@router.get("/api/actions/connector_types")
+@router.get(
+    "/api/actions/connector_types",
+    dependencies=[refuses_unknown("feature_id")],
+)
 def connector_types(
     _feature_id: str | None = Query(default=None, alias="feature_id"),
     _: dict = Depends(require_es_auth),

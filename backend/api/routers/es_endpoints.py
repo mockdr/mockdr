@@ -12,6 +12,7 @@ from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_query import refuses_unknown
 from utils.kibana_validation import (
     ENDPOINT_ACTION_BODY,
     ENDPOINT_METADATA_QUERY,
@@ -194,12 +195,26 @@ def scan_endpoint(
 # ── Action Status ────────────────────────────────────────────────────────────
 
 
-@router.get("/api/endpoint/action")
+@router.get(
+    "/api/endpoint/action",
+    dependencies=[refuses_unknown(
+        "agentIds", "page", "pageSize", "startDate", "endDate", "userIds",
+        "withOutputs", "commands", "statuses", "types", "agentTypes",
+    )],
+)
 def list_actions(
-    agent_id: str = Query(None),
+    agent_ids: list[str] = Query(default=[], alias="agentIds"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """List endpoint action responses, optionally filtered by agent ID."""
+    """List endpoint action responses, optionally filtered by agent.
+
+    8.15 spells the filter `agentIds`, and refuses `agent_id` outright:
+    `[request query.agent_id]: definition for this key is missing` — measured,
+    the schema is checked before the endpoint authorisation that otherwise
+    answers this route. mockdr took the snake_case spelling, so a client that
+    filtered here saw its filter work against the mock and 400 in production.
+    """
+    agent_id = agent_ids[0] if agent_ids else None
     actions = endpoint_commands.list_actions(agent_id)
     return {"data": actions, "total": len(actions), "page": 1, "per_page": len(actions) or 20}
 

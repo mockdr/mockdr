@@ -161,9 +161,11 @@ class TestKibanaReportsTheTruth:
         self, client: TestClient,
     ) -> None:
         """All-zero counts were indistinguishable from an empty list."""
-        assert client.get(
-            "/kibana/api/exception_lists/summary", headers=ES_AUTH,
-        ).status_code == 400
+        resp = client.get("/kibana/api/exception_lists/summary", headers=ES_AUTH)
+        assert resp.status_code == 400
+        # And in 8.15's words, which the two exception-list routes beside
+        # this one already used: it said `list_id: Required`.
+        assert resp.json()["message"] == "id or list_id required"
 
 
 class TestEndpointActions:
@@ -206,6 +208,10 @@ class TestEndpointActions:
             )
         entries = client.get(
             f"/kibana/api/endpoint/action_log/{agent}", headers=ES_AUTH,
+            params={
+                "start_date": "2020-01-01T00:00:00.000Z",
+                "end_date": "2030-01-01T00:00:00.000Z",
+            },
         ).json()["data"]
         stamps = [e["started_at"] for e in entries]
         assert len(stamps) >= 2
@@ -355,3 +361,113 @@ class TestKibanaRecordsWhoWroteARule:
             params={"rule_id": created["rule_id"]},
         ).json()
         assert read["updated_by"] == "analyst"
+
+
+class TestAJobNamesItsOwnQuery:
+    """What a client reads back after dispatching a search."""
+
+    def test_the_job_reports_the_search_it_was_given(self, client: TestClient) -> None:
+        """It reported the query the recorded fixture had been dispatched with.
+
+        `search`, `request` and `eventSearch` all came from
+        `search_jobs.json`, so a client polling a job it had just created
+        read back `search index=_internal | head 5` under HTTP 200.
+        """
+        query = "search index=sentinelone | head 3"
+        sid = client.post(
+            SPLUNK, data={"search": query}, headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()["sid"]
+
+        content = client.get(
+            f"{SPLUNK}/{sid}", headers=SPLUNK_AUTH, params={"output_mode": "json"},
+        ).json()["entry"][0]["content"]
+
+        assert content["search"] == query
+        assert content["eventSearch"] == query
+        assert content["request"] == {"search": query}
+
+    def test_the_job_echoes_the_arguments_it_was_sent_and_no_others(
+        self, client: TestClient,
+    ) -> None:
+        """splunkd repeats the dispatch arguments verbatim, `output_mode` aside."""
+        sid = client.post(
+            SPLUNK, data={"search": "search index=sentinelone", "exec_mode": "blocking"},
+            headers=SPLUNK_AUTH, params={"output_mode": "json"},
+        ).json()["sid"]
+
+        request = client.get(
+            f"{SPLUNK}/{sid}", headers=SPLUNK_AUTH, params={"output_mode": "json"},
+        ).json()["entry"][0]["content"]["request"]
+
+        assert request["exec_mode"] == "blocking"
+        assert "output_mode" not in request
+
+    def test_events_carry_what_splunkd_stamps_on_them(self, client: TestClient) -> None:
+        """`/events` served neither the internal members nor only the indexed ones.
+
+        A client de-duplicating on `_cd` or locating an event through `_si`
+        found nothing to read; what it did find were the fields mockdr had
+        parsed out of `_raw`, which `/events` does not carry.
+        """
+        sid = client.post(
+            SPLUNK, data={"search": "search index=sentinelone"}, headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()["sid"]
+
+        events = client.get(
+            f"{SPLUNK}/{sid}/events", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "count": 2},
+        ).json()["results"]
+
+        assert events, "the seeded index should have matched something"
+        stamped = {
+            "_bkt", "_cd", "_indextime", "_serial", "_si", "_sourcetype",
+            "linecount", "splunk_server",
+        }
+        assert stamped <= set(events[0])
+        assert events[0]["_serial"] == "0"
+        assert events[0]["_si"] == ["mockdr-splunk", events[0].get("index", "main")]
+        # And nothing beyond what splunkd keeps with the event.
+        assert set(events[0]) <= stamped | {
+            "_raw", "_time", "host", "index", "source", "sourcetype",
+        }
+
+
+class TestAnUnknownQueryMemberIsRefused:
+    """8.15 checks the query schema before the handler runs."""
+
+    @pytest.mark.parametrize(("path", "message"), [
+        ("/kibana/api/status", "[request query.zzz]: definition for this key is missing"),
+        ("/kibana/api/cases/tags", 'invalid keys "zzz,qqq"'),
+        (
+            "/kibana/api/timeline",
+            '[request query]: Invalid value {"zzz":"1","qqq":"2"}, '
+            'excess properties: ["zzz","qqq"]',
+        ),
+    ])
+    def test_each_validator_words_it_the_way_kibana_does(
+        self, client: TestClient, path: str, message: str,
+    ) -> None:
+        """Three validators, three wordings — measured on 8.15."""
+        resp = client.get(path, headers=ES_AUTH, params={"zzz": "1", "qqq": "2"})
+
+        assert resp.status_code == 400
+        assert resp.json()["message"] == message
+
+    def test_a_member_the_route_reads_is_not_refused(self, client: TestClient) -> None:
+        """The route's own members are allowed, whatever the measured list holds."""
+        assert client.get(
+            "/kibana/api/status", headers=ES_AUTH, params={"v8format": "true"},
+        ).status_code == 200
+
+    def test_the_action_filter_is_spelled_the_way_kibana_spells_it(
+        self, client: TestClient,
+    ) -> None:
+        """mockdr took `agent_id`, which 8.15 refuses outright."""
+        assert client.get(
+            "/kibana/api/endpoint/action", headers=ES_AUTH, params={"agent_id": "x"},
+        ).status_code == 400
+        assert client.get(
+            "/kibana/api/endpoint/action", headers=ES_AUTH, params={"agentIds": "x"},
+        ).status_code == 200

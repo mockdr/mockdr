@@ -20,6 +20,12 @@ ES_AUTH = {
     "kbn-xsrf": "true",
 }
 
+#: A window wide enough to hold anything a test writes.
+_WINDOW = {
+    "start_date": "2020-01-01T00:00:00.000Z",
+    "end_date": "2030-01-01T00:00:00.000Z",
+}
+
 
 class TestSplunkCatalogue:
     """``/services``, apps, messages and query parsing."""
@@ -324,6 +330,41 @@ class TestEndpointExtras:
             "/kibana/api/endpoint/metadata", headers=ES_AUTH,
         ).json()["data"][0]["metadata"]["agent"]["id"])
 
+    def test_the_action_log_needs_the_window_it_reports_on(
+        self, client: TestClient,
+    ) -> None:
+        """8.15 names `start_date`, then `end_date`; mockdr served an empty log.
+
+        A client that had forgotten the window was told the endpoint had
+        done nothing, which is the answer a client acts on.
+        """
+        agent_id = self._agent_id(client)
+        without = client.get(
+            f"/kibana/api/endpoint/action_log/{agent_id}", headers=ES_AUTH,
+        )
+        assert without.status_code == 400
+        assert "query.start_date" in without.json()["message"]
+
+        half = client.get(
+            f"/kibana/api/endpoint/action_log/{agent_id}", headers=ES_AUTH,
+            params={"start_date": _WINDOW["start_date"]},
+        )
+        assert half.status_code == 400
+        assert "query.end_date" in half.json()["message"]
+
+    def test_policy_response_without_an_agent_names_the_member(
+        self, client: TestClient,
+    ) -> None:
+        """It answered `Endpoint  not found` — that no such endpoint exists.
+
+        What the caller did was omit `agentId`, which the route's schema
+        refuses before anything is looked up.
+        """
+        resp = client.get("/kibana/api/endpoint/policy_response", headers=ES_AUTH)
+
+        assert resp.status_code == 400
+        assert "query.agentId" in resp.json()["message"]
+
     def test_action_log_is_scoped_to_the_agent(self, client: TestClient) -> None:
         agent_id = self._agent_id(client)
         client.post(
@@ -333,6 +374,7 @@ class TestEndpointExtras:
 
         body = client.get(
             f"/kibana/api/endpoint/action_log/{agent_id}", headers=ES_AUTH,
+            params=_WINDOW,
         ).json()
 
         assert body["total"] >= 1

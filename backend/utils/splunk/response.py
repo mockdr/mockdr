@@ -286,6 +286,24 @@ def _origin_of(entries: list[dict]) -> str:
         f"{_BASE_URL}/services")
 
 
+def _default_top_links(origin: str) -> dict[str, str]:
+    """Where a collection says a new member is created.
+
+    splunkd points at the collection's own `_new` — `/services/messages/_new`
+    for messages, `/services/authorization/roles/_new` for roles (measured
+    across seventeen collections on 10.4.2). mockdr answered
+    `{"create": "/services", "_reload": "/services/_reload"}` for every one
+    of them: a create target that exists nowhere in splunkd, and a `_reload`
+    most collections do not offer. A collection that offers more relations —
+    `_reload`, `_acl`, `_validate` — or none at all names them itself.
+    """
+    path = origin.split("/services", 1)[-1] if "/services" in origin else ""
+    path = path.rstrip("/")
+    if not path or path == "/":
+        return {}
+    return {"create": f"/services{path}/_new"}
+
+
 def build_splunk_envelope(
     entries: list[dict],
     *,
@@ -293,6 +311,7 @@ def build_splunk_envelope(
     offset: int = 0,
     per_page: int = 30,
     origin: str = "",
+    collection: str = "",
     links: dict[str, str] | None = None,
     paging: bool = True,
     messages: bool = True,
@@ -302,8 +321,8 @@ def build_splunk_envelope(
     ``paging`` and ``messages`` are not universal: ``server/status`` carries
     no paging block and the job list no messages array (measured on 10.4.2).
 
-    ``links`` replaces the default ``create``/``_reload`` pair when a
-    collection does not offer them — ``server/info`` has ``{}``.
+    ``links`` replaces the derived ``create`` link when a collection offers
+    more relations than that, or none — ``server/info`` has ``{}``.
 
     Args:
         entries:  List of entry dicts.
@@ -311,7 +330,11 @@ def build_splunk_envelope(
         offset:   Pagination offset.
         per_page: Page size.
         origin:   Origin URL for the response.
-        links:    Top-level link relations; ``None`` for the default pair.
+        collection: REST path of the collection, e.g. ``messages``. An empty
+                  listing has no entry to read the collection off, so
+                  without this it named neither its origin nor its links.
+        links:    Top-level link relations; ``None`` to derive ``create``
+                  from the collection the entries belong to.
         paging:   Emit the ``paging`` block.
         messages: Emit the ``messages`` array.
 
@@ -320,11 +343,12 @@ def build_splunk_envelope(
     """
     if total is None:
         total = len(entries)
+    origin_url = origin or (
+        f"{_BASE_URL}/services/{collection.strip('/')}" if collection else _origin_of(entries)
+    )
     envelope: dict = {
-        "links": (
-            {"create": "/services", "_reload": "/services/_reload"} if links is None else links
-        ),
-        "origin": origin or _origin_of(entries),
+        "links": _default_top_links(origin_url) if links is None else links,
+        "origin": origin_url,
         "updated": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
         "generator": {"build": _SPLUNK_BUILD, "version": _SPLUNK_VERSION},
         "entry": entries,

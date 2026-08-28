@@ -1,0 +1,49 @@
+{
+  "content": {
+    "SPLUNK_DB": "/opt/splunk/var/lib/splunk",
+    "SPLUNK_HOME": "/opt/splunk",
+    "appServerPorts": [
+      8065
+    ],
+    "caTrustStore": "splunk",
+    "caTrustStorePath": "",
+    "dataFederationDisabled": false,
+    "eai:acl": null,
+    "enableSplunkWebSSL": false,
+    "host": "mockdr-splunk",
+    "host_resolved": "mockdr-splunk",
+    "httpport": 8000,
+    "invalidateSessionTokensOnLogout": false,
+    "kvStoreDisabled": false,
+    "kvStorePort": 8191,
+    "logoutCacheRefreshInterval": "30s",
+    "mgmtHostPort": 8089,
+    "minFreeSpace": 5000,
+    "pass4SymmKey": "$7$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "python.version": "force_python3",
+    "serverName": "mockdr-splunk",
+    "sessionTimeout": "1h",
+    "skipSearchSessionTokenInvalidationOnLogout": true,
+    "startwebserver": true,
+    "trustedIP": "",
+    "unbiasLanguageForLogging": false
+  },
+  "links": [
+    "alternate",
+    "edit",
+    "list"
+  ],
+  "acl_keys": [
+    "app",
+    "can_list",
+    "can_write",
+    "modifiable",
+    "owner",
+    "perms",
+    "removable",
+    "sharing"
+  ],
+  "has_fields": false,
+  "top_links": {},
+  "source": "Splunk 10.4.2, GET /services/server/settings?output_mode=json"
+}

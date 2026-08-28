@@ -70,9 +70,16 @@ async def create_job(
     latest_time = ""
     exec_mode = "normal"
 
+    # What the client actually sent, which the job echoes back as `request`:
+    # splunkd repeats those arguments and no others, and mockdr answered a
+    # recorded fixture's arguments instead — every job reported having been
+    # dispatched with a query no client had ever sent.
+    dispatched: dict[str, str] = {}
+
     content_type = request.headers.get("content-type", "")
     if "form" in content_type:
         form = await request.form()
+        dispatched = {k: str(v) for k, v in form.items() if isinstance(v, str)}
         search = str(form.get("search", ""))
         earliest_time = str(form.get("earliest_time", ""))
         latest_time = str(form.get("latest_time", ""))
@@ -80,6 +87,7 @@ async def create_job(
     else:
         try:
             body = await request.json()
+            dispatched = {k: str(v) for k, v in body.items()}
             search = body.get("search", "")
             earliest_time = body.get("earliest_time", "")
             latest_time = body.get("latest_time", "")
@@ -98,6 +106,7 @@ async def create_job(
             earliest_time=earliest_time,
             latest_time=latest_time,
             exec_mode=exec_mode,
+            request={k: v for k, v in dispatched.items() if k != "output_mode"},
         )
     except (InvalidTimeParameterError, UnknownSearchCommandError) as exc:
         raise HTTPException(status_code=400, detail={"messages": [

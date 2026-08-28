@@ -251,7 +251,8 @@ class TestListActions:
         body = client.get(
             "/kibana/api/endpoint/action",
             headers=ES_AUTH,
-            params={"agent_id": agent_id},
+            # 8.15 spells it `agentIds` and refuses `agent_id` outright.
+            params={"agentIds": agent_id},
         ).json()
         assert body["total"] >= 1
         actions = body["data"]

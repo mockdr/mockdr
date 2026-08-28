@@ -21,13 +21,14 @@ from api.es_auth import optional_es_auth, require_es_auth
 from application.es_endpoints import queries as endpoint_queries
 from config import APP_VERSION
 from utils.es_response import build_kbn_error_response
+from utils.kibana_query import EXCESS, INVALID_KEYS, refuses_unknown
 
 router = APIRouter(tags=["Kibana Platform"])
 
 _KIBANA_VERSION = "8.12.0"
 
 
-@router.get("/api/status")
+@router.get("/api/status", dependencies=[refuses_unknown("v8format")])
 async def kibana_status(request: Request) -> dict:
     """Report instance health, as ``/api/status`` does.
 
@@ -80,7 +81,7 @@ _FEATURES: list[dict] = json.loads(
 )
 
 
-@router.get("/api/features")
+@router.get("/api/features", dependencies=[refuses_unknown("ignoreValidLicenses")])
 def list_features(
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
@@ -88,7 +89,10 @@ def list_features(
     return _FEATURES
 
 
-@router.get("/api/spaces/space")
+@router.get(
+    "/api/spaces/space",
+    dependencies=[refuses_unknown("purpose", "include_authorized_purposes")],
+)
 def list_spaces(
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
@@ -132,7 +136,13 @@ def get_space(
     return space
 
 
-@router.get("/api/fleet/agents")
+@router.get(
+    "/api/fleet/agents",
+    dependencies=[refuses_unknown(
+        "page", "perPage", "kuery", "showInactive", "showUpgradeable", "sortField",
+        "sortOrder", "getStatusSummary", "withMetrics",
+    )],
+)
 def list_fleet_agents(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=1000, alias="perPage"),
@@ -219,7 +229,12 @@ def list_data_views(_: dict = Depends(require_es_auth)) -> dict:
     return {"data_view": []}
 
 
-@router.get("/api/fleet/agent_policies")
+@router.get(
+    "/api/fleet/agent_policies",
+    dependencies=[refuses_unknown(
+        "page", "perPage", "kuery", "sortField", "sortOrder", "full", "noAgentCount",
+    )],
+)
 def list_agent_policies(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=1000, alias="perPage"),
@@ -259,7 +274,10 @@ def list_timelines(_: dict = Depends(require_es_auth)) -> dict:
     }
 
 
-@router.get("/api/timeline")
+@router.get(
+    "/api/timeline",
+    dependencies=[refuses_unknown("id", "template_timeline_id", dialect=EXCESS)],
+)
 def get_timeline(
     _id: str | None = Query(default=None, alias="id"),
     _: dict = Depends(require_es_auth),
@@ -268,13 +286,21 @@ def get_timeline(
     return {}
 
 
-@router.get("/api/note")
+@router.get(
+    "/api/note",
+    dependencies=[refuses_unknown(
+        "page", "perPage", "search", "sortField", "sortOrder", "filter", "documentIds",
+    )],
+)
 def list_notes(_: dict = Depends(require_es_auth)) -> dict:
     """The notes attached to timelines and events."""
     return {"notes": [], "totalCount": 0}
 
 
-@router.get("/api/cases/configure")
+@router.get(
+    "/api/cases/configure",
+    dependencies=[refuses_unknown("owner", dialect=INVALID_KEYS)],
+)
 def case_configuration(_: dict = Depends(require_es_auth)) -> list[dict]:
     """The case connectors this space configures, of which mockdr has none."""
     return []

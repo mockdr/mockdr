@@ -137,7 +137,7 @@ def _with_seed(
         else httpx.USE_CLIENT_DEFAULT
     )
     try:
-        context.update(seed_search_job(target, clients, auth))
+        context.update(seed_search_job(target, clients, auth, _RUN_SOURCETYPE))
     except SeedError as exc:
         raise BootstrapError(str(exc)) from exc
     return context

@@ -86,7 +86,12 @@ def list_apps(
         )
         for app in _APPS
     ]
-    return build_splunk_envelope(entries)
+    # splunkd offers a `_reload` here beside the `create` every collection
+    # derives; measured on 10.4.2.
+    return build_splunk_envelope(entries, links={
+        "create": "/services/apps/local/_new",
+        "_reload": "/services/apps/local/_reload",
+    })
 
 
 def _app_content(app: dict[str, object]) -> dict[str, object]:
@@ -123,8 +128,12 @@ def list_messages(
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
-    """List system messages. A healthy instance reports none."""
-    return build_splunk_envelope([])
+    """List system messages. A healthy instance reports none.
+
+    An empty listing still names where a message is created; the link was
+    derived from the entries, so with none it named nothing at all.
+    """
+    return build_splunk_envelope([], collection="messages")
 
 
 #: How splunkd classifies each command it knows. ``pipeline`` is the stage a

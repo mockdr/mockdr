@@ -379,6 +379,11 @@ probes:
       - $.entry[*].content.searchTelemetry.desc.sourcetypes
       - $.entry[*].content.searchTelemetry.search_commands
       - $.entry[*].content.searchTelemetry.perf
+      # Each listed job echoes the arguments *its own* client sent, and the
+      # two instances hold different jobs dispatched by different clients.
+      # `spl-job-by-sid` compares this on a job both sides dispatched the
+      # same way, which is where the echo can be compared at all.
+      - $.entry[*].content.request
       - $.entry[*].content.indexEarliestTime
       - $.entry[*].content.indexLatestTime
       - $.entry[*].content.isGoodSummarizationCandidate
@@ -3069,7 +3074,7 @@ probes:
     request:
       method: GET
       path: /services/authorization/capabilities
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
 
   - id: splunk-server-settings
@@ -3078,7 +3083,7 @@ probes:
     request:
       method: GET
       path: /services/server/settings
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
 
   - id: splunk-messages
@@ -3087,7 +3092,7 @@ probes:
     request:
       method: GET
       path: /services/messages
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
 
   - id: splunk-kvstore-collections-config
@@ -3096,7 +3101,7 @@ probes:
     request:
       method: GET
       path: /services/storage/collections/config
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
 
   - id: splunk-tcp-raw-inputs
@@ -3105,7 +3110,7 @@ probes:
     request:
       method: GET
       path: /services/data/inputs/tcp/raw
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
 
   - id: splunk-props-extractions
@@ -3114,7 +3119,7 @@ probes:
     request:
       method: GET
       path: /services/data/props/extractions
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
 
   # ── The versioned spellings of the collector (2.3.1) ──────────────────
@@ -3189,8 +3194,16 @@ probes:
     request:
       method: GET
       path: /services/search/v2/jobs/${seed_sid}
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic
+    ignore_paths:
+      # splunkd's own timing report: which nodes appear depends on which
+      # commands its planner ran and how long each took, so the tree differs
+      # between two runs of the same search on the same instance. mockdr has
+      # no planner to measure. The telemetry block is keyed by the run's
+      # sourcetype, which is new on every run.
+      - $.entry[*].content.performance
+      - $.entry[*].content.searchTelemetry
 
   - id: spl-job-events
     endpoint: management
@@ -3199,7 +3212,7 @@ probes:
     request:
       method: GET
       path: /services/search/v2/jobs/${seed_sid}/events
-      params: {output_mode: json, count: 1}
+      query: {output_mode: json, count: 1}
       auth: basic
 
   - id: spl-job-by-a-sid-nobody-has
@@ -3210,5 +3223,5 @@ probes:
     request:
       method: GET
       path: /services/search/v2/jobs/1234567890.99999
-      params: {output_mode: json}
+      query: {output_mode: json}
       auth: basic

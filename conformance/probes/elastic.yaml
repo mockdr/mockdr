@@ -3876,3 +3876,148 @@ probes:
       json: {endpoint_ids: ["probe"], comment: "conformance-probe"}
       headers: {kbn-xsrf: "true"}
       auth: basic
+
+  # ── Query members these routes are about (2.3.1) ──────────────────────
+
+  - id: kbn-exception-list-summary-without-a-list
+    endpoint: kibana
+    why: >
+      A summary of nothing is not an empty summary. Both name the member
+      they wanted.
+    request: {method: GET, path: /api/exception_lists/summary, auth: basic}
+
+  - id: kbn-policy-response-without-an-agent
+    endpoint: kibana
+    why: >
+      The endpoint is named by `agentId`, and the schema refuses a request
+      without one before anything is looked up. mockdr answered
+      `Endpoint  not found`, which says an endpoint with no name does not
+      exist rather than that the caller did not name one.
+    request: {method: GET, path: /api/endpoint/policy_response, auth: basic}
+
+  - id: kbn-action-log-without-a-window
+    endpoint: kibana
+    why: >
+      The window is not optional: 8.15 names `start_date`, and then
+      `end_date`. mockdr answered an empty log, so a client that had
+      forgotten the window was told the endpoint had done nothing.
+    request:
+      method: GET
+      path: /api/endpoint/action_log/probe-agent
+      auth: basic
+
+  - id: kbn-action-log-with-only-a-start
+    endpoint: kibana
+    why: The second half of the window, named once the first is there.
+    request:
+      method: GET
+      path: /api/endpoint/action_log/probe-agent
+      query: {start_date: "2020-01-01T00:00:00.000Z"}
+      auth: basic
+
+  - id: es-cache-clear
+    endpoint: search
+    needs_seed: true
+    why: What a cluster answers when a client clears an index's caches.
+    request:
+      method: POST
+      path: /${seed_index}/_cache/clear
+      auth: basic
+    ignore_paths:
+      - $._shards.total
+
+  # ── An unknown query member is refused, in three dialects (2.3.1) ──────
+  #
+  # 8.15 does not ignore a query member its route does not declare: it
+  # refuses the request, and its three validators word that refusal three
+  # ways. mockdr answered 200 and ignored the member, so a client that
+  # misspelled a filter saw an unfiltered result reported as a filtered one.
+
+  - id: kbn-status-refuses-an-unknown-member
+    endpoint: kibana
+    why: config-schema names the first unknown member, in the order sent.
+    request: {method: GET, path: /api/status, query: {zzz: "1", qqq: "2"}, auth: basic}
+
+  - id: kbn-features-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/features, query: {zzz: "1"}, auth: basic}
+
+  - id: kbn-spaces-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/spaces/space, query: {zzz: "1"}, auth: basic}
+
+  - id: kbn-connector-types-refuses-an-unknown-member
+    endpoint: kibana
+    request:
+      method: GET
+      path: /api/actions/connector_types
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: kbn-alerting-find-refuses-an-unknown-member
+    endpoint: kibana
+    request:
+      method: GET
+      path: /api/alerting/rules/_find
+      query: {per_page: "1", zzz: "1"}
+      auth: basic
+
+  - id: kbn-fleet-agents-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/fleet/agents, query: {zzz: "1"}, auth: basic}
+
+  - id: kbn-fleet-policies-refuses-an-unknown-member
+    endpoint: kibana
+    request:
+      method: GET
+      path: /api/fleet/agent_policies
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: kbn-endpoint-action-refuses-an-unknown-member
+    endpoint: kibana
+    why: >
+      And `agent_id` is one of them: 8.15 spells this filter `agentIds`,
+      and mockdr took the snake_case spelling, so a client's filter worked
+      against the mock and 400s in production.
+    request:
+      method: GET
+      path: /api/endpoint/action
+      query: {agent_id: "x"}
+      auth: basic
+
+  - id: kbn-note-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/note, query: {zzz: "1"}, auth: basic}
+
+  - id: kbn-timeline-refuses-an-unknown-member
+    endpoint: kibana
+    why: >
+      The runtime-type dialect: the query echoed back as JSON, then the
+      excess named separately.
+    request:
+      method: GET
+      path: /api/timeline
+      query: {id: "abc", zzz: "1", qqq: "2"}
+      auth: basic
+
+  - id: kbn-cases-tags-refuses-an-unknown-member
+    endpoint: kibana
+    why: The io-ts dialect names every unknown member, comma-joined.
+    request:
+      method: GET
+      path: /api/cases/tags
+      query: {zzz: "1", qqq: "2"}
+      auth: basic
+
+  - id: kbn-cases-status-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/cases/status, query: {zzz: "1"}, auth: basic}
+
+  - id: kbn-cases-reporters-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/cases/reporters, query: {zzz: "1"}, auth: basic}
+
+  - id: kbn-cases-configure-refuses-an-unknown-member
+    endpoint: kibana
+    request: {method: GET, path: /api/cases/configure, query: {zzz: "1"}, auth: basic}

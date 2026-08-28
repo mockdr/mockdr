@@ -127,12 +127,16 @@ def list_roles() -> dict:
 def list_capabilities() -> dict:
     """Return available capabilities."""
     all_caps = sorted(set(ADMIN_CAPABILITIES + SC_ADMIN_CAPABILITIES + USER_CAPABILITIES))
-    return build_splunk_envelope(
-        [
-            build_splunk_entry(
-                "capabilities",
-                {"capabilities": all_caps},
-                collection="authorization/capabilities",
-            )
-        ],
+    # A capability is neither created, edited nor removed: splunkd offers no
+    # top-level links at all and only `alternate`/`list` on the entry, sends
+    # no `fields` block, and carries a null `eai:acl` inside `content`
+    # (measured on 10.4.2).
+    entry = build_splunk_entry(
+        "capabilities",
+        {"capabilities": all_caps},
+        collection="authorization/capabilities",
+        links=("alternate", "list"),
+        fields=False,
     )
+    entry["content"]["eai:acl"] = None
+    return build_splunk_envelope([entry], links={})

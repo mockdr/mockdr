@@ -248,7 +248,9 @@ def seed_kibana_case(target: str, clients: Clients, auth: object) -> dict[str, s
     }
 
 
-def seed_search_job(target: str, clients: Clients, auth: object) -> dict[str, str]:
+def seed_search_job(
+    target: str, clients: Clients, auth: object, sourcetype: str = "",
+) -> dict[str, str]:
     """Dispatch a search on one target and hand back its sid.
 
     Three routes are addressed by the sid of a job that exists — reading it,
@@ -263,9 +265,14 @@ def seed_search_job(target: str, clients: Clients, auth: object) -> dict[str, st
         SeedError: If the target would not dispatch the search.
     """
     client = clients.get("management", target)
+    # Scoped to this run's own events: `index=main | head 1` took whichever
+    # event happened to be first, and the two targets hold different ones, so
+    # the events probe compared a seeded event against an unrelated leftover
+    # and reported the difference between them as a defect.
+    scope = f"sourcetype={sourcetype}" if sourcetype else ""
     made = client.post(
         "/services/search/jobs",
-        content=f"search=search index={SEED_INDEX} | head 1&output_mode=json",
+        content=f"search=search index={SEED_INDEX} {scope} | head 1&output_mode=json",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         auth=auth,
     )

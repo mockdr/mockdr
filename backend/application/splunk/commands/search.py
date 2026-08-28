@@ -84,6 +84,7 @@ def create_search_job(
     latest_time: str = "",
     exec_mode: str = "normal",
     status_buckets: int = 0,
+    request: dict[str, str] | None = None,
 ) -> str:
     """Create a search job, execute the SPL query, and store results.
 
@@ -93,6 +94,8 @@ def create_search_job(
         latest_time:    Latest time modifier.
         exec_mode:      Execution mode (normal, blocking, oneshot).
         status_buckets: Number of status buckets.
+        request:        The dispatch arguments as the client sent them,
+                        which the job echoes back unchanged.
 
     Returns:
         The search job SID.
@@ -133,6 +136,7 @@ def create_search_job(
         earliest_time=earliest_time,
         latest_time=latest_time,
         exec_mode=exec_mode,
+        request=dict(request or {"search": search}),
         status_buckets=status_buckets,
         dispatch_state="FAILED" if failed else "DONE",
         is_failed=failed,
