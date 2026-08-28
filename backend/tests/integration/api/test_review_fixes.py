@@ -615,3 +615,61 @@ class TestAnUnknownClusterParameterIsRefused:
         assert client.get(
             "/elastic/_cat/indices/sentinelone", headers=self.ES,
         ).status_code == 200
+
+
+class TestAnUnknownSplunkArgumentIsRefused:
+    """splunkd refuses an argument its handler does not take."""
+
+    @pytest.mark.parametrize("collection", [
+        "authorization/capabilities", "admin/macros", "saved/eventtypes",
+        "server/health/splunkd", "data/inputs/monitor", "kvstore/status",
+    ])
+    def test_the_collections_that_used_to_ignore_it_refuse_it(
+        self, client: TestClient, collection: str,
+    ) -> None:
+        resp = client.get(
+            f"/splunk/services/{collection}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "zzz": "1"},
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["messages"][0]["text"] == (
+            'Argument "zzz" is not supported by this handler.'
+        )
+
+    def test_the_alphabetically_first_is_named(self, client: TestClient) -> None:
+        """Not the first one sent — measured with the two swapped."""
+        for order in ([("zzz", "1"), ("aaa", "2")], [("aaa", "2"), ("zzz", "1")]):
+            resp = client.get(
+                "/splunk/services/admin/macros", headers=SPLUNK_AUTH,
+                params=[("output_mode", "json"), *order],
+            )
+            assert resp.json()["messages"][0]["text"] == (
+                'Argument "aaa" is not supported by this handler.'
+            )
+
+    def test_add_orphan_field_belongs_to_saved_searches_alone(
+        self, client: TestClient,
+    ) -> None:
+        """It was in the set every collection shares, and is not."""
+        assert client.get(
+            "/splunk/services/server/info", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "add_orphan_field": "true"},
+        ).status_code == 400
+        assert client.get(
+            "/splunk/services/saved/searches", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "add_orphan_field": "true"},
+        ).status_code == 200
+
+    def test_the_longer_collection_path_wins_the_prefix(
+        self, client: TestClient,
+    ) -> None:
+        """`data/indexes` takes `summarize`; `data/indexes-extended` does not."""
+        assert client.get(
+            "/splunk/services/data/indexes", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "summarize": "false"},
+        ).status_code == 200
+        assert client.get(
+            "/splunk/services/data/indexes-extended", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "summarize": "false"},
+        ).status_code == 400

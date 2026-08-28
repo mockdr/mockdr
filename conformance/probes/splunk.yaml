@@ -3270,3 +3270,105 @@ probes:
       path: /services/authentication/users/admin
       query: {output_mode: json}
       auth: basic
+
+  # ── An argument the handler does not take is a refusal (2.3.1) ─────────
+  #
+  # splunkd names the alphabetically first of them, whatever order they
+  # arrived in. mockdr refused on twelve collections and ignored the rest,
+  # so a client that misspelled `sort_key` got the collection in whatever
+  # order the mock held it and read that as the order it had asked for. And
+  # `add_orphan_field` was in mockdr's common set where splunkd gives it to
+  # `saved/searches` alone.
+
+  - id: splunk-capabilities-refuses-an-unknown-argument
+    endpoint: management
+    request:
+      method: GET
+      path: /services/authorization/capabilities
+      query: {output_mode: json, zzz: "1"}
+      auth: basic
+
+  - id: splunk-macros-refuses-an-unknown-argument
+    endpoint: management
+    why: The alphabetically first is named, not the first sent.
+    request:
+      method: GET
+      path: /services/admin/macros
+      query: {output_mode: json, zzz: "1", aaa: "2"}
+      auth: basic
+
+  - id: splunk-eventtypes-refuses-an-unknown-argument
+    endpoint: management
+    request:
+      method: GET
+      path: /services/saved/eventtypes
+      query: {output_mode: json, zzz: "1"}
+      auth: basic
+
+  - id: splunk-health-refuses-an-unknown-argument
+    endpoint: management
+    request:
+      method: GET
+      path: /services/server/health/splunkd
+      query: {output_mode: json, zzz: "1"}
+      auth: basic
+
+  - id: splunk-server-info-refuses-add-orphan-field
+    endpoint: management
+    why: >
+      It belongs to `saved/searches` alone; mockdr had it in the set every
+      collection shares.
+    request:
+      method: GET
+      path: /services/server/info
+      query: {output_mode: json, add_orphan_field: "true"}
+      auth: basic
+
+  - id: splunk-saved-searches-takes-add-orphan-field
+    endpoint: management
+    why: The other half of the same measurement — here splunkd takes it.
+    request:
+      method: GET
+      path: /services/saved/searches
+      query: {output_mode: json, add_orphan_field: "true", count: "1"}
+      auth: basic
+    ignore_paths:
+      - $.entry
+      - $.paging.total
+      - $.origin
+
+  - id: splunk-indexes-takes-summarize
+    endpoint: management
+    why: >
+      `data/indexes` takes `datatype` and `summarize`, which mockdr refused;
+      `data/indexes-extended` takes only `datatype`, so the longer path has
+      to win the prefix match.
+    request:
+      method: GET
+      path: /services/data/indexes
+      query: {output_mode: json, summarize: "false", count: "1"}
+      auth: basic
+    ignore_paths:
+      - $.entry
+      - $.paging.total
+      - $.origin
+
+  - id: splunk-indexes-extended-refuses-summarize
+    endpoint: management
+    request:
+      method: GET
+      path: /services/data/indexes-extended
+      query: {output_mode: json, summarize: "false"}
+      auth: basic
+
+  - id: splunk-apps-takes-refresh
+    endpoint: management
+    request:
+      method: GET
+      path: /services/apps/local
+      query: {output_mode: json, refresh: "false", count: "1"}
+      auth: basic
+    ignore_paths:
+      - $.entry
+      - $.paging.total
+      - $.origin

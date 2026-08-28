@@ -93,8 +93,22 @@ _SORT_MISMATCH = "Number of sort_key and sort_dir arguments do not match."
 #: name — which is how splunkd tells a client its parameter did nothing.
 _COLLECTION_ARGS = frozenset({
     "count", "offset", "search", "sort_key", "sort_dir", "sort_mode", "f",
-    "add_orphan_field", "output_mode",
+    "output_mode",
 })
+
+#: What a few collections take on top of those eight. `add_orphan_field` was
+#: in the common set and belongs to `saved/searches` alone, so `server/info`
+#: accepted an argument splunkd refuses; the other four were refused here and
+#: splunkd takes them (all measured on 10.4.2, every candidate asked of every
+#: collection — `scripts/splunk_arg_audit.py`).
+_COLLECTION_EXTRAS = {
+    "/splunk/services/apps/local": frozenset({"refresh"}),
+    "/splunk/services/data/indexes": frozenset({"datatype", "summarize"}),
+    "/splunk/services/data/indexes-extended": frozenset({"datatype"}),
+    "/splunk/services/saved/searches": frozenset({
+        "add_orphan_field", "earliest_time", "latest_time",
+    }),
+}
 
 #: The collections that refuse an argument they do not declare. The others
 #: take anything: `search/jobs` and `data/inputs/http` have handlers of their
@@ -102,18 +116,42 @@ _COLLECTION_ARGS = frozenset({
 #: measured on 10.4.2).
 _STRICT_COLLECTIONS = (
     "/splunk/services/saved/searches",
+    "/splunk/services/saved/eventtypes",
     "/splunk/services/data/indexes",
+    "/splunk/services/data/inputs/monitor",
+    "/splunk/services/data/inputs/tcp/raw",
+    "/splunk/services/data/lookup-table-files",
+    "/splunk/services/data/props/extractions",
+    "/splunk/services/data/transforms/lookups",
     "/splunk/services/apps/local",
+    "/splunk/services/admin/macros",
     "/splunk/services/authentication/users",
+    "/splunk/services/authentication/current-context",
     "/splunk/services/authorization/roles",
+    "/splunk/services/authorization/capabilities",
+    "/splunk/services/authorization/grantable_capabilities",
     "/splunk/services/alerts/fired_alerts",
+    "/splunk/services/kvstore/status",
     "/splunk/services/server/info",
     "/splunk/services/server/settings",
+    "/splunk/services/server/health/splunkd",
     "/splunk/services/data/ui/views",
     "/splunk/services/messages",
     "/splunk/services/cluster/config",
     "/splunk/services/licenser/licenses",
 )
+
+
+def _extras(path: str) -> frozenset[str]:
+    """What this collection takes beyond the eight every one of them does.
+
+    Longest prefix first: `data/indexes` is a prefix of
+    `data/indexes-extended`, which takes `datatype` and not `summarize`.
+    """
+    for prefix in sorted(_COLLECTION_EXTRAS, key=len, reverse=True):
+        if path.startswith(prefix):
+            return _COLLECTION_EXTRAS[prefix]
+    return frozenset()
 
 
 class SplunkOutputModeMiddleware:
@@ -244,9 +282,13 @@ def _refusal(
     ):
         return f'Unknown sort order "{directions[0]}".', as_json, "ERROR"
 
-    if path.rstrip("/").startswith(_STRICT_COLLECTIONS):
-        for name in query:
-            if name not in _COLLECTION_ARGS:
+    trimmed = path.rstrip("/")
+    if trimmed.startswith(_STRICT_COLLECTIONS):
+        allowed = _COLLECTION_ARGS | _extras(trimmed)
+        # splunkd names the alphabetically first of them, whatever order they
+        # arrived in — measured with `?zzz=1&aaa=2` and with the two swapped.
+        for name in sorted(query):
+            if name not in allowed:
                 return (
                     f'Argument "{name}" is not supported by this handler.',
                     as_json, "ERROR",

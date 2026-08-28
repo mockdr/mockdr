@@ -100,6 +100,20 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**An argument splunkd's handler does not take is a refusal too.**
+Same shape, third product: splunkd names the alphabetically first argument
+it does not recognise — whatever order they arrived in — and mockdr refused
+on twelve collections and ignored the rest. A client that misspelled
+`sort_key` got the collection in whatever order the mock held it and read
+that as the order it had asked for. Twenty-four collections refuse it now,
+and the common set is right in the other direction as well:
+`add_orphan_field` was in it and belongs to `saved/searches` alone, while
+`refresh`, `summarize`, `datatype`, `earliest_time` and `latest_time` were
+refused where splunkd takes them. `data/indexes-extended` takes `datatype`
+and not `summarize`, so the longer collection path has to win the prefix
+match. `scripts/splunk_arg_audit.py` asks all of it — every candidate of
+every collection, in both directions.
+
 **A listing named four things nothing would serve.**
 splunkd addresses a collection both ways, and splunklib's `.list()` followed
 by `[name]` uses both. mockdr listed roles, the capabilities entry, the
