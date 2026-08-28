@@ -4,6 +4,33 @@ from config import DV_FINISH_DELAY_SECONDS
 from repository.dv_query_repo import dv_query_repo
 from utils.pagination import build_list_response, paginate
 
+#: The mode a Deep Visibility query ran in. `queryModeInfo` is on every
+#: status the 2.1 swagger declares, and this answered neither it nor
+#: `warnings` — while answering a `queryId` and a `status` the swagger
+#: declares nowhere, the second of them a duplicate of `responseState` under
+#: a name the vendor does not use.
+_QUERY_MODE = "scalyr"
+
+
+def _status_body(state: str, progress: int, activated_at: str = "") -> dict:
+    """The status body `DvQueryStatusResponse` declares.
+
+    `lastActivatedAt` is a `date-time` string in the swagger, so the mode
+    carries when it was last active — which for this install is when the
+    query it belongs to started.
+    """
+    body: dict = {
+        "responseState": state,
+        "progressStatus": progress,
+        "queryModeInfo": {"mode": _QUERY_MODE, "lastActivatedAt": activated_at},
+        # The swagger declares this a string, not a list.
+        "warnings": "",
+    }
+    if state in ("FAILED", "FAILED_CLIENT"):
+        # The swagger says so: relevant only for these two.
+        body["responseError"] = ""
+    return body
+
 
 def get_query_status(query_id: str) -> dict | None:
     """Return the current status and progress of a Deep Visibility query.
@@ -28,22 +55,8 @@ def get_query_status(query_id: str) -> dict | None:
             query.status = "FINISHED"
             dv_query_repo.save(query)
             progress = 100
-        return {
-            "data": {
-                "queryId": query_id,
-                "responseState": query.status,
-                "progressStatus": progress,
-                "status": query.status,
-            }
-        }
-    return {
-        "data": {
-            "queryId": query_id,
-            "responseState": query.status,
-            "progressStatus": 100,
-            "status": query.status,
-        }
-    }
+        return {"data": _status_body(query.status, progress, query.createdAt)}
+    return {"data": _status_body(query.status, 100, query.createdAt)}
 
 
 def get_events(

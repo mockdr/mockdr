@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Three Deep Visibility routes that had never been compared.**
+`/dv/query-status`, `/dv/events` and `/dv/events/{type}` all take the
+`queryId` that `POST /dv/init-query` answers, and the drift audit could not
+make one — the swagger branch took only global parameters, so all three sat
+behind `HTTP 400 (skipped)` while the run reported no findings. Compared at
+last, the status answered a `queryId` and a `status` the 2.1 swagger declares
+nowhere — the second a duplicate of `responseState` under a name the vendor
+does not use — and carried neither `queryModeInfo` nor `warnings`, which it
+does declare. It answers the declared shape now, `responseError` included
+only for the two states the swagger says it belongs to. `/sites/{site_id}`
+joins them: SentinelOne nests that collection as `data.sites`, so the audit
+had never found an id for it and filled the path with a literal placeholder.
+
 **Two Defender collections nothing could be read from.**
 `mde_software` and `mde_vulnerabilities` are keyed `softwareId` and
 `vulnerabilityId` in the store and `id` on the wire, and the rename never

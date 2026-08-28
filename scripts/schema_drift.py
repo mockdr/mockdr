@@ -396,6 +396,20 @@ def _disposable(client: TestClient, headers: dict) -> dict:
     return {"disposable_group_id": first_id(group), "disposable_ioc_id": first_id(ioc)}
 
 
+def _s1_prepare(client: TestClient, headers: dict) -> dict:
+    """A Deep Visibility query id, which three routes cannot be read without."""
+    answer = client.post(
+        "/web/api/v2.1/dv/init-query", headers=headers,
+        json={
+            "query": "EventType = \"Process Creation\"",
+            "fromDate": "2020-01-01T00:00:00.000000Z",
+            "toDate": "2099-01-01T00:00:00.000000Z",
+        },
+    )
+    data = answer.json().get("data") if answer.status_code == 200 else {}
+    return {"query_id": str((data or {}).get("queryId", "x"))}
+
+
 def _xdr_prepare(client: TestClient, headers: dict) -> dict:
     """Ids for Cortex XDR's entity routes, from its list routes."""
 
@@ -766,9 +780,24 @@ PLATFORMS = {
         "mount": "/web/api/v2.1",
         "auth": lambda c: {"Authorization": "ApiToken admin-token-0000-0000-000000000001"},
         "optional_top": ("errors",),
+        # "Relevant only for FAILED and FAILED_CLIENT DV errors" — the
+        # swagger's own words for this member.
+        "conditional": ("data.responseError",),
         "spec_prefix": "/web/api/v2.1",
         "params": {},
         "fill": {},
+        "prepare": _s1_prepare,
+        "skip": {
+            # The answer is a zip, not a document: there is no shape to
+            # compare, and a client downloading it does not read one.
+            "GET /threats/{threat_id}/download-from-cloud":
+                "the answer is a file, not a document",
+        },
+        "requests": {
+            "GET /dv/events": {"params": {"queryId": "{query_id}"}},
+            "GET /dv/events/{event_type}": {"params": {"queryId": "{query_id}"}},
+            "GET /dv/query-status": {"params": {"queryId": "{query_id}"}},
+        },
     },
     "graph": {
         "mount": "/graph",
@@ -827,6 +856,12 @@ def _ids(client: TestClient, collection_url: str, headers: dict, params: dict) -
     items = body
     if isinstance(body, dict):
         items = body.get("value") or body.get("data") or body.get("resources")
+        # SentinelOne nests one collection inside its envelope —
+        # `data.sites` beside `data.allSites` — so `data` is an object and
+        # the ids were never found: `/sites/{site_id}` was filled with the
+        # literal placeholder and recorded as "Not Found".
+        if isinstance(items, dict):
+            items = next((v for v in items.values() if isinstance(v, list)), None)
         if items is None and isinstance(body.get("reply"), dict):
             items = next((v for v in body["reply"].values() if isinstance(v, list)), None)
     out = []
@@ -860,7 +895,8 @@ def _reason(response) -> str:
     except ValueError:
         return (response.text or "").strip()[:90] or "no body"
     for path in (
-        ("errors", 0, "message"), ("error", "message"), ("reply", "err_msg"),
+        ("errors", 0, "message"), ("errors", 0, "detail"), ("errors", 0, "title"),
+        ("error", "message"), ("reply", "err_msg"),
         ("detail",), ("message",), ("messages", 0, "text"),
     ):
         node = body
@@ -1141,7 +1177,7 @@ def main(platform: str) -> int:
             url = _fill(client, route, headers, cfg["params"], cfg["fill"], mount)
             r = client.get(mount + url, headers=headers, params=cfg["params"])
             if r.status_code != 200:
-                print(f"  -  {method} {route}: HTTP {r.status_code} (skipped)")
+                print(f"  -  {method} {route}: HTTP {r.status_code} (skipped) — {_reason(r)}")
                 continue
             body = r.json()
             checked += 1
@@ -1205,6 +1241,12 @@ def main(platform: str) -> int:
         return 1 if findings else 0
 
     docs = load_specs(platform)
+    # The swagger branch took only the platform's global params, so a route
+    # with a precondition — Deep Visibility needs the `queryId` that
+    # `POST /dv/init-query` answers — could never be exercised and was
+    # recorded as skipped for ever.
+    ctx = cfg["prepare"](client, headers) if "prepare" in cfg else {}
+    per_route = {k.lower(): v for k, v in cfg.get("requests", {}).items()}
     spec_paths: dict[str, tuple[dict, str]] = {}
     for doc in docs:
         for p in doc.get("paths", {}):
@@ -1235,12 +1277,23 @@ def main(platform: str) -> int:
         # Top-level members the spec declares but a success response omits
         # (SentinelOne's ``errors``).
         declared = {p for p in declared if p.split(".")[0] not in cfg.get("optional_top", ())}
+        # Members the specification itself calls conditional: present only in
+        # a state this request did not produce.
+        declared -= set(cfg.get("conditional", ()))
         if not declared:
             continue
+        key = f"{method} {route}"
+        if key in cfg.get("skip", {}):
+            print(f"  -  {method} {route}: {cfg['skip'][key]} (skipped)")
+            continue
+        entry = _substitute(per_route.get(key.lower(), {}), ctx)
         url = _fill(client, route, headers, cfg.get("params", {}), cfg["fill"], mount)
-        r = client.get(mount + url, headers=headers, params=cfg.get("params", {}))
+        r = client.get(
+            mount + url, headers=headers,
+            params={**cfg.get("params", {}), **entry.get("params", {})},
+        )
         if r.status_code != 200:
-            print(f"  -  {method} {route}: HTTP {r.status_code} (skipped)")
+            print(f"  -  {method} {route}: HTTP {r.status_code} (skipped) — {_reason(r)}")
             continue
         body = r.json()
         seen = observed(body)

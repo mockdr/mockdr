@@ -727,3 +727,60 @@ class TestDefenderCollectionsCanBeAddressed:
         }).json()
         listed = client.get("/mde/api/indicators", headers=headers).json()["value"][0]
         assert set(created) == set(listed)
+
+
+class TestDeepVisibilityStatusIsWhatTheSwaggerDeclares:
+    """Three DV routes had never been compared: they need a query id first.
+
+    `GET /dv/query-status`, `/dv/events` and `/dv/events/{type}` all take the
+    `queryId` that `POST /dv/init-query` answers, and the drift audit had no
+    way to make one — so all three sat behind `HTTP 400 (skipped)` while the
+    run reported no findings. Compared at last, the status answered a
+    `queryId` and a `status` the 2.1 swagger declares nowhere — the second a
+    duplicate of `responseState` under a name the vendor does not use — and
+    carried neither `queryModeInfo` nor `warnings`, which it declares.
+    """
+
+    S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+    BASE = "/web/api/v2.1"
+
+    def _query(self, client: TestClient) -> str:
+        answer = client.post(f"{self.BASE}/dv/init-query", headers=self.S1, json={
+            "query": 'EventType = "Process Creation"',
+            "fromDate": "2020-01-01T00:00:00.000000Z",
+            "toDate": "2099-01-01T00:00:00.000000Z",
+        })
+        return str(answer.json()["data"]["queryId"])
+
+    def test_the_status_carries_what_the_swagger_declares(
+        self, client: TestClient,
+    ) -> None:
+        status = client.get(
+            f"{self.BASE}/dv/query-status", headers=self.S1,
+            params={"queryId": self._query(client)},
+        ).json()["data"]
+        assert status["responseState"]
+        assert isinstance(status["progressStatus"], int)
+        assert set(status["queryModeInfo"]) == {"mode", "lastActivatedAt"}
+        # The 2.1 swagger declares `warnings` a string, not a list.
+        assert status["warnings"] == ""
+
+    def test_and_nothing_the_swagger_does_not(self, client: TestClient) -> None:
+        status = client.get(
+            f"{self.BASE}/dv/query-status", headers=self.S1,
+            params={"queryId": self._query(client)},
+        ).json()["data"]
+        # `status` duplicated `responseState`; `queryId` echoed the request.
+        assert "status" not in status
+        assert "queryId" not in status
+
+    def test_the_error_member_stays_away_until_there_is_one(
+        self, client: TestClient,
+    ) -> None:
+        """"Relevant only for FAILED and FAILED_CLIENT DV errors" — the
+        swagger's own words."""
+        status = client.get(
+            f"{self.BASE}/dv/query-status", headers=self.S1,
+            params={"queryId": self._query(client)},
+        ).json()["data"]
+        assert "responseError" not in status
