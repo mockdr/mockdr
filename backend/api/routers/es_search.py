@@ -20,6 +20,7 @@ from application.es_search import queries as search_queries
 from application.es_search.queries import IndexNotFoundError, MultipleIndicesError
 from utils.es_mapping import MappingConflictError, flatten_properties
 from utils.es_painless import PainlessError
+from utils.es_params import refuses_unknown as es_refuses_unknown
 from utils.es_query import ESQueryError
 from utils.es_response import (
     build_es_document_missing,
@@ -34,6 +35,94 @@ _register_convertors()
 
 router = APIRouter(tags=["ES Search"])
 
+#: What each of these routes accepts, measured one parameter at a time on
+#: 8.15 against the cluster's own oracle: it calls an unrecognised parameter
+#: unrecognised and complains about the *value* of a known one, so the two
+#: are told apart by the message and not by the status. `format`,
+#: `ignore_throttled` and the index-selection options reach further than the
+#: documentation suggests, and asking every route about every candidate is
+#: the only way that showed — a shorter candidate list invented a 400 on
+#: `_stats?ignore_unavailable=`, which this repo's own tests caught.
+_SEARCH_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "allow_no_indices",
+    "allow_partial_search_results", "analyze_wildcard", "analyzer",
+    "batched_reduce_size", "ccs_minimize_roundtrips", "default_operator", "df",
+    "docvalue_fields", "expand_wildcards", "explain", "force_synthetic_source",
+    "from", "ignore_throttled", "ignore_unavailable", "include_named_queries_score",
+    "lenient", "max_concurrent_shard_requests", "min_compatible_shard_node",
+    "pre_filter_shard_size", "preference", "q", "request_cache",
+    "rest_total_hits_as_int", "routing", "scroll", "search_type",
+    "seq_no_primary_term", "size", "sort", "stats", "stored_fields",
+    "suggest_field", "suggest_mode", "suggest_size", "suggest_text",
+    "terminate_after", "timeout", "track_scores", "track_total_hits", "typed_keys",
+    "version",
+)
+_COUNT_PARAMS = (
+    "allow_no_indices", "analyze_wildcard", "analyzer", "default_operator", "df",
+    "expand_wildcards", "ignore_throttled", "ignore_unavailable", "lenient",
+    "min_score", "preference", "q", "routing", "terminate_after",
+)
+#: The index form takes exactly the same members as the cluster-wide one.
+_CLUSTER_HEALTH_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "level", "local", "master_timeout", "timeout",
+    "wait_for_active_shards", "wait_for_events", "wait_for_no_initializing_shards",
+    "wait_for_no_relocating_shards", "wait_for_nodes", "wait_for_status",
+)
+_CAT_INDICES_PARAMS = (
+    "allow_no_indices", "bytes", "expand_wildcards", "h", "health", "help",
+    "ignore_throttled", "ignore_unavailable", "include_unloaded_segments", "local",
+    "master_timeout", "pri", "s", "size", "time", "ts", "v",
+)
+_CAT_HEALTH_PARAMS = (
+    "bytes", "h", "help", "pri", "s", "size", "time", "ts", "v",
+)
+_SCROLL_PARAMS = ("rest_total_hits_as_int", "scroll", "scroll_id")
+#: `/_alias/{alias}` and `/{index}/_alias` take the same members.
+_ALIAS_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "local",
+)
+_RESOLVE_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled", "ignore_unavailable",
+)
+_INDEX_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "features", "flat_settings",
+    "ignore_throttled", "ignore_unavailable", "include_defaults", "local",
+    "master_timeout",
+)
+_FIELD_CAPS_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "fields", "filters", "ignore_throttled",
+    "ignore_unavailable", "include_empty_fields", "include_unmapped", "types",
+)
+_MAPPING_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "ignore_throttled",
+    "ignore_unavailable", "local", "master_timeout",
+)
+_FIELD_MAPPING_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "fields", "ignore_throttled",
+    "ignore_unavailable", "include_defaults",
+)
+_SETTINGS_PARAMS = (
+    "allow_no_indices", "expand_wildcards", "flat_settings", "ignore_throttled",
+    "ignore_unavailable", "include_defaults", "local", "master_timeout",
+)
+_STATS_PARAMS = (
+    "allow_no_indices", "completion_fields", "expand_wildcards", "fielddata_fields",
+    "fields", "forbid_closed_indices", "groups", "ignore_throttled",
+    "ignore_unavailable", "include_segment_file_sizes", "include_unloaded_segments",
+    "level", "metric",
+)
+_DOC_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "fields",
+    "force_synthetic_source", "preference", "realtime", "refresh", "routing",
+    "stored_fields", "version", "version_type",
+)
+_DOC_SOURCE_PARAMS = (
+    "_source", "_source_excludes", "_source_includes", "preference", "realtime",
+    "refresh", "routing",
+)
+
 
 def _missing_index(exc: IndexNotFoundError) -> HTTPException:
     """Translate a missing index into Elasticsearch's 404."""
@@ -43,7 +132,7 @@ def _missing_index(exc: IndexNotFoundError) -> HTTPException:
 # ── Cluster Info ─────────────────────────────────────────────────────────────
 
 
-@router.get("/")
+@router.get("/", dependencies=[es_refuses_unknown(source=False)])
 def cluster_info(
     _: dict = Depends(require_es_auth),
 ) -> dict:
@@ -54,8 +143,14 @@ def cluster_info(
 # ── Cluster / cat APIs ───────────────────────────────────────────────────────
 
 
-@router.get("/_cluster/health")
-@router.get("/_cluster/health/{index}")
+@router.get(
+    "/_cluster/health",
+    dependencies=[es_refuses_unknown(*_CLUSTER_HEALTH_PARAMS, source=False)],
+)
+@router.get(
+    "/_cluster/health/{index}",
+    dependencies=[es_refuses_unknown(*_CLUSTER_HEALTH_PARAMS, source=False)],
+)
 def cluster_health(
     index: str = "",
     _: dict = Depends(require_es_auth),
@@ -64,8 +159,14 @@ def cluster_health(
     return search_queries.es_cluster_health(index)
 
 
-@router.get("/_cat/indices")
-@router.get("/_cat/indices/{pattern}")
+@router.get(
+    "/_cat/indices",
+    dependencies=[es_refuses_unknown(*_CAT_INDICES_PARAMS, source=False)],
+)
+@router.get(
+    "/_cat/indices/{pattern}",
+    dependencies=[es_refuses_unknown(*_CAT_INDICES_PARAMS, source=False)],
+)
 def cat_indices(
     pattern: str = "",
     format: str = Query(default=""),  # noqa: A002 - ES's own parameter name
@@ -84,7 +185,12 @@ def cat_indices(
     )
 
 
-@router.get("/_cat/health")
+@router.get(
+    "/_cat/health",
+    dependencies=[es_refuses_unknown(
+        *_CAT_HEALTH_PARAMS, source=False,
+    )],
+)
 def cat_health(
     format: str = Query(default=""),  # noqa: A002 - ES's own parameter name
     v: str | None = Query(default=None),
@@ -239,7 +345,10 @@ def _cat_response(
     return Response(content=text, media_type="text/plain; charset=UTF-8")
 
 
-@router.get("/_security/_authenticate")
+@router.get(
+    "/_security/_authenticate",
+    dependencies=[es_refuses_unknown(source=False)],
+)
 def authenticate(
     user: dict = Depends(require_es_auth),
 ) -> dict:
@@ -261,7 +370,11 @@ def authenticate(
 # ── Search ───────────────────────────────────────────────────────────────────
 
 
-@router.get("/_search", operation_id="es_search_all_get")
+@router.get(
+    "/_search",
+    operation_id="es_search_all_get",
+    dependencies=[es_refuses_unknown(*_SEARCH_PARAMS)],
+)
 @router.post("/_search", operation_id="es_search_all_post")
 def es_search_all(
     request: Request,
@@ -400,7 +513,11 @@ def _checked_count_body(body: dict) -> dict:
     return body
 
 
-@router.get("/_count", operation_id="es_count_all_get")
+@router.get(
+    "/_count",
+    operation_id="es_count_all_get",
+    dependencies=[es_refuses_unknown(*_COUNT_PARAMS)],
+)
 @router.post("/_count", operation_id="es_count_all_post")
 def es_count_all(
     request: Request,
@@ -415,19 +532,42 @@ def es_count_all(
     )
 
 
-@router.get("/_mget", operation_id="es_mget_all_get")
-@router.post("/_mget", operation_id="es_mget_all_post")
-def es_mget_all(
-    body: dict = Body(default={}),
-    _: dict = Depends(require_es_auth),
-) -> dict:
-    """Fetch documents by ``docs`` entries that each name their own index."""
-    if not body.get("docs") and not body.get("ids"):
+async def _mget_body(request: Request) -> dict:
+    """The documents an mget asks for, refusing the two ways it can be empty.
+
+    8.15 tells them apart: no body at all is a `parse_exception` saying a
+    body or a `source` parameter is required, and a body naming no documents
+    is an `action_request_validation_exception`. The per-index route made
+    neither distinction — it answered `{"docs": []}`, an empty result
+    reported as a successful lookup of nothing.
+    """
+    raw = await request.body()
+    if not raw.strip() and not request.query_params.get("source"):
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "parse_exception", "request body or source parameter is required",
+        ))
+    try:
+        body = json.loads(raw or request.query_params.get("source") or "{}")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "parse_exception", "request body is required",
+        )) from exc
+    if not isinstance(body, dict) or (not body.get("docs") and not body.get("ids")):
         raise HTTPException(status_code=400, detail=build_es_error_response(
             400, "action_request_validation_exception",
             "Validation Failed: 1: no documents to get;",
         ))
-    return search_queries.es_mget("_all", body)
+    return body
+
+
+@router.get("/_mget", operation_id="es_mget_all_get")
+@router.post("/_mget", operation_id="es_mget_all_post")
+async def es_mget_all(
+    request: Request,
+    _: dict = Depends(require_es_auth),
+) -> dict:
+    """Fetch documents by ``docs`` entries that each name their own index."""
+    return search_queries.es_mget("_all", await _mget_body(request))
 
 
 @router.post("/_bulk", operation_id="es_bulk")
@@ -571,7 +711,11 @@ def _bulk_parse_error(line: str, exc: json.JSONDecodeError, line_no: int) -> dic
     return content
 
 
-@router.get("/{index:esindex}/_search", operation_id="es_search_get")
+@router.get(
+    "/{index:esindex}/_search",
+    operation_id="es_search_get",
+    dependencies=[es_refuses_unknown(*_SEARCH_PARAMS)],
+)
 @router.post("/{index:esindex}/_search", operation_id="es_search_post")
 def es_search(
     index: str,
@@ -616,7 +760,13 @@ def close_pit(body: dict = Body(...), _: dict = Depends(require_es_auth)) -> dic
 
 
 @router.post("/_search/scroll", operation_id="es_scroll")
-@router.get("/_search/scroll", operation_id="es_scroll_get")
+@router.get(
+    "/_search/scroll",
+    operation_id="es_scroll_get",
+    dependencies=[es_refuses_unknown(
+        *_SCROLL_PARAMS,
+    )],
+)
 def scroll_search(
     body: dict = Body(default={}), caller: dict = Depends(require_es_auth),
 ) -> dict:
@@ -663,7 +813,11 @@ def clear_scroll(body: dict = Body(default={}), _: dict = Depends(require_es_aut
     return search_queries.close_context(str(body.get("scroll_id", "")))
 
 
-@router.get("/{index:esindex}/_count", operation_id="es_count_get")
+@router.get(
+    "/{index:esindex}/_count",
+    operation_id="es_count_get",
+    dependencies=[es_refuses_unknown(*_COUNT_PARAMS)],
+)
 @router.post("/{index:esindex}/_count", operation_id="es_count_post")
 def es_count(
     index: str,
@@ -684,20 +838,23 @@ def es_count(
 
 @router.get("/{index:esindex}/_mget", operation_id="es_mget_get")
 @router.post("/{index:esindex}/_mget", operation_id="es_mget_post")
-def es_mget(
+async def es_mget(
     index: str,
-    body: dict = Body(default={}),
+    request: Request,
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """Fetch several documents by id in one request."""
-    return search_queries.es_mget(index, body)
+    return search_queries.es_mget(index, await _mget_body(request))
 
 
 
 # ── Mapping / Stats ──────────────────────────────────────────────────────────
 
 
-@router.get("/{index:esindex}/_mapping")
+@router.get(
+    "/{index:esindex}/_mapping",
+    dependencies=[es_refuses_unknown(*_MAPPING_PARAMS, source=False)],
+)
 def get_mapping(
     index: str,
     ignore_unavailable: bool = Query(default=False),
@@ -710,7 +867,10 @@ def get_mapping(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index:esindex}/_mapping/field/{field}")
+@router.get(
+    "/{index:esindex}/_mapping/field/{field}",
+    dependencies=[es_refuses_unknown(*_FIELD_MAPPING_PARAMS, source=False)],
+)
 def get_field_mapping(
     index: str,
     field: str,
@@ -751,7 +911,11 @@ def put_mapping(
         )) from exc
 
 
-@router.get("/{index:esindex}/_field_caps", operation_id="es_field_caps_get")
+@router.get(
+    "/{index:esindex}/_field_caps",
+    operation_id="es_field_caps_get",
+    dependencies=[es_refuses_unknown(*_FIELD_CAPS_PARAMS)],
+)
 @router.post("/{index:esindex}/_field_caps", operation_id="es_field_caps_post")
 def field_caps(
     index: str,
@@ -842,7 +1006,11 @@ def delete_by_query(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index:esindex}/_source/{doc_id}", operation_id="es_get_source")
+@router.get(
+    "/{index:esindex}/_source/{doc_id}",
+    operation_id="es_get_source",
+    dependencies=[es_refuses_unknown(*_DOC_SOURCE_PARAMS, source=False)],
+)
 def get_source(
     index: str,
     doc_id: str,
@@ -929,7 +1097,11 @@ def _one_search(index: str, body: dict) -> dict:
         }
 
 
-@router.get("/{index:esindex}/_settings", operation_id="es_get_settings")
+@router.get(
+    "/{index:esindex}/_settings",
+    operation_id="es_get_settings",
+    dependencies=[es_refuses_unknown(*_SETTINGS_PARAMS, source=False)],
+)
 def get_settings(index: str, _: dict = Depends(require_es_auth)) -> dict:
     """An index's settings, which is the half of it a client tunes."""
     try:
@@ -967,7 +1139,11 @@ def delete_alias(index: str, alias: str, _: dict = Depends(require_es_write)) ->
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index:esindex}/_alias", operation_id="es_get_index_alias")
+@router.get(
+    "/{index:esindex}/_alias",
+    operation_id="es_get_index_alias",
+    dependencies=[es_refuses_unknown(*_ALIAS_PARAMS, source=False)],
+)
 def get_index_alias(index: str, _: dict = Depends(require_es_auth)) -> dict:
     """Which aliases an index carries."""
     if not search_queries.index_exists(index):
@@ -1005,7 +1181,11 @@ def update_aliases(body: dict = Body(...), _: dict = Depends(require_es_write)) 
         raise _missing_index(exc) from exc
 
 
-@router.get("/_alias/{alias}", operation_id="es_get_alias")
+@router.get(
+    "/_alias/{alias}",
+    operation_id="es_get_alias",
+    dependencies=[es_refuses_unknown(*_ALIAS_PARAMS, source=False)],
+)
 def get_alias(alias: str, _: dict = Depends(require_es_auth)) -> dict:
     """Every index an alias stands for."""
     found = search_queries.alias_map(alias)
@@ -1019,7 +1199,11 @@ def get_alias(alias: str, _: dict = Depends(require_es_auth)) -> dict:
     return found
 
 
-@router.get("/_resolve/index/{expression}", operation_id="es_resolve_index")
+@router.get(
+    "/_resolve/index/{expression}",
+    operation_id="es_resolve_index",
+    dependencies=[es_refuses_unknown(*_RESOLVE_PARAMS, source=False)],
+)
 def resolve_index(expression: str, _: dict = Depends(require_es_auth)) -> dict:
     """What a name stands for: indices, aliases and data streams."""
     return search_queries.resolve_index(expression)
@@ -1069,7 +1253,10 @@ def terms_enum(
         raise _missing_index(exc) from exc
 
 
-@router.get("/{index:esindex}/_stats")
+@router.get(
+    "/{index:esindex}/_stats",
+    dependencies=[es_refuses_unknown(*_STATS_PARAMS, source=False)],
+)
 def get_stats(
     index: str,
     ignore_unavailable: bool = Query(default=False),
@@ -1085,7 +1272,10 @@ def get_stats(
 # ── Document CRUD ────────────────────────────────────────────────────────────
 
 
-@router.get("/{index:esindex}/_doc/{doc_id}")
+@router.get(
+    "/{index:esindex}/_doc/{doc_id}",
+    dependencies=[es_refuses_unknown(*_DOC_PARAMS, source=False)],
+)
 def get_doc(
     index: str,
     doc_id: str,
@@ -1172,7 +1362,11 @@ def create_index(
         )) from exc
 
 
-@router.get("/{index:esindex}", operation_id="es_get_index")
+@router.get(
+    "/{index:esindex}",
+    operation_id="es_get_index",
+    dependencies=[es_refuses_unknown(*_INDEX_PARAMS, source=False)],
+)
 async def get_index(request: Request, index: str) -> Response:
     """The index's settings and mappings.
 

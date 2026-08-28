@@ -532,3 +532,86 @@ class TestAListingNamesNothingItCannotServe:
             )
             assert resp.status_code == 404, path
             assert "nosuch" in resp.json()["messages"][0]["text"]
+
+
+class TestAnUnknownClusterParameterIsRefused:
+    """Elasticsearch refuses what it does not recognise, before running it."""
+
+    ES = {
+        "Authorization": "Basic " + base64.b64encode(
+            b"elastic:mock-elastic-password").decode(),
+    }
+
+    def test_a_misspelled_size_is_refused_not_ignored(
+        self, client: TestClient,
+    ) -> None:
+        """`siz` for `size` read as an unfiltered result set under HTTP 200."""
+        resp = client.get("/elastic/_search", headers=self.ES, params={"siz": "1"})
+
+        assert resp.status_code == 400
+        reason = resp.json()["error"]["reason"]
+        assert reason == "request [/_search] contains unrecognized parameter: [siz]"
+        assert resp.json()["error"]["type"] == "illegal_argument_exception"
+        assert resp.json()["status"] == 400
+
+    def test_several_are_named_alphabetically_not_as_sent(
+        self, client: TestClient,
+    ) -> None:
+        """Measured on 8.15: sorted, and the plural form."""
+        resp = client.get(
+            "/elastic/_cluster/health", headers=self.ES,
+            params=[("zzz", "1"), ("aaa", "2"), ("mmm", "3")],
+        )
+
+        assert resp.json()["error"]["reason"] == (
+            "request [/_cluster/health] contains unrecognized parameters: "
+            "[aaa], [mmm], [zzz]"
+        )
+
+    def test_the_message_names_the_path_the_cluster_would_have_seen(
+        self, client: TestClient,
+    ) -> None:
+        """Not mockdr's `/elastic` mount, which no cluster has."""
+        resp = client.get(
+            "/elastic/sentinelone/_search", headers=self.ES, params={"zzz": "1"},
+        )
+
+        assert "/elastic" not in resp.json()["error"]["reason"]
+        assert "[/sentinelone/_search]" in resp.json()["error"]["reason"]
+
+    def test_a_parameter_the_cluster_takes_is_not_refused(
+        self, client: TestClient,
+    ) -> None:
+        assert client.get(
+            "/elastic/_search", headers=self.ES,
+            params={"size": "1", "from": "0", "track_total_hits": "true"},
+        ).status_code == 200
+
+    def test_source_content_type_is_known_only_beside_source(
+        self, client: TestClient,
+    ) -> None:
+        """It is unrecognised on its own — which one-at-a-time asking missed."""
+        alone = client.get(
+            "/elastic/_search", headers=self.ES,
+            params={"source_content_type": "application/json"},
+        )
+        assert alone.status_code == 400
+        assert "source_content_type" in alone.json()["error"]["reason"]
+
+        beside = client.get(
+            "/elastic/_search", headers=self.ES,
+            params={"source": '{"query":{"match_all":{}}}',
+                    "source_content_type": "application/json"},
+        )
+        assert beside.status_code == 200
+
+    def test_the_cat_pattern_is_a_path_segment_not_a_parameter(
+        self, client: TestClient,
+    ) -> None:
+        """Two routes share one handler, so `pattern` became a query member."""
+        assert client.get(
+            "/elastic/_cat/indices", headers=self.ES, params={"pattern": "x*"},
+        ).status_code == 400
+        assert client.get(
+            "/elastic/_cat/indices/sentinelone", headers=self.ES,
+        ).status_code == 200

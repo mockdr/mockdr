@@ -4021,3 +4021,187 @@ probes:
   - id: kbn-cases-configure-refuses-an-unknown-member
     endpoint: kibana
     request: {method: GET, path: /api/cases/configure, query: {zzz: "1"}, auth: basic}
+
+  # ── A parameter the cluster does not know is a refusal (2.3.1) ─────────
+  #
+  # Elasticsearch refuses an unrecognised query parameter before running the
+  # request, naming it and the path. mockdr answered 200 and ignored it, so
+  # a client that wrote `siz` for `size` got a full result set back where a
+  # real cluster refuses outright — an answer that looks right and is not.
+
+  - id: es-search-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    why: The plural form, alphabetical rather than in the order sent.
+    request:
+      method: GET
+      path: /${seed_index}/_search
+      query: {zzz: "1", aaa: "2"}
+      auth: basic
+
+  - id: es-search-all-refuses-an-unknown-parameter
+    endpoint: search
+    request: {method: GET, path: /_search, query: {siz: "1"}, auth: basic}
+
+  - id: es-count-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_count
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-cluster-health-refuses-an-unknown-parameter
+    endpoint: search
+    request: {method: GET, path: /_cluster/health, query: {zzz: "1"}, auth: basic}
+
+  - id: es-cat-indices-refuses-an-unknown-parameter
+    endpoint: search
+    why: >
+      `pattern` among them: it is the path segment of
+      `/_cat/indices/{pattern}`, and sharing one handler made it a query
+      parameter on the bare route, which the cluster does not know.
+    request:
+      method: GET
+      path: /_cat/indices
+      query: {pattern: "conformance*"}
+      auth: basic
+
+  - id: es-cat-health-refuses-an-unknown-parameter
+    endpoint: search
+    request: {method: GET, path: /_cat/health, query: {zzz: "1"}, auth: basic}
+
+  - id: es-authenticate-refuses-an-unknown-parameter
+    endpoint: search
+    request:
+      method: GET
+      path: /_security/_authenticate
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-root-refuses-an-unknown-parameter
+    endpoint: search
+    request: {method: GET, path: /, query: {zzz: "1"}, auth: basic}
+
+  - id: es-scroll-refuses-an-unknown-parameter
+    endpoint: search
+    request: {method: GET, path: /_search/scroll, query: {zzz: "1"}, auth: basic}
+
+  # The same refusal on the index routes, one probe each.
+
+  - id: es-index-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-mapping-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_mapping
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-settings-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_settings
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-stats-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_stats
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-field-caps-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_field_caps
+      query: {fields: "host", zzz: "1"}
+      auth: basic
+
+  - id: es-doc-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_doc/a
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-doc-source-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_source/a
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-index-alias-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /${seed_index}/_alias
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-resolve-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /_resolve/index/${seed_index}
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-index-health-refuses-an-unknown-parameter
+    endpoint: search
+    needs_seed: true
+    request:
+      method: GET
+      path: /_cluster/health/${seed_index}
+      query: {zzz: "1"}
+      auth: basic
+
+  - id: es-mget-with-no-body
+    endpoint: search
+    needs_seed: true
+    why: >
+      An mget that names nothing answered `{"docs": []}` — an empty result
+      reported as a successful lookup. 8.15 tells the two empties apart: no
+      body at all is a parse_exception, a body naming no documents is a
+      validation one.
+    request:
+      method: GET
+      path: /${seed_index}/_mget
+      auth: basic
+
+  - id: es-mget-with-no-documents
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_mget
+      json: {docs: []}
+      auth: basic
+
+  - id: es-mget-all-with-no-body
+    endpoint: search
+    request: {method: GET, path: /_mget, auth: basic}

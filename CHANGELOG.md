@@ -71,6 +71,35 @@ as a number.
 says which listings mockdr serves empty, so its entry was not compared at
 all.
 
+**A parameter the cluster does not know is a refusal, not something to ignore.**
+Elasticsearch refuses an unrecognised query parameter before running the
+request, naming it and the path it was sent to — and names several of them
+alphabetically rather than in the order they arrived. mockdr answered 200 and
+ignored them, so a client that wrote `siz` for `size` got a full result set
+back where a real cluster refuses outright: an answer that looks right and is
+not, which is the worst thing this mock can do. Twenty-two routes refuse it now,
+each one's accepted parameters measured one at a time against the cluster's
+own oracle — it names an unrecognised parameter and complains about the
+*value* of a known one, so the two are told apart by the message and not by
+the status. `scripts/es_param_audit.py` asks all of it, 1980 questions across
+22 routes, and checks both directions: a parameter the cluster accepts must
+not be refused, and one neither knows must be. It earns its keep — a shorter
+candidate list had left `ignore_unavailable` off `_stats`, inventing a 400
+the cluster never answers, which this repo's own tests caught first. Asking
+one parameter at a time has a blind spot too: `source_content_type` is
+recognised only beside `source`, and alone reads as unknown.
+
+`_cat/indices` was among them from the other side: `pattern` is the path
+segment of `/_cat/indices/{pattern}`, and sharing one handler with the bare
+route made it a query parameter there — one the cluster does not know.
+
+The sweep also found `/{index}/_mget` answering `{"docs": []}` to a request
+that named no documents at all — an empty result reported as a successful
+lookup of nothing. 8.15 tells the two empties apart: no body is a
+`parse_exception` saying a body or a `source` parameter is required, a body
+naming no documents an `action_request_validation_exception`. The route that
+takes an index made neither distinction.
+
 **A listing named four things nothing would serve.**
 splunkd addresses a collection both ways, and splunklib's `.list()` followed
 by `[name]` uses both. mockdr listed roles, the capabilities entry, the
