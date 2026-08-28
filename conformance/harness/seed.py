@@ -246,3 +246,59 @@ def seed_kibana_case(target: str, clients: Clients, auth: object) -> dict[str, s
         "seed_case": case_id,
         "seed_comment": str(comments[-1]["id"]) if comments else "",
     }
+
+
+def seed_search_job(target: str, clients: Clients, auth: object) -> dict[str, str]:
+    """Dispatch a search on one target and hand back its sid.
+
+    Three routes are addressed by the sid of a job that exists — reading it,
+    reading its events, deleting it — and nothing here could make one, so
+    `scripts/audit_coverage.py` reported them watched by mockdr's own tests
+    alone.
+
+    Returns:
+        ``{"seed_sid": sid}``.
+
+    Raises:
+        SeedError: If the target would not dispatch the search.
+    """
+    client = clients.get("management", target)
+    made = client.post(
+        "/services/search/jobs",
+        content=f"search=search index={SEED_INDEX} | head 1&output_mode=json",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        auth=auth,
+    )
+    if made.status_code not in (200, 201):
+        raise SeedError(
+            f"{target} would not dispatch the seed search: HTTP "
+            f"{made.status_code} {made.text[:200]}",
+        )
+    return {"seed_sid": str(made.json().get("sid", ""))}
+
+
+def seed_scroll(target: str, clients: Clients, auth: object) -> dict[str, str]:
+    """Open a scroll on one target and hand back its cursor.
+
+    `/_search/scroll` is addressed by a cursor and by nothing else, so the
+    three routes under it could never be compared.
+
+    Returns:
+        ``{"seed_scroll": scroll_id}``.
+
+    Raises:
+        SeedError: If the target would not open the scroll.
+    """
+    client = clients.get("search", target)
+    opened = client.post(
+        f"/{ES_SEED_INDEX}/_search",
+        params={"scroll": "1m"},
+        json={"size": 1, "query": {"match_all": {}}},
+        auth=auth,
+    )
+    if opened.status_code != 200:
+        raise SeedError(
+            f"{target} would not open the seed scroll: HTTP "
+            f"{opened.status_code} {opened.text[:200]}",
+        )
+    return {"seed_scroll": str(opened.json().get("_scroll_id", ""))}

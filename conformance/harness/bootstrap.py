@@ -20,6 +20,8 @@ from harness.seed import (
     await_indexed,
     seed_elastic,
     seed_kibana_case,
+    seed_scroll,
+    seed_search_job,
     seed_sourcetype,
     seed_splunk,
 )
@@ -130,6 +132,14 @@ def _with_seed(
     except SeedError as exc:
         raise BootstrapError(str(exc)) from exc
     context["sourcetype"] = _RUN_SOURCETYPE
+    auth = (
+        spec.credentials[target].pair if target in spec.credentials
+        else httpx.USE_CLIENT_DEFAULT
+    )
+    try:
+        context.update(seed_search_job(target, clients, auth))
+    except SeedError as exc:
+        raise BootstrapError(str(exc)) from exc
     return context
 
 
@@ -227,6 +237,7 @@ def _with_elastic_seed(
     )
     try:
         context = {**context, "seed_index": seed_elastic(target, clients, auth)}
+        context = {**context, **seed_scroll(target, clients, auth)}
         if "kibana" in spec.endpoints:
             context = {**context, **seed_kibana_case(target, clients, auth)}
     except SeedError as exc:

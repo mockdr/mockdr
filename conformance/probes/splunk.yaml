@@ -3176,3 +3176,39 @@ probes:
       method: POST
       path: /services/collector/event/1.0
       json: {event: conformance-probe}
+
+  # ── A job that exists (2.3.1) ─────────────────────────────────────────
+  #
+  # Three routes are addressed by the sid of a dispatched search, and the
+  # bootstrap could not make one — so nothing had ever compared them.
+
+  - id: spl-job-by-sid
+    endpoint: management
+    needs_seed: true
+    why: What a job says about itself, which every client polls in a loop.
+    request:
+      method: GET
+      path: /services/search/v2/jobs/${seed_sid}
+      params: {output_mode: json}
+      auth: basic
+
+  - id: spl-job-events
+    endpoint: management
+    needs_seed: true
+    why: The raw events behind a job, beside the results this suite compares.
+    request:
+      method: GET
+      path: /services/search/v2/jobs/${seed_sid}/events
+      params: {output_mode: json, count: 1}
+      auth: basic
+
+  - id: spl-job-by-a-sid-nobody-has
+    endpoint: management
+    why: >
+      The refusal, which is the half a client meets when a job has expired
+      out from under it.
+    request:
+      method: GET
+      path: /services/search/v2/jobs/1234567890.99999
+      params: {output_mode: json}
+      auth: basic

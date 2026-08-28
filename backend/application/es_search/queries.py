@@ -428,6 +428,20 @@ def close_context(context_id: str) -> dict:
     return {"succeeded": bool(freed), "num_freed": freed}
 
 
+class ScrollIdUnparsableError(ValueError):
+    """Raised when a scroll id is not one this cluster could have issued.
+
+    Elasticsearch answers such an id with a `403 security_exception` rather
+    than a missing context: the id encodes which indices the scroll reads,
+    so an id it cannot parse cannot be authorised, and the security layer
+    refuses it before the search context is looked for. Measured on 8.15,
+    where `Cannot parse scroll id` arrives as the cause beneath it. mockdr
+    reported the missing context instead — the answer for an id that was
+    well-formed and has expired, which is a different thing to a client
+    deciding whether to retry.
+    """
+
+
 class SearchContextMissingError(LookupError):
     """Raised when a scroll id names a context that is gone."""
 
@@ -437,12 +451,19 @@ class SearchContextMissingError(LookupError):
         super().__init__(f"No search context found for id [{context_id}]")
 
 
+#: The shape of a scroll id this cluster issues.
+_SCROLL_ID = re.compile(r"^[0-9a-f]{32}$")
+
+
 def scroll(context_id: str) -> dict:
     """The next page of a scrolled search.
 
     Raises:
+        ScrollIdUnparsableError: If the id is not one this cluster issues.
         SearchContextMissingError: If the scroll is gone or was never opened.
     """
+    if not _SCROLL_ID.match(context_id):
+        raise ScrollIdUnparsableError(context_id)
     context = store.get(_CONTEXTS, context_id)
     if not context:
         raise SearchContextMissingError(context_id)

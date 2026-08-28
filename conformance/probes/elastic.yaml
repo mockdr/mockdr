@@ -3766,3 +3766,54 @@ probes:
     ignore_paths:
       - $.timestamp
       - $.stats
+
+  # ── A scroll that exists (2.3.1) ──────────────────────────────────────
+  #
+  # `/_search/scroll` is addressed by a cursor and by nothing else, so the
+  # three routes under it had never been compared. The bootstrap opens one.
+
+  - id: es-scroll-next-page
+    endpoint: search
+    needs_seed: true
+    why: >
+      The second page of a scrolled search, which is how a client reads a
+      result set larger than a window.
+    request:
+      method: POST
+      path: /_search/scroll
+      json: {scroll: "1m", scroll_id: "${seed_scroll}"}
+      auth: basic
+    ignore_paths:
+      - $._scroll_id
+
+  - id: es-scroll-with-a-cursor-nobody-has
+    endpoint: search
+    why: >
+      A scroll id encodes which indices the scroll reads, so one the cluster
+      cannot parse cannot be authorised either: 8.15 refuses it in the
+      security layer, before the search context is looked for, and names the
+      parse failure as the cause. mockdr reported a missing context — the
+      answer for a well-formed id that has expired, which is a different
+      thing to a client deciding whether to retry.
+    request:
+      method: POST
+      path: /_search/scroll
+      json: {scroll: "1m", scroll_id: "not-a-scroll-id"}
+      auth: basic
+    ignore_paths:
+      # The refusal quotes the caller's own roles, and the two installs name
+      # them differently: `superuser` there, `admin` here.
+      - $.error.reason
+      - $.error.root_cause[*].reason
+
+  - id: es-scroll-cleared
+    endpoint: search
+    needs_seed: true
+    why: >
+      Clearing a scroll, which a well-behaved client does rather than
+      waiting for the timeout.
+    request:
+      method: DELETE
+      path: /_search/scroll
+      json: {scroll_id: ["${seed_scroll}"]}
+      auth: basic

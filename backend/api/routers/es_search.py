@@ -617,10 +617,33 @@ def close_pit(body: dict = Body(...), _: dict = Depends(require_es_auth)) -> dic
 
 @router.post("/_search/scroll", operation_id="es_scroll")
 @router.get("/_search/scroll", operation_id="es_scroll_get")
-def scroll_search(body: dict = Body(default={}), _: dict = Depends(require_es_auth)) -> dict:
+def scroll_search(
+    body: dict = Body(default={}), caller: dict = Depends(require_es_auth),
+) -> dict:
     """The next page of a scrolled search."""
     try:
         return search_queries.scroll(str(body.get("scroll_id", "")))
+    except search_queries.ScrollIdUnparsableError as exc:
+        # A scroll id encodes which indices the scroll reads, so one the
+        # cluster cannot parse cannot be authorised either — 8.15 refuses it
+        # in the security layer, before the search context is looked for,
+        # and names the parse failure as the cause. Measured.
+        user = str(caller.get("user") or "elastic")
+        denied = (
+            f"action [indices:data/read/scroll] is unauthorized for user [{user}] "
+            f"with effective roles [{caller.get('role', 'superuser')}], this action "
+            f"is granted by the index privileges [read,all]"
+        )
+        raise HTTPException(status_code=403, detail={"error": {
+            "root_cause": [{"type": "security_exception", "reason": denied}],
+            "type": "security_exception",
+            "reason": denied,
+            "caused_by": {
+                "type": "illegal_argument_exception",
+                "reason": "Cannot parse scroll id",
+                "caused_by": {"type": "e_o_f_exception", "reason": None},
+            },
+        }, "status": 403}) from exc
     except search_queries.SearchContextMissingError as exc:
         cause = {"type": "search_context_missing_exception", "reason": str(exc)}
         raise HTTPException(status_code=404, detail={"error": {

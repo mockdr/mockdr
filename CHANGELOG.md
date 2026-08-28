@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A scroll cursor the cluster cannot read is a refusal from the security layer.**
+The bootstrap can open a scroll and dispatch a search now, so the six routes
+addressed by a cursor or a sid — which nothing had ever compared — are
+compared. The jobs matched; the scroll did not. A scroll id encodes which
+indices the scroll reads, so one Elasticsearch cannot parse cannot be
+authorised either: 8.15 answers `403 security_exception` with
+`Cannot parse scroll id` as the cause, before the search context is looked
+for. mockdr reported a missing context — the answer for a well-formed id
+that has expired, which is a different thing to a client deciding whether to
+retry. And the product header goes with it: `X-elastic-product` is absent on
+a 403 as well as on a 401, present on a 400 and a 404 — measured, where
+mockdr had only known about the 401.
+
 **A collector path splunkd does not have, and the 404 it answers with.**
 Five probes went to the versioned spellings of the event collector, which
 nothing had ever sent anything to. `/services/collector/event/1.0` and

@@ -5,8 +5,9 @@ Elasticsearch client since 7.14 — Python, JavaScript, Java, Go — reads it of
 the first response and refuses to talk to a server that does not send it,
 with an `UnsupportedProductError`. mockdr never sent it, so the one client
 this mount exists for could not use it at all. Measured on 8.15: it is on
-every answer, including a 404, and *not* on the 401 that asks for
-credentials — the header goes on once the request has been authenticated.
+every answer, including a 404 and a 400, and *not* on the 401 that asks for
+credentials nor on the 403 that refuses what the caller may not do — the
+header goes on once the request has got past the security layer.
 
 Kibana names itself the same way on every answer, whatever the status and
 whether or not the caller authenticated: `kbn-name`, `kbn-license-sig`, and
@@ -61,7 +62,7 @@ class ElasticHeadersMiddleware:
         async def send_named(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
-                if elastic and message["status"] != 401:
+                if elastic and message["status"] not in (401, 403):
                     headers["x-elastic-product"] = _PRODUCT
                 elif kibana:
                     headers["kbn-name"] = _KBN_NAME
