@@ -99,6 +99,31 @@ def kill_process(agent_id: str, params: dict) -> dict | None:
     return _create_action(agent_id, "kill-process", parameters=params)
 
 
+def run_action(
+    agent_id: str, command: str, comment: str = "", params: dict | None = None,
+) -> dict | None:
+    """Run one of the response actions that only records what it was asked.
+
+    `suspend-process`, `running-processes`, `get-file` and `execute` are
+    routed by 8.15 and were not served here at all, so a playbook that ran
+    any of them met a 404 from a product that has the route. The command
+    names are Kibana's own, hyphenated — the vocabulary its `commands`
+    filter validates against (measured).
+
+    Args:
+        agent_id: ID of the target endpoint.
+        command:  The command name, as Kibana spells it.
+        comment:  Operator comment.
+        params:   The action's own parameters.
+
+    Returns:
+        Action response dict, or None if endpoint not found.
+    """
+    if not es_endpoint_repo.get(agent_id):
+        return None
+    return _create_action(agent_id, command, comment, params)
+
+
 def scan_endpoint(agent_id: str, comment: str = "") -> dict | None:
     """Trigger a scan on the endpoint.
 

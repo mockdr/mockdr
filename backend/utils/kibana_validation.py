@@ -543,6 +543,7 @@ def _union_failure(where: str, name: str, allowed: tuple[str, ...]) -> str:
 def validate_config_schema(
     values: Mapping[str, object], fields: tuple[SchemaField, ...], *, where: str,
     from_query: bool = False,
+    undeclared: bool = True,
 ) -> None:
     """Refuse a request the way ``@kbn/config-schema`` refuses it.
 
@@ -555,6 +556,10 @@ def validate_config_schema(
         where:      ``request query`` or ``request body``.
         from_query: Whether every value arrived as a string, as it does in a
                     query string — a number is then whatever parses as one.
+        undeclared: Whether to refuse a member the schema does not declare.
+                    The response actions check their own `parameters` block
+                    between the declared members and this, so they ask for
+                    the two halves in turn.
 
     Raises:
         ConfigSchemaError: Carrying Kibana's own message.
@@ -571,6 +576,8 @@ def validate_config_schema(
             continue
         _check_field(values[field.name], field, where=where, from_query=from_query)
 
+    if not undeclared:
+        return
     declared = {field.name for field in fields}
     for key in values:
         if key not in declared:

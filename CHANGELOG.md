@@ -100,6 +100,29 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**Four response actions Kibana routes and mockdr answered 404 for.**
+8.15 routes nine — `isolate`, `unisolate`, `kill-process`, `suspend-process`,
+`running-processes`, `get-file`, `execute`, `upload`, `scan`, which is the
+vocabulary its own `commands` filter validates against. mockdr served four,
+so a playbook that ran `get_file` or `execute` met a 404 from a product that
+has the route. `upload` is the one still left out: it takes a multipart body
+and a file, which this mock has nowhere to put.
+
+Their schema also asks in a definite order, and mockdr asked in another. It
+checks the members it declares in declaration order, with each action's own
+`parameters` block checked *where that block is declared* — so a body with a
+bad `agent_type` and no `parameters` is refused for the `parameters` — and
+the members it has no definition for last of all. mockdr reported the
+unknown key first, and on two actions looked the endpoint up before reading
+the body at all, answering `Endpoint x not found` to a request that never
+named a valid one. Each action's block has its own declared members too:
+`scan` and `get_file` take a `path`, `execute` a `command` and a numeric
+`timeout`, the two process actions a union of `pid` and `entity_id` whose
+failure lists both arms, and `isolate`, `unisolate` and `running-processes`
+declare none at all — so any member of one is a member with no definition.
+Eleven bodies against eight actions now answer what 8.15 answers, word for
+word.
+
 **An argument splunkd's handler does not take is a refusal too.**
 Same shape, third product: splunkd names the alphabetically first argument
 it does not recognise — whatever order they arrived in — and mockdr refused

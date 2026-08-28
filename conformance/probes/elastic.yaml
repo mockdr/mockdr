@@ -4205,3 +4205,97 @@ probes:
   - id: es-mget-all-with-no-body
     endpoint: search
     request: {method: GET, path: /_mget, auth: basic}
+
+  # ── The response actions, and the order their schema checks (2.3.1) ────
+  #
+  # 8.15 routes nine response actions; mockdr served four, so a playbook
+  # that ran `get_file` or `execute` met a 404 from a product that has the
+  # route. Its schema also asks in a definite order — the members it
+  # declares, in declaration order, with each action's own `parameters`
+  # block checked where that block is declared, and the members it does not
+  # declare last of all.
+
+  - id: kbn-action-suspend-process-exists
+    endpoint: kibana
+    why: One of the four mockdr answered 404 for.
+    request:
+      method: POST
+      path: /api/endpoint/action/suspend_process
+      json: {endpoint_ids: ["probe-agent"]}
+      auth: basic
+
+  - id: kbn-action-running-procs-exists
+    endpoint: kibana
+    why: The one action that takes no `parameters` block at all.
+    request:
+      method: POST
+      path: /api/endpoint/action/running_procs
+      json: {endpoint_ids: []}
+      auth: basic
+
+  - id: kbn-action-get-file-exists
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/endpoint/action/get_file
+      json: {endpoint_ids: ["probe-agent"]}
+      auth: basic
+
+  - id: kbn-action-execute-exists
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/endpoint/action/execute
+      json: {endpoint_ids: ["probe-agent"]}
+      auth: basic
+
+  - id: kbn-action-parameters-before-agent-type
+    endpoint: kibana
+    why: >
+      `parameters` is checked where it is declared, so a body with a bad
+      `agent_type` and no `parameters` is refused for the `parameters`.
+    request:
+      method: POST
+      path: /api/endpoint/action/scan
+      json: {endpoint_ids: ["probe-agent"], agent_type: "nope"}
+      auth: basic
+
+  - id: kbn-action-parameters-before-an-unknown-key
+    endpoint: kibana
+    why: And before the members the schema has no definition for.
+    request:
+      method: POST
+      path: /api/endpoint/action/kill_process
+      json: {endpoint_ids: ["probe-agent"], zzzqqq: 1}
+      auth: basic
+
+  - id: kbn-action-process-union-lists-both-arms
+    endpoint: kibana
+    why: >
+      A `parameters` block naming neither `pid` nor `entity_id` fails both
+      arms, and Kibana reports the first failure of each.
+    request:
+      method: POST
+      path: /api/endpoint/action/suspend_process
+      json: {endpoint_ids: ["probe-agent"], parameters: {}}
+      auth: basic
+
+  - id: kbn-action-isolate-declares-no-parameters
+    endpoint: kibana
+    why: >
+      `isolate` takes a `parameters` block and declares nothing inside it,
+      so any member of one is a member the schema has no definition for.
+    request:
+      method: POST
+      path: /api/endpoint/action/isolate
+      json: {endpoint_ids: ["probe-agent"], parameters: {path: "/tmp"}}
+      auth: basic
+
+  - id: kbn-action-execute-declares-a-timeout
+    endpoint: kibana
+    why: Its block declares `command` and a numeric `timeout`, and no more.
+    request:
+      method: POST
+      path: /api/endpoint/action/execute
+      json: {endpoint_ids: ["probe-agent"], parameters: {command: "ls", timeout: "soon"}}
+      auth: basic

@@ -673,3 +673,102 @@ class TestAnUnknownSplunkArgumentIsRefused:
             "/splunk/services/data/indexes-extended", headers=SPLUNK_AUTH,
             params={"output_mode": "json", "summarize": "false"},
         ).status_code == 400
+
+
+class TestTheResponseActionsKibanaRoutes:
+    """Nine commands, and the order their schema asks in."""
+
+    @staticmethod
+    def _agent(client: TestClient) -> str:
+        listing = client.get("/kibana/api/endpoint/metadata", headers=ES_AUTH).json()
+        return str(listing["data"][0]["metadata"]["agent"]["id"])
+
+    @pytest.mark.parametrize(("action", "command", "parameters"), [
+        ("suspend_process", "suspend-process", {"pid": 42}),
+        ("running_procs", "running-processes", None),
+        ("get_file", "get-file", {"path": "/etc/passwd"}),
+        ("execute", "execute", {"command": "whoami"}),
+    ])
+    def test_the_four_actions_that_answered_404_now_run(
+        self, client: TestClient, action: str, command: str, parameters: dict | None,
+    ) -> None:
+        """A playbook running any of them met a 404 from a product that routes it."""
+        agent = self._agent(client)
+        body: dict = {"endpoint_ids": [agent], "comment": "why"}
+        if parameters is not None:
+            body["parameters"] = parameters
+
+        resp = client.post(
+            f"/kibana/api/endpoint/action/{action}", headers=ES_AUTH, json=body,
+        )
+
+        assert resp.status_code == 200, resp.text
+        # Kibana's own command vocabulary is hyphenated — the one its
+        # `commands` filter validates against.
+        assert resp.json()["action"] == command
+        assert resp.json()["agent_id"] == agent
+
+    def test_parameters_are_checked_where_the_schema_declares_them(
+        self, client: TestClient,
+    ) -> None:
+        """Before `agent_type`, which is declared after them, and before the
+        members the schema has no definition for."""
+        agent = self._agent(client)
+        by_type = client.post(
+            "/kibana/api/endpoint/action/scan", headers=ES_AUTH,
+            json={"endpoint_ids": [agent], "agent_type": "nope"},
+        )
+        assert by_type.json()["message"] == (
+            "[request body.parameters.path]: expected value of type [string] "
+            "but got [undefined]"
+        )
+
+        by_key = client.post(
+            "/kibana/api/endpoint/action/kill_process", headers=ES_AUTH,
+            json={"endpoint_ids": [agent], "zzzqqq": 1},
+        )
+        assert by_key.json()["message"] == (
+            "[request body.parameters]: expected at least one defined value "
+            "but got [undefined]"
+        )
+
+    def test_a_process_block_naming_neither_member_fails_both_arms(
+        self, client: TestClient,
+    ) -> None:
+        """It read as one failure; Kibana reports the first of each arm."""
+        resp = client.post(
+            "/kibana/api/endpoint/action/suspend_process", headers=ES_AUTH,
+            json={"endpoint_ids": [self._agent(client)], "parameters": {}},
+        )
+
+        assert resp.json()["message"] == (
+            "[request body.parameters]: types that failed validation:\n"
+            "- [request body.parameters.0.pid]: expected value of type [number] "
+            "but got [undefined]\n"
+            "- [request body.parameters.1.entity_id]: expected value of type "
+            "[string] but got [undefined]"
+        )
+
+    def test_an_action_that_declares_no_parameters_refuses_every_member(
+        self, client: TestClient,
+    ) -> None:
+        """`isolate` takes the block and declares nothing inside it."""
+        resp = client.post(
+            "/kibana/api/endpoint/action/isolate", headers=ES_AUTH,
+            json={"endpoint_ids": [self._agent(client)], "parameters": {"path": "/tmp"}},
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["message"] == (
+            "[request body.parameters.path]: definition for this key is missing"
+        )
+
+    def test_execute_declares_a_numeric_timeout(self, client: TestClient) -> None:
+        resp = client.post(
+            "/kibana/api/endpoint/action/execute", headers=ES_AUTH,
+            json={"endpoint_ids": [self._agent(client)],
+                  "parameters": {"command": "ls", "timeout": "soon"}},
+        )
+
+        assert resp.status_code == 400
+        assert "[request body.parameters.timeout]" in resp.json()["message"]

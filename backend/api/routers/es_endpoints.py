@@ -17,6 +17,7 @@ from utils.kibana_validation import (
     ENDPOINT_ACTION_BODY,
     ENDPOINT_METADATA_QUERY,
     ConfigSchemaError,
+    SchemaField,
     validate_config_schema,
 )
 
@@ -96,7 +97,7 @@ def isolate_endpoint(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Isolate an endpoint from the network."""
-    _validate_action_body(body)
+    _action_body(body, "isolate")
     ids = body.get("endpoint_ids") or []
     agent_id = ids[0] if ids else body.get("agent_id")
     if not agent_id:
@@ -121,7 +122,7 @@ def unisolate_endpoint(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Release an endpoint from network isolation."""
-    _validate_action_body(body)
+    _action_body(body, "unisolate")
     ids = body.get("endpoint_ids") or []
     agent_id = ids[0] if ids else body.get("agent_id")
     if not agent_id:
@@ -151,21 +152,7 @@ def kill_process(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Kill a process on an endpoint."""
-    ids = body.get("endpoint_ids") or []
-    agent_id = ids[0] if ids else body.get("agent_id")
-    if not agent_id:
-        raise HTTPException(
-            status_code=400,
-            detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
-        )
-    params = _require_parameters(body, "kill_process")
-    result = endpoint_commands.kill_process(agent_id, params)
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
-        )
-    return result
+    return _record_action(body, "kill-process", _action_body(body, "kill_process"))
 
 
 @router.post("/api/endpoint/action/scan", dependencies=[Depends(require_kbn_xsrf)])
@@ -174,6 +161,25 @@ def scan_endpoint(
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Trigger a scan on an endpoint."""
+    return _record_action(body, "scan", _action_body(body, "scan"))
+
+
+# Kibana 8.15 routes seven more response actions than mockdr served, and a
+# playbook that ran any of the four below met a 404 from a product that has
+# the route. The command names are Kibana's own, hyphenated — the vocabulary
+# its `commands` filter validates against (measured: isolate, unisolate,
+# kill-process, suspend-process, running-processes, get-file, execute,
+# upload, scan). `upload` is the one left out: it takes a multipart body and
+# a file, which this mock has nowhere to put.
+
+
+def _record_action(body: dict, command: str, params: dict) -> dict:
+    """Record one response action against the endpoint the body names.
+
+    Raises:
+        HTTPException: 400 for a body Kibana's schema refuses, 404 for an
+            endpoint this install does not have.
+    """
     ids = body.get("endpoint_ids") or []
     agent_id = ids[0] if ids else body.get("agent_id")
     if not agent_id:
@@ -181,15 +187,55 @@ def scan_endpoint(
             status_code=400,
             detail=build_kbn_error_response(400, _NO_ENDPOINT_IDS),
         )
-    _require_parameters(body, "scan")
-    comment = body.get("comment", "")
-    result = endpoint_commands.scan_endpoint(agent_id, comment)
+    result = endpoint_commands.run_action(
+        agent_id, command, body.get("comment", ""), params,
+    )
     if result is None:
         raise HTTPException(
             status_code=404,
             detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
     return result
+
+
+@router.post("/api/endpoint/action/suspend_process", dependencies=[Depends(require_kbn_xsrf)])
+def suspend_process(
+    body: dict = Body(...),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Suspend a process on an endpoint."""
+    return _record_action(body, "suspend-process", _action_body(body, "suspend_process"))
+
+
+@router.post("/api/endpoint/action/running_procs", dependencies=[Depends(require_kbn_xsrf)])
+def running_processes(
+    body: dict = Body(...),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """List the processes running on an endpoint.
+
+    The one response action that asks for no `parameters` block: 8.15 takes
+    a body with nothing but `endpoint_ids` here (measured).
+    """
+    return _record_action(body, "running-processes", _action_body(body, "running_procs"))
+
+
+@router.post("/api/endpoint/action/get_file", dependencies=[Depends(require_kbn_xsrf)])
+def get_file(
+    body: dict = Body(...),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Fetch a file from an endpoint."""
+    return _record_action(body, "get-file", _action_body(body, "get_file"))
+
+
+@router.post("/api/endpoint/action/execute", dependencies=[Depends(require_kbn_xsrf)])
+def execute_command(
+    body: dict = Body(...),
+    _: dict = Depends(require_es_write),
+) -> dict:
+    """Run a command on an endpoint."""
+    return _record_action(body, "execute", _action_body(body, "execute"))
 
 
 # ── Action Status ────────────────────────────────────────────────────────────
@@ -239,22 +285,39 @@ def get_action(
 #: a `command`, and the two process actions ask only that the block carry
 #: something. mockdr accepted a scan with no parameters at all and answered
 #: 200, so a client that had forgotten the one member the action is about
-#: was told the scan had started.
-_ACTION_PARAMETERS = {
-    "scan": ("path", "[request body.parameters.path]: expected value of type "
-                     "[string] but got [undefined]"),
-    "get_file": ("path", "[request body.parameters.path]: expected value of type "
-                         "[string] but got [undefined]"),
-    "execute": ("command", "[request body.parameters.command]: expected value of type "
-                           "[string] but got [undefined]"),
+#: What each action's `parameters` block declares, measured member by member
+#: on 8.15. An action not named here declares none, so any member inside its
+#: block is one the schema has no definition for — which is what `isolate`
+#: answers to a `parameters: {path: …}`.
+_ACTION_PARAMETERS: dict[str, tuple[SchemaField, ...]] = {
+    "scan": (SchemaField("path", required=True),),
+    "get_file": (SchemaField("path", required=True),),
+    "execute": (
+        SchemaField("command", required=True),
+        SchemaField("timeout", "number"),
+    ),
 }
+
+#: The two actions whose block is a *union*: one arm names a process by `pid`,
+#: the other by `entity_id`. Kibana tries both and reports the first failure
+#: of each, numbered — so a block naming neither reads as two failures, not
+#: one, and a block naming a member no arm declares fails on that instead.
+_PROCESS_ARMS: tuple[tuple[SchemaField, ...], ...] = (
+    (SchemaField("pid", "number", required=True),),
+    (SchemaField("entity_id", required=True),),
+)
+_PROCESS_ACTIONS = ("kill_process", "suspend_process")
+
+#: What a union action answers to no block at all. The others do not have a
+#: case of their own for it: 8.15 reports the member *inside* the block it
+#: wanted, exactly as it does for a block that is there and incomplete.
 _PARAMETERS_REQUIRED = (
     "[request body.parameters]: expected at least one defined value but got [undefined]"
 )
 
 
 def _require_parameters(body: dict, action: str) -> dict:
-    """The `parameters` block an action needs, refused the way Kibana refuses it.
+    """The `parameters` block an action needs, refused as Kibana refuses it.
 
     Raises:
         HTTPException: 400, in Kibana's own wording.
@@ -262,31 +325,96 @@ def _require_parameters(body: dict, action: str) -> dict:
     params = body.get("parameters")
     if not isinstance(params, dict):
         params = {}
-    # An action with a member of its own names that member whether the block
-    # is absent or merely incomplete; the two process actions ask only that
-    # the block carry something. Measured on 8.15.
-    named = _ACTION_PARAMETERS.get(action)
-    if named:
-        if not params.get(named[0]):
-            raise HTTPException(status_code=400, detail=build_kbn_error_response(400, named[1]))
+    if action in _PROCESS_ACTIONS:
+        if "parameters" not in body:
+            raise HTTPException(status_code=400, detail=build_kbn_error_response(
+                400, _PARAMETERS_REQUIRED,
+            ))
+        _require_one_arm(params)
         return params
-    if not params:
+    try:
+        validate_config_schema(
+            params, _ACTION_PARAMETERS.get(action, ()), where="request body.parameters",
+        )
+    except ConfigSchemaError as exc:
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
-            400, _PARAMETERS_REQUIRED,
-        ))
+            400, str(exc),
+        )) from exc
     return params
 
 
-def _validate_action_body(body: dict) -> None:
+def _require_one_arm(params: dict) -> None:
+    """Refuse a process block that satisfies neither arm of the union.
+
+    Raises:
+        HTTPException: 400, listing what each arm complained about.
+    """
+    failures = []
+    for index, arm in enumerate(_PROCESS_ARMS):
+        try:
+            validate_config_schema(
+                params, arm, where=f"request body.parameters.{index}",
+            )
+        except ConfigSchemaError as exc:
+            failures.append(f"- {exc}")
+    if len(failures) == len(_PROCESS_ARMS):
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body.parameters]: types that failed validation:\n"
+                 + "\n".join(failures),
+        ))
+
+
+def _validate_action_body(
+    body: dict,
+    fields: tuple[SchemaField, ...] = ENDPOINT_ACTION_BODY,
+    *,
+    undeclared: bool = True,
+) -> None:
     """Refuse a response-action body the way Kibana's schema refuses it.
 
     mockdr looked for an id and reported "Endpoint x not found" for anything
     else, so a body with a member Kibana has no definition for came back as a
     404 about an endpoint rather than a 400 about the request.
+
+    `undeclared` splits the check in two because 8.15 asks in this order: the
+    members it declares, then the action's own `parameters` block, then the
+    members it does not declare. A body missing `parameters` *and* carrying
+    an unknown key is refused for the `parameters` (measured on all six
+    actions that take one).
     """
     try:
-        validate_config_schema(body, ENDPOINT_ACTION_BODY, where="request body")
+        validate_config_schema(
+            body, fields, where="request body", undeclared=undeclared,
+        )
     except ConfigSchemaError as exc:
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
             400, str(exc),
         )) from exc
+
+
+#: `ENDPOINT_ACTION_BODY` split where `parameters` sits, because 8.15 checks
+#: that block *in its declared position*: a body with a bad `agent_type` and
+#: no `parameters` is refused for the `parameters`, and one with a good
+#: `parameters` and a bad `agent_type` for the `agent_type` (measured).
+_PARAMETERS_AT = next(
+    i for i, field in enumerate(ENDPOINT_ACTION_BODY) if field.name == "parameters"
+)
+_BODY_BEFORE_PARAMETERS = ENDPOINT_ACTION_BODY[:_PARAMETERS_AT]
+_BODY_AFTER_PARAMETERS = ENDPOINT_ACTION_BODY[_PARAMETERS_AT + 1:]
+
+
+def _action_body(body: dict, action: str) -> dict:
+    """Check a response-action body in the order 8.15 checks it.
+
+    The members it declares, in declaration order, with the action's own
+    `parameters` block checked where that block is declared — and the
+    members it does *not* declare last of all.
+
+    Returns:
+        The `parameters` block, empty for an action that declares none.
+    """
+    _validate_action_body(body, _BODY_BEFORE_PARAMETERS, undeclared=False)
+    params = _require_parameters(body, action)
+    _validate_action_body(body, _BODY_AFTER_PARAMETERS, undeclared=False)
+    _validate_action_body(body, ENDPOINT_ACTION_BODY)
+    return params
