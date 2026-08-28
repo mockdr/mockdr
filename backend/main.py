@@ -500,6 +500,81 @@ def _with_repeated_challenges(
 #: The splunkd paths that answer 405 rather than the EAI collections' 400.
 _SPLUNK_SEARCH_405 = re.compile(r"/splunk/services/search/")
 _SPLUNK_KVSTORE_405 = re.compile(r"/storage/collections/data/[^/]+/batch_")
+#: The job collections, whose DELETE is worded differently from the rest of
+#: the search endpoints', and typeahead, whose is different again.
+_SPLUNK_JOB_COLLECTION = re.compile(r"/splunk/services/search/(v2/)?jobs/?$")
+_SPLUNK_TYPEAHEAD = re.compile(r"/splunk/services/search/typeahead")
+
+
+#: splunkd's answer to a verb a path does not take, which is decided by the
+#: *verb* first and the path second (measured across fifteen paths on
+#: 10.4.2). mockdr had it the other way round and answered one thing for the
+#: search endpoints, another for the KV store's batch paths, and a third for
+#: everything else — so `PUT` and `PATCH` on any EAI collection came back as
+#: the 400 splunkd keeps for a `POST` with no name to act on.
+_SPLUNK_METHOD_NOT_ALLOWED = "Method Not Allowed"
+
+
+def _splunk_wrong_method(
+    request: Request, path: str, allowed: tuple[str, ...],
+) -> JSONResponse:
+    """What splunkd answers when the path exists and the verb does not fit.
+
+    * The search endpoints answer for themselves — see
+      `_splunk_search_wrong_method`.
+    * `PATCH` is 405 `Method Not Allowed` everywhere else, with no `Allow`.
+    * `PUT` is 404 `Requested invalid action 'PUT'.`.
+    * A KV store's batch path is 405 *with* an `Allow` naming `POST,PUT`.
+    * everything else is the 400 an EAI collection answers a verb it cannot
+      route to a named object.
+    """
+    search = bool(_SPLUNK_SEARCH_405.search(path))
+    if search:
+        return _splunk_search_wrong_method(request, path, allowed)
+    if request.method == "PATCH":
+        return JSONResponse(status_code=405, content={
+            "messages": [{"type": "ERROR", "text": _SPLUNK_METHOD_NOT_ALLOWED}]})
+    if request.method == "PUT":
+        return JSONResponse(status_code=404, content={
+            "messages": [{"type": "ERROR", "text": "Requested invalid action 'PUT'."}]})
+    if _SPLUNK_KVSTORE_405.search(path):
+        return JSONResponse(
+            status_code=405, headers={"Allow": ",".join(allowed)},
+            content={"messages": [
+                {"type": "ERROR", "text": _SPLUNK_METHOD_NOT_ALLOWED}]},
+        )
+    return JSONResponse(
+        status_code=400,
+        content={"messages": [{"type": "ERROR", "text":
+            f'Cannot perform action "{request.method}" without a target name to act on.'}]},
+    )
+
+
+
+def _splunk_search_wrong_method(
+    request: Request, path: str, allowed: tuple[str, ...],
+) -> JSONResponse:
+    """The search endpoints' answer, which is theirs alone.
+
+    `PUT` and `PATCH` are the plain 405 with no `Allow`, wherever they land.
+    Any other verb a path does not take is FATAL *with* an `Allow` — and in
+    two wordings: the job collections say `Method Not Allowed`, everything
+    else `The method is not allowed.`. `typeahead` is outside all of it and
+    answers the plain 405 to every wrong verb. Measured path by path on
+    10.4.2, because no rule accounts for the split.
+    """
+    if _SPLUNK_TYPEAHEAD.search(path) or request.method in ("PUT", "PATCH"):
+        return JSONResponse(status_code=405, content={
+            "messages": [{"type": "ERROR", "text": _SPLUNK_METHOD_NOT_ALLOWED}]})
+    text = (
+        _SPLUNK_METHOD_NOT_ALLOWED if _SPLUNK_JOB_COLLECTION.search(path)
+        else "The method is not allowed."
+    )
+    return JSONResponse(
+        status_code=405, headers={"Allow": ",".join(allowed)},
+        content={"messages": [{"type": "FATAL", "text": text}]},
+    )
+
 
 #: Paths that mock Entra's token endpoint rather than the API in front of it.
 _TOKEN_ENDPOINT_SUFFIX = "/oauth2/v2.0/token"
@@ -1171,28 +1246,7 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
             content={"text": "The requested URL was not found on this server.", "code": 404},
         )
     if allowed and vendor == "splunk":
-        # splunkd is three services under one mount, and they disagree here.
-        # The EAI collections have no 405 at all: a verb they do not take is
-        # a 400, in the wording they use for a POST with no name, and with no
-        # Allow header. The search endpoints and the KV store *do* answer
-        # 405, with an Allow header and two different bodies. All measured on
-        # 10.4.2, which is the only way anyone would know.
-        if _SPLUNK_SEARCH_405.search(path):
-            return JSONResponse(
-                status_code=405, headers={"Allow": ",".join(allowed)},
-                content={"messages": [
-                    {"type": "FATAL", "text": "The method is not allowed."}]},
-            )
-        if _SPLUNK_KVSTORE_405.search(path):
-            return JSONResponse(
-                status_code=405, headers={"Allow": ",".join(allowed)},
-                content={"messages": [{"type": "ERROR", "text": "Method Not Allowed"}]},
-            )
-        return JSONResponse(
-            status_code=400,
-            content={"messages": [{"type": "ERROR", "text":
-                f'Cannot perform action "{request.method}" without a target name to act on.'}]},
-        )
+        return _splunk_wrong_method(request, path, allowed)
     if allowed and vendor == "elasticsearch":
         # Elasticsearch's 405 carries a bare string, not the nested error
         # object every other status uses, and it names the verbs the uri does

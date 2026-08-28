@@ -180,7 +180,12 @@ async def insert_kv_record(
     return JSONResponse(status_code=201, content={"_key": result["_key"]})
 
 
+# splunkd routes both verbs here — its 405 for a third one names
+# `Allow: POST,PUT` (measured on 10.4.2), and mockdr served only
+# the one, so a client using the other met a refusal that does not
+# exist.
 @router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_save")
+@router.put("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_save")
 async def batch_save_records(
     owner: str,
     app: str,
@@ -203,6 +208,7 @@ async def batch_save_records(
 
 
 @router.post("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_find")
+@router.put("/servicesNS/{owner}/{app}/storage/collections/data/{name}/batch_find")
 async def batch_find_records(
     owner: str,
     app: str,

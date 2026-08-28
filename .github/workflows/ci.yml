@@ -213,8 +213,15 @@ jobs:
           python scripts/error_envelope_audit.py
           python scripts/authz_audit.py
           python scripts/method_drift.py
-          python scripts/enum_drift.py
           python scripts/body_audit.py
+
+      # data/ is gitignored, so without this the spec is absent and the
+      # check does not run — the same reason the field-drift job fetches it.
+      - name: Fetch SentinelOne API spec
+        run: ./scripts/fetch_swagger.sh
+
+      - name: Enum values the vendor declares
+        run: python scripts/enum_drift.py
 
   field-drift:
     name: Field drift — swagger spec vs mock responses

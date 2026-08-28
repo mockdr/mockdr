@@ -3372,3 +3372,87 @@ probes:
       - $.entry
       - $.paging.total
       - $.origin
+
+  # ── A verb a path does not take (2.3.1) ───────────────────────────────
+  #
+  # splunkd decides this by the *verb* first and the path second, and mockdr
+  # had it the other way round: `PUT` and `PATCH` on any EAI collection came
+  # back as the 400 splunkd keeps for a `POST` with no name to act on.
+
+  - id: splunk-put-on-a-collection
+    endpoint: management
+    why: 404, and a wording of its own — not the 405 a client would expect.
+    request:
+      method: PUT
+      path: /services/authorization/roles
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-patch-on-a-collection
+    endpoint: management
+    why: 405, and no Allow header — the search paths carry one, this does not.
+    request:
+      method: PATCH
+      path: /services/data/indexes
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-put-on-a-search-path
+    endpoint: management
+    why: The one place `PUT` is a 405 rather than a 404.
+    request:
+      method: PUT
+      path: /services/search/jobs
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-delete-on-a-search-path
+    endpoint: management
+    why: >
+      FATAL rather than ERROR, and the only refusal here that names what the
+      path does take.
+    request:
+      method: DELETE
+      path: /services/search/jobs
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-patch-on-a-search-path
+    endpoint: management
+    request:
+      method: PATCH
+      path: /services/search/typeahead
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-put-on-the-kvstore-config
+    endpoint: management
+    request:
+      method: PUT
+      path: /services/storage/collections/config
+      query: {output_mode: json}
+      auth: basic
+
+  - id: splunk-typeahead-needs-a-count
+    endpoint: management
+    why: >
+      `count` is required and splunkd says so; mockdr defaulted to 50 and
+      answered an empty list, which reads as "there is nothing to complete"
+      rather than "you did not say how many".
+    request:
+      method: GET
+      path: /services/search/typeahead
+      query: {output_mode: json, prefix: "index="}
+      auth: basic
+
+  - id: splunk-timeparser-without-a-time
+    endpoint: management
+    why: >
+      204 and no body — it does not assume `now`, which mockdr did, so a
+      client that had forgotten the parameter was handed an answer to a
+      question it never asked.
+    request:
+      method: GET
+      path: /services/search/timeparser
+      query: {output_mode: json}
+      auth: basic

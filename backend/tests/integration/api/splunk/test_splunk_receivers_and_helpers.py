@@ -182,7 +182,8 @@ class TestTypeaheadOutputModes:
 
     def test_xml_is_the_results_document(self, client: TestClient) -> None:
         response = client.get("/splunk/services/search/typeahead", headers=AUTH,
-                              params={"prefix": "index=mai", "output_mode": "xml"})
+                              params={"prefix": "index=mai", "count": 5,
+                                      "output_mode": "xml"})
         # One newline under the declaration here, where a job's results have
         # two (both measured).
         assert response.text.startswith(
@@ -191,5 +192,8 @@ class TestTypeaheadOutputModes:
 
     def test_atom_is_refused_like_anywhere_else(self, client: TestClient) -> None:
         response = client.get("/splunk/services/search/typeahead", headers=AUTH,
-                              params={"prefix": "index=mai", "output_mode": "atom"})
+                              # `count` too, so the refusal under test is the
+                              # output mode's and not the missing argument's.
+                              params={"prefix": "index=mai", "count": 5,
+                                      "output_mode": "atom"})
         assert response.status_code == 400

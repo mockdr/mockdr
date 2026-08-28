@@ -467,12 +467,18 @@ def delete_job(
     sid: str,
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
-    """Delete a search job."""
+    """Delete a search job.
+
+    splunkd calls this cancelling, and says so without naming the sid — the
+    same line its `control` action answers to `action=cancel` (measured on
+    10.4.2). mockdr echoed the sid back, which is not what a client matching
+    on the message sees.
+    """
     if not delete_search_job(sid):
         raise HTTPException(status_code=404, detail={"messages": [
             {"type": "FATAL", "text": "Unknown sid."},
         ]})
-    return {"messages": [{"type": "INFO", "text": f"Search job '{sid}' deleted"}]}
+    return {"messages": [{"type": "INFO", "text": "Search job cancelled."}]}
 
 
 # ── Time and typeahead ───────────────────────────────────────────────────────
@@ -485,16 +491,26 @@ def delete_job(
 @router.get("/services/search/timeparser")
 def timeparser(
     request: Request,
-    time: str = Query(default="now"),
+    time: str = Query(default=""),
     _user: dict = Depends(require_splunk_auth),
-) -> JSONResponse:
+) -> Response:
     """Resolve a time modifier to the instant it stands for.
 
     The answer is keyed by the modifier itself, so a client that asked about
     several gets them back by name. splunkd takes one at a time: a repeated
     parameter, or a modifier it cannot read, is `Invalid time.`
+
+    With no `time` at all it answers **204** and no body — it does not assume
+    `now`, which mockdr did, so a client that had forgotten the parameter was
+    handed an answer to a question it never asked.
     """
-    modifiers = request.query_params.getlist("time") or [time]
+    # Read from the raw query, not from `time`, because a repeated parameter
+    # is its own refusal and FastAPI would hand over only the last one.
+    modifiers = request.query_params.getlist("time") or ([time] if time else [])
+    if not modifiers:
+        # No body at all, and so no `Content-Type` either — splunkd's 204
+        # carries `Content-Length: 0` and nothing that describes a body.
+        return Response(status_code=204)
     if len(modifiers) != 1:
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "FATAL", "text": _INVALID_TIME},
@@ -522,10 +538,19 @@ _TYPEAHEAD_FIELDS = ("index", "sourcetype", "source", "host")
 @router.get("/services/search/typeahead")
 def typeahead(
     prefix: str = Query(default=""),
-    count: int = Query(default=50, ge=0),
+    count: int | None = Query(default=None, ge=0),
     _user: dict = Depends(require_splunk_auth),
 ) -> JSONResponse:
-    """Complete a search term from what the events actually carry."""
+    """Complete a search term from what the events actually carry.
+
+    `count` is required — splunkd says so and refuses without it, where
+    mockdr defaulted to 50 and answered an empty list, which reads as "there
+    is nothing to complete" rather than "you did not say how many".
+    """
+    if count is None:
+        raise HTTPException(status_code=400, detail={"messages": [
+            {"type": "ERROR", "text": "Count is a required argument"},
+        ]})
     field, _, written = prefix.partition("=")
     if not _ or field not in _TYPEAHEAD_FIELDS:
         # splunkd completes a `field=` term and nothing else: a bare word or

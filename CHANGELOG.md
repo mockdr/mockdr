@@ -110,6 +110,27 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**A verb splunkd's path does not take is answered by the verb, not the path.**
+mockdr had it the other way round: one answer for the search endpoints,
+another for the KV store's batch paths, and the 400 splunkd keeps for a
+`POST` with no name to act on for everything else — so `PUT` and `PATCH` on
+any EAI collection came back as that 400. Measured across fifteen paths:
+`PATCH` is 405 `Method Not Allowed` everywhere and carries no `Allow`; `PUT`
+is 404 `Requested invalid action 'PUT'.` except under `/services/search/`,
+where it is the same 405. `DELETE` under `/services/search/` is FATAL rather
+than ERROR and names what the path takes — in three wordings, one per group,
+which is encoded path by path because no rule accounts for it. The batch
+paths take `PUT` as well as `POST`: splunkd's own refusal there names
+`Allow: POST,PUT`, and mockdr served one of the two. And deleting a job is
+*cancelling* it, in a line that does not name the sid.
+
+Two more of the search endpoints, found in the same sweep: `typeahead`
+requires a `count` and says so, where mockdr defaulted to fifty and answered
+an empty list — which reads as "there is nothing to complete" rather than
+"you did not say how many"; and `timeparser` with no `time` answers **204**
+and no body rather than assuming `now`, so a client that had forgotten the
+parameter was handed an answer to a question it never asked.
+
 **Four response actions Kibana routes and mockdr answered 404 for.**
 8.15 routes nine — `isolate`, `unisolate`, `kill-process`, `suspend-process`,
 `running-processes`, `get-file`, `execute`, `upload`, `scan`, which is the

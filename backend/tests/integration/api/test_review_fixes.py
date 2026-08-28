@@ -801,3 +801,73 @@ class TestTheResponseActionsKibanaRoutes:
 
         assert resp.status_code == 400
         assert "[request body.parameters.timeout]" in resp.json()["message"]
+
+
+class TestTheVerbDecidesBeforeThePath:
+    """splunkd's answer to a verb a path does not take."""
+
+    @pytest.mark.parametrize(("method", "path", "status", "kind", "text"), [
+        ("PUT", "authorization/roles", 404, "ERROR", "Requested invalid action 'PUT'."),
+        ("PUT", "data/indexes", 404, "ERROR", "Requested invalid action 'PUT'."),
+        ("PUT", "storage/collections/config", 404, "ERROR",
+         "Requested invalid action 'PUT'."),
+        ("PATCH", "authorization/roles", 405, "ERROR", "Method Not Allowed"),
+        ("PATCH", "server/settings", 405, "ERROR", "Method Not Allowed"),
+        ("PUT", "search/jobs", 405, "ERROR", "Method Not Allowed"),
+        ("PATCH", "search/typeahead", 405, "ERROR", "Method Not Allowed"),
+        ("DELETE", "search/jobs", 405, "FATAL", "Method Not Allowed"),
+    ])
+    def test_each_one_answers_what_splunkd_answers(
+        self, client: TestClient, method: str, path: str, status: int,
+        kind: str, text: str,
+    ) -> None:
+        """It answered the 400 splunkd keeps for a POST with no name, for all
+        of them."""
+        resp = client.request(
+            method, f"/splunk/services/{path}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+
+        assert resp.status_code == status
+        assert resp.json()["messages"][0] == {"type": kind, "text": text}
+
+    def test_only_the_search_delete_names_what_the_path_takes(
+        self, client: TestClient,
+    ) -> None:
+        """Of the three refusals here, one carries an Allow header."""
+        with_allow = client.request(
+            "DELETE", "/splunk/services/search/jobs", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+        without = client.request(
+            "PATCH", "/splunk/services/authorization/roles", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+
+        assert with_allow.headers["allow"] == "GET,POST,HEAD"
+        assert "allow" not in without.headers
+
+    def test_the_batch_paths_take_put_as_well_as_post(
+        self, client: TestClient,
+    ) -> None:
+        """splunkd's own 405 there names `Allow: POST,PUT`; mockdr served one."""
+        resp = client.put(
+            "/splunk/servicesNS/nobody/search/storage/collections/data/probe_kv/batch_save",
+            headers=SPLUNK_AUTH, json=[{"_key": "a", "v": 1}],
+        )
+
+        assert resp.status_code != 405
+
+    def test_deleting_a_job_is_cancelling_it(self, client: TestClient) -> None:
+        """splunkd says so without naming the sid; mockdr echoed it back."""
+        sid = client.post(
+            SPLUNK, data={"search": "search index=sentinelone"}, headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()["sid"]
+
+        resp = client.request(
+            "DELETE", f"{SPLUNK}/{sid}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+
+        assert resp.json()["messages"][0]["text"] == "Search job cancelled."
