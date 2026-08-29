@@ -57,12 +57,66 @@ _KNOWN_TOP_LEVEL: frozenset[str] = frozenset({
 })
 
 _JSON_TOKENS = {
-    dict: "START_OBJECT", list: "START_ARRAY", str: "VALUE_STRING", bool: "VALUE_TRUE",
+    dict: "START_OBJECT", list: "START_ARRAY", str: "VALUE_STRING",
+    # One name for `true` and `false` alike: Elasticsearch names the *type*
+    # here, not the token, and mockdr split them the way Jackson does.
+    bool: "VALUE_BOOLEAN",
     int: "VALUE_NUMBER", float: "VALUE_NUMBER", type(None): "VALUE_NULL",
 }
 
 #: Elasticsearch's default index.max_result_window.
 MAX_RESULT_WINDOW = 10000
+
+
+#: The members a search body must hand an *object* — or, for two of them, an
+#: object or an array. A scalar there is reported as though the key itself
+#: were unknown, which is the same line an unknown key gets: the parser
+#: looked for an object under that name and found something else. mockdr took
+#: a `query` of `[]` as "match everything" and a `sort` of a number as a
+#: crash (measured across eleven members on 8.15).
+_OBJECT_MEMBERS = frozenset({
+    "query", "aggs", "aggregations", "highlight", "collapse", "post_filter",
+    "runtime_mappings", "suggest", "script_fields", "fields", "docvalue_fields",
+    "rescore", "knn",
+})
+#: The two that take an array as well.
+_ALSO_ARRAY = frozenset({"rescore", "knn"})
+
+#: What the members with a shape of their own say instead.
+_SOURCE_SHAPE = (
+    "Expected one of [VALUE_BOOLEAN, VALUE_STRING, START_ARRAY, START_OBJECT] "
+    "but found [{token}]"
+)
+_STORED_FIELDS_SHAPE = (
+    "Expected [VALUE_STRING] or [START_ARRAY] in [stored_fields] but found [{token}]"
+)
+
+
+
+def _refuse_wrong_shape(key: str, value: object) -> None:
+    """Refuse the members whose complaint is theirs alone.
+
+    Raises:
+        ESQueryError: For a `_source`, `stored_fields`, `track_total_hits` or
+            `explain` that is not one of the shapes 8.15 takes there.
+    """
+    token = _JSON_TOKENS.get(type(value), "VALUE_STRING")
+    # These two name where the parser stood; the two below them do not
+    # (measured on 8.15).
+    if key == "_source" and not isinstance(value, (bool, str, list, dict)):
+        raise ESQueryError(_SOURCE_SHAPE.format(token=token), clause=key)
+    if key == "stored_fields" and not isinstance(value, (str, list)):
+        raise ESQueryError(_STORED_FIELDS_SHAPE.format(token=token), clause=key)
+    if key == "track_total_hits" and isinstance(value, str):
+        # A string is read as a number here, and the failure is Java's.
+        try:
+            int(value)
+        except ValueError as exc:
+            msg = f'For input string: "{value}"'
+            raise ESQueryError(msg, es_type="number_format_exception") from exc
+    if key == "explain" and not isinstance(value, bool):
+        msg = f"Failed to parse value [{value}] as only [true] or [false] are allowed."
+        raise ESQueryError(msg, es_type="illegal_argument_exception")
 
 
 def validate_search_body(body: dict) -> None:
@@ -73,11 +127,17 @@ def validate_search_body(body: dict) -> None:
             ``index.max_result_window``.
     """
     for key, value in body.items():
-        if key not in _KNOWN_TOP_LEVEL:
+        wrong_shape = (
+            key in _OBJECT_MEMBERS
+            and not isinstance(value, dict)
+            and not (key in _ALSO_ARRAY and isinstance(value, list))
+            # `fields` and `docvalue_fields` are arrays; only a scalar is wrong.
+            and not (key in ("fields", "docvalue_fields") and isinstance(value, list))
+        )
+        if key not in _KNOWN_TOP_LEVEL or wrong_shape:
             token = _JSON_TOKENS.get(type(value), "VALUE_STRING")
-            if value is False:
-                token = "VALUE_FALSE"
             raise ESQueryError(f"Unknown key for a {token} in [{key}].", clause=key)
+        _refuse_wrong_shape(key, value)
     terminate_after = body.get("terminate_after")
     if isinstance(terminate_after, int) and not isinstance(terminate_after, bool) \
             and terminate_after < 0:
@@ -1404,18 +1464,41 @@ class SortKey(NamedTuple):
     unmapped_type: str = ""
 
 
-def parse_sort_keys(sort_spec: list) -> list[SortKey]:
-    """Read a sort array as ``SortKey`` entries, in priority order.
+def parse_sort_keys(sort_spec: object) -> list[SortKey]:
+    """Read a sort as ``SortKey`` entries, in priority order.
 
     Accepts every spelling the DSL allows: ``"field"``, ``{"field": "desc"}``
     and ``{"field": {"order": "desc", "missing": "_first",
-    "unmapped_type": "long"}}``.
+    "unmapped_type": "long"}}`` — and each of those *outside* an array as
+    well, which is how a client sorts on one field. mockdr iterated a bare
+    string and sorted on its letters, so `sort: "host"` failed on a mapping
+    for `[h]` where the cluster answers the documents in order.
+
+    Raises:
+        ESQueryError: For a member of the *array* that is neither a string
+            nor an object. Outside an array a scalar is a field name, and
+            fails later on the mapping for it.
     """
+    entries: list[object] = sort_spec if isinstance(sort_spec, list) else [sort_spec]
+    in_array = isinstance(sort_spec, list)
     sort_keys: list[SortKey] = []
-    for entry in sort_spec:
+    for entry in entries:
+        if not isinstance(entry, (str, dict)) and not in_array:
+            # A bare scalar is read as a field name, and fails on the mapping
+            # for it — `sort: 1` looks for a field called `1`.
+            sort_keys.append(SortKey(str(entry)))
+            continue
+        if not isinstance(entry, (str, dict)):
+            msg = (
+                "malformed sort format, within the sort array, an object, "
+                "or an actual string are allowed"
+            )
+            # Flat, not wrapped: this one the coordinating node catches
+            # while parsing, before any shard sees it (measured on 8.15).
+            raise ESQueryError(msg, es_type="illegal_argument_exception")
         if isinstance(entry, str):
             sort_keys.append(SortKey(entry))
-        elif isinstance(entry, dict):
+        else:
             for field, opts in entry.items():
                 if isinstance(opts, dict):
                     desc = opts.get("order", "asc") == "desc"

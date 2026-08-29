@@ -4784,3 +4784,122 @@ probes:
       path: /${seed_index}/_search
       json: {size: 0, aggs: {a: {terms: {field: host, shard_min_doc_count: -1}}}}
       auth: basic
+
+  # ── A member of the wrong type (2.3.1) ────────────────────────────────
+  #
+  # The cluster reports a scalar where it wanted an object as though the key
+  # itself were unknown — the parser looked for an object under that name
+  # and found something else. mockdr took a `query` of `[]` as "match
+  # everything" and a `sort` of a number as a crash.
+
+  - id: es-query-that-is-an-array
+    endpoint: search
+    needs_seed: true
+    why: Read as "match everything", which is every document in the index.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: []}
+      auth: basic
+
+  - id: es-query-that-is-a-string
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: "everything"}
+      auth: basic
+
+  - id: es-query-that-is-a-boolean
+    endpoint: search
+    needs_seed: true
+    why: >
+      `true` and `false` are both VALUE_BOOLEAN — mockdr split them the way
+      Jackson does, and no context on 8.15 does.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: true}
+      auth: basic
+
+  - id: es-aggs-that-is-a-string
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {aggs: "count them"}
+      auth: basic
+
+  - id: es-source-that-is-a-number
+    endpoint: search
+    needs_seed: true
+    why: This member names the four shapes it takes.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {_source: 1}
+      auth: basic
+
+  - id: es-stored-fields-that-is-a-boolean
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {stored_fields: true}
+      auth: basic
+
+  - id: es-track-total-hits-that-is-a-word
+    endpoint: search
+    needs_seed: true
+    why: Read as a number, and the failure is Java's.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {track_total_hits: "yes"}
+      auth: basic
+
+  - id: es-explain-that-is-a-word
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {explain: "please"}
+      auth: basic
+
+  - id: es-sort-on-one-bare-field
+    endpoint: search
+    needs_seed: true
+    why: >
+      Sorting on one field without an array around it. mockdr iterated the
+      string and sorted on its letters, failing on a mapping for `[h]`.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {sort: "host", size: 0}
+      auth: basic
+
+  - id: es-sort-that-is-a-number
+    endpoint: search
+    needs_seed: true
+    why: A bare scalar names a field, and fails on the mapping for it.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {sort: 1}
+      auth: basic
+
+  - id: es-sort-array-holding-a-number
+    endpoint: search
+    needs_seed: true
+    why: >
+      Inside the array it is a format complaint instead, and a flat one —
+      the coordinating node catches it before any shard sees it.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {sort: [1]}
+      auth: basic

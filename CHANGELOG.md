@@ -110,6 +110,29 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**A member of the wrong type read as something it is not.**
+The third neighbour of the empty-member question. A `query` of `[]` was read
+as "match everything" and answered the whole index; a `sort` of a number was
+a 500; `_source`, `stored_fields`, `track_total_hits`, `explain`, `fields`
+and `docvalue_fields` were all taken at face value. The cluster reports a
+scalar where it wanted an object as though the *key* were unknown — the
+parser looked for an object under that name and found something else — and
+the members with a shape of their own name it: `_source` lists the four it
+takes, `stored_fields` the two, `explain` refuses anything but `true` and
+`false`, and `track_total_hits` reads a string as a number and hands back
+Java's failure. `_source` and `stored_fields` carry the position; the other
+two do not.
+
+`true` and `false` are both `VALUE_BOOLEAN`. mockdr split them into
+`VALUE_TRUE` and `VALUE_FALSE` — Jackson's token names — in three separate
+tables, and no context measured on 8.15 says either.
+
+And a sort on one field needs no array around it: `sort: "host"` is how a
+client sorts on one, where mockdr iterated the string and sorted on its
+letters, failing on a mapping for `[h]`. A bare scalar names a field and
+fails on the mapping for it; the same scalar *inside* the array is a format
+complaint instead, and a flat one rather than a shard failure.
+
 **Numbers outside the range a paginating client reaches.**
 `from: -1` and `size: -1` are worded differently and mockdr used one formula
 for both — the cluster says `, found [-1]` for one and ` but was [-1]` for

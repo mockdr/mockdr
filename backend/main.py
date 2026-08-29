@@ -758,8 +758,8 @@ async def es_aggregation_exception_handler(
 
 
 _JSON_TOKEN_NAMES = {dict: "START_OBJECT", list: "START_ARRAY", str: "VALUE_STRING",
-                     bool: "VALUE_TRUE", int: "VALUE_NUMBER", float: "VALUE_NUMBER",
-                     type(None): "VALUE_NULL"}
+                     bool: "VALUE_BOOLEAN", int: "VALUE_NUMBER",
+                     float: "VALUE_NUMBER", type(None): "VALUE_NULL"}
 
 
 def _key_position(body: bytes, clause: str) -> tuple[int, int]:

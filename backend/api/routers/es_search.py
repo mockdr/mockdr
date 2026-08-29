@@ -803,7 +803,8 @@ def _bulk_action(verb: str, index: str, doc_id: str, doc: dict) -> dict:
 
 _BULK_VERBS = frozenset({"create", "delete", "index", "update"})
 _JSON_TOKEN_OF = {list: "START_ARRAY", str: "VALUE_STRING", int: "VALUE_NUMBER",
-                  float: "VALUE_NUMBER", type(None): "VALUE_NULL", bool: "VALUE_TRUE"}
+                  float: "VALUE_NUMBER", type(None): "VALUE_NULL",
+                  bool: "VALUE_BOOLEAN"}
 
 
 def _jackson_message(line: str, exc: json.JSONDecodeError, line_no: int) -> str:

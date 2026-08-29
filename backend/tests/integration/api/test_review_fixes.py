@@ -1314,3 +1314,105 @@ class TestNumbersOutsideTheRange:
 
         assert negative["perPage"] == 18446744073709552000
         assert zero["perPage"] == 10000000
+
+
+class TestAMemberOfTheWrongType:
+    """A scalar where the cluster wanted an object."""
+
+    ES = {
+        "Authorization": "Basic " + base64.b64encode(
+            b"elastic:mock-elastic-password").decode(),
+    }
+
+    @pytest.mark.parametrize(("member", "value", "token"), [
+        ("query", [], "START_ARRAY"),
+        ("query", "x", "VALUE_STRING"),
+        ("query", 1, "VALUE_NUMBER"),
+        ("query", True, "VALUE_BOOLEAN"),
+        ("query", False, "VALUE_BOOLEAN"),
+        ("aggs", "x", "VALUE_STRING"),
+        ("highlight", 1, "VALUE_NUMBER"),
+        ("collapse", "x", "VALUE_STRING"),
+        ("post_filter", [], "START_ARRAY"),
+        ("fields", 1, "VALUE_NUMBER"),
+    ])
+    def test_it_reads_as_an_unknown_key(
+        self, client: TestClient, member: str, value: object, token: str,
+    ) -> None:
+        """The parser looked for an object under that name and found something
+        else — and `true` and `false` are both VALUE_BOOLEAN, where mockdr
+        split them the way Jackson does."""
+        resp = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={member: value},
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["error"]["reason"] == (
+            f"Unknown key for a {token} in [{member}]."
+        )
+
+    def test_the_members_with_a_shape_of_their_own(self, client: TestClient) -> None:
+        """`_source` and `stored_fields` name the shapes they take, and where
+        the parser stood; `explain` and `track_total_hits` name neither."""
+        source = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={"_source": 1},
+        ).json()["error"]
+        stored = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"stored_fields": True},
+        ).json()["error"]
+        explain = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"explain": "please"},
+        ).json()["error"]
+        counted = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"track_total_hits": "yes"},
+        ).json()["error"]
+
+        assert source["reason"] == (
+            "Expected one of [VALUE_BOOLEAN, VALUE_STRING, START_ARRAY, "
+            "START_OBJECT] but found [VALUE_NUMBER]"
+        )
+        assert source["line"] == 1
+        assert stored["reason"] == (
+            "Expected [VALUE_STRING] or [START_ARRAY] in [stored_fields] "
+            "but found [VALUE_BOOLEAN]"
+        )
+        assert explain["type"] == "illegal_argument_exception"
+        assert explain["reason"] == (
+            "Failed to parse value [please] as only [true] or [false] are allowed."
+        )
+        assert counted["type"] == "number_format_exception"
+        assert "line" not in counted
+
+    def test_a_sort_on_one_field_needs_no_array_around_it(
+        self, client: TestClient,
+    ) -> None:
+        """It iterated the string and sorted on its letters."""
+        assert client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"sort": "host.name", "size": 0},
+        ).status_code == 200
+        assert client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"sort": {"host.name": "desc"}, "size": 0},
+        ).status_code == 200
+
+    def test_a_scalar_sort_names_a_field_and_an_array_member_does_not(
+        self, client: TestClient,
+    ) -> None:
+        """Two different complaints, and the second is flat rather than wrapped."""
+        bare = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={"sort": 1},
+        ).json()["error"]
+        inside = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={"sort": [1]},
+        ).json()["error"]
+
+        assert bare["type"] == "search_phase_execution_exception"
+        assert inside["type"] == "illegal_argument_exception"
+        assert inside["reason"] == (
+            "malformed sort format, within the sort array, an object, "
+            "or an actual string are allowed"
+        )

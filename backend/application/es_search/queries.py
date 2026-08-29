@@ -720,7 +720,9 @@ def _missing_target(index: str) -> str | None:
 _SORT_METADATA = frozenset({"_doc", "_score", "_id", "_index", "_shard_doc"})
 
 
-def _refuse_unsortable(index: str, sort_spec: list, records: list[dict] | None = None) -> None:
+def _refuse_unsortable(
+    index: str, sort_spec: object, records: list[dict] | None = None,
+) -> None:
     """Refuse a sort a real cluster cannot run.
 
     A cluster sorts on doc values, so a `text` field is refused for the same
@@ -743,11 +745,17 @@ def _refuse_unsortable(index: str, sort_spec: list, records: list[dict] | None =
     entry = store.get("es_indices", index)
     if not sort_spec:
         return
+    # Read it first, so a member of the array that is neither a string nor an
+    # object is refused for *that* before anything looks for a mapping.
+    parse_sort_keys(sort_spec)
+    # A sort outside an array is one key, which is how a client sorts on one
+    # field; iterating a bare string sorted on its letters.
+    keys: list = sort_spec if isinstance(sort_spec, list) else [sort_spec]
     if not entry:
-        _refuse_sorting_on_nothing(index, sort_spec, records or [])
+        _refuse_sorting_on_nothing(index, keys, records or [])
         return
     properties = flatten_properties(_mapped_properties(index))
-    for key in sort_spec:
+    for key in keys:
         name, spec = _sort_key_name(key)
         if not name or name in _SORT_METADATA or spec.get("unmapped_type"):
             continue
@@ -797,13 +805,19 @@ def _holds(record: dict, field: str) -> bool:
 
 
 def _sort_key_name(key: object) -> tuple[str, dict]:
-    """The field one sort key names, and whatever it says about it."""
+    """The field one sort key names, and whatever it says about it.
+
+    A bare scalar names a field too — `sort: 1` looks for one called `1` and
+    fails on the mapping for it, which is what 8.15 answers.
+    """
     if isinstance(key, str):
         return key, {}
     if isinstance(key, dict) and key:
         name, spec = next(iter(key.items()))
         return str(name), spec if isinstance(spec, dict) else {}
-    return "", {}
+    if key is None or isinstance(key, (dict, list)):
+        return "", {}
+    return str(key), {}
 
 
 def _terms_lookup(index: str, doc_id: str, path: str) -> list:
