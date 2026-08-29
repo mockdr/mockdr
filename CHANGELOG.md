@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**An empty query value is a zero to two validators and a string to the third.**
+`?perPage=` on the Cases, detection-engine and lists APIs answers 200 with
+the page size at 0 — the real `total` beside an empty page — and `?page=`
+becomes page zero, refused for being *out of range* in each API's own words:
+`[from] parameter cannot be negative but was [-20]` on Cases, `page: Number
+must be greater than or equal to 1` on the detection engine. config-schema
+does not coerce at all: to it an empty value is a string, and the answer is
+`[request query.page]: expected value of type [number] but got [string]`.
+
+mockdr refused four page sizes the product accepts and answered pydantic's
+wording on six routes. Every query member it declares was asked of 8.15
+empty and absent: 38 of 56 agreed before, 50 after. Two of the remaining six
+are routes where Kibana itself answers a 500 (`/api/lists/_find?page=` and
+`/api/osquery/packs?page=`), which is not imitated; the rest are the
+endpoint APIs, where a Basic licence answers 403 before anything else.
+
+One 500 of mockdr's own was made and found on the way: reading the empty as
+zero *everywhere* let it past config-schema, which then crashed on
+`float("")`. The two readings are separate functions now, each saying which
+validator it belongs to.
+
 **A query member given twice is refused for a scalar and taken for an array.**
 `perPage=1&perPage=3` on the Cases API is a 400; `status=open&status=closed`
 beside it is a 200, because that member is declared as an array. mockdr took

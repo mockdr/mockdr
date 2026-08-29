@@ -273,3 +273,67 @@ class TestAQueryMemberGivenTwice:
                           params={"perPage": "3"})
         assert resp.status_code == 200
         assert resp.json()["per_page"] == 3
+
+
+class TestAnEmptyQueryValue:
+    """Empty is the number zero to one validator and a string to another.
+
+    Measured on 8.15 for every query member mockdr declares.  The io-ts and
+    zod codecs read `?perPage=` as zero — 200, an empty page beside the real
+    `total` — and `?page=` as page zero, refused for being out of range in
+    each API's own words.  config-schema does not coerce at all: to it an
+    empty value is a string, and `[request query.page]: expected value of
+    type [number] but got [string]`.
+
+    mockdr answered pydantic's wording on six routes and refused four page
+    sizes the product accepts.
+    """
+
+    def test_an_empty_page_size_is_zero(self, client: TestClient) -> None:
+        """The real total, and no rows."""
+        for path, member, size_key in (
+            ("/kibana/api/cases/_find", "perPage", "per_page"),
+            ("/kibana/api/detection_engine/rules/_find", "per_page", "perPage"),
+            ("/kibana/api/lists/_find", "per_page", "per_page"),
+            ("/kibana/api/osquery/packs", "per_page", "per_page"),
+        ):
+            resp = client.get(path, headers=ES_AUTH, params={member: ""})
+            assert resp.status_code == 200, path
+            assert resp.json()[size_key] == 0, path
+
+    def test_an_empty_page_is_page_zero_and_out_of_range(
+        self, client: TestClient,
+    ) -> None:
+        cases = client.get("/kibana/api/cases/_find", headers=ES_AUTH,
+                           params={"page": ""})
+        assert cases.status_code == 400
+        assert cases.json()["message"].startswith(
+            "[from] parameter cannot be negative but was [-20]")
+
+        rules = client.get("/kibana/api/detection_engine/rules/_find",
+                           headers=ES_AUTH, params={"page": ""})
+        assert rules.status_code == 400
+        assert rules.json()["message"] == (
+            "[request query]: page: Number must be greater than or equal to 1")
+
+    def test_config_schema_does_not_coerce_at_all(self, client: TestClient) -> None:
+        """To it an empty value is a string, not a zero."""
+        for path, member in (("/kibana/api/fleet/agents", "page"),
+                             ("/kibana/api/fleet/agents", "perPage"),
+                             ("/kibana/api/fleet/agent_policies", "page"),
+                             ("/kibana/api/alerting/rules/_find", "page"),
+                             ("/kibana/api/alerting/rules/_find", "per_page"),
+                             ("/kibana/api/endpoint/metadata", "page")):
+            resp = client.get(path, headers=ES_AUTH, params={member: ""})
+            assert resp.status_code == 400, (path, member)
+            assert resp.json()["message"] == (
+                f"[request query.{member}]: expected value of type [number] "
+                f"but got [string]"
+            ), (path, member)
+
+    def test_a_real_number_still_pages(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/fleet/agents", headers=ES_AUTH,
+                          params={"page": "2", "perPage": "5"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert (body["page"], body["perPage"]) == (2, 5)

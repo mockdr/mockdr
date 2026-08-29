@@ -104,14 +104,14 @@ def validate_find_query(params: Mapping[str, str]) -> None:
             if value not in allowed:
                 problems.append(_invalid(field, value))
         elif field in _NUMERIC:
-            if not _is_number(value):
+            if _as_number_or_zero(value, None) is None:
                 problems.append(f"{_invalid(field, value)},cannot parse to a number")
         else:
             # A field whose value is an object in the codec; a scalar never
             # satisfies it.
             problems.append(_invalid(field, value))
 
-    per_page = _as_number(params.get("perPage"), 20)
+    per_page = _as_number_or_zero(params.get("perPage"), 20)
     if per_page is not None and per_page > MAX_PER_PAGE:
         problems.append(
             f"The provided perPage value is too high. "
@@ -127,7 +127,7 @@ def validate_find_query(params: Mapping[str, str]) -> None:
 
     # Only once nothing above has fired does the query reach Elasticsearch,
     # which is where a negative window is caught.
-    page = _as_number(params.get("page"), 1)
+    page = _as_number_or_zero(params.get("page"), 1)
     size = per_page if per_page is not None else 20
     if size < 0:
         raise FindQueryError(
@@ -158,13 +158,32 @@ def _is_number(value: str) -> bool:
 
 
 def _as_number(value: str | None, default: float | None) -> float | None:
-    """Read a numeric parameter, or the default when it is absent."""
+    """Read a numeric parameter, or the default when it is absent.
+
+    Strict about the empty string, because config-schema is: `?page=` on a
+    route it guards is `expected value of type [number] but got [string]`.
+    The io-ts codec reads the same emptiness as zero — see
+    `_as_number_or_zero` — and the two must not share one rule.
+    """
     if value is None:
         return default
     try:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _as_number_or_zero(value: str | None, default: float | None) -> float | None:
+    """The io-ts codec's reading, where an empty value is the number zero.
+
+    `?perPage=` answers 200 with `per_page: 0` — an empty page beside the
+    real `total` — and `?page=` becomes page zero and is refused for being
+    out of range, not for being unreadable.  Measured on 8.15 across the
+    Cases, detection-engine and lists APIs, all three agreeing.
+    """
+    if value == "":
+        return 0.0
+    return _as_number(value, default)
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +256,7 @@ def validate_rules_find_query(params: Mapping[str, str]) -> None:
         elif field == "sort_order" and value not in RULE_SORT_ORDERS:
             problems.append(_enum_problem(field, value, RULE_SORT_ORDERS))
         elif field in _RULE_MINIMUMS:
-            number = _as_number(value, None)
+            number = _as_number_or_zero(value, None)
             if number is None:
                 problems.append(f"{field}: Expected number, received nan")
             elif number < _RULE_MINIMUMS[field]:

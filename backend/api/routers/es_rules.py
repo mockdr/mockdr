@@ -240,8 +240,10 @@ def find_rules(
     # complaint, and reading it as one here answered a 500 instead.
     _refuse_past_the_result_window(int(float(page or 1)), int(float(per_page or 20)))
     return rule_queries.find_rules(
-        page=int(float(page)),
-        per_page=int(float(per_page)),
+        # An empty value is the number zero: `?per_page=` answers 200 with
+        # `perPage: 0`, an empty page beside the real total.
+        page=int(float(page or 0)),
+        per_page=int(float(per_page or 0)),
         sort_field=sort_field,
         sort_order=sort_order or "asc",
         filter_str=filter,

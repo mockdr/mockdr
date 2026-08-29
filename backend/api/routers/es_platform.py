@@ -141,15 +141,19 @@ def get_space(
     dependencies=[refuses_unknown(
         "page", "perPage", "kuery", "showInactive", "showUpgradeable", "sortField",
         "sortOrder", "getStatusSummary", "withMetrics",
+        numbers=("page", "perPage"),
     )],
 )
 def list_fleet_agents(
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=20, ge=1, le=1000, alias="perPage"),
+    # Taken as text: config-schema answers a non-number in its own words, and
+    # an `int` here answers pydantic's to it instead.
+    page: str = Query(default="1"),
+    per_page: str = Query(default="20", alias="perPage"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """List Fleet agents, derived from the same endpoints the metadata API serves."""
-    listing = endpoint_queries.list_endpoints(page=page, per_page=per_page)
+    listing = endpoint_queries.list_endpoints(
+        page=int(float(page or 0)), per_page=int(float(per_page or 0)))
     entries = listing.get("data", [])
 
     agents = [_fleet_agent(entry) for entry in entries]
@@ -158,8 +162,8 @@ def list_fleet_agents(
         # Fleet still sends `list`, the pre-8.x name, beside `items` (measured).
         "list": agents,
         "total": listing.get("total", len(entries)),
-        "page": page,
-        "perPage": per_page,
+        "page": int(float(page or 0)),
+        "perPage": int(float(per_page or 0)),
     }
 
 
@@ -233,15 +237,17 @@ def list_data_views(_: dict = Depends(require_es_auth)) -> dict:
     "/api/fleet/agent_policies",
     dependencies=[refuses_unknown(
         "page", "perPage", "kuery", "sortField", "sortOrder", "full", "noAgentCount",
+        numbers=("page", "perPage"),
     )],
 )
 def list_agent_policies(
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=20, ge=1, le=1000, alias="perPage"),
+    page: str = Query(default="1"),
+    per_page: str = Query(default="20", alias="perPage"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """The Fleet policies agents are enrolled into."""
-    return {"items": [], "page": page, "perPage": per_page, "total": 0}
+    return {"items": [], "page": int(float(page or 0)),
+            "perPage": int(float(per_page or 0)), "total": 0}
 
 
 @router.get("/api/fleet/agents/setup")
@@ -323,12 +329,16 @@ def case_configuration(_: dict = Depends(require_es_auth)) -> list[dict]:
 
 @router.get("/api/osquery/packs")
 def osquery_packs(
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=20, ge=0, le=1000),
+    # Taken as text: an empty value is the number zero on 8.15 — `?per_page=`
+    # answers 200 with an empty page beside the real total — and an `int`
+    # here answers pydantic's wording to it instead.
+    page: str = Query(default="1"),
+    per_page: str = Query(default="20"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """The Osquery packs this space defines, of which mockdr defines none."""
-    return {"page": page, "per_page": per_page, "total": 0, "data": []}
+    return {"page": int(float(page or 0)), "per_page": int(float(per_page or 0)),
+            "total": 0, "data": []}
 
 
 @router.post("/api/console/proxy")

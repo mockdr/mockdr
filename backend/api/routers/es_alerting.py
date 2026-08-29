@@ -96,11 +96,14 @@ def rule_types(_: dict = Depends(require_es_auth)) -> list[dict]:
         "page", "per_page", "search", "default_search_operator", "search_fields",
         "sort_field", "sort_order", "has_reference", "fields", "filter",
         "filter_consumers",
+        numbers=("page", "per_page"),
     )],
 )
 def find_rules(
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=10, ge=0, le=1000),
+    # Taken as text: config-schema answers a non-number in its own words, and
+    # an `int` here answers pydantic's to it instead.
+    page: str = Query(default="1"),
+    per_page: str = Query(default="10"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """The alerting rules this deployment holds.
@@ -109,7 +112,8 @@ def find_rules(
     and are not backed by the alerting framework, so this lists none — the
     same answer a Kibana with no alerting rules gives.
     """
-    return {"page": page, "per_page": per_page, "total": 0, "data": []}
+    return {"page": int(float(page or 0)), "per_page": int(float(per_page or 0)),
+            "total": 0, "data": []}
 
 
 @router.get("/api/actions/connectors")
@@ -196,8 +200,11 @@ def _list_envelope(page: int, per_page: int, data: list[Any]) -> dict:
 
 @router.get("/api/lists/_find")
 def find_lists(
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=20, ge=0, le=1000),
+    # Taken as text: an empty value is the number zero on 8.15 — `?per_page=`
+    # answers 200 with an empty page beside the real total — and an `int`
+    # here answers pydantic's wording to it instead.
+    page: str = Query(default="1"),
+    per_page: str = Query(default="20"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """The value lists an exception can point at.
@@ -206,4 +213,4 @@ def find_lists(
     in the mock creates one. The envelope is the one Kibana pages with, so a
     client reading `cursor` and `total` sees what it expects.
     """
-    return _list_envelope(page, per_page, [])
+    return _list_envelope(int(float(page or 0)), int(float(per_page or 0)), [])

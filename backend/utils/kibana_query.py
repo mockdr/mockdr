@@ -55,7 +55,9 @@ def _message(dialect: str, sent: dict[str, str], extra: list[str]) -> str:
     return f"[request query.{extra[0]}]: definition for this key is missing"
 
 
-def known_query_members(*known: str, dialect: str = KEY_MISSING) -> Callable[..., None]:
+def known_query_members(
+    *known: str, dialect: str = KEY_MISSING, numbers: tuple[str, ...] = (),
+) -> Callable[..., None]:
     """Refuse any query member outside `known` the way 8.15 refuses it.
 
     The route's own declared members are allowed too, so a member mockdr
@@ -71,6 +73,23 @@ def known_query_members(*known: str, dialect: str = KEY_MISSING) -> Callable[...
         }
         # dict, not set: the wordings name the members in the order sent.
         sent = dict(request.query_params)
+        # A member config-schema declares as a number, given something that is
+        # not one — an empty value included — is refused in its own words
+        # before anything reads it.  `?page=` is `expected value of type
+        # [number] but got [string]`, where an absent one is simply absent.
+        for name in numbers:
+            value = sent.get(name)
+            if value is None:
+                continue
+            try:
+                float(value)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=build_kbn_error_response(
+                    400,
+                    f"[request query.{name}]: expected value of type [number] "
+                    f"but got [string]",
+                )) from None
+
         extra = [k for k in sent if k not in measured and k not in declared]
         if extra:
             # Refused before the handler is dispatched to, which is what
@@ -85,7 +104,10 @@ def known_query_members(*known: str, dialect: str = KEY_MISSING) -> Callable[...
     return refuse
 
 
-def refuses_unknown(*known: str, dialect: str = KEY_MISSING) -> DependsMarker:
+def refuses_unknown(
+    *known: str, dialect: str = KEY_MISSING, numbers: tuple[str, ...] = (),
+) -> DependsMarker:
     """`known_query_members` as a route dependency."""
-    marker: DependsMarker = Depends(known_query_members(*known, dialect=dialect))
+    marker: DependsMarker = Depends(
+        known_query_members(*known, dialect=dialect, numbers=numbers))
     return marker

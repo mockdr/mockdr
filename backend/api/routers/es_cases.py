@@ -70,8 +70,10 @@ def find_cases(
         status=status,
         tags=tag_list,
         owner=owner,
-        page=int(float(page)),
-        per_page=int(float(per_page)),
+        # An empty value is the number zero, which the validator above has
+        # already let through: `?perPage=` answers 200 with `per_page: 0`.
+        page=int(float(page or 0)),
+        per_page=int(float(per_page or 0)),
         severity=severity,
         search=search,
         reporters=reporter_list,
