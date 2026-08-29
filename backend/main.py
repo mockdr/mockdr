@@ -24,6 +24,7 @@ from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
+from api.middleware.kibana_api_version import KibanaApiVersionMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.odata_properties import ODataPropertyMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
@@ -444,6 +445,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # `/services/...` path; outside the routes, so a 404 or 405 carries it too —
 # which splunkd's does.
 app.add_middleware(SplunkJobLinkMiddleware)
+app.add_middleware(KibanaApiVersionMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped

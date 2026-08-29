@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Kibana's versioned routes say which version they are.**
+8.15 registers some routes through its versioned router and the rest
+plainly, and only the versioned ones answer with
+`elastic-api-version: 2023-10-31`. It belongs to the *operation*, not the
+path or the family: `GET /api/exception_lists/_find` carries one and
+`GET /api/exception_lists/items/_find` does not; `GET /api/endpoint/action`
+does and `GET /api/endpoint/action_status` does not. The header comes from
+dispatch, so a handler's own 500 carries it — `GET /api/timeline` with no id
+— while a query-schema refusal, raised before the handler runs, carries
+none. mockdr sent it nowhere; all 48 of its Kibana GET routes now answer
+exactly as 8.15 does. The 34 write operations are unmeasured rather than
+known to carry none: neither a query-schema nor a body-schema refusal
+carries the header, so measuring one means letting it succeed, and that
+means creating objects on the probe instance.
+
 **Every answer addressed through a search job now points back at the job.**
 splunkd sends `Link: <sid>; rel=info` on the job and everything under it —
 on 200, 204, 404 and 405 alike — and the link is relative to the request:

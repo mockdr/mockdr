@@ -119,3 +119,49 @@ class TestTheOneMemberACaseTakes:
         asked = client.get(f"/kibana/api/cases/{case_id}", headers=ES_AUTH,
                            params={"includeComments": "true"}).json()
         assert bare["comments"] == asked["comments"]
+
+
+class TestTheVersionedRoutesSaySo:
+    """`elastic-api-version` belongs to the operation, not the path family.
+
+    8.15 registers some routes through its versioned router and the rest
+    plainly, and only the versioned ones answer with `2023-10-31`.  Measured
+    operation by operation: `/api/exception_lists/_find` carries one and
+    `/api/exception_lists/items/_find` does not; `/api/endpoint/metadata`
+    does and `/api/endpoint/action_status` does not.  The header comes from
+    dispatch, so a handler's own 500 carries it while a query-schema refusal
+    — raised before the handler runs — carries none.
+    """
+
+    VERSION = "2023-10-31"
+
+    def test_the_versioned_ones_answer_with_it(self, client: TestClient) -> None:
+        for path in ("/kibana/api/data_views",
+                     "/kibana/api/detection_engine/rules/_find",
+                     "/kibana/api/exception_lists/_find",
+                     "/kibana/api/endpoint/metadata",
+                     "/kibana/api/timelines"):
+            resp = client.get(path, headers=ES_AUTH)
+            assert resp.headers.get("elastic-api-version") == self.VERSION, path
+
+    def test_their_neighbours_do_not(self, client: TestClient) -> None:
+        for path in ("/kibana/api/exception_lists/items/_find",
+                     "/kibana/api/endpoint/action_status",
+                     "/kibana/api/cases/_find",
+                     "/kibana/api/status",
+                     "/kibana/api/alerting/_health"):
+            resp = client.get(path, headers=ES_AUTH)
+            assert "elastic-api-version" not in {k.lower() for k in resp.headers}, path
+
+    def test_a_handler_error_still_carries_it(self, client: TestClient) -> None:
+        """`GET /api/timeline` with no id is a 500 — and a versioned one."""
+        resp = client.get("/kibana/api/timeline", headers=ES_AUTH)
+        assert resp.status_code == 500
+        assert resp.headers.get("elastic-api-version") == self.VERSION
+
+    def test_a_refusal_before_dispatch_does_not(self, client: TestClient) -> None:
+        """The header comes from dispatch, and the query schema runs first."""
+        resp = client.get("/kibana/api/exception_lists", headers=ES_AUTH,
+                          params={"zzzUnknownMember": "1"})
+        assert resp.status_code == 400
+        assert "elastic-api-version" not in {k.lower() for k in resp.headers}

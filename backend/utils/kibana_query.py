@@ -73,6 +73,11 @@ def known_query_members(*known: str, dialect: str = KEY_MISSING) -> Callable[...
         sent = dict(request.query_params)
         extra = [k for k in sent if k not in measured and k not in declared]
         if extra:
+            # Refused before the handler is dispatched to, which is what
+            # decides whether the answer carries `elastic-api-version`: 8.15
+            # adds that header when it dispatches, so a query-schema refusal
+            # on a versioned route carries none.  Measured on four routes.
+            request.scope["kbn_refused_before_dispatch"] = True
             raise HTTPException(status_code=400, detail=build_kbn_error_response(
                 400, _message(dialect, sent, extra),
             ))
