@@ -35,6 +35,18 @@ from main import app
 c = TestClient(app, raise_server_exceptions=False).__enter__()
 
 
+#: The one 500 that is the product's own answer rather than a crash.
+#: `GET /api/timeline` with neither `id` nor `template_timeline_id` is
+#: `500 please provide id or template_timeline_id` on Kibana 8.15 — a JSON
+#: body, not a leaked stack trace, and a client that omitted the id needs to
+#: read it.  Matched on the exact body so a real crash on the same route
+#: still counts.
+_MEASURED_500: frozenset[tuple[str, str]] = frozenset({
+    ("/kibana/api/timeline",
+     '{"message":"please provide id or template_timeline_id","status_code":500}'),
+})
+
+
 def oauth(path, cid, sec, extra=None):
     r = c.post(
         path,
@@ -174,7 +186,7 @@ for path, methods in paths.items():
                 ct = r.headers.get("content-type", "")
                 txt = r.text[:200]
                 bad = (
-                    r.status_code >= 500
+                    (r.status_code >= 500 and (path, txt) not in _MEASURED_500)
                     or "Traceback" in txt
                     or "Internal Server Error" in txt
                     or "RecursionError" in txt
