@@ -110,6 +110,54 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**An empty clause is not a match-all, and twelve of them were a 500.**
+`{"query": {}}` came back as every document in the index — a search that
+looks like it worked and returns the opposite of what an empty filter should
+mean. The cluster refuses it: `query malformed, empty clause found at
+[1:11]`, where the position is the closing brace of that empty object.
+`_count` refuses it too, in a shape of its own — `Failed to parse` with the
+position as `line` and `col` beside the reason and the search's wording
+underneath as the cause — and `_validate/query` answers `{"valid": false}`,
+because judging that is the whole point of the route.
+
+A clause type with an empty body was worse. Twelve of them reached a builder
+that assumed a first key and raised `StopIteration` out of the handler as a
+plain-text 500, and five more were read as "match everything". All twenty-two
+are measured now, clause by clause: the ones the query builder raises say
+`field name is null or empty` and carry no position, the ones the *parser*
+raises are `parsing_exception` with a `line` and `col`, `fuzzy` says
+*cannot* where its neighbours say *is*, `boosting` keeps the stray apostrophe
+Elasticsearch leaves at the end of its line, and `bool`, `ids` and
+`match_all` take an empty body and mean it.
+
+An empty clause one level down — `{"bool": {"must": [{}]}}` — was read as
+"matches everything" too, so a `must` a client had built from a filter that
+matched nothing selected the whole index. The cluster refuses it by arm:
+`[bool] failed to parse field [must]`, with the empty clause underneath as
+the cause. `scripts/hostile_probe.py` sends that shape now: none of its
+bodies reached it, because they were all empty *at the top* and the builders
+that assumed a first key sit one level down.
+
+`_validate/query` was wrong in three more ways while it was being looked at:
+a body it cannot parse is `{"valid": false}` and not a refusal — which is
+the same news in a shape the client does not read — no body at all is
+*valid*, since there was nothing to find fault with, and `{"query": null}`
+is invalid rather than a 400.
+
+**An alias on one index, and the HEAD that asks about it.**
+`GET /{index}/_alias/{alias}` is how a client asks whether an index carries
+a particular alias, and mockdr had the route under two other spellings and
+not that one — so the question came back 405 from a mount that answers it.
+An alias the index does not carry is 404 `alias [x] missing`, in the bare
+`{error, status}` envelope the cluster keeps for it rather than the nested
+one. `HEAD` is more often how that question is asked, and `_source` was
+missing from mockdr's list of the endpoints Elasticsearch answers HEAD on,
+so it was 405 rather than yes or no.
+
+Seeding an alias to compare them against then exposed a third: `GET /{index}`
+built an empty `aliases` block instead of reading one, so a client asking
+that route what an index is called by saw none of its names.
+
 **A verb splunkd's path does not take is answered by the verb, not the path.**
 mockdr had it the other way round: one answer for the search endpoints,
 another for the KV store's batch paths, and the 400 splunkd keeps for a

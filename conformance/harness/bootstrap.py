@@ -16,6 +16,7 @@ import httpx
 
 from harness.clients import Clients
 from harness.seed import (
+    ES_SEED_ALIAS,
     SeedError,
     await_indexed,
     seed_elastic,
@@ -236,7 +237,11 @@ def _with_elastic_seed(
         else httpx.USE_CLIENT_DEFAULT
     )
     try:
-        context = {**context, "seed_index": seed_elastic(target, clients, auth)}
+        context = {
+            **context,
+            "seed_index": seed_elastic(target, clients, auth),
+            "seed_alias": ES_SEED_ALIAS,
+        }
         context = {**context, **seed_scroll(target, clients, auth)}
         if "kibana" in spec.endpoints:
             context = {**context, **seed_kibana_case(target, clients, auth)}

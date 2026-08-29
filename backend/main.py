@@ -766,13 +766,16 @@ def _key_position(body: bytes, clause: str) -> tuple[int, int]:
     return line, column
 
 
-def _body_position(body: bytes, clause: str) -> tuple[int, int]:
+def _body_position(body: bytes, clause: str, *, at_end: bool = False) -> tuple[int, int]:
     """Line and column (1-based) where Elasticsearch would report the clause.
 
     Not where the key starts: where the parser *stood* when it failed, which
     is the first character of the clause's value. For
     ``{"query":{"not_a_real_clause":{}}}`` that is the ``{`` at column 31,
     and that is what Elasticsearch 8.15 reports.
+
+    ``at_end`` moves to the first ``}`` at or after that, which is where an
+    *empty* clause body closes — `"query":{}` and `"must":[{}]` alike.
     """
     text = body.decode("utf-8", errors="replace")
     key = text.find(f'"{clause}"')
@@ -781,6 +784,9 @@ def _body_position(body: bytes, clause: str) -> tuple[int, int]:
     offset = key + len(clause) + 2
     while offset < len(text) and text[offset] in ": \t\r\n":
         offset += 1
+    if at_end:
+        closing = text.find("}", offset)
+        offset = closing if closing >= 0 else offset
     return text.count("\n", 0, offset) + 1, offset - text.rfind("\n", 0, offset)
 
 
@@ -858,7 +864,9 @@ async def es_query_exception_handler(
         if exc.es_type == "illegal_argument_exception":
             error["caused_by"] = {**cause, "caused_by": dict(cause)}
         return JSONResponse(status_code=400, content={"error": error, "status": 400})
-    content = build_es_error_response(400, exc.es_type, str(exc))
+    content = build_es_error_response(400, exc.es_type, str(exc), exc.detail)
+    if exc.caused_by is not None:
+        content["error"]["caused_by"] = dict(exc.caused_by)
     if exc.clause is not None:
         # Elasticsearch reports where in the body the unknown clause sits and
         # wraps the cause. The position is found in the bytes the client
@@ -873,10 +881,18 @@ async def es_query_exception_handler(
             or await _request.body()
             or _request.query_params.get("source", "").encode()
         )
-        line, col = _body_position(text, exc.clause)
-        for entry in (content["error"], *content["error"].get("root_cause", [])):
-            entry["line"] = line
-            entry["col"] = col
+        line, col = _body_position(text, exc.clause, at_end=exc.at_end)
+        if exc.position_in_message:
+            # `[line:col] …` in front of the reason, and on the end of the
+            # cause, rather than as two fields of its own.
+            for entry in (content["error"], *content["error"].get("root_cause", [])):
+                entry["reason"] = f"[{line}:{col}] {entry['reason']}"
+            if exc.caused_by is not None:
+                content["error"]["caused_by"]["reason"] += f" [{line}:{col}]"
+        else:
+            for entry in (content["error"], *content["error"].get("root_cause", [])):
+                entry["line"] = line
+                entry["col"] = col
         if exc.named_object:
             content["error"]["caused_by"] = {
                 "type": "named_object_not_found_exception",

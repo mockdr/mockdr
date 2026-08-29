@@ -51,6 +51,9 @@ SEED_INDEX = "main"
 #: without the sort field so missing-value ordering has something to order.
 ES_SEED_INDEX = "conformance-seeded"
 
+#: The alias both targets put on it.
+ES_SEED_ALIAS = "conformance-seeded-alias"
+
 ES_SEED_MAPPING: dict = {
     "settings": {"number_of_shards": 1, "number_of_replicas": 0},
     "mappings": {"properties": {
@@ -190,6 +193,15 @@ def seed_elastic(target: str, clients: Clients, auth: object) -> str:
                 f"{target} refused seed document {doc_id}: HTTP "
                 f"{written.status_code} {written.text[:200]}",
             )
+    # An alias on it, so the routes that are *about* an alias have one to be
+    # about. `GET /{index}/_alias/{alias}` and the HEAD that asks the same
+    # question had nothing to compare against before.
+    aliased = client.put(f"/{ES_SEED_INDEX}/_alias/{ES_SEED_ALIAS}", auth=auth)
+    if aliased.status_code != 200:
+        raise SeedError(
+            f"{target} would not alias {ES_SEED_INDEX}: HTTP "
+            f"{aliased.status_code} {aliased.text[:200]}",
+        )
     return ES_SEED_INDEX
 
 

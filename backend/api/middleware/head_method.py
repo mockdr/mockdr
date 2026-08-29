@@ -29,6 +29,7 @@ ES_HEAD_PATHS = re.compile(
     r"^/elastic/?$"                                  # the root
     r"|^/elastic/[^_/][^/]*/?$"                      # an index
     r"|^/elastic/[^/]+/_doc/[^/]+/?$"                # a document
+    r"|^/elastic/[^/]+/_source/[^/]+/?$"             # a document's source
     r"|^/elastic/_alias/[^/]+/?$"                    # an alias
     r"|^/elastic/[^/]+/_alias/[^/]+/?$",
 )

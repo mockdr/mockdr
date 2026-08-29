@@ -1328,6 +1328,33 @@ def get_index_alias(index: str, _: dict = Depends(require_es_auth)) -> dict:
     return search_queries.alias_map(index)
 
 
+@router.get(
+    "/{index:esindex}/_alias/{alias}",
+    operation_id="es_get_index_alias_by_name",
+    dependencies=[es_refuses_unknown(*_ALIAS_PARAMS, source=False)],
+)
+def get_index_alias_by_name(
+    index: str, alias: str, _: dict = Depends(require_es_auth),
+) -> dict:
+    """One alias on one index, which nothing here served at all.
+
+    A client asking whether an index carries a particular alias — with `GET`
+    or, more often, with the `HEAD` that means exactly that question — got
+    405 from a mount that has the route under two other spellings. An alias
+    the index does not carry is 404 `alias [x] missing`, with the bare
+    `{error, status}` envelope the cluster uses for it rather than the nested
+    one (measured on 8.15).
+    """
+    if not search_queries.index_exists(index):
+        raise _missing_index(IndexNotFoundError(index))
+    carried = search_queries.alias_map(index).get(index, {}).get("aliases", {})
+    if alias not in carried:
+        raise HTTPException(status_code=404, detail={
+            "error": f"alias [{alias}] missing", "status": 404,
+        })
+    return {index: {"aliases": {alias: carried[alias]}}}
+
+
 @router.post("/_aliases", operation_id="es_update_aliases")
 def update_aliases(body: dict = Body(...), _: dict = Depends(require_es_write)) -> dict:
     """Add and remove aliases in one request.
@@ -1406,13 +1433,33 @@ def analyze(
     operation_id="es_validate_query",
     dependencies=[es_refuses_unknown(*_VALIDATE_QUERY_PARAMS)],
 )
-def validate_query(
+async def validate_query(
     index: str,
-    body: dict = Body(default={}),
+    request: Request,
     explain: bool = Query(default=False),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Whether a query would run, without running it."""
+    """Whether a query would run, without running it.
+
+    A body it cannot even parse is what this route is *for*: 8.15 answers
+    `{"valid": false}` and 200, where every other route answers a parse
+    error. mockdr let FastAPI refuse the body first, so a client asking
+    whether its query was valid was told its request was malformed instead
+    — which is the same news in a shape the client does not read.
+    """
+    raw = await request.body()
+    # `None` for nothing sent, which is nothing to find fault with and so
+    # valid; an unreadable body is the route's own answer rather than a
+    # refusal.
+    body: dict | None = None
+    if raw.strip():
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            return {"valid": False}
+        if not isinstance(parsed, dict):
+            return {"valid": False}
+        body = parsed
     try:
         return search_queries.validate_query(index, body, explain=explain)
     except IndexNotFoundError as exc:

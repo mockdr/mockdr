@@ -126,6 +126,8 @@ class ESQueryError(ValueError):
         self, message: str, *, clause: str | None = None,
         es_type: str = "parsing_exception", named_object: bool = False,
         shard_failure: bool = False, body: str = "",
+        detail: dict | None = None, at_end: bool = False,
+        caused_by: dict | None = None, position_in_message: bool = False,
     ) -> None:
         """Record the message, the clause if any, and Elasticsearch's exception type.
 
@@ -143,6 +145,21 @@ class ESQueryError(ValueError):
         ``body`` is the text the position is counted in, for a request whose
         body is not one document: a multi-search reports the line and column
         *within the search that failed*, not within the whole payload.
+
+        ``detail`` carries the members this error has beside its reason — the
+        ``line`` and ``col`` a parse failure names, when the position is a
+        field of its own rather than part of the message.
+
+        ``at_end`` moves that position one character on, to where an *empty*
+        clause body closes: the parser stood at the `{` and reported the `}`.
+
+        ``caused_by`` is attached to the error alone and not repeated in the
+        root cause — which is where Elasticsearch puts the reason underneath
+        a parse failure.
+
+        ``position_in_message`` prefixes the reason with ``[line:col]`` and
+        appends it to the cause, rather than carrying the two as fields —
+        which is how the parse failures inside a ``bool`` read.
         """
         super().__init__(message)
         self.clause = clause
@@ -150,6 +167,10 @@ class ESQueryError(ValueError):
         self.named_object = named_object
         self.body = body
         self.shard_failure = shard_failure
+        self.detail = detail
+        self.at_end = at_end
+        self.caused_by = caused_by
+        self.position_in_message = position_in_message
 
 # ---------------------------------------------------------------------------
 # Range comparison helper
@@ -203,6 +224,46 @@ def _compare_range(field_val: Any, target: Any, op: str) -> bool:
 # ---------------------------------------------------------------------------
 # Predicate builders — one per query type
 # ---------------------------------------------------------------------------
+
+#: What each clause type says when its body is empty. Every one of these
+#: reached a builder that assumed a first key and raised StopIteration out of
+#: the handler as a plain-text 500 — twelve of them — or was read as "match
+#: everything", which is worse. `match_all`, `ids`, `bool` take an empty body
+#: and mean it. Measured clause by clause on 8.15, including `fuzzy` saying
+#: *cannot* where its neighbours say *is*, and the stray apostrophe
+#: Elasticsearch itself leaves at the end of the `boosting` line.
+_EMPTY_CLAUSE: dict[str, tuple[str, str]] = {
+    "term": ("field name is null or empty", "illegal_argument_exception"),
+    "prefix": ("field name is null or empty", "illegal_argument_exception"),
+    "wildcard": ("field name is null or empty", "illegal_argument_exception"),
+    "regexp": ("field name is null or empty", "illegal_argument_exception"),
+    "range": ("field name is null or empty", "illegal_argument_exception"),
+    "fuzzy": ("field name cannot be null or empty", "illegal_argument_exception"),
+    "match_phrase": ("[match_phrase] requires fieldName", "illegal_argument_exception"),
+    "match_phrase_prefix": (
+        "[match_phrase_prefix] requires fieldName", "illegal_argument_exception"),
+    "match_bool_prefix": (
+        "[match_bool_prefix] requires fieldName", "illegal_argument_exception"),
+    "match": ("No text specified for text query", "parsing_exception"),
+    "multi_match": ("No text specified for multi_match query", "parsing_exception"),
+    "terms": (
+        "[terms] query requires a field name, followed by array of terms or a "
+        "document lookup specification", "parsing_exception"),
+    "terms_set": ("[terms_set] unknown token [END_OBJECT]", "parsing_exception"),
+    "exists": ("[exists] must be provided with a [field]", "parsing_exception"),
+    "constant_score": (
+        "[constant_score] requires a 'filter' element", "parsing_exception"),
+    "dis_max": (
+        "[dis_max] requires 'queries' field with at least one clause",
+        "parsing_exception"),
+    "boosting": (
+        "[boosting] query requires 'positive' query to be set'", "parsing_exception"),
+    "query_string": (
+        "[query_string] must be provided with a [query]", "parsing_exception"),
+    "simple_query_string": (
+        "[simple_query_string] query text missing", "parsing_exception"),
+}
+
 
 def build_predicate(
     clause: dict,
@@ -263,6 +324,16 @@ def build_predicate(
             # raised AttributeError out of the handler as a plain-text 500.
             msg = f"[{query_type}] query malformed, expected an object"
             raise ESQueryError(msg)
+        if not body and query_type in _EMPTY_CLAUSE:
+            text, kind = _EMPTY_CLAUSE[query_type]
+            # The ones the parser raises name where they stood; the ones the
+            # query builder raises do not (measured on 8.15).
+            positioned = kind == "parsing_exception"
+            raise ESQueryError(
+                text, es_type=kind,
+                clause=query_type if positioned else None,
+                at_end=positioned,
+            )
         if query_type == "bool":
             return _build_bool(body, _depth + 1, ids, lookup)
         wrapper = _WRAPPERS.get(query_type)
@@ -952,7 +1023,22 @@ def _build_bool(
 
     Combines ``must``, ``filter``, ``should``, and ``must_not`` sub-clauses.
     The depth is threaded through so nesting stays bounded.
+
+    An arm holding an empty clause is refused by name: `[bool] failed to
+    parse field [must]`, with the empty clause as the cause underneath.
+    mockdr read it as a clause that matches everything, so a `must` a client
+    had built from a filter that matched nothing selected the whole index.
     """
+    for arm in ("must", "filter", "should", "must_not"):
+        entries = body.get(arm)
+        if isinstance(entries, list) and any(entry == {} for entry in entries):
+            raise ESQueryError(
+                f"[bool] failed to parse field [{arm}]",
+                es_type="x_content_parse_exception",
+                clause=arm, at_end=True, position_in_message=True,
+                caused_by={"type": "illegal_argument_exception",
+                           "reason": "query malformed, empty clause found at"},
+            )
     must_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("must", [])]
     filter_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("filter", [])]
     should_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("should", [])]

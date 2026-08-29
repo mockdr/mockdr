@@ -4379,3 +4379,199 @@ probes:
       path: /${seed_index}/_forcemerge
       query: {zzzqqq: "1"}
       auth: basic
+
+  # ── An alias on one index, and the HEAD that asks about it (2.3.1) ─────
+
+  - id: es-index-alias-by-name
+    endpoint: search
+    needs_seed: true
+    why: >
+      `GET /{index}/_alias/{alias}` is how a client asks whether an index
+      carries one. mockdr had the route under two other spellings and not
+      this one, so the question came back 405 from a mount that answers it.
+    request:
+      method: GET
+      path: /${seed_index}/_alias/${seed_alias}
+      auth: basic
+
+  - id: es-index-alias-that-is-not-there
+    endpoint: search
+    needs_seed: true
+    why: >
+      404 `alias [x] missing`, in the bare `{error, status}` envelope the
+      cluster keeps for it rather than the nested one.
+    request:
+      method: GET
+      path: /${seed_index}/_alias/no-such-alias
+      auth: basic
+
+  - id: es-head-a-document-source
+    endpoint: search
+    needs_seed: true
+    why: >
+      Elasticsearch answers HEAD on its existence endpoints, and `_source` is
+      one of them — mockdr's list of them was missing it, so the question was
+      405 rather than yes or no.
+    request:
+      method: HEAD
+      path: /${seed_index}/_source/a
+      auth: basic
+
+  - id: es-head-a-document-source-that-is-not-there
+    endpoint: search
+    needs_seed: true
+    request:
+      method: HEAD
+      path: /${seed_index}/_source/no-such-doc
+      auth: basic
+
+  - id: es-head-an-index-alias
+    endpoint: search
+    needs_seed: true
+    request:
+      method: HEAD
+      path: /${seed_index}/_alias/${seed_alias}
+      auth: basic
+
+  # ── An empty clause (2.3.1) ───────────────────────────────────────────
+  #
+  # `{"query": {}}` is not "match everything": the cluster refuses it, and
+  # mockdr answered every document in the index — a search that looks like
+  # it worked and returns the opposite of what an empty filter should. Every
+  # clause type with an empty body was worse still: twelve of them reached a
+  # builder that assumed a first key and came back 500.
+
+  - id: es-empty-query-clause
+    endpoint: search
+    needs_seed: true
+    why: The position is the closing brace of the empty object.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {}}
+      auth: basic
+
+  - id: es-empty-query-clause-on-count
+    endpoint: search
+    needs_seed: true
+    why: >
+      `_count` refuses it too, but as `Failed to parse` with the position as
+      `line` and `col` of its own rather than inside the message.
+    request:
+      method: POST
+      path: /${seed_index}/_count
+      json: {query: {}}
+      auth: basic
+
+  - id: es-empty-query-clause-is-invalid-not-refused
+    endpoint: search
+    needs_seed: true
+    why: On `_validate/query` the same body is an answer, not a refusal.
+    request:
+      method: POST
+      path: /${seed_index}/_validate/query
+      json: {query: {}}
+      auth: basic
+
+  - id: es-empty-term-clause
+    endpoint: search
+    needs_seed: true
+    why: 500 here, and in eleven other clause types.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {term: {}}}
+      auth: basic
+
+  - id: es-empty-match-clause
+    endpoint: search
+    needs_seed: true
+    why: A different exception type and wording again.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {match: {}}}
+      auth: basic
+
+  - id: es-empty-terms-clause
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {terms: {}}}
+      auth: basic
+
+  - id: es-empty-exists-clause
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {exists: {}}}
+      auth: basic
+
+  - id: es-empty-fuzzy-clause
+    endpoint: search
+    needs_seed: true
+    why: It says *cannot* where its neighbours say *is*.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {fuzzy: {}}}
+      auth: basic
+
+  - id: es-empty-boosting-clause
+    endpoint: search
+    needs_seed: true
+    why: With the stray apostrophe Elasticsearch itself leaves on the line.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {boosting: {}}}
+      auth: basic
+
+  - id: es-empty-query-string-clause
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {query_string: {}}}
+      auth: basic
+
+  - id: es-empty-bool-clause-is-fine
+    endpoint: search
+    needs_seed: true
+    why: >
+      `bool`, `ids` and `match_all` take an empty body and mean it — the
+      other half of the same measurement.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {bool: {}}}
+      auth: basic
+    ignore_paths:
+      - $.took
+
+  - id: es-empty-clause-inside-a-bool
+    endpoint: search
+    needs_seed: true
+    why: >
+      One level down and read as "matches everything", so a `must` a client
+      had built from a filter that matched nothing selected the whole index.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {bool: {must: [{}]}}}
+      auth: basic
+
+  - id: es-empty-clause-inside-a-bool-should
+    endpoint: search
+    needs_seed: true
+    why: The position follows the arm, and so does the name in the message.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {query: {bool: {should: [{}]}}}
+      auth: basic

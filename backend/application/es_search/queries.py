@@ -7,6 +7,7 @@ response envelopes.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import time
 from fnmatch import fnmatch
@@ -189,7 +190,10 @@ def describe_index(index: str) -> dict | None:
     settings = {str(k): str(v) for k, v in (entry.get("settings") or {}).items()}
     return {
         index: {
-            "aliases": {},
+            # Read, not left empty: `GET /{index}` reports the index's aliases
+            # too, and a client asking this one route what an index is called
+            # by saw none of them.
+            "aliases": dict(entry.get("aliases") or {}),
             "mappings": (
                 {"properties": index_properties(index)}
                 if index_properties(index) else {}
@@ -544,22 +548,95 @@ def _analyses_as_keyword(index: str, body: dict) -> bool:
     return str(spec.get("type", "")) != "text"
 
 
-def validate_query(index: str, body: dict, *, explain: bool = False) -> dict:
+
+def _empty_clause_column(body: dict) -> int:
+    """Where the empty `query` object closes, counted as a client writes it.
+
+    Read off the compact form, which is what a client library sends; a
+    hand-formatted body would put the brace somewhere else and the number
+    would be off by the whitespace.
+    """
+    compact = json.dumps(body, separators=(",", ":"))
+    at = compact.find('"query":{}')
+    return at + len('"query":{}') if at >= 0 else len(compact)
+
+
+def _count_query_clause(body: dict) -> dict | None:
+    """The same, worded as `_count` words it.
+
+    `_count` refuses an empty query too, but as a `parsing_exception` reading
+    `Failed to parse` with the position as `line` and `col` of its own — and
+    the search's own wording underneath it as the cause (measured on 8.15).
+
+    Raises:
+        ESQueryError: If `query` is there and empty.
+    """
+    clause = body.get("query")
+    if clause != {}:
+        return clause
+    column = _empty_clause_column(body)
+    raise ESQueryError(
+        "Failed to parse", es_type="parsing_exception",
+        detail={"line": 1, "col": column},
+        caused_by={
+            "type": "illegal_argument_exception",
+            "reason": f"query malformed, empty clause found at [1:{column}]",
+        },
+    )
+
+
+def _query_clause(body: dict) -> dict | None:
+    """The `query` a search body carries, refusing the one that is empty.
+
+    `{"query": {}}` is not "match everything": Elasticsearch refuses it with
+    `query malformed, empty clause found at [1:N]`, and mockdr answered every
+    document in the index — a search that looks like it worked and returns
+    the opposite of what an empty filter should.
+
+    The column is the closing brace of that empty object, counted in the body
+    as it was sent. It is read off the compact form here, which is what a
+    client library writes; a hand-formatted body would put the brace
+    somewhere else and the number would be off by the whitespace.
+
+    Raises:
+        ESQueryError: If `query` is there and empty.
+    """
+    clause = body.get("query")
+    if clause != {}:
+        return clause
+    msg = f"query malformed, empty clause found at [1:{_empty_clause_column(body)}]"
+    raise ESQueryError(msg, es_type="illegal_argument_exception")
+
+
+def validate_query(index: str, body: dict | None, *, explain: bool = False) -> dict:
     """``_validate/query``: whether a query would run at all.
 
     A valid one answers with the shards that judged it; an invalid one
     answers ``{"valid": false}`` and nothing else — no shards, no status
     other than 200. Only ``explain`` adds a reason.
+
+    Four cases, and 8.15 answers them four ways: no body at all is *valid*
+    — there was nothing to find fault with; a body that names no ``query``
+    is the one refusal, `query cannot be null`; and a ``query`` that is
+    ``null``, or empty, or unreadable, is `{"valid": false}` at 200. mockdr
+    refused three of the four, so a client asking whether its query was
+    valid was told its request was malformed instead.
     """
     missing = _missing_target(index)
     if missing is not None:
         raise IndexNotFoundError(missing)
-    clause = body.get("query")
-    if clause is None:
-        # A request with nothing to validate is refused rather than called
-        # valid — which is what mockdr answered.
+    if body is None:
+        return {"valid": True, "_shards": {"total": 1, "successful": 1, "failed": 0}}
+    if "query" not in body:
         msg = "Validation Failed: 1: query cannot be null;"
         raise ValueError(msg)
+    clause = body.get("query")
+    if clause is None or clause == {}:
+        # A query that is null, or names no clause at all, is invalid — and
+        # here that is an answer rather than a refusal, which is the whole
+        # point of the route.
+        reason = "query is null" if clause is None else "empty clause"
+        return {"valid": False, "error": reason} if explain else {"valid": False}
     try:
         build_predicate(clause)
     except (ESQueryError, ValueError) as exc:
@@ -825,7 +902,7 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
 
     # If a query clause was provided, the total is the filtered count
     # before from/size pagination; otherwise it's all records.
-    query_clause = body.get("query")
+    query_clause = _query_clause(body)
     if query_clause:
         # Re-filter without pagination to get the true total.
         predicate = build_predicate(
@@ -906,7 +983,7 @@ def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dic
         IndexNotFoundError: If a concrete index name is unknown.
     """
     records, _, written = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
-    query_clause = (body or {}).get("query")
+    query_clause = _count_query_clause(body or {})
     if query_clause:
         predicate = build_predicate(query_clause, ids=written)
         records = [r for r in records if predicate(r)]
@@ -1242,7 +1319,7 @@ def _by_query(index: str, body: dict, *, delete: bool) -> dict:
     reported as a failure rather than silently counted as written.
     """
     records, canonical, written = _resolve_collection(index)
-    clause = body.get("query")
+    clause = _query_clause(body)
     if clause:
         predicate = build_predicate(clause, ids=written, lookup=_terms_lookup)
         records = [r for r in records if predicate(r)]

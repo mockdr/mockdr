@@ -573,11 +573,11 @@ class TestAnUnknownClusterParameterIsRefused:
     ) -> None:
         """Not mockdr's `/elastic` mount, which no cluster has."""
         resp = client.get(
-            "/elastic/sentinelone/_search", headers=self.ES, params={"zzz": "1"},
+            "/elastic/.siem-signals/_search", headers=self.ES, params={"zzz": "1"},
         )
 
         assert "/elastic" not in resp.json()["error"]["reason"]
-        assert "[/sentinelone/_search]" in resp.json()["error"]["reason"]
+        assert "[/.siem-signals/_search]" in resp.json()["error"]["reason"]
 
     def test_a_parameter_the_cluster_takes_is_not_refused(
         self, client: TestClient,
@@ -871,3 +871,162 @@ class TestTheVerbDecidesBeforeThePath:
         )
 
         assert resp.json()["messages"][0]["text"] == "Search job cancelled."
+
+
+class TestAnAliasOnOneIndex:
+    """The routes that are about one alias, and the HEAD that asks about it."""
+
+    ES = {
+        "Authorization": "Basic " + base64.b64encode(
+            b"elastic:mock-elastic-password").decode(),
+    }
+    INDEX = "mockdr-alias-probe"
+
+    @pytest.fixture
+    def index(self, client: TestClient) -> str:
+        client.put(f"/elastic/{self.INDEX}", headers=self.ES, json={})
+        client.put(f"/elastic/{self.INDEX}/_alias/probe-alias", headers=self.ES)
+        yield self.INDEX
+        client.request("DELETE", f"/elastic/{self.INDEX}", headers=self.ES)
+
+    def test_one_alias_on_one_index_is_served(
+        self, client: TestClient, index: str,
+    ) -> None:
+        """mockdr had the route under two other spellings and not this one."""
+        resp = client.get(f"/elastic/{index}/_alias/probe-alias", headers=self.ES)
+
+        assert resp.status_code == 200
+        assert resp.json() == {index: {"aliases": {"probe-alias": {}}}}
+
+    def test_an_alias_the_index_does_not_carry_is_a_bare_envelope(
+        self, client: TestClient, index: str,
+    ) -> None:
+        """404 `alias [x] missing`, without the nested `error` object."""
+        resp = client.get(f"/elastic/{index}/_alias/nosuch", headers=self.ES)
+
+        assert resp.status_code == 404
+        assert resp.json() == {"error": "alias [nosuch] missing", "status": 404}
+
+    def test_head_answers_the_question_it_is_asking(
+        self, client: TestClient, index: str,
+    ) -> None:
+        """`_source` is an existence endpoint and was not in mockdr's list."""
+        client.put(f"/elastic/{index}/_doc/a", headers=self.ES,
+                   json={"host": "probe"}, params={"refresh": "true"})
+
+        assert client.head(f"/elastic/{index}/_source/a", headers=self.ES
+                           ).status_code == 200
+        assert client.head(f"/elastic/{index}/_source/zzz", headers=self.ES
+                           ).status_code == 404
+        assert client.head(f"/elastic/{index}/_alias/probe-alias", headers=self.ES
+                           ).status_code == 200
+        assert client.head(f"/elastic/{index}/_alias/nosuch", headers=self.ES
+                           ).status_code == 404
+
+    def test_the_index_itself_reports_what_it_is_called_by(
+        self, client: TestClient, index: str,
+    ) -> None:
+        """`GET /{index}` built an empty alias block instead of reading one."""
+        body = client.get(f"/elastic/{index}", headers=self.ES).json()
+
+        assert body[index]["aliases"] == {"probe-alias": {}}
+
+
+class TestAnEmptyClauseIsNotAMatchAll:
+    """What the cluster answers to a query that names nothing."""
+
+    ES = {
+        "Authorization": "Basic " + base64.b64encode(
+            b"elastic:mock-elastic-password").decode(),
+    }
+
+    def test_an_empty_query_is_refused_not_answered_with_everything(
+        self, client: TestClient,
+    ) -> None:
+        """It returned every document — a search that looks like it worked and
+        gives the opposite of what an empty filter should."""
+        resp = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={"query": {}},
+        )
+
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["type"] == "illegal_argument_exception"
+        assert error["reason"] == "query malformed, empty clause found at [1:11]"
+
+    def test_count_words_it_its_own_way(self, client: TestClient) -> None:
+        """`Failed to parse`, the position as fields of its own, and the
+        search's wording underneath as the cause."""
+        error = client.post(
+            "/elastic/.siem-signals/_count", headers=self.ES, json={"query": {}},
+        ).json()["error"]
+
+        assert error["type"] == "parsing_exception"
+        assert error["reason"] == "Failed to parse"
+        assert (error["line"], error["col"]) == (1, 11)
+        assert error["caused_by"] == {
+            "type": "illegal_argument_exception",
+            "reason": "query malformed, empty clause found at [1:11]",
+        }
+
+    def test_validate_answers_rather_than_refuses(self, client: TestClient) -> None:
+        """The same body is this route's whole subject."""
+        resp = client.post(
+            "/elastic/.siem-signals/_validate/query", headers=self.ES,
+            json={"query": {}},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"valid": False}
+
+    @pytest.mark.parametrize(("clause", "kind", "reason"), [
+        ("term", "illegal_argument_exception", "field name is null or empty"),
+        ("prefix", "illegal_argument_exception", "field name is null or empty"),
+        ("fuzzy", "illegal_argument_exception", "field name cannot be null or empty"),
+        ("match", "parsing_exception", "No text specified for text query"),
+        ("exists", "parsing_exception", "[exists] must be provided with a [field]"),
+        ("query_string", "parsing_exception",
+         "[query_string] must be provided with a [query]"),
+        ("boosting", "parsing_exception",
+         "[boosting] query requires 'positive' query to be set'"),
+    ])
+    def test_an_empty_clause_body_is_refused_by_name(
+        self, client: TestClient, clause: str, kind: str, reason: str,
+    ) -> None:
+        """Twelve of these reached a builder that assumed a first key and came
+        back 500."""
+        resp = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"query": {clause: {}}},
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["error"]["type"] == kind
+        assert resp.json()["error"]["reason"] == reason
+
+    @pytest.mark.parametrize("clause", ["bool", "ids", "match_all"])
+    def test_the_three_that_take_an_empty_body_still_do(
+        self, client: TestClient, clause: str,
+    ) -> None:
+        assert client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"query": {clause: {}}},
+        ).status_code == 200
+
+    @pytest.mark.parametrize("arm", ["must", "should", "must_not", "filter"])
+    def test_an_empty_clause_inside_a_bool_is_refused_too(
+        self, client: TestClient, arm: str,
+    ) -> None:
+        """It matched everything, so a `must` built from a filter that matched
+        nothing selected the whole index."""
+        resp = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"query": {"bool": {arm: [{}]}}},
+        )
+
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["type"] == "x_content_parse_exception"
+        assert error["reason"].endswith(f"[bool] failed to parse field [{arm}]")
+        assert error["caused_by"]["type"] == "illegal_argument_exception"
+        assert "empty clause found at" in error["caused_by"]["reason"]

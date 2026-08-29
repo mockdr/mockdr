@@ -121,6 +121,16 @@ BODIES = [
     '{"ids":null,"filter":null,"query":null,"event":null,"events":null}',
     "{not json",
     "\x00",
+    # A member that is there and empty, which is not the same as absent and
+    # is what a client sends when its own filter matched nothing. Twelve
+    # Elasticsearch clause types crashed on exactly this shape and none of
+    # the bodies above reached it: they are empty *at the top*, and the
+    # builders that assumed a first key sit one level down.
+    '{"query":{}}',
+    '{"query":{"term":{}}}',
+    '{"query":{"bool":{"must":[{}]}}}',
+    '{"filter":{},"where":{},"parameters":{},"body":{}}',
+    '{"query":{"term":{"a":{}}}}',
 ]
 QUERIES = [
     "",
