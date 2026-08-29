@@ -145,3 +145,59 @@ class TestThe405NamesWhatWasSent:
         resp = client.request("DELETE", "/elastic/zzz-idx/_search", headers=AUTH)
         assert resp.status_code == 405
         assert "[/zzz-idx/_search]" in resp.json()["error"]
+
+
+class TestScrollTakesItsIdEitherWay:
+    """`_search/scroll` reads the id from the query as readily as the body.
+
+    The route declared `scroll_id` as a query member and then read only the
+    body, so a client scrolling the documented way was told its perfectly
+    good id could not be parsed.  And naming no id at all is a *validation*
+    failure, which on 8.15 runs before the security layer: 400, where an id
+    that is present but unparsable is a 403.  Both measured against the
+    cluster, id absent, in the query, and in the body.
+    """
+
+    def _a_scroll_id(self, client: TestClient) -> str:
+        started = client.post(
+            "/elastic/logs-endpoint/_search", headers=AUTH,
+            params={"scroll": "1m"}, json={"size": 1, "query": {"match_all": {}}},
+        )
+        return str(started.json()["_scroll_id"])
+
+    def test_no_id_at_all_is_a_validation_failure(self, client: TestClient) -> None:
+        resp = client.request("GET", "/elastic/_search/scroll", headers=AUTH)
+        assert resp.status_code == 400
+        reason = "Validation Failed: 1: scrollId is missing;"
+        assert resp.json() == {
+            "error": {
+                "root_cause": [
+                    {"type": "action_request_validation_exception", "reason": reason},
+                ],
+                "type": "action_request_validation_exception",
+                "reason": reason,
+            },
+            "status": 400,
+        }
+
+    def test_the_query_member_scrolls_like_the_body(self, client: TestClient) -> None:
+        scroll_id = self._a_scroll_id(client)
+        by_query = client.request("GET", "/elastic/_search/scroll", headers=AUTH,
+                                  params={"scroll_id": scroll_id})
+        assert by_query.status_code == 200, by_query.text
+        assert by_query.json()["hits"]["hits"]
+
+        scroll_id = self._a_scroll_id(client)
+        by_body = client.request("GET", "/elastic/_search/scroll", headers=AUTH,
+                                 json={"scroll_id": scroll_id})
+        assert by_body.status_code == 200
+        assert by_body.json()["hits"]["hits"]
+
+    def test_an_id_that_cannot_be_parsed_is_still_the_403(
+        self, client: TestClient,
+    ) -> None:
+        """Present but unparsable is refused in the security layer, not here."""
+        resp = client.request("GET", "/elastic/_search/scroll", headers=AUTH,
+                              params={"scroll_id": "zzz"})
+        assert resp.status_code == 403
+        assert resp.json()["error"]["type"] == "security_exception"

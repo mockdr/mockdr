@@ -244,6 +244,11 @@ Rules that follow from it:
   reads as a mock defect and is not one.
 - Clean up after a sweep that creates: a HEC token, a saved search, an index.
 - Identity and authorisation endpoints are not probing surface at all.
+- **One suite at a time against a given target.** Two runs overlapping on the
+  same Elasticsearch reported 17 differences that a single run does not have:
+  each re-seeds at the start and writes to the seeded index as it goes, so the
+  second reads what the first is still changing. The findings look exactly
+  like mock defects. If a run is still going, wait for it.
 - **The seeded index is not seeded any more once the suite has run.** Two
   dozen probes write to it — `_update`, `_update_by_query`,
   `_delete_by_query`, a stale-`seq_no` write — so afterwards the real side

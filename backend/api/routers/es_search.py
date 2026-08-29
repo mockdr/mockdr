@@ -898,11 +898,34 @@ def close_pit(body: dict = Body(...), _: dict = Depends(require_es_auth)) -> dic
     )],
 )
 def scroll_search(
-    body: dict = Body(default={}), caller: dict = Depends(require_es_auth),
+    body: dict = Body(default={}),
+    scroll_id_param: str | None = Query(default=None, alias="scroll_id"),
+    caller: dict = Depends(require_es_auth),
 ) -> dict:
-    """The next page of a scrolled search."""
+    """The next page of a scrolled search.
+
+    The id may come in the query as readily as in the body — the route
+    declared `scroll_id` as a query member and then read only the body, so a
+    client that scrolled the documented way was told its perfectly good id
+    could not be parsed.
+
+    Naming no id at all is a *validation* failure, and validation runs before
+    the security layer: `400 Validation Failed: 1: scrollId is missing;`,
+    where an id that is present but unparsable is the 403 below.  Measured on
+    8.15, with the id absent, in the query, and in the body.
+    """
+    scroll_id = str(body.get("scroll_id") or scroll_id_param or "")
+    if not scroll_id:
+        reason = "Validation Failed: 1: scrollId is missing;"
+        raise HTTPException(status_code=400, detail={"error": {
+            "root_cause": [
+                {"type": "action_request_validation_exception", "reason": reason},
+            ],
+            "type": "action_request_validation_exception",
+            "reason": reason,
+        }, "status": 400})
     try:
-        return search_queries.scroll(str(body.get("scroll_id", "")))
+        return search_queries.scroll(scroll_id)
     except search_queries.ScrollIdUnparsableError as exc:
         # A scroll id encodes which indices the scroll reads, so one the
         # cluster cannot parse cannot be authorised either — 8.15 refuses it

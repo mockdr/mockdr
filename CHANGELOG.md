@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**`_search/scroll` ignored the id it said it took, and refused before it validated.**
+The route declared `scroll_id` as a query member and then read only the
+body, so a client scrolling the documented way was told its perfectly good
+id could not be parsed — a 403, for a call that was correct. And naming no
+id at all is a *validation* failure, which runs before the security layer:
+`400 Validation Failed: 1: scrollId is missing;`, where an id that is
+present but unparsable is the 403. mockdr gave the 403 to both. Found by
+sweeping response headers across the three live products and noticing that
+one Elasticsearch route out of 32 was missing `X-Elastic-Product` — the
+symptom of a refusal raised before the handler ran.
+
 **The threat-intelligence metrics were the wrong shape at every level.**
 `ThreatIntelligenceMetricsList` is a *list*: `{"value": [{"properties":
 {...}}]}`, and every metric entry is `{metricName, metricValue}`. mockdr
