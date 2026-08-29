@@ -108,6 +108,10 @@ class TestSettings:
 class TestMultiSearch:
     """Several searches in one request, which is how Kibana asks."""
 
+    #: The cluster refuses a body with no `Content-Type` — 406, measured — so
+    #: a client that omits it never reaches `_msearch` at all.
+    NDJSON = {**AUTH, "Content-Type": "application/x-ndjson"}
+
     def ndjson(self, *pairs: dict) -> str:
         return "\n".join(json.dumps(p) for p in pairs) + "\n"
 
@@ -116,14 +120,14 @@ class TestMultiSearch:
             {"index": INDEX}, {"query": {"match_all": {}}, "size": 0},
             {"index": INDEX}, {"query": {"term": {"host": "h1"}}, "size": 0},
         )
-        response = client.post(f"/elastic/{INDEX}/_msearch", headers=AUTH, content=body)
+        response = client.post(f"/elastic/{INDEX}/_msearch", headers=self.NDJSON, content=body)
         assert response.status_code == 200
         responses = response.json()["responses"]
         assert [r["hits"]["total"]["value"] for r in responses] == [3, 1]
 
     def test_each_answer_carries_its_own_status(self, client: TestClient) -> None:
         body = self.ndjson({"index": INDEX}, {"query": {"match_all": {}}, "size": 0})
-        responses = client.post("/elastic/_msearch", headers=AUTH, content=body).json()
+        responses = client.post("/elastic/_msearch", headers=self.NDJSON, content=body).json()
         assert responses["responses"][0]["status"] == 200
 
     def test_a_shard_failure_belongs_to_its_own_search(
@@ -133,7 +137,7 @@ class TestMultiSearch:
             {"index": "no-such-index"}, {"query": {"match_all": {}}},
             {"index": INDEX}, {"query": {"match_all": {}}, "size": 0},
         )
-        responses = client.post("/elastic/_msearch", headers=AUTH, content=body).json()
+        responses = client.post("/elastic/_msearch", headers=self.NDJSON, content=body).json()
         assert responses["responses"][0]["status"] == 404
         assert responses["responses"][1]["status"] == 200
 
@@ -145,7 +149,7 @@ class TestMultiSearch:
             {"index": INDEX}, {"query": {"nosuchquery": {}}},
             {"index": INDEX}, {"query": {"match_all": {}}, "size": 0},
         )
-        response = client.post("/elastic/_msearch", headers=AUTH, content=body)
+        response = client.post("/elastic/_msearch", headers=self.NDJSON, content=body)
         assert response.status_code == 400
         assert response.json()["error"]["type"] == "parsing_exception"
 

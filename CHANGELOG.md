@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A body under a content type Elasticsearch cannot read is refused, not parsed.**
+8.15 answers `406` — not the `415` one would guess — with the bare-string
+error it also uses for a 405: `{"error": "Content-Type header [text/plain] is
+not supported", "status": 406}`. It reads six types, and only judges the
+header when there *is* a body: a GET with none, or a POST with an empty one,
+is served whatever was sent. mockdr read every body as JSON and answered a
+`parsing_exception` — a 400 about the content where the product refuses the
+header, which sends a client that forgot `Content-Type` looking at its query.
+
+Deliberately not imitated: the cluster answers *in* the format asked for, so
+`application/yaml` comes back as YAML and `application/cbor` as CBOR. Those
+types are accepted here, read as JSON and answered in JSON; refusing them
+would invent a 406 the cluster never gives, which is the worse of the two. A
+body that really is YAML, CBOR or SMILE is therefore not parsed.
+
+Six repo tests had been posting `_bulk` and `_msearch` bodies with no
+`Content-Type` at all, which the cluster refuses outright; they send
+`application/x-ndjson` now, as a client must.
+
+splunkd was asked the same question and ignores the header entirely — four
+types, four 200s — so there is nothing to imitate there.
+
 **Kibana's versioned routes say which version they are.**
 8.15 registers some routes through its versioned router and the rest
 plainly, and only the versioned ones answer with

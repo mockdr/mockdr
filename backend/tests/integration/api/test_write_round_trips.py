@@ -1619,7 +1619,10 @@ class TestEachBulkActionDoesWhatItSays:
         b"elastic:mock-elastic-password").decode()}
 
     def _bulk(self, client: TestClient, *lines: str) -> dict:
-        return client.post("/elastic/_bulk", headers=self.ES,
+        # The cluster refuses a body with no `Content-Type` — 406, measured —
+        # so a client that omits it never reaches `_bulk` at all.
+        return client.post("/elastic/_bulk",
+                           headers={**self.ES, "Content-Type": "application/x-ndjson"},
                            content="".join(f"{line}\n" for line in lines),
                            params={"refresh": "true"}).json()
 

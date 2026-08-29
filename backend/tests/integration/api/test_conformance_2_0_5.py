@@ -227,7 +227,11 @@ class TestElasticsearchMeasured:
         assert "unable to authenticate user [elastic] for REST request" in resp.json()["error"]["reason"]
 
     def test_bulk_malformed_action_line(self, client: TestClient) -> None:
-        resp = client.post("/elastic/_bulk", headers=ES, content=b'{"a":null}\n')
+        # The cluster refuses a body with no `Content-Type` before it reads a
+        # line of it — 406, measured — so the header is part of the question.
+        resp = client.post("/elastic/_bulk",
+                           headers={**ES, "Content-Type": "application/x-ndjson"},
+                           content=b'{"a":null}\n')
         assert resp.status_code == 400
         assert resp.json()["error"]["reason"] == ("Malformed action/metadata line [1], expected field [create], [delete], [index] or [update] but found [a]")
 

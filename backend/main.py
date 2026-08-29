@@ -21,6 +21,7 @@ from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.compression import CompressionMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.elastic_shaping import ElasticShapingMiddleware
+from api.middleware.es_content_type import ElasticContentTypeMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
@@ -446,6 +447,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 # which splunkd's does.
 app.add_middleware(SplunkJobLinkMiddleware)
 app.add_middleware(KibanaApiVersionMiddleware)
+# Before routing: the cluster refuses the header without looking at the body.
+app.add_middleware(ElasticContentTypeMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped

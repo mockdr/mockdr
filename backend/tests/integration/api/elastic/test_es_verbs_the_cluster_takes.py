@@ -201,3 +201,52 @@ class TestScrollTakesItsIdEitherWay:
                               params={"scroll_id": "zzz"})
         assert resp.status_code == 403
         assert resp.json()["error"]["type"] == "security_exception"
+
+
+class TestABodyUnderAContentTypeTheClusterCannotRead:
+    """Elasticsearch refuses the *header*, with 406 and not the 415 one guesses.
+
+    Measured on 8.15 type by type.  It reads six of them; anything else is
+    `{"error": "Content-Type header [X] is not supported", "status": 406}` —
+    the bare-string error shape it also uses for a 405.  The check is made
+    only when there is a body: a GET with none, or a POST with an empty one,
+    is served whatever the header says.  mockdr read every body as JSON and
+    answered a `parsing_exception` — a 400 about the content, where the
+    product refuses the header, which sends a client that forgot
+    `Content-Type` looking at its query.
+    """
+
+    BODY = '{"query":{"match_all":{}}}'
+
+    def _search(self, client: TestClient, content_type: str, body: str = BODY):
+        return client.post(
+            "/elastic/logs-endpoint/_search",
+            headers={**AUTH, "Content-Type": content_type}, content=body,
+        )
+
+    def test_the_six_it_reads(self, client: TestClient) -> None:
+        for content_type in ("application/json", "application/json; charset=utf-8",
+                             "application/JSON", "application/yaml",
+                             "application/cbor", "application/smile",
+                             "application/x-ndjson",
+                             "application/vnd.elasticsearch+json"):
+            resp = self._search(client, content_type)
+            assert resp.status_code == 200, content_type
+
+    def test_anything_else_is_406_naming_the_header(self, client: TestClient) -> None:
+        for content_type in ("text/plain", "text/json", "application/json5",
+                             "application/x-www-form-urlencoded", "*/*"):
+            resp = self._search(client, content_type)
+            assert resp.status_code == 406, content_type
+            assert resp.json() == {
+                "error": f"Content-Type header [{content_type}] is not supported",
+                "status": 406,
+            }, content_type
+
+    def test_no_body_is_never_refused(self, client: TestClient) -> None:
+        """The header is only judged when something was sent under it."""
+        by_get = client.get("/elastic/logs-endpoint/_count",
+                            headers={**AUTH, "Content-Type": "text/plain"})
+        assert by_get.status_code == 200
+        empty = self._search(client, "text/plain", body="")
+        assert empty.status_code == 200
