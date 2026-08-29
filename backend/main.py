@@ -1450,6 +1450,29 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
                         "error": {"root_cause": [dict(detail)], **detail}, "status": 400,
                     })
                 return JSONResponse(status_code=404, content=build_es_index_not_found(name))
+            # Two segments under the mount are `/{index}/{type}`, the typed
+            # create endpoint 8.x removed: the pattern is still registered, so
+            # every verb but POST is told which one it takes, and POST itself
+            # finds no handler.  Measured on 8.15, on an index that exists and
+            # one that does not.
+            # A doubled slash is an *empty* segment to the cluster, so
+            # `/{index}//_search` is three of them and matches nothing.
+            doubled = "//" in inner
+            if len(segments) == 2 and not doubled and request.method != "POST":
+                return JSONResponse(status_code=405, content={
+                    "error": f"Incorrect HTTP method for uri "
+                             f"[{_es_uri(request, path)}] and method "
+                             f"[{request.method}], allowed: [POST]",
+                    "status": 405,
+                })
+            # Anything else the cluster cannot route is a 400 naming the uri
+            # and the verb — not a 404.  Elasticsearch has no "resource not
+            # found" for a path.
+            return JSONResponse(status_code=400, content={
+                "error": f"no handler found for uri [{_es_uri(request, path)}] "
+                         f"and method [{request.method}]",
+                "status": 400,
+            })
         if vendor in ("splunk", "splunk_hec"):
             # Two 404s, measured on 10.4.2: the search service has its own
             # dispatcher and refuses an unknown path under it as FATAL

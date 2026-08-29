@@ -364,3 +364,57 @@ class TestEveryIndexAndItsAliases:
         resp = client.get("/elastic/_alias", headers=AUTH)
         assert resp.status_code == 200
         assert resp.json()["zzz-alias-probe"] == {"aliases": {"zzz-the-alias": {}}}
+
+
+class TestAPathTheClusterCannotRoute:
+    """Elasticsearch has no "resource not found" for a path.
+
+    What it cannot route is a `400` naming the uri and the verb, in the
+    bare-string error shape it keeps for the HTTP layer.  The one exception
+    is a two-segment path — `/{index}/{type}`, the typed create endpoint 8.x
+    removed: the pattern is still registered, so every verb but `POST` is
+    told which one it takes, and `POST` itself finds no handler.  A doubled
+    slash is an *empty* segment, so `/{index}//_search` is three of them and
+    matches nothing.  mockdr answered `404 resource_not_found_exception` to
+    all of it.  Measured on 8.15, eleven shapes.
+    """
+
+    def test_what_cannot_be_routed_is_a_400_naming_the_verb(
+        self, client: TestClient,
+    ) -> None:
+        for method, path in (("GET", "/elastic/zzz/no/such/path"),
+                             ("GET", "/elastic/logs-endpoint/_search/extra"),
+                             ("GET", "/elastic/a/b/c/d"),
+                             ("POST", "/elastic/logs-endpoint/zzz")):
+            resp = client.request(method, path, headers=AUTH)
+            assert resp.status_code == 400, (method, path)
+            inner = path[len("/elastic"):]
+            assert resp.json() == {
+                "error": f"no handler found for uri [{inner}] and method [{method}]",
+                "status": 400,
+            }, (method, path)
+
+    def test_two_segments_are_the_typed_create_endpoint(
+        self, client: TestClient,
+    ) -> None:
+        """Every verb but POST is told it takes POST — index or no index."""
+        for method in ("GET", "DELETE", "PUT", "HEAD"):
+            for path in ("/elastic/logs-endpoint/zzz", "/elastic/zzz-no-index/zzz"):
+                resp = client.request(method, path, headers=AUTH)
+                assert resp.status_code == 405, (method, path)
+
+    def test_a_doubled_slash_is_an_empty_segment(self, client: TestClient) -> None:
+        resp = client.get("/elastic/logs-endpoint//_search", headers=AUTH)
+        assert resp.status_code == 400
+        assert resp.json()["error"] == (
+            "no handler found for uri [/logs-endpoint//_search] and method [GET]"
+        )
+
+    def test_one_segment_is_still_an_index_name(self, client: TestClient) -> None:
+        """The rules above must not swallow what was already right."""
+        underscore = client.get("/elastic/_zzznope", headers=AUTH)
+        assert underscore.status_code == 400
+        assert underscore.json()["error"]["type"] == "invalid_index_name_exception"
+
+        missing = client.get("/elastic/no-such-index", headers=AUTH)
+        assert missing.status_code == 404

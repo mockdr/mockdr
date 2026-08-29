@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Elasticsearch has no "resource not found" for a path.**
+What it cannot route is a `400` naming the uri and the verb — `no handler
+found for uri [/a/b/c/d] and method [GET]` — in the bare-string error shape
+it keeps for the HTTP layer. The one exception is a two-segment path:
+`/{index}/{type}` is the typed create endpoint 8.x removed, and the pattern
+is still registered, so every verb but `POST` is told it takes `POST` while
+`POST` itself finds no handler. A doubled slash is an *empty* segment, so
+`/{index}//_search` is three of them and matches nothing. mockdr answered
+`404 resource_not_found_exception` to all of it, which is a status
+Elasticsearch never sends for a path. Eleven shapes compared afterwards,
+none differing.
+
+The doubled slash is a third answer again: splunkd collapses it and serves
+the request, Kibana answers its ordinary 404, and mockdr already matched
+Kibana.
+
 **A path that ends in a slash: two products serve it, one redirects.**
 A client that builds its URL by joining a base and a path lands on one
 constantly. Elasticsearch serves `/{index}/_search/` and every other shape
