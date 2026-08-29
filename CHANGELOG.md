@@ -76,10 +76,17 @@ tags back saw nothing happen. `ThreatIntelligenceIndicatorMetrics_List` is a
 Found by finishing the path-and-verb sweep against every vendor spec the
 repository holds — Graph, CrowdStrike, Sentinel and MDE. The three Sentinel
 paths still unmatched are the two Entra token endpoints and the Log
-Analytics query API, which are other services. Measured but not closed:
-mockdr emits 15 of the 28 properties the swagger declares on an indicator,
-and invents none of them; nothing watches Sentinel's fields against that
-spec, because `field_drift` is the SentinelOne comparator.
+Analytics query API, which are other services.
+
+An earlier draft of this entry claimed mockdr emitted 15 of the 28
+properties the swagger declares on an indicator. That was read off the
+source rather than measured, and it was wrong twice over: the response
+carries every declared member, and the two it appeared to add
+(`additionalData`, `friendlyName`) are declared too. `schema_drift` had it
+right all along — it resolves the `kind` discriminator to
+`ThreatIntelligenceIndicatorModel` and compares 44 declared paths against 30
+seen, the difference being members of array elements where the arrays are
+empty. Sentinel's fields are watched, by that comparator.
 
 **Four Kibana routes that answered before the query schema had spoken.**
 The schema check runs before the handler, so an unknown query member is a
