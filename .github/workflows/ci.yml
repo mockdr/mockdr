@@ -214,6 +214,7 @@ jobs:
           python scripts/authz_audit.py
           python scripts/method_drift.py
           python scripts/body_audit.py
+          python scripts/http_contract_audit.py
 
       # data/ is gitignored, so without this the spec is absent and the
       # check does not run — the same reason the field-drift job fetches it.

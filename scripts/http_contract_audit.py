@@ -9,10 +9,11 @@ client reads too and a mock is unusually likely to answer uniformly:
 * **the content type**, whose charset three products spell three ways —
   Kibana lower-case, splunkd upper-case, Elasticsearch not at all;
 * **a verb the route does not take**, which is a 405 with `Allow` on
-  Elasticsearch, a 404 with none on Kibana, and — on splunkd — either,
-  depending on which of the three services under that one mount owns the
-  path: its EAI collections answer 400 and have no 405 at all, while the
-  search endpoints and the KV store answer a proper 405;
+  Elasticsearch, a 404 with none on Kibana, and — on splunkd — decided by
+  the verb before the path: `PATCH` is a bare 405 everywhere, `PUT` is the
+  EAI `404 Requested invalid action 'PUT'.` on a config handler and a 405 on
+  the search service, and only the verbs that reach a handler depend on
+  where they land.  splunkd sends `Allow` on none of the first two;
 * **`HEAD`**, which Elasticsearch serves on its existence endpoints alone and
   Kibana and splunkd serve wherever they serve `GET`;
 * **the `WWW-Authenticate` challenge** on a 401, which Elasticsearch sends as
@@ -70,15 +71,20 @@ WRONG_METHOD = {
     "kibana": (404, False),
 }
 
-#: The splunkd paths that answer a proper 405 instead of the EAI 400 — the
-#: search service and the KV store, which are not the config handlers.
-_SPLUNK_405 = re.compile(r"/splunk/services/search/|/storage/collections/data/[^/]+/batch_")
+#: The search service, and the KV store's batch endpoints, which answer a
+#: proper 405 where the config handlers answer the EAI 400.
+_SPLUNK_SEARCH = re.compile(r"/splunk/services/search/")
+_SPLUNK_KVSTORE_BATCH = re.compile(r"/storage/collections/data/[^/]+/batch_")
+_SPLUNK_TYPEAHEAD = re.compile(r"/splunk/services/search/typeahead")
 
 #: Where Elasticsearch serves HEAD. Everywhere else under `/elastic` is a
 #: 405; Kibana and splunkd serve it wherever they serve GET.
 _ES_HEAD = re.compile(
     r"^/elastic/?$|^/elastic/[^_/][^/]*/?$"
     r"|^/elastic/[^/]+/_doc/[^/]+/?$"
+    # `HEAD /{index}/_source/{id}` asks whether a document's source exists:
+    # 200 when it does, 404 when it does not.  Measured on 8.15.
+    r"|^/elastic/[^/]+/_source/[^/]+/?$"
     r"|^/elastic/_alias/[^/]+/?$|^/elastic/[^/]+/_alias/[^/]+/?$",
 )
 
@@ -87,12 +93,62 @@ _ES_HEAD = re.compile(
 _SKIP = re.compile(r"/splunk/services/collector|/oauth2/|/token$|/console/proxy")
 
 #: Query parameters a route needs before it will look at anything.
-PARAMS = {"output_mode": "json", "api-version": "2024-03-01"}
+#: Per mount, because a parameter belonging to another product is not a
+#: neutral addition: Elasticsearch refuses an unrecognised one with a 400,
+#: so sending splunkd's `output_mode` to it measured the parameter check
+#: rather than the question asked.
+PARAMS = {
+    "splunk": {"output_mode": "json"},
+    "elastic": {},
+    "kibana": {},
+}
 _MISSING = "zzz-no-such-id-00000000"
 
 
 def fill(path):
     return re.sub(r"\{([^}:]+)(?::[^}]*)?\}", _MISSING, path)
+
+
+#: The two search endpoints that resolve the sid before they judge the verb;
+#: with a name that does not exist, a verb they do not take is a 404 and not
+#: a 405.  Everything else under a job judges the verb first.
+#: An EAI handler's `{name}/{custom action}` paths, where a verb the action
+#: does not allow is a 404 naming the handler.
+_SPLUNK_CUSTOM_ACTION = re.compile(
+    r"/splunk/services/(saved/searches|data/indexes)/\{[^}]+\}/[^/]+/?$")
+
+_SPLUNK_SID_FIRST = re.compile(
+    r"/splunk/services/search/(v2/)?jobs/\{[^}]+\}(/control)?/?$")
+
+
+def _splunk_expectation(verb, path):
+    """What splunkd answers to *verb* on *path*, measured on 10.4.2.
+
+    The rule is the verb's before it is the path's, which is what the earlier
+    per-path table got wrong: `PATCH` is a bare 405 on every handler in every
+    service, and `PUT` is the EAI 404 `Requested invalid action 'PUT'.` on the
+    config handlers and a 405 on the search service.  Only the verbs that
+    reach a handler — `DELETE` among them — depend on where they land, and
+    splunkd sends `Allow` on none of the first three.
+    """
+    if verb == "PATCH":
+        return 405, False
+    search = bool(_SPLUNK_SEARCH.search(path))
+    if verb == "PUT":
+        return (405, False) if search else (404, False)
+    if _SPLUNK_TYPEAHEAD.search(path):
+        return 405, False
+    if _SPLUNK_SID_FIRST.search(path):
+        return 404, False          # `Unknown sid.`, before the verb is judged
+    if verb == "DELETE" and _SPLUNK_CUSTOM_ACTION.search(path):
+        # An EAI handler maps the verb to an eai action and then looks for the
+        # trailing segment among that action's custom actions: 404 `Invalid
+        # custom action for this internal handler (...)`, never the 400 about
+        # a target name the path plainly carries.
+        return 404, False
+    if search or _SPLUNK_KVSTORE_BATCH.search(path):
+        return 405, True
+    return 400, False
 
 
 def judge(mount, path, methods):
@@ -102,14 +158,14 @@ def judge(mount, path, methods):
     url = fill(path)
 
     if "get" in methods:
-        answer = client.get(url, headers=headers, params=PARAMS)
+        answer = client.get(url, headers=headers, params=PARAMS[mount])
         actual = answer.headers.get("content-type", "")
         if actual.startswith("application/json") and actual != CONTENT_TYPE[mount]:
             found.append(("content type", f"{actual!r}, not {CONTENT_TYPE[mount]!r}"))
 
         # HEAD, where the product's rule says it is served.
         served = mount != "elastic" or bool(_ES_HEAD.match(url))
-        head = client.request("HEAD", url, headers=headers, params=PARAMS)
+        head = client.request("HEAD", url, headers=headers, params=PARAMS[mount])
         if served and head.status_code == 405:
             found.append(("HEAD", "answered 405 where the product serves it"))
         if not served and head.status_code != 405:
@@ -118,13 +174,13 @@ def judge(mount, path, methods):
 
     unused = {"delete", "patch", "put"} - methods
     if unused:
+        verb = sorted(unused)[0].upper()
         want_status, want_allow = WRONG_METHOD[mount]
-        if mount == "splunk" and _SPLUNK_405.search(path):
-            want_status, want_allow = 405, True
-        answer = client.request(sorted(unused)[0].upper(), url,
-                                headers=headers, params=PARAMS)
+        if mount == "splunk":
+            want_status, want_allow = _splunk_expectation(verb, path)
+        answer = client.request(verb, url, headers=headers, params=PARAMS[mount])
         if answer.status_code != want_status:
-            found.append((f"{sorted(unused)[0].upper()} it does not take",
+            found.append((f"{verb} it does not take",
                           f"answered {answer.status_code}, not {want_status}"))
         has_allow = "allow" in {k.lower() for k in answer.headers}
         if has_allow is not want_allow:

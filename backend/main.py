@@ -502,7 +502,32 @@ _SPLUNK_SEARCH_405 = re.compile(r"/splunk/services/search/")
 _SPLUNK_KVSTORE_405 = re.compile(r"/storage/collections/data/[^/]+/batch_")
 #: The job collections, whose DELETE is worded differently from the rest of
 #: the search endpoints', and typeahead, whose is different again.
-_SPLUNK_JOB_COLLECTION = re.compile(r"/splunk/services/search/(v2/)?jobs/?$")
+#: Where the search service says `Method Not Allowed` rather than `The method
+#: is not allowed.`: the job collections and everything addressed through a
+#: job — `{sid}` itself and each of its sub-resources.  `jobs/export` is not a
+#: job, and answers with the other wording, as `parser` and `timeparser` do.
+#: Measured verb by verb on 10.4.2 against a job that exists.
+_SPLUNK_JOB_COLLECTION = re.compile(
+    r"/splunk/services/search/(v2/)?jobs(?:/?$|/(?!export(?:/|$)))",
+)
+
+#: The two job endpoints that resolve the sid *before* they judge the verb:
+#: the job itself and its `control`.  Both take a write, so the handler runs
+#: and looks the job up; the read-only sub-resources (`results`, `events`,
+#: `summary`, `timeline`, `search.log`, `acl`, `results_preview`) refuse the
+#: verb first and answer 405 with `Allow` even for a sid that never existed.
+#: Measured one sub-resource at a time — no rule accounts for the split.
+_SPLUNK_JOB_SID = re.compile(
+    r"/splunk/services/search/(?:v2/)?jobs/(?!export(?:/|$))"
+    r"(?P<sid>[^/]+)(?:/control)?/?$",
+)
+
+#: The EAI handlers whose `{name}/{action}` paths name a custom action, and
+#: the handler name splunkd puts in its refusal.
+_SPLUNK_CUSTOM_ACTION = (
+    ("/splunk/services/saved/searches/", "savedsearch"),
+    ("/splunk/services/data/indexes/", "indexes"),
+)
 _SPLUNK_TYPEAHEAD = re.compile(r"/splunk/services/search/typeahead")
 
 
@@ -537,6 +562,9 @@ def _splunk_wrong_method(
     if request.method == "PUT":
         return JSONResponse(status_code=404, content={
             "messages": [{"type": "ERROR", "text": "Requested invalid action 'PUT'."}]})
+    invalid_action = _splunk_invalid_custom_action(request, path)
+    if invalid_action is not None:
+        return invalid_action
     if _SPLUNK_KVSTORE_405.search(path):
         return JSONResponse(
             status_code=405, headers={"Allow": ",".join(allowed)},
@@ -549,6 +577,36 @@ def _splunk_wrong_method(
             f'Cannot perform action "{request.method}" without a target name to act on.'}]},
     )
 
+
+
+def _splunk_invalid_custom_action(
+    request: Request, path: str,
+) -> JSONResponse | None:
+    """What splunkd answers when the last segment is not an action it knows.
+
+    An EAI handler maps the verb to an *eai action* — `DELETE` is `remove` —
+    and then looks for the trailing segment among the custom actions that
+    action allows.  `DELETE /saved/searches/{name}/dispatch` is a 404 naming
+    all three, not the 400 an unnamed target gets: the path names a target
+    perfectly well, and mockdr's `without a target name to act on` read as
+    nonsense to anyone who looked at it.  Measured on 10.4.2, on names that
+    exist and names that do not — the object is never resolved this far.
+    """
+    if request.method != "DELETE":
+        return None
+    for prefix, handler in _SPLUNK_CUSTOM_ACTION:
+        if not path.startswith(prefix):
+            continue
+        rest = path[len(prefix):].strip("/").split("/")
+        if len(rest) != 2:
+            continue
+        return JSONResponse(status_code=404, content={"messages": [{
+            "type": "ERROR",
+            "text": f"Invalid custom action for this internal handler "
+                    f"(handler: {handler}, custom action: {rest[1]}, "
+                    f"eai action: remove).",
+        }]})
+    return None
 
 
 def _splunk_search_wrong_method(
@@ -566,6 +624,16 @@ def _splunk_search_wrong_method(
     if _SPLUNK_TYPEAHEAD.search(path) or request.method in ("PUT", "PATCH"):
         return JSONResponse(status_code=405, content={
             "messages": [{"type": "ERROR", "text": _SPLUNK_METHOD_NOT_ALLOWED}]})
+    # Every other verb reaches the handler, which resolves the sid before it
+    # decides anything about the method: `DELETE …/jobs/{unknown}/control` is
+    # 404 `Unknown sid.`, not a 405.  `PUT` and `PATCH` above never get that
+    # far, which is why the sid check sits here and not at the top.
+    named = _SPLUNK_JOB_SID.search(path)
+    if named is not None:
+        from repository.splunk.search_job_repo import search_job_repo
+        if search_job_repo.get(named.group("sid")) is None:
+            return JSONResponse(status_code=404, content={
+                "messages": [{"type": "FATAL", "text": "Unknown sid."}]})
     text = (
         _SPLUNK_METHOD_NOT_ALLOWED if _SPLUNK_JOB_COLLECTION.search(path)
         else "The method is not allowed."
