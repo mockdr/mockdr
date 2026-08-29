@@ -1170,3 +1170,52 @@ class TestSettingAnAlertStatus:
         assert client.post(
             "/kibana/api/detection_engine/signals/status", headers=ES_AUTH, json=body,
         ).status_code == 200
+
+
+class TestACommandGivenNoArgument:
+    """Ten SPL commands ran on nothing and answered the rows unchanged."""
+
+    @pytest.mark.parametrize(("command", "text"), [
+        ("sort", "You must specify fields to sort."),
+        ("table", "Error in 'table' command: Must specify at least one valid "
+                  "field name (can contain wildcards)."),
+        ("eval", "Error in 'eval' command: Arguments are missing. "
+                 "Usage: eval dest_key = expression."),
+        ("dedup", "Error in 'dedup' command: At least one field must be given "
+                  "as an argument."),
+        ("top", "Error in 'top' command: No fields were specified."),
+        ("rare", "Error in 'rare' command: No fields were specified."),
+        ("rename", "Error in 'rename' command: Usage: rename "
+                   "[old_name AS/TO/-> new_name]+."),
+        ("regex", "Error in 'SearchOperator:regex': Usage: regex <field> "
+                  "(=|!=) <regex>."),
+        ("rex", "Error in 'SearchOperator:rex': Usage: regex [field=<field>] "
+                "<regex>."),
+        ("timechart", "Error in 'timechart' command: You must specify data "
+                      "field(s) to chart."),
+    ])
+    def test_each_says_what_it_wanted(
+        self, client: TestClient, command: str, text: str,
+    ) -> None:
+        """A search whose `| sort` had lost its field list looked as though it
+        had worked."""
+        body = client.post(
+            SPLUNK, headers=SPLUNK_AUTH,
+            data={"search": f"search index=sentinelone | {command}",
+                  "output_mode": "json", "exec_mode": "oneshot"},
+        ).json()
+
+        assert body["messages"][0] == {"type": "FATAL", "text": text}
+
+    @pytest.mark.parametrize("command", ["where", "stats", "fields", "head", "tail"])
+    def test_the_ones_that_take_no_argument_still_run(
+        self, client: TestClient, command: str,
+    ) -> None:
+        """splunkd accepts these bare — the other half of the measurement."""
+        body = client.post(
+            SPLUNK, headers=SPLUNK_AUTH,
+            data={"search": f"search index=sentinelone | {command}",
+                  "output_mode": "json", "exec_mode": "oneshot"},
+        ).json()
+
+        assert not [m for m in body.get("messages", []) if m["type"] == "FATAL"]

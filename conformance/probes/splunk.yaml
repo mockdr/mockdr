@@ -3456,3 +3456,73 @@ probes:
       path: /services/search/timeparser
       query: {output_mode: json}
       auth: basic
+
+  # ── A command given no argument (2.3.1) ───────────────────────────────
+  #
+  # Ten of them ran on nothing here and answered the rows unchanged, so a
+  # search whose `| sort` or `| table` had lost its field list came back
+  # looking as though it had worked.
+
+  - id: splunk-sort-with-no-fields
+    endpoint: management
+    needs_seed: true
+    why: The one whose refusal carries no subject at all.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | sort&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-table-with-no-fields
+    endpoint: management
+    needs_seed: true
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | table&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-eval-with-no-expression
+    endpoint: management
+    needs_seed: true
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | eval&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-dedup-with-no-fields
+    endpoint: management
+    needs_seed: true
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | dedup&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-rex-with-no-expression
+    endpoint: management
+    needs_seed: true
+    why: >
+      The search *operator* answers this one, not the command — and
+      describes its own usage as `regex`, which is splunkd's own slip.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | rex&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: splunk-timechart-with-no-fields
+    endpoint: management
+    needs_seed: true
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: "search=search index=main | timechart&output_mode=json&exec_mode=oneshot"
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic

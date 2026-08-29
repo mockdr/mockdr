@@ -110,6 +110,17 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**Ten SPL commands ran on no argument at all.**
+The same question, third product: `| sort`, `| table`, `| eval`, `| dedup`,
+`| top`, `| rare`, `| rename`, `| regex`, `| rex` and `| timechart` with
+nothing after them answered the rows unchanged here, so a search whose field
+list had gone missing came back looking as though it had worked. splunkd
+refuses each by name, and the lines are its own: `sort` carries no subject
+at all, `regex` and `rex` are answered by the *search operator* rather than
+the command, and `rex` describes its own usage as `regex`. `where`, `stats`,
+`fields`, `head` and `tail` take no argument and mean it — the other half of
+the same measurement.
+
 **Setting an alert's status answered one hand-written line.**
 The route a SOAR uses to close an alert refused every malformed body with
 `signal_ids and status are required`, where 8.15 names each member of each

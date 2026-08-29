@@ -122,6 +122,9 @@ def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, 
                 ),
             })
             return [], messages
+        if not command.arg.strip() and command.name in _NO_ARGUMENT:
+            messages.append({"type": "FATAL", "text": _NO_ARGUMENT[command.name]})
+            return [], messages
         handler = _HANDLERS.get(command.name)
         if handler is None:  # pragma: no cover - parser filters these out
             messages.append({
@@ -1460,6 +1463,31 @@ def _sort_key(value: Any) -> tuple[int, float, str]:
     if number is not None:
         return (0, number, "")
     return (1, 0.0, str(value if value is not None else ""))
+
+
+#: What splunkd says when a command is given no argument at all. Ten of
+#: these ran on nothing here and answered the rows unchanged, so a search
+#: whose `| sort` or `| table` had lost its field list came back looking as
+#: though it had worked. The lines are verbatim, including the two the
+#: *search operator* answers rather than the command — and `rex` describing
+#: its own usage as `regex`, which is splunkd's own slip.
+_NO_ARGUMENT: dict[str, str] = {
+    "eval": "Error in 'eval' command: Arguments are missing. "
+            "Usage: eval dest_key = expression.",
+    "sort": "You must specify fields to sort.",
+    "table": "Error in 'table' command: Must specify at least one valid field "
+             "name (can contain wildcards).",
+    "dedup": "Error in 'dedup' command: At least one field must be given as "
+             "an argument.",
+    "top": "Error in 'top' command: No fields were specified.",
+    "rare": "Error in 'rare' command: No fields were specified.",
+    "rename": "Error in 'rename' command: Usage: rename "
+              "[old_name AS/TO/-> new_name]+.",
+    "regex": "Error in 'SearchOperator:regex': Usage: regex <field> (=|!=) <regex>.",
+    "rex": "Error in 'SearchOperator:rex': Usage: regex [field=<field>] <regex>.",
+    "timechart": "Error in 'timechart' command: You must specify data field(s) "
+                 "to chart.",
+}
 
 
 _HANDLERS: dict[str, Callable[[Rows, SPLCommand], Rows]] = {
