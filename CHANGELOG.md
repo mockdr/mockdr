@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every answer addressed through a search job now points back at the job.**
+splunkd sends `Link: <sid>; rel=info` on the job and everything under it —
+on 200, 204, 404 and 405 alike — and the link is relative to the request:
+`<sid>` for the job, `<../sid>` for a sub-resource, `<../../sid>` one level
+deeper. The collection carries none, and neither do `jobs/export`,
+`typeahead` or `parser`, which are not jobs. A client following it reaches
+the job a partial answer belongs to, which is why a 204 from `/results`
+carries one. Measured on 10.4.2 against a job that exists and sids that do
+not; mockdr sent none at all.
+
 **`_search/scroll` ignored the id it said it took, and refused before it validated.**
 The route declared `scroll_id` as a query member and then read only the
 body, so a client scrolling the documented way was told its perfectly good

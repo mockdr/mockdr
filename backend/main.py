@@ -32,6 +32,7 @@ from api.middleware.request_logging import RequestLoggingMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
 from api.middleware.splunk_field_filter import SplunkFieldFilterMiddleware
 from api.middleware.splunk_headers import SplunkHeadersMiddleware
+from api.middleware.splunk_job_link import SplunkJobLinkMiddleware
 from api.middleware.splunk_namespace import SplunkNamespaceMiddleware
 from api.middleware.splunk_output_mode import SplunkOutputModeMiddleware
 from api.middleware.splunk_paging import SplunkPagingMiddleware
@@ -439,6 +440,10 @@ app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries
 app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+# Inside the namespace rewrite, so a `/servicesNS/...` job is seen by its
+# `/services/...` path; outside the routes, so a 404 or 405 carries it too —
+# which splunkd's does.
+app.add_middleware(SplunkJobLinkMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped

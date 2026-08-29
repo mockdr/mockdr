@@ -124,3 +124,58 @@ class TestACustomActionThatIsNotOne:
             "Invalid custom action for this internal handler "
             "(handler: indexes, custom action: zzz-act, eai action: remove)."
         )
+
+
+class TestTheLinkBackToTheJob:
+    """splunkd points every job-addressed answer back at the job.
+
+    Measured on 10.4.2 against a job that exists and sids that do not: the
+    header is there on 200, 204, 404 and 405 alike, and it is relative to the
+    request — the job itself gets `<sid>`, a sub-resource `<../sid>`, one
+    level deeper `<../../sid>`.  The collection carries none, and neither do
+    `jobs/export`, `typeahead` or `parser`, which are not jobs.  A client
+    following it reaches the job a partial answer belongs to, which is why a
+    204 from `/results` carries one.
+    """
+
+    def test_the_job_links_to_itself(self, client: TestClient) -> None:
+        sid = _a_job(client)
+        resp = client.get(f"/splunk/services/search/jobs/{sid}",
+                          headers=AUTH, params=JSON)
+        assert resp.headers["link"] == f"<{sid}>; rel=info"
+
+    def test_a_sub_resource_climbs_one_level(self, client: TestClient) -> None:
+        sid = _a_job(client)
+        for sub in ("results", "events", "summary", "control"):
+            resp = client.get(f"/splunk/services/search/jobs/{sid}/{sub}",
+                              headers=AUTH, params=JSON)
+            assert resp.headers["link"] == f"<../{sid}>; rel=info", sub
+
+    def test_the_v2_paths_carry_it_too(self, client: TestClient) -> None:
+        sid = _a_job(client)
+        resp = client.get(f"/splunk/services/search/v2/jobs/{sid}/results",
+                          headers=AUTH, params=JSON)
+        assert resp.headers["link"] == f"<../{sid}>; rel=info"
+
+    def test_a_sid_that_never_existed_is_linked_all_the_same(
+        self, client: TestClient,
+    ) -> None:
+        """The header is the path's, not the job's — 404s carry it."""
+        resp = client.get("/splunk/services/search/jobs/zzz-none/search.log",
+                          headers=AUTH, params=JSON)
+        assert resp.status_code == 404
+        assert resp.headers["link"] == "<../zzz-none>; rel=info"
+
+    def test_one_level_deeper_climbs_twice(self, client: TestClient) -> None:
+        resp = client.get("/splunk/services/search/jobs/zzz-none/a/b",
+                          headers=AUTH, params=JSON)
+        assert resp.headers["link"] == "<../../zzz-none>; rel=info"
+
+    def test_what_is_not_a_job_carries_none(self, client: TestClient) -> None:
+        for path in ("/splunk/services/search/jobs",
+                     "/splunk/services/search/jobs/export",
+                     "/splunk/services/search/v2/jobs/export",
+                     "/splunk/services/search/typeahead",
+                     "/splunk/services/search/parser"):
+            resp = client.get(path, headers=AUTH, params=JSON)
+            assert "link" not in {k.lower() for k in resp.headers}, path
