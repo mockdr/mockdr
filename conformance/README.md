@@ -235,6 +235,18 @@ Rules that follow from it:
   reads as a mock defect and is not one.
 - Clean up after a sweep that creates: a HEC token, a saved search, an index.
 - Identity and authorisation endpoints are not probing surface at all.
+- **The seeded index is not seeded any more once the suite has run.** Two
+  dozen probes write to it — `_update`, `_update_by_query`,
+  `_delete_by_query`, a stale-`seq_no` write — so afterwards the real side
+  holds documents the seed never described. Comparing by hand against that
+  state and reading the difference as a defect is easy and wrong: it cost an
+  afternoon's conclusion here, which a clean index disproved in one request.
+  Make your own index for a hand comparison, or re-run the seeder first.
+
+  The suite's own comparison is unaffected: both targets run the same probes
+  in the same order and mutate alike. What it does mean is that one
+  *diverging* write shows up again in every probe after it, so findings are
+  read in file order and the first one is the one to fix.
 
 ## Findings, ranked
 

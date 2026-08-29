@@ -236,6 +236,9 @@ def find_rules(
         raise HTTPException(status_code=400, detail=build_kbn_error_response(
             400, str(exc),
         )) from exc
+    # After the schema, not before it: a `page` that is not a number is zod's
+    # complaint, and reading it as one here answered a 500 instead.
+    _refuse_past_the_result_window(int(float(page or 1)), int(float(per_page or 20)))
     return rule_queries.find_rules(
         page=int(float(page)),
         per_page=int(float(per_page)),
@@ -243,6 +246,38 @@ def find_rules(
         sort_order=sort_order or "asc",
         filter_str=filter,
     )
+
+
+#: What Kibana relays when the search behind this route asks for more than
+#: the index will page: the cluster's own failure, indented under a
+#: `Caused by:` and a `Root causes:` of Kibana's making. mockdr answered the
+#: page, so a client asking for more than the window got one here and a
+#: refusal in production.
+_RESULT_WINDOW = 10000
+_WINDOW_REASON = (
+    "Result window is too large, from + size must be less than or equal to: "
+    "[{limit}] but was [{asked}]. See the scroll api for a more efficient way "
+    "to request large data sets. This limit can be set by changing the "
+    "[index.max_result_window] index level setting."
+)
+
+
+def _refuse_past_the_result_window(page: int, per_page: int) -> None:
+    """Refuse a page past `index.max_result_window`, as 8.15 relays it.
+
+    Raises:
+        HTTPException: 400, carrying the cluster's failure as Kibana wraps it.
+    """
+    asked = max(page - 1, 0) * per_page + per_page
+    if asked <= _RESULT_WINDOW:
+        return
+    reason = _WINDOW_REASON.format(limit=_RESULT_WINDOW, asked=asked)
+    raise HTTPException(status_code=400, detail=build_security_solution_error(
+        400,
+        "all shards failed: search_phase_execution_exception\n"
+        f"\tCaused by:\n\t\tillegal_argument_exception: {reason}\n"
+        f"\tRoot causes:\n\t\tillegal_argument_exception: {reason}",
+    ))
 
 
 # ── Bulk Actions ─────────────────────────────────────────────────────────────

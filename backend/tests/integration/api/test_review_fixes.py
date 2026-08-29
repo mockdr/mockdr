@@ -1416,3 +1416,42 @@ class TestAMemberOfTheWrongType:
             "malformed sort format, within the sort array, an object, "
             "or an actual string are allowed"
         )
+
+    def test_a_page_past_the_result_window_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        """Kibana relays the cluster's own failure; mockdr answered the page,
+        so a client asking for more than the window got one here and a
+        refusal in production."""
+        resp = client.get(
+            "/kibana/api/detection_engine/rules/_find", headers=ES_AUTH,
+            params={"per_page": 10001},
+        )
+
+        assert resp.status_code == 400
+        message = resp.json()["message"]
+        assert message.startswith("all shards failed: search_phase_execution_exception")
+        assert "\n\tCaused by:\n\t\tillegal_argument_exception: " in message
+        assert "\n\tRoot causes:\n\t\tillegal_argument_exception: " in message
+        assert "but was [10001]" in message
+
+    def test_it_is_from_plus_size_not_size_alone(self, client: TestClient) -> None:
+        """The page number counts toward the window."""
+        assert client.get(
+            "/kibana/api/detection_engine/rules/_find", headers=ES_AUTH,
+            params={"page": 10, "per_page": 1000},
+        ).status_code == 200
+        assert client.get(
+            "/kibana/api/detection_engine/rules/_find", headers=ES_AUTH,
+            params={"page": 11, "per_page": 1000},
+        ).status_code == 400
+
+    def test_the_schema_still_speaks_first(self, client: TestClient) -> None:
+        """A page that is not a number is zod's complaint, not the window's."""
+        resp = client.get(
+            "/kibana/api/detection_engine/rules/_find", headers=ES_AUTH,
+            params={"page": "abc", "per_page": 10001},
+        )
+
+        assert resp.status_code == 400
+        assert "page: Expected number" in str(resp.json()["message"])

@@ -110,6 +110,16 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**A page past the result window came back as a page.**
+`GET /api/detection_engine/rules/_find` with a `per_page` above
+`index.max_result_window` — or a `page` far enough into it, since the limit
+is `from + size` and not `size` alone — is refused by 8.15 with the
+cluster's own failure relayed, indented under a `Caused by:` and a `Root
+causes:` of Kibana's making. mockdr answered the page, so a client asking
+for more than the window got one here and a refusal in production. The
+schema still speaks first: a `page` that is not a number is zod's
+complaint, and reading it as one before the schema ran answered a 500.
+
 **A member of the wrong type read as something it is not.**
 The third neighbour of the empty-member question. A `query` of `[]` was read
 as "match everything" and answered the whole index; a `sort` of a number was
