@@ -1,7 +1,7 @@
 """Sentinel Threat Intelligence router."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import threat_intel as ti_cmds
@@ -40,53 +40,73 @@ def list_indicators(
     )
 
 
-# ── Bulk operations (must be before {name} route) ────────────────────────
+# ── Tagging one indicator ────────────────────────────────────────────────
+#
+# `ThreatIntelligenceIndicator_AppendTags` and `_ReplaceTags` act on the
+# indicator named in the *path*, and take `{"threatIntelligenceTags": [...]}`.
+# mockdr had invented a bulk pair on the collection — a path the vendor does
+# not have, reading `indicatorNames` and `tags`, which no client generated
+# from the ARM spec would ever send.  The two also differ in what they answer,
+# which is not a thing anyone would guess: append gives 200 and no body,
+# replace gives the indicator back (2024-03-01 SecurityInsights swagger,
+# `ThreatIntelligence.json`).
 
 
-@router.post(_WS + "/threatIntelligence/main/indicators/appendTags")
+async def _tags_from(request: Request) -> list[str]:
+    """The tag list, in the member the vendor's schema names."""
+    body = await request.json()
+    if not isinstance(body, dict):
+        # A JSON null or array reached `.get` on the wrong type and 500ed.
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
+        )
+    tags = body.get("threatIntelligenceTags") or []
+    return [str(tag) for tag in tags] if isinstance(tags, list) else []
+
+
+@router.post(
+    _WS + "/threatIntelligence/main/indicators/{name}/appendTags",
+    status_code=200,
+)
 async def append_tags(
     subscription_id: str,
     resource_group: str,
     workspace: str,
+    name: str,
     request: Request,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
-    """Append tags to indicators."""
-    body = await request.json()
-    if not isinstance(body, dict):
-        # A JSON null or array reached `.get` on the wrong type and 500ed.
-        raise HTTPException(
-            status_code=400,
-            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
-        )
-    indicator_names = body.get("indicatorNames", [])
-    tags = body.get("tags", [])
-    count = ti_cmds.append_tags(indicator_names, tags)
-    return {"updated": count}
+) -> Response:
+    """Append tags to one indicator, and answer with nothing."""
+    tags = await _tags_from(request)
+    if ti_queries.get_indicator(name) is None:
+        raise HTTPException(status_code=404, detail=build_vendor_error(
+            "sentinel", 404, f"Threat intelligence indicator {name} was not found",
+        ))
+    ti_cmds.append_tags([name], tags)
+    return Response(status_code=200)
 
 
-@router.post(_WS + "/threatIntelligence/main/indicators/replaceTags")
+@router.post(_WS + "/threatIntelligence/main/indicators/{name}/replaceTags")
 async def replace_tags(
     subscription_id: str,
     resource_group: str,
     workspace: str,
+    name: str,
     request: Request,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
-    """Replace tags on indicators."""
-    body = await request.json()
-    if not isinstance(body, dict):
-        # A JSON null or array reached `.get` on the wrong type and 500ed.
-        raise HTTPException(
-            status_code=400,
-            detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
-        )
-    indicator_names = body.get("indicatorNames", [])
-    tags = body.get("tags", [])
-    count = ti_cmds.replace_tags(indicator_names, tags)
-    return {"updated": count}
+    """Replace one indicator's tags, and answer with the indicator."""
+    tags = await _tags_from(request)
+    if ti_queries.get_indicator(name) is None:
+        raise HTTPException(status_code=404, detail=build_vendor_error(
+            "sentinel", 404, f"Threat intelligence indicator {name} was not found",
+        ))
+    ti_cmds.replace_tags([name], tags)
+    indicator = ti_queries.get_indicator(name)
+    return indicator if indicator is not None else {}
 
 
 # ── Single indicator CRUD ────────────────────────────────────────────────
@@ -215,7 +235,10 @@ async def query_indicators(
     )
 
 
-@router.post(_WS + "/threatIntelligence/main/metrics")
+# `ThreatIntelligenceIndicatorMetrics_List` is a GET: it lists what the
+# workspace holds and takes no body.  mockdr served it on POST alone, so a
+# client generated from the ARM spec reached it not at all.
+@router.get(_WS + "/threatIntelligence/main/metrics")
 def get_metrics(
     subscription_id: str,
     resource_group: str,

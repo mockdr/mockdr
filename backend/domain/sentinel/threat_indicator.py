@@ -29,6 +29,11 @@ class SentinelThreatIndicator:
     threat_types: list[str] = field(default_factory=list)
     kill_chain_phases: list[dict] = field(default_factory=list)
     labels: list[str] = field(default_factory=list)
+    #: Sentinel's own tagging, which the swagger declares beside `labels` and
+    #: which `_AppendTags` and `_ReplaceTags` are named after and act on.  The
+    #: two commands used to write into `labels`, so a client that tagged an
+    #: indicator and read `threatIntelligenceTags` back saw nothing happen.
+    threat_intelligence_tags: list[str] = field(default_factory=list)
     external_references: list[dict] = field(default_factory=list)
 
     # ── Timestamps ────────────────────────────────────────────────────────────

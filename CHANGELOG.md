@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Sentinel's tag operations acted on a path and a field the vendor does not have.**
+`ThreatIntelligenceIndicator_AppendTags` and `_ReplaceTags` name one
+indicator in the path and take `{"threatIntelligenceTags": [...]}`. mockdr
+had invented a bulk pair on the collection — `/indicators/appendTags`,
+reading `indicatorNames` and `tags` — which no client generated from the
+2024-03-01 SecurityInsights swagger would ever call. The two also differ in
+what they answer, which is not something anyone would guess: append gives
+200 and no body, replace gives the indicator back. And both wrote into
+`labels`, the STIX field the swagger declares *beside*
+`threatIntelligenceTags`, so a client that tagged an indicator and read the
+tags back saw nothing happen. `ThreatIntelligenceIndicatorMetrics_List` is a
+`GET`, where mockdr served it on `POST` alone.
+
+Found by finishing the path-and-verb sweep against every vendor spec the
+repository holds — Graph, CrowdStrike, Sentinel and MDE. The three Sentinel
+paths still unmatched are the two Entra token endpoints and the Log
+Analytics query API, which are other services. Measured but not closed:
+mockdr emits 15 of the 28 properties the swagger declares on an indicator,
+and invents none of them; nothing watches Sentinel's fields against that
+spec, because `field_drift` is the SentinelOne comparator.
+
 **Four Kibana routes that answered before the query schema had spoken.**
 The schema check runs before the handler, so an unknown query member is a
 400 naming it — whatever else the request is wrong about.

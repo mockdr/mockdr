@@ -21,6 +21,7 @@ def _indicator_to_arm(ind: SentinelThreatIndicator) -> dict:
         "threatTypes": ind.threat_types,
         "killChainPhases": ind.kill_chain_phases,
         "labels": ind.labels,
+        "threatIntelligenceTags": ind.threat_intelligence_tags,
         "externalReferences": ind.external_references,
         "validFrom": ind.valid_from,
         "validUntil": ind.valid_until,

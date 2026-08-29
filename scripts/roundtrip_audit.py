@@ -550,9 +550,17 @@ def sentinel_indicators(check):
                  find(check.request("POST", f"{ARM}/threatIntelligence/main/queryIndicators",
                                     params=API, json={"pageSize": 500}), "value"),
                  "name", name)
-    check.request("POST", f"{ARM}/threatIntelligence/main/indicators/appendTags",
+    # `_AppendTags` names one indicator in the path and answers with nothing;
+    # the tag has to be read back from the indicator itself, which is what
+    # makes this a round trip rather than a call.
+    check.request("POST",
+                  f"{ARM}/threatIntelligence/main/indicators/{name}/appendTags",
                   params=API, json={"threatIntelligenceTags": ["zzz-audit-tag"]},
-                  expect=(200, 204, 400, 404))
+                  expect=(200, 204))
+    check.carries("GET /indicators/{name} after appendTags",
+                  find(check.get(f"{ARM}/threatIntelligence/main/indicators/{name}",
+                                 params=API), "properties"),
+                  "threatIntelligenceTags", ["zzz-audit-tag"])
     check.request("DELETE", f"{ARM}/threatIntelligence/main/indicators/{name}",
                   params=API, expect=(200, 204))
     check.get(f"{ARM}/threatIntelligence/main/indicators/{name}", params=API, expect=(404,))

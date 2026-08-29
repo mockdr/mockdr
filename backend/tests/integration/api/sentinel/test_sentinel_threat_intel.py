@@ -58,28 +58,77 @@ class TestThreatIndicators:
         assert "value" in resp.json()
 
     def test_get_metrics(self, client: TestClient) -> None:
-        resp = client.post(
+        """`ThreatIntelligenceIndicatorMetrics_List` is a GET, per the swagger."""
+        resp = client.get(
             f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/metrics",
             headers=_auth(client),
         )
         assert resp.status_code == 200
         assert "properties" in resp.json()
 
-    def test_append_tags(self, client: TestClient) -> None:
-        headers = _auth(client)
-        # Get an indicator name
-        list_resp = client.get(
+    def _an_indicator(self, client: TestClient, headers: dict) -> str:
+        listed = client.get(
             f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/indicators",
             headers=headers,
         )
-        name = list_resp.json()["value"][0]["name"]
+        return str(listed.json()["value"][0]["name"])
+
+    def test_append_tags_acts_on_the_indicator_in_the_path(
+        self, client: TestClient,
+    ) -> None:
+        """`_AppendTags` names one indicator and answers with nothing.
+
+        mockdr had invented a bulk pair on the collection, reading
+        `indicatorNames` and `tags` — a path the vendor does not have and a
+        body no client generated from the swagger would send.
+        """
+        headers = _auth(client)
+        name = self._an_indicator(client, headers)
 
         resp = client.post(
-            f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/indicators/appendTags",
-            json={"indicatorNames": [name], "tags": ["test-tag"]},
+            f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/indicators/"
+            f"{name}/appendTags",
+            json={"threatIntelligenceTags": ["test-tag"]},
             headers=headers,
         )
         assert resp.status_code == 200
+        assert resp.content == b"", "append answers 200 with no body"
+
+        after = client.get(
+            f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/indicators/{name}",
+            headers=headers,
+        ).json()
+        assert "test-tag" in after["properties"]["threatIntelligenceTags"]
+
+    def test_replace_tags_answers_with_the_indicator(
+        self, client: TestClient,
+    ) -> None:
+        """The asymmetry is the vendor's: append returns nothing, replace
+        returns `ThreatIntelligenceInformation`."""
+        headers = _auth(client)
+        name = self._an_indicator(client, headers)
+
+        resp = client.post(
+            f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/indicators/"
+            f"{name}/replaceTags",
+            json={"threatIntelligenceTags": ["only-this"]},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["name"] == name
+        assert body["properties"]["threatIntelligenceTags"] == ["only-this"]
+
+    def test_tagging_an_indicator_that_is_not_there_is_404(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/indicators/"
+            f"zzz-no-such/appendTags",
+            json={"threatIntelligenceTags": ["t"]},
+            headers=_auth(client),
+        )
+        assert resp.status_code == 404
 
     def test_delete_indicator(self, client: TestClient) -> None:
         headers = _auth(client)

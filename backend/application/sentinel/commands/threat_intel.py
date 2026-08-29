@@ -72,8 +72,8 @@ def append_tags(indicator_ids: list[str], tags: list[str]) -> int:
         ind = sentinel_threat_indicator_repo.get(name)
         if ind:
             for tag in tags:
-                if tag not in ind.labels:
-                    ind.labels.append(tag)
+                if tag not in ind.threat_intelligence_tags:
+                    ind.threat_intelligence_tags.append(tag)
             sentinel_threat_indicator_repo.save(ind)
             count += 1
     return count
@@ -85,7 +85,7 @@ def replace_tags(indicator_ids: list[str], tags: list[str]) -> int:
     for name in indicator_ids:
         ind = sentinel_threat_indicator_repo.get(name)
         if ind:
-            ind.labels = list(tags)
+            ind.threat_intelligence_tags = list(tags)
             sentinel_threat_indicator_repo.save(ind)
             count += 1
     return count
