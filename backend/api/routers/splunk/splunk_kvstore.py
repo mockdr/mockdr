@@ -22,6 +22,7 @@ from application.splunk.commands.kvstore import (
 )
 from application.splunk.queries.kvstore import (
     collection_exists,
+    get_collection_config,
     get_record,
     get_records,
     list_collections,
@@ -86,6 +87,24 @@ def list_kv_collections(
     """List KV Store collections, under the one context that may."""
     _require_nobody(owner, current_user)
     return list_collections(app)
+
+
+@router.get("/servicesNS/{owner}/{app}/storage/collections/config/{name}")
+def get_kv_collection(
+    owner: str,
+    app: str,
+    name: str,
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """One KV Store collection's configuration, which nothing here served."""
+    _require_nobody(owner, current_user)
+    found = get_collection_config(name, app)
+    if found is None:
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
+        ]})
+    return found
 
 
 @router.post("/servicesNS/{owner}/{app}/storage/collections/config")

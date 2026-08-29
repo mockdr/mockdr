@@ -22,6 +22,35 @@ _KV_ACL = {
 }
 
 
+def get_collection_config(name: str, app: str | None = "search") -> dict | None:
+    """One collection's configuration, addressed by name.
+
+    splunkd serves the entry under its own path as well as in the listing,
+    and mockdr had only the listing — so a client reading back the
+    collection it had just created met the catch-all's 400 about a missing
+    target name, where splunkd answers the entry or a 404 naming it.
+    """
+    listing = list_collections(app)
+    entries = [e for e in listing.get("entry", []) if e.get("name") == name]
+    if not entries:
+        return None
+    # A single read names what the collection accepts; the listing does not.
+    # The wildcards are the two families a schema is written in — measured on
+    # 10.4.2, and the first `fields` block here with a non-empty one.
+    entry = {**entries[0], "fields": {
+        "required": [],
+        "optional": [
+            "enforceTypes", "profilingEnabled", "profilingThresholdMs",
+            "replicate", "replication_dump_maximum_file_size",
+            "replication_dump_strategy",
+        ],
+        "wildcard": ["accelerated_fields\\..*", "field\\..*"],
+    }}
+    return {**listing, "entry": [entry], "paging": {
+        **(listing.get("paging") or {}), "total": 1,
+    }}
+
+
 def list_collections(app: str | None = "search") -> dict:
     """Return the KV Store collections in Splunk envelope format.
 

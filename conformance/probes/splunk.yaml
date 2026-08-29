@@ -3555,3 +3555,15 @@ probes:
       - $.entry
       - $.paging.total
       - $.origin
+
+  - id: splunk-kv-collection-that-is-not-there
+    endpoint: management
+    why: >
+      splunkd serves a collection's configuration under its own path as well
+      as in the listing; mockdr had only the listing, so reading back a
+      collection met the catch-all's complaint about a missing target name.
+    request:
+      method: GET
+      path: /servicesNS/nobody/search/storage/collections/config/no-such-collection
+      query: {output_mode: json}
+      auth: basic

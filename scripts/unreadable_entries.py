@@ -75,12 +75,17 @@ def main(collections: list[str]) -> int:
     return 1 if unreadable else 0
 
 
+#: The KV Store's configuration is served only under `nobody`, so the bare
+#: path is a refusal rather than a listing — asking there skipped the one
+#: collection this audit exists to check.
+_KVSTORE = "servicesNS/nobody/search/storage/collections/config"
+
 #: The Splunk collections this repo serves as a listing.
 COLLECTIONS = [
     "authorization/roles", "authorization/capabilities", "authentication/users",
     "apps/local", "data/indexes", "saved/searches", "saved/eventtypes",
     "data/inputs/monitor", "data/props/extractions", "data/lookup-table-files",
-    "data/transforms/lookups", "storage/collections/config", "admin/macros",
+    "data/transforms/lookups", "admin/macros",
     "messages", "search/jobs", "server/settings",
 ]
 

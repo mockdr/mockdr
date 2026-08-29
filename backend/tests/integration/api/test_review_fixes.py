@@ -1455,3 +1455,54 @@ class TestAMemberOfTheWrongType:
 
         assert resp.status_code == 400
         assert "page: Expected number" in str(resp.json()["message"])
+
+
+class TestOneKvCollectionByName:
+    """splunkd serves a collection's configuration under its own path."""
+
+    BASE = "/splunk/servicesNS/nobody/search/storage/collections/config"
+
+    def test_the_collection_can_be_read_back(self, client: TestClient) -> None:
+        """mockdr had only the listing, so reading one back met the
+        catch-all's complaint about a missing target name."""
+        listed = client.get(
+            self.BASE, headers=SPLUNK_AUTH, params={"output_mode": "json"},
+        ).json()["entry"]
+        name = listed[0]["name"]
+
+        one = client.get(
+            f"{self.BASE}/{name}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+
+        assert one.status_code == 200
+        assert [e["name"] for e in one.json()["entry"]] == [name]
+        assert one.json()["paging"]["total"] == 1
+
+    def test_a_single_read_names_what_the_collection_accepts(
+        self, client: TestClient,
+    ) -> None:
+        """And the listing does not — with the first non-empty `wildcard`
+        block in this mock, for the two families a schema is written in."""
+        listed = client.get(
+            self.BASE, headers=SPLUNK_AUTH, params={"output_mode": "json"},
+        ).json()["entry"][0]
+        one = client.get(
+            f"{self.BASE}/{listed['name']}", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        ).json()["entry"][0]
+
+        assert "fields" not in listed
+        assert one["fields"]["wildcard"] == ["accelerated_fields\\..*", "field\\..*"]
+        assert "enforceTypes" in one["fields"]["optional"]
+
+    def test_a_name_nothing_defines_is_a_refusal(self, client: TestClient) -> None:
+        resp = client.get(
+            f"{self.BASE}/no-such-collection", headers=SPLUNK_AUTH,
+            params={"output_mode": "json"},
+        )
+
+        assert resp.status_code == 404
+        assert resp.json()["messages"][0]["text"] == (
+            "Could not find object id=no-such-collection"
+        )

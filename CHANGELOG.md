@@ -110,6 +110,14 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**One KV Store collection, read back by name.**
+splunkd serves a collection's configuration under its own path as well as in
+the listing, and mockdr had only the listing — so a client reading back the
+collection it had just created met the catch-all's complaint about a missing
+target name. The single read carries the `fields` block naming what the
+collection accepts, with the first non-empty `wildcard` in this mock: the two
+families a schema is written in.
+
 **A page past the result window came back as a page.**
 `GET /api/detection_engine/rules/_find` with a `per_page` above
 `index.max_result_window` — or a `page` far enough into it, since the limit
