@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A query member given twice is refused for a scalar and taken for an array.**
+`perPage=1&perPage=3` on the Cases API is a 400; `status=open&status=closed`
+beside it is a 200, because that member is declared as an array. mockdr took
+the last value and answered 200 for both, so a client whose URL builder
+appended a filter twice read a page from the mock and got a 400 from the
+product. Every query member mockdr declares was asked of 8.15 once and
+twice — 29 of 56 refuse — and the wording is the route's own validator's, in
+three dialects and two types: config-schema's `expected value of type
+[number] but got [Array]`, io-ts's `Invalid value "["1","2"]" supplied to
+"page"` (with the `[request query]: ` prefix on the exception-list API and
+without it on Cases), and zod's `Expected number, received nan`. Which
+members are scalars cannot be read off mockdr's own signatures — they are
+all `str` there on purpose, so that FastAPI's 422 never pre-empts Kibana's
+wording — so the table is the measurement. All 56 compared afterwards,
+wording included, none differing.
+
+Elasticsearch was asked the same question and takes the last value:
+`size=1&size=2` returns two hits, `size=2&size=1` one. mockdr already did
+the same.
+
 **`hostile_probe` never sent a hostile credential header, and a 500 walked through.**
 Everything it does authenticates *correctly* first and then sends hostile
 bodies and queries, so the one header every client must get right was the

@@ -351,6 +351,7 @@ from utils.es_response import (
     build_kbn_error_response,
 )
 from utils.kibana_content_type import refuse_unreadable_content_type
+from utils.kibana_repeated_query import refuse_repeated_query_members
 from utils.logging import setup_logging
 from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
@@ -1124,7 +1125,10 @@ for _es_module in [
     # the route is known, and before the body is read.
     app.include_router(
         _es_module.router, prefix=KBN_PREFIX,
-        dependencies=[Depends(refuse_unreadable_content_type)],
+        dependencies=[
+            Depends(refuse_unreadable_content_type),
+            Depends(refuse_repeated_query_members),
+        ],
     )
 
 # ── Cortex XDR mock endpoints (mounted at /xdr/public_api/v1) ────────────────

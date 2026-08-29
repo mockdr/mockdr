@@ -227,3 +227,49 @@ class TestAContentTypeHapiCannotParse:
         resp = client.get("/kibana/api/cases/_find",
                           headers={**ES_AUTH, "Content-Type": "foo/bar"})
         assert resp.status_code == 200
+
+
+class TestAQueryMemberGivenTwice:
+    """A repeat is refused for a scalar member and accepted for an array one.
+
+    Measured on 8.15, every query member mockdr declares asked once and
+    twice: 29 of 56 refuse.  `status=open&status=closed` on the Cases API is
+    a 200 — the member is an array — while `perPage=1&perPage=3` beside it
+    is a 400.  mockdr took the last value and answered 200 for both, so a
+    client whose URL builder appended a filter twice read a page from the
+    mock and a 400 from the product.
+
+    Which members are scalars cannot be read off mockdr's own signatures:
+    they are all `str` there on purpose, so FastAPI's 422 never pre-empts
+    Kibana's wording.  The table is the measurement.
+    """
+
+    def test_each_dialect_words_it_its_own_way(self, client: TestClient) -> None:
+        expected = {
+            ("/kibana/api/cases/_find", "perPage"):
+                'Invalid value "["1","2"]" supplied to "perPage"',
+            ("/kibana/api/alerting/rules/_find", "page"):
+                "[request query.page]: expected value of type [number] but got [Array]",
+            ("/kibana/api/detection_engine/rules/_find", "per_page"):
+                "[request query]: per_page: Expected number, received nan",
+            ("/kibana/api/exception_lists/_find", "page"):
+                '[request query]: Invalid value "["1","2"]" supplied to "page"',
+            ("/kibana/api/endpoint/policy_response", "agentId"):
+                "[request query.agentId]: expected value of type [string] but got [Array]",
+        }
+        for (path, member), message in expected.items():
+            resp = client.get(path, headers=ES_AUTH,
+                              params=[(member, "1"), (member, "2")])
+            assert resp.status_code == 400, (path, member)
+            assert resp.json()["message"] == message, (path, member)
+
+    def test_an_array_member_takes_a_repeat(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/cases/_find", headers=ES_AUTH,
+                          params=[("status", "open"), ("status", "closed")])
+        assert resp.status_code == 200
+
+    def test_one_value_is_never_refused(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/cases/_find", headers=ES_AUTH,
+                          params={"perPage": "3"})
+        assert resp.status_code == 200
+        assert resp.json()["per_page"] == 3
