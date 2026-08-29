@@ -1506,3 +1506,107 @@ class TestOneKvCollectionByName:
         assert resp.json()["messages"][0]["text"] == (
             "Could not find object id=no-such-collection"
         )
+
+
+class TestThreeRoutesThatAnsweredAnotherDialect:
+    """A Kibana client parses zod's wording, not pydantic's."""
+
+    def test_bulk_create_names_what_it_got(self, client: TestClient) -> None:
+        """It let FastAPI answer `Input should be a valid list`."""
+        for body, named in (({}, "object"), ("a rule", "string"), (1, "number")):
+            resp = client.post(
+                "/kibana/api/detection_engine/rules/_bulk_create",
+                headers=ES_AUTH, json=body,
+            )
+            assert resp.status_code == 400
+            assert resp.json()["message"] == (
+                f"[request body]: Expected array, received {named}"
+            )
+
+    def test_a_preview_lists_five_and_counts_the_rest(
+        self, client: TestClient,
+    ) -> None:
+        """mockdr asked for a `name` alone, in another family's wording."""
+        message = client.post(
+            "/kibana/api/detection_engine/rules/preview", headers=ES_AUTH, json={},
+        ).json()["message"]
+
+        assert message.startswith(
+            "[request body]: name: Required, description: Required, "
+            "risk_score: Required, severity: Required, type: Invalid discriminator"
+        )
+        assert message.endswith(", and 2 more")
+
+    def test_a_preview_needs_to_know_how_far_back_to_run(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            "/kibana/api/detection_engine/rules/preview", headers=ES_AUTH,
+            json={"name": "n", "description": "d", "risk_score": 1,
+                  "severity": "low", "type": "query", "query": "*"},
+        )
+
+        assert resp.json()["message"] == (
+            "[request body]: invocationCount: Required, timeframeEnd: Required"
+        )
+
+    def test_a_preview_of_an_array_fails_every_arm(self, client: TestClient) -> None:
+        assert client.post(
+            "/kibana/api/detection_engine/rules/preview", headers=ES_AUTH, json=[],
+        ).json()["message"] == (
+            "[request body]: Expected object, received array, "
+            "Expected object, received array, Expected object, received array"
+        )
+
+    @pytest.mark.parametrize(("body", "message"), [
+        ({}, "[request body]: assignees: Required, ids: Required"),
+        ({"assignees": {}},
+         "[request body]: assignees.add: Required, assignees.remove: Required, "
+         "ids: Required"),
+        ({"ids": ["a"]}, "[request body]: assignees: Required"),
+    ])
+    def test_assignees_names_each_member(
+        self, client: TestClient, body: dict, message: str,
+    ) -> None:
+        """It answered one hand-written `ids is required` for all of them."""
+        resp = client.post(
+            "/kibana/api/detection_engine/signals/assignees", headers=ES_AUTH,
+            json=body,
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["message"] == message
+
+    def test_an_assignee_is_a_string_on_the_wire(self, client: TestClient) -> None:
+        """mockdr read them as the `{"uid": …}` objects it stores, so an
+        assignment written the way 8.15 takes it raised out of the handler."""
+        alert = client.post(
+            "/kibana/api/detection_engine/signals/search", headers=ES_AUTH,
+            json={"query": {"match_all": {}}, "size": 1},
+        ).json()["hits"]["hits"][0]["_id"]
+
+        refused = client.post(
+            "/kibana/api/detection_engine/signals/assignees", headers=ES_AUTH,
+            json={"ids": [alert], "assignees": {"add": [{"uid": "x"}], "remove": []}},
+        )
+
+        assert refused.status_code == 400
+        assert refused.json()["message"] == (
+            "[request body]: assignees.add.0: Expected string, received object"
+        )
+
+    def test_the_members_are_add_and_remove(self, client: TestClient) -> None:
+        """mockdr read `assignees_to_add`, so an assignment written the way
+        8.15 takes it was read as none at all and answered success."""
+        alert = client.post(
+            "/kibana/api/detection_engine/signals/search", headers=ES_AUTH,
+            json={"query": {"match_all": {}}, "size": 1},
+        ).json()["hits"]["hits"][0]["_id"]
+
+        resp = client.post(
+            "/kibana/api/detection_engine/signals/assignees", headers=ES_AUTH,
+            json={"ids": [alert], "assignees": {"add": ["analyst"], "remove": []}},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["updated"] == 1

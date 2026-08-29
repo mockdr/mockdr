@@ -4939,3 +4939,112 @@ probes:
       path: /api/detection_engine/rules/_find
       query: {page: "11", per_page: "1000"}
       auth: basic
+
+  # ── Three routes that answered a dialect no client parses (2.3.1) ─────
+
+  - id: kbn-bulk-create-with-an-object
+    endpoint: kibana
+    why: >
+      mockdr let FastAPI answer pydantic's `Input should be a valid list`,
+      which is not a line any Kibana client reads.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/_bulk_create
+      json: {}
+      auth: basic
+
+  - id: kbn-bulk-create-with-a-string
+    endpoint: kibana
+    why: zod names what it got.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/_bulk_create
+      content: '"a rule"'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: kbn-preview-with-nothing
+    endpoint: kibana
+    why: >
+      Five failures shown and the rest counted, as the bulk-action route
+      does. mockdr asked for a `name` alone, in another family's wording.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/preview
+      json: {}
+      auth: basic
+
+  - id: kbn-preview-with-an-array
+    endpoint: kibana
+    why: Three arms of the union, each saying the same thing about it.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/preview
+      json: []
+      auth: basic
+
+  - id: kbn-preview-without-its-window
+    endpoint: kibana
+    why: A preview needs to know how far back to run.
+    request:
+      method: POST
+      path: /api/detection_engine/rules/preview
+      json:
+        name: probe
+        description: probe
+        risk_score: 1
+        severity: low
+        type: query
+        query: "*"
+      auth: basic
+
+  - id: kbn-assignees-with-nothing
+    endpoint: kibana
+    why: >
+      The block first, its two members inside it, then the ids. mockdr
+      answered one hand-written `ids is required` for every one of them.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/assignees
+      json: {}
+      auth: basic
+
+  - id: kbn-assignees-with-an-empty-block
+    endpoint: kibana
+    why: >
+      And the members are `add` and `remove` — mockdr read
+      `assignees_to_add`, so an assignment written the way 8.15 takes it was
+      read as none at all.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/assignees
+      json: {assignees: {}}
+      auth: basic
+
+  - id: kbn-assignees-without-a-block
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/detection_engine/signals/assignees
+      json: {ids: ["probe-alert"]}
+      auth: basic
+
+  - id: kbn-assignees-of-the-wrong-shape
+    endpoint: kibana
+    why: >
+      An assignee is a user id as a plain string. mockdr read them as the
+      `{"uid": …}` objects it stores, so an assignment written the way 8.15
+      takes it raised out of the handler.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/assignees
+      json: {ids: ["probe-alert"], assignees: {add: [{uid: analyst}], remove: []}}
+      auth: basic
+
+  - id: kbn-assignees-that-are-not-a-list
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/detection_engine/signals/assignees
+      json: {ids: ["probe-alert"], assignees: {add: "analyst", remove: []}}
+      auth: basic

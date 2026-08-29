@@ -222,10 +222,9 @@ class TestUpdateSignalAssignees:
             headers=KBN_WRITE_HEADERS,
             json={
                 "ids": alert_ids,
-                "assignees": {
-                    "assignees_to_add": [{"uid": "analyst-001"}],
-                    "assignees_to_remove": [],
-                },
+                # `add`/`remove`, and a user id as a plain string: what 8.15
+                # takes, where this used to send the shape mockdr stores.
+                "assignees": {"add": ["analyst-001"], "remove": []},
             },
         )
         assert resp.status_code == 200
@@ -240,10 +239,7 @@ class TestUpdateSignalAssignees:
             headers=KBN_WRITE_HEADERS,
             json={
                 "ids": alert_ids,
-                "assignees": {
-                    "assignees_to_add": [{"uid": "to-remove"}],
-                    "assignees_to_remove": [],
-                },
+                "assignees": {"add": ["to-remove"], "remove": []},
             },
         )
         resp = client.post(
@@ -251,10 +247,7 @@ class TestUpdateSignalAssignees:
             headers=KBN_WRITE_HEADERS,
             json={
                 "ids": alert_ids,
-                "assignees": {
-                    "assignees_to_add": [],
-                    "assignees_to_remove": [{"uid": "to-remove"}],
-                },
+                "assignees": {"add": [], "remove": ["to-remove"]},
             },
         )
         assert resp.status_code == 200

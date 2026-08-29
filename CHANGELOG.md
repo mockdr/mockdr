@@ -110,6 +110,22 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**Three routes answered a dialect no Kibana client parses.**
+`rules/_bulk_create` let FastAPI answer pydantic's `Input should be a valid
+list`; `rules/preview` asked for a `name` alone in the io-ts wording a
+different family of routes uses; `signals/assignees` answered one
+hand-written `ids is required` for every malformed body. 8.15 words all
+three with zod: it names what it got, lists five failures and counts the
+rest, and names each member of each block in declaration order — the
+assignment's `add` and `remove` inside `assignees`, then `ids`.
+
+Two more findings came out of the last of them. The members are `add` and
+`remove`, where mockdr read `assignees_to_add` and `assignees_to_remove` —
+so an assignment written the way the product takes it was read as no
+assignment at all and answered success. And an assignee is a user id as a
+plain *string*, where mockdr read the `{"uid": …}` object it stores
+internally, so the same request raised out of the handler.
+
 **One KV Store collection, read back by name.**
 splunkd serves a collection's configuration under its own path as well as in
 the listing, and mockdr had only the listing — so a client reading back the

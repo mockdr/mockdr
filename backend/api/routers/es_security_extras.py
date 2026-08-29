@@ -107,13 +107,75 @@ def detection_index(
     """Report the signals index, which clients check before creating rules."""
     return {"name": ".alerts-security.alerts-default", "index_mapping_outdated": False}
 
+#: What zod calls each JSON type in `Expected x, received y`.
+_ZOD_TYPES = {
+    dict: "object", list: "array", str: "string", bool: "boolean",
+    int: "number", float: "number", type(None): "null",
+}
+
+
+def _zod_type(value: object) -> str:
+    """The name zod gives what it was handed."""
+    return _ZOD_TYPES.get(type(value), "string")
+
+
+#: What a preview declares before it will run: the rule's own members, then
+#: the two that say how far back to run it. mockdr asked for a `name` alone,
+#: in the io-ts wording a different family of routes uses.
+_PREVIEW_REQUIRED = ("name", "description", "risk_score", "severity")
+_PREVIEW_WINDOW = ("invocationCount", "timeframeEnd")
+
+#: The rule types the discriminator takes, shared with the create route.
+_RULE_TYPES = frozenset({
+    "eql", "query", "saved_query", "threshold", "threat_match",
+    "machine_learning", "new_terms", "esql",
+})
+_RULE_TYPES_LISTED = (
+    "'eql' | 'query' | 'saved_query' | 'threshold' | 'threat_match' | "
+    "'machine_learning' | 'new_terms' | 'esql'"
+)
+
+
+def _refuse_bad_preview(body: object) -> None:
+    """Refuse a preview body the way 8.15's schema refuses it.
+
+    Raises:
+        HTTPException: 400, in Kibana's own wording.
+    """
+    if not isinstance(body, dict):
+        # Three arms of the union, each saying the same thing about it.
+        one = f"Expected object, received {_zod_type(body)}"
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: " + ", ".join([one] * 3)))
+    issues = [f"{name}: Required" for name in _PREVIEW_REQUIRED if name not in body]
+    if body.get("type") not in _RULE_TYPES:
+        issues.append(
+            "type: Invalid discriminator value. Expected " + _RULE_TYPES_LISTED)
+    issues += [f"{name}: Required" for name in _PREVIEW_WINDOW if name not in body]
+    if issues:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: " + _five_and_the_rest(issues)))
+
+
+#: How many failures zod prints before it starts counting. The same rule the
+#: bulk-action route answers with, measured again here.
+_SHOWN = 5
+
+
+def _five_and_the_rest(issues: list[str]) -> str:
+    """The first five failures, and a count of what is left."""
+    shown = issues[:_SHOWN]
+    rest = len(issues) - len(shown)
+    return ", ".join(shown) + (f", and {rest} more" if rest > 0 else "")
+
+
 
 @router.post(
     "/api/detection_engine/rules/_bulk_create",
     dependencies=[Depends(require_kbn_xsrf)],
 )
 def bulk_create_rules(
-    body: list = Body(...),
+    body: object = Body(default=None),
     _: dict = Depends(require_es_write),
 ) -> list[dict]:
     """Create several rules in one request.
@@ -125,9 +187,13 @@ def bulk_create_rules(
     from application.es_rules import queries as rule_queries
 
     if not isinstance(body, list):
+        # zod names what it got, and mockdr let FastAPI answer pydantic's
+        # `Input should be a valid list` — which is not a line any Kibana
+        # client parses.
         raise HTTPException(
             status_code=400,
-            detail=build_security_solution_error(400, "expected an array of rules"),
+            detail=build_kbn_error_response(
+                400, f"[request body]: Expected array, received {_zod_type(body)}"),
         )
 
     required = ("name", "description", "type", "severity", "risk_score")
@@ -167,7 +233,7 @@ def bulk_create_rules(
 
 @router.post("/api/detection_engine/rules/preview", dependencies=[Depends(require_kbn_xsrf)])
 def preview_rule(
-    body: dict = Body(...),
+    body: object = Body(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Preview a rule without creating it.
@@ -176,13 +242,7 @@ def preview_rule(
     produced. This reports a clean preview with no logged errors or warnings,
     which is the shape a client branches on.
     """
-    if not body.get("name"):
-        raise HTTPException(
-            status_code=400,
-            detail=build_security_solution_error(
-                400, 'Invalid value "undefined" supplied to "name"',
-            ),
-        )
+    _refuse_bad_preview(body)
     return {
         "logs": [{"errors": [], "warnings": [], "duration": 12, "startedAt": None}],
         "previewId": "preview-0000-0000-0000-000000000001",

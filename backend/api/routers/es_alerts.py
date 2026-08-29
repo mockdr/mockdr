@@ -158,21 +158,69 @@ def update_alert_assignees(
 
         {
             "ids": ["id1", "id2"],
-            "assignees": {
-                "assignees_to_add": [{"uid": "user1"}],
-                "assignees_to_remove": [{"uid": "user2"}]
-            }
+            "assignees": {"add": ["user1"], "remove": ["user2"]}
         }
+
+    Both member names are the product's: mockdr read `assignees_to_add` and
+    `assignees_to_remove`, so an assignment written the way 8.15 takes it was
+    read as no assignment at all and answered success.
     """
-    alert_ids = body.get("ids", [])
-    assignees = body.get("assignees", {})
-    if not alert_ids:
-        raise HTTPException(
-            status_code=400,
-            detail=build_kbn_error_response(400, "ids is required"),
-        )
+    _refuse_bad_assignees(body)
+    assignees = body.get("assignees") or {}
+    # Stored as `{"uid": …}`, which is the shape an alert carries; the wire
+    # names them as plain strings.
     return alert_commands.update_alert_assignees(
-        alert_ids,
-        assignees_to_add=assignees.get("assignees_to_add", []),
-        assignees_to_remove=assignees.get("assignees_to_remove", []),
+        body.get("ids") or [],
+        assignees_to_add=[{"uid": uid} for uid in assignees.get("add") or []],
+        assignees_to_remove=[{"uid": uid} for uid in assignees.get("remove") or []],
     )
+
+
+#: What zod calls each JSON type in `Expected x, received y`.
+_ZOD_TYPES = {
+    dict: "object", list: "array", str: "string", bool: "boolean",
+    int: "number", float: "number", type(None): "null",
+}
+
+
+def _assignee_list_issues(member: str, value: object) -> list[str]:
+    """What zod says about one side of the assignment.
+
+    Each is an array of user ids as *strings*. mockdr read them as objects
+    carrying a `uid`, which is the shape it stores — so an assignment
+    written the way 8.15 takes it raised out of the handler.
+    """
+    if not isinstance(value, list):
+        kind = _ZOD_TYPES.get(type(value), "string")
+        return [f"assignees.{member}: Expected array, received {kind}"]
+    return [
+        f"assignees.{member}.{i}: Expected string, received "
+        f"{_ZOD_TYPES.get(type(entry), 'string')}"
+        for i, entry in enumerate(value) if not isinstance(entry, str)
+    ]
+
+
+#: What this route declares, in the order zod reports it: the block first,
+#: its two members inside it, then the ids. mockdr answered one hand-written
+#: `ids is required` for every one of them.
+def _refuse_bad_assignees(body: dict) -> None:
+    """Refuse an assignment body the way 8.15's schema refuses it.
+
+    Raises:
+        HTTPException: 400, in Kibana's own wording.
+    """
+    issues: list[str] = []
+    if "assignees" not in body:
+        issues.append("assignees: Required")
+    elif isinstance(body["assignees"], dict):
+        for member in ("add", "remove"):
+            if member not in body["assignees"]:
+                issues.append(f"assignees.{member}: Required")
+                continue
+            issues += _assignee_list_issues(member, body["assignees"][member])
+    if "ids" not in body:
+        issues.append("ids: Required")
+    if issues:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: " + ", ".join(issues),
+        ))
