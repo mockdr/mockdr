@@ -9,7 +9,6 @@ from utils.serde import record_dict
 
 
 def find_lists(
-    list_id: str | None = None,
     namespace_type: str | None = None,
     page: int = 1,
     per_page: int = 20,
@@ -17,7 +16,6 @@ def find_lists(
     """Find exception lists with optional filters and Kibana pagination.
 
     Args:
-        list_id:        Filter by list_id.
         namespace_type: Filter by namespace_type (single or agnostic).
         page:           Page number (1-based).
         per_page:       Number of items per page.
@@ -27,8 +25,6 @@ def find_lists(
     """
     records = [_serialise(el) for el in es_exception_list_repo.list_all()]
 
-    if list_id:
-        records = [r for r in records if r["list_id"] == list_id]
     if namespace_type:
         records = [r for r in records if r["namespace_type"] == namespace_type]
 

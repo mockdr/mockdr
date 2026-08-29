@@ -63,3 +63,59 @@ class TestWhichCaseRoutesResolveTheCase:
             resp = client.get(f"/kibana/api/cases/{MISSING}/{sub}", headers=ES_AUTH)
             assert resp.status_code == 200, sub
             assert resp.json() == [], sub
+
+
+class TestTheOneMemberACaseTakes:
+    """`GET /api/cases/{id}` accepts `includeComments` and nothing else.
+
+    Measured key by key on 8.15 against the 400-versus-not oracle, and the
+    effect measured against a throwaway case with one comment on it.
+    """
+
+    @staticmethod
+    def _a_case(client: TestClient) -> str:
+        found = client.get("/kibana/api/cases/_find", headers=ES_AUTH).json()
+        return str(found["cases"][0]["id"])
+
+    def test_an_unknown_member_is_refused_before_the_case_is_resolved(
+        self, client: TestClient,
+    ) -> None:
+        """Even for a case that does not exist: the schema runs first."""
+        resp = client.get(f"/kibana/api/cases/{MISSING}", headers=ES_AUTH,
+                          params={"zzzUnknown": "1"})
+        assert resp.status_code == 400
+        assert resp.json()["message"] == (
+            "[request query.zzzUnknown]: definition for this key is missing"
+        )
+
+    def test_include_comments_must_be_one_of_two_literals(
+        self, client: TestClient,
+    ) -> None:
+        case_id = self._a_case(client)
+        for value in ("zzz", "1", "0", "yes"):
+            resp = client.get(f"/kibana/api/cases/{case_id}", headers=ES_AUTH,
+                              params={"includeComments": value})
+            assert resp.status_code == 400, value
+            assert resp.json()["message"] == (
+                "[request query.includeComments]: expected value of type "
+                "[boolean] but got [string]"
+            ), value
+
+    def test_false_empties_the_list_and_keeps_the_key(
+        self, client: TestClient,
+    ) -> None:
+        case_id = self._a_case(client)
+        with_them = client.get(f"/kibana/api/cases/{case_id}", headers=ES_AUTH,
+                               params={"includeComments": "true"}).json()
+        without = client.get(f"/kibana/api/cases/{case_id}", headers=ES_AUTH,
+                             params={"includeComments": "false"}).json()
+        assert "comments" in without, "the key stays, the list empties"
+        assert without["comments"] == []
+        assert len(with_them["comments"]) >= 1
+
+    def test_absent_behaves_as_true(self, client: TestClient) -> None:
+        case_id = self._a_case(client)
+        bare = client.get(f"/kibana/api/cases/{case_id}", headers=ES_AUTH).json()
+        asked = client.get(f"/kibana/api/cases/{case_id}", headers=ES_AUTH,
+                           params={"includeComments": "true"}).json()
+        assert bare["comments"] == asked["comments"]

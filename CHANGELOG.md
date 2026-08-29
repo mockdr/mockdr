@@ -8,6 +8,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Four Kibana routes that answered before the query schema had spoken.**
+The schema check runs before the handler, so an unknown query member is a
+400 naming it — whatever else the request is wrong about.
+`GET /api/cases/{id}` resolved the case first and answered its 404, telling
+a client its id was wrong when its spelling was; the three exception-list
+routes answered their handler's `id or list_id required`.  Worse, with the
+required member actually present they answered **200**:
+`?list_id=<real>&zzzTypo=1` came back with the list, so a client that had
+misspelled a second filter read a full answer from the mock and got a 400
+from the product.  Each route's accepted set measured member by member on
+8.15 against the undeclared-versus-bad-value oracle: `/api/cases/{id}` takes
+`includeComments` and nothing else, `/api/exception_lists` takes `id`,
+`list_id` and `namespace_type`, `/api/exception_lists/items` takes `item_id`
+where the list route takes `list_id`, and only `/summary` also takes
+`filter`.  `list_id` was declared on `/api/exception_lists/_find` too, and
+filtered there — Kibana refuses it outright, so that filter worked in
+testing and 400s in production.
+
+**`includeComments=false` empties the comment list; it does not drop it.**
+The key is there either way, which is what a client reading
+`case.comments.length` depends on, and absent behaves as `true`.  The member
+must be one of the two literals — `1` is a type error, not a truthy value —
+and the wording is config-schema's `expected value of type [boolean] but got
+[string]`, not pydantic's.  Measured against a throwaway case with one
+comment on it.
+
+**io-ts words the same refusal two ways.**
+The Cases API leaves the `[request query]: ` prefix off and the
+exception-list API keeps it — four routes each, measured one by one.  A
+fourth dialect now, because a substring check took one for the other.
+
+**`scripts/kbn_param_audit.py`**, the Kibana counterpart to the parameter
+audits for Elasticsearch and splunkd: 152 questions across 48 routes, in
+both directions — every route asked whether it refuses an unknown member and
+in exactly which words, and every member mockdr declares asked of Kibana.
+It compares the whole message rather than a phrase inside it, which is what
+catches a refusal given in the wrong dialect.
+
 **Three Kibana routes that resolved an object the product does not.**
 Every verb each of the 72 Kibana routes does not take, asked of 8.15 and of
 the mock — 123 of 128 questions already identical, and 218 left unasked

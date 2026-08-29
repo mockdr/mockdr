@@ -94,12 +94,35 @@ def get_tags(
 # ── Single Case ──────────────────────────────────────────────────────────────
 
 
-@router.get("/api/cases/{case_id}")
+@router.get(
+    "/api/cases/{case_id}",
+    # The query schema runs before the handler, so an unknown member is a 400
+    # even for a case that does not exist — mockdr resolved the case first and
+    # answered the 404, telling a client its id was wrong when its spelling
+    # was.  `includeComments` is the one member this route takes, and it takes
+    # nothing else; both measured key by key on 8.15.
+    dependencies=[refuses_unknown("includeComments")],
+)
 def get_case(
     case_id: str,
+    # Taken raw: a `bool` here would answer with pydantic's wording, and the
+    # point of checking it at all is to send what config-schema sends.
+    include_comments: str | None = Query(default=None, alias="includeComments"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Get a single case by its ID."""
+    """Get a single case by its ID.
+
+    `includeComments=false` *empties* the comment list rather than dropping
+    the member: the key is there either way, which is what a client reading
+    `case.comments.length` depends on.  Absent behaves as `true`.  Anything
+    but the two literals is a type error, `1` included.  Measured on 8.15
+    against a case with one comment on it.
+    """
+    if include_comments is not None and include_comments not in ("true", "false"):
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request query.includeComments]: expected value of type "
+                 "[boolean] but got [string]",
+        ))
     result = case_queries.get_case(case_id)
     if result is None:
         raise HTTPException(
@@ -108,6 +131,8 @@ def get_case(
                 404, f"Saved object [cases/{case_id}] not found",
             ),
         )
+    if include_comments == "false" and "comments" in result:
+        return {**result, "comments": []}
     return result
 
 

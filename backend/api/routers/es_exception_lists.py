@@ -12,6 +12,10 @@ from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_exception_lists import commands as exc_commands
 from application.es_exception_lists import queries as exc_queries
 from utils.es_response import build_kbn_error_response, build_security_solution_error
+from utils.kibana_query import (
+    PREFIXED_INVALID_KEYS,
+    refuses_unknown,
+)
 from utils.kibana_validation import (
     EXCEPTION_NAMESPACES,
     ExceptionListError,
@@ -29,7 +33,6 @@ router = APIRouter(tags=["ES Exception Lists"])
 @router.get("/api/exception_lists/_find")
 def find_lists(
     request: Request,
-    list_id: str = Query(None),
     namespace_type: str = Query(None),
     # Untyped on purpose: FastAPI's own 422 would pre-empt the wording this
     # endpoint answers with, which is a third dialect again — io-ts, but with
@@ -51,14 +54,23 @@ def find_lists(
             else build_kbn_error_response(400, str(exc))
         )) from exc
     return exc_queries.find_lists(
-        list_id=list_id,
         namespace_type=namespace_type,
         page=int(float(page)),
         per_page=int(float(per_page)),
     )
 
 
-@router.get("/api/exception_lists")
+# The query schema runs before the handler, so an unknown member is a 400
+# naming it — not the "id or list_id required" the handler answers when a
+# required one is missing, and not a 200 when the required one *is* there:
+# `?list_id=<real>&zzzTypo=1` came back with the list.  Each accepted set
+# measured member by member on 8.15.
+@router.get(
+    "/api/exception_lists",
+    dependencies=[refuses_unknown(
+        "id", "list_id", "namespace_type",
+        dialect=PREFIXED_INVALID_KEYS)],
+)
 def get_list(
     list_id: str = Query(None),
     id: str = Query(None),
@@ -185,7 +197,13 @@ def find_items(
         ) from exc
 
 
-@router.get("/api/exception_lists/items")
+@router.get(
+    "/api/exception_lists/items",
+    # `item_id` here, where the list route takes `list_id`.
+    dependencies=[refuses_unknown(
+        "id", "item_id", "namespace_type",
+        dialect=PREFIXED_INVALID_KEYS)],
+)
 def get_item(
     item_id: str = Query(None),
     id: str = Query(None),

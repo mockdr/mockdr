@@ -65,6 +65,32 @@ class TestFindLists:
         ).json()
         assert body["total"] == 5
 
+    def test_list_id_belongs_to_the_items_search_and_is_refused_here(
+        self, client: TestClient,
+    ) -> None:
+        """Measured on 8.15: the list search does not take `list_id`.
+
+        It belongs to `/api/exception_lists/items/_find`, which finds the
+        items *of* a list.  mockdr accepted it here and filtered by it, so a
+        client narrowing the list search that way got a narrowed answer from
+        the mock and a 400 from the product.
+        """
+        resp = client.get(
+            "/kibana/api/exception_lists/_find", headers=ES_AUTH,
+            params={"list_id": "zzz"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["message"] == '[request query]: invalid keys "list_id"'
+
+    def test_the_items_search_still_takes_it(self, client: TestClient) -> None:
+        """Where Kibana does know the member, mockdr must keep knowing it."""
+        list_id = _get_first_list(client)["list_id"]
+        resp = client.get(
+            "/kibana/api/exception_lists/items/_find", headers=ES_AUTH,
+            params={"list_id": list_id},
+        )
+        assert resp.status_code == 200
+
     def test_list_has_required_fields(self, client: TestClient) -> None:
         """Each exception list must include key fields."""
         exc_list = _get_first_list(client)
@@ -462,3 +488,60 @@ class TestDeleteItem:
             headers=KBN_WRITE_HEADERS,
         )
         assert resp.status_code == 400
+
+
+class TestTheSchemaRunsBeforeTheHandler:
+    """An unknown query member is refused even when the required one is there.
+
+    Measured on 8.15 member by member.  `?list_id=<real>&zzzTypo=1` came back
+    with the list — a client that had misspelled a second filter read a full
+    answer from the mock and got a 400 from the product.  The three routes
+    take different sets: the list search takes `list_id`, the item search
+    takes `item_id`, and only `summary` also takes `filter`.
+    """
+
+    UNKNOWN = "zzzUnknownMember"
+
+    def _list_id(self, client: TestClient) -> str:
+        return str(_get_first_list(client)["list_id"])
+
+    def test_a_typo_beside_a_valid_member_is_still_refused(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.get(
+            "/kibana/api/exception_lists", headers=ES_AUTH,
+            params={"list_id": self._list_id(client), self.UNKNOWN: "1"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["message"] == (
+            f'[request query]: invalid keys "{self.UNKNOWN}"'
+        )
+
+    def test_each_route_takes_its_own_id_member(self, client: TestClient) -> None:
+        """`list_id` on the list search, `item_id` on the item search."""
+        refused = client.get(
+            "/kibana/api/exception_lists/items", headers=ES_AUTH,
+            params={"list_id": "zzz"},
+        )
+        assert refused.status_code == 400
+        assert refused.json()["message"] == '[request query]: invalid keys "list_id"'
+
+        accepted = client.get(
+            "/kibana/api/exception_lists", headers=ES_AUTH,
+            params={"list_id": "zzz"},
+        )
+        assert accepted.status_code == 404, "the member is known; the list is not"
+
+    def test_only_the_summary_takes_filter(self, client: TestClient) -> None:
+        summary = client.get(
+            "/kibana/api/exception_lists/summary", headers=ES_AUTH,
+            params={"list_id": self._list_id(client), "filter": ""},
+        )
+        assert summary.status_code == 200
+
+        refused = client.get(
+            "/kibana/api/exception_lists", headers=ES_AUTH,
+            params={"list_id": self._list_id(client), "filter": ""},
+        )
+        assert refused.status_code == 400
+        assert refused.json()["message"] == '[request query]: invalid keys "filter"'

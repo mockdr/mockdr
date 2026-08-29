@@ -363,8 +363,13 @@ _EXCEPTION_QUERY_ORDER: tuple[str, ...] = (
     "namespace_type", "page", "per_page", "sort_order",
 )
 
+#: What `/api/exception_lists/_find` takes.  Not `list_id`: that belongs to
+#: `/api/exception_lists/items/_find`, which finds the items *of* a list, and
+#: the list search refuses it outright — `invalid keys "list_id"`, measured
+#: on 8.15.  mockdr accepted it and filtered by it, so a client narrowing the
+#: list search by list_id got a narrowed answer here and a 400 in production.
 _EXCEPTION_QUERY_KEYS: frozenset[str] = frozenset({
-    "list_id", "namespace_type", "page", "per_page", "filter", "sort_field",
+    "namespace_type", "page", "per_page", "filter", "sort_field",
     "sort_order",
 })
 

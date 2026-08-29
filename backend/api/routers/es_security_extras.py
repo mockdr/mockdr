@@ -22,7 +22,11 @@ from application.es_exception_lists import queries as exception_queries
 from application.es_rules import queries as rule_queries
 from repository.es_rule_repo import es_rule_repo
 from utils.es_response import build_kbn_error_response, build_security_solution_error
-from utils.kibana_query import INVALID_KEYS, refuses_unknown
+from utils.kibana_query import (
+    INVALID_KEYS,
+    PREFIXED_INVALID_KEYS,
+    refuses_unknown,
+)
 from utils.kibana_validation import (
     ENDPOINT_ACTION_STATUS_QUERY,
     ConfigSchemaError,
@@ -581,7 +585,14 @@ def case_user_actions(
 # ── Exception lists ──────────────────────────────────────────────────────────
 
 
-@router.get("/api/exception_lists/summary")
+# The one of the three that also takes `filter`.  Measured member by
+# member on 8.15, against the undeclared-versus-bad-value oracle.
+@router.get(
+    "/api/exception_lists/summary",
+    dependencies=[refuses_unknown(
+        "id", "list_id", "namespace_type", "filter",
+        dialect=PREFIXED_INVALID_KEYS)],
+)
 def exception_list_summary(
     list_id: str = Query(default=""),
     _: dict = Depends(require_es_auth),

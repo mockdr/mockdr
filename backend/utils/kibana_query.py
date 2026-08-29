@@ -11,7 +11,10 @@ three different ways (measured, `/api/status`, `/api/cases/tags` and
                    excess properties: ["zzz","qqq"]
 
 The first names only the first unknown member, in the order the client sent
-them; the other two name all of them. mockdr answered 200 and ignored the
+them; the other two name all of them. io-ts comes in two spellings of
+the same message: the Cases API leaves the `[request query]: ` prefix off
+and the exception-list API keeps it — four routes each, measured one by
+one. mockdr answered 200 and ignored the
 member, so a client that misspelled a filter saw an unfiltered result
 reported as a successful, filtered one — and the same request 400s against
 the product.
@@ -31,14 +34,17 @@ from utils.es_response import build_kbn_error_response
 KEY_MISSING = "key_missing"
 #: io-ts routes (the Cases API): every unknown member, comma-joined.
 INVALID_KEYS = "invalid_keys"
+#: The same, as the exception-list API words it — with the prefix Cases drops.
+PREFIXED_INVALID_KEYS = "prefixed_invalid_keys"
 #: The runtime-type routes (Timeline): the query echoed, then the excess.
 EXCESS = "excess"
 
 
 def _message(dialect: str, sent: dict[str, str], extra: list[str]) -> str:
     """Word the refusal the way `dialect`'s validator words it."""
-    if dialect == INVALID_KEYS:
-        return 'invalid keys "' + ",".join(extra) + '"'
+    if dialect in (INVALID_KEYS, PREFIXED_INVALID_KEYS):
+        prefix = "[request query]: " if dialect == PREFIXED_INVALID_KEYS else ""
+        return prefix + 'invalid keys "' + ",".join(extra) + '"'
     if dialect == EXCESS:
         return (
             "[request query]: Invalid value "
