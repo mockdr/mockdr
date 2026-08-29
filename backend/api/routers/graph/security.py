@@ -105,7 +105,18 @@ async def get_incident(
 
 # ── Advanced Hunting ──────────────────────────────────────────────────────────
 
+# Two spellings, both the vendor's own.  The documented request line is
+# `POST /security/runHuntingQuery`; the published OpenAPI carries only the
+# fully qualified `/security/microsoft.graph.security.runHuntingQuery`,
+# because the action lives in the `microsoft.graph.security` namespace — and
+# the official Graph SDKs are generated from that OpenAPI, so an SDK client
+# sends the qualified segment and nothing else.
+
 @router.post("/v1.0/security/runHuntingQuery", dependencies=[Depends(require_graph_write)])
+@router.post(
+    "/v1.0/security/microsoft.graph.security.runHuntingQuery",
+    dependencies=[Depends(require_graph_write)],
+)
 async def run_hunting_query(
     body: dict = Body(...),
     _: dict = Depends(require_graph_feature("security/runHuntingQuery")),

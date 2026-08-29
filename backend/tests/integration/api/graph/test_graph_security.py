@@ -161,6 +161,39 @@ class TestGraphHunting:
         assert isinstance(body["Results"], list)
         assert len(body["Results"]) >= 1
 
+    def test_the_qualified_spelling_is_the_same_endpoint(
+        self, client: TestClient, graph_admin_headers: dict,
+    ) -> None:
+        """The SDKs send the namespace-qualified action name.
+
+        The published OpenAPI — which the official Graph SDKs are generated
+        from — carries only `/security/microsoft.graph.security.runHuntingQuery`,
+        while the documented request line is the plain one.  Both reach the
+        same endpoint.
+        """
+        body = {"Query": "DeviceInfo | take 10"}
+        plain = client.post(
+            "/graph/v1.0/security/runHuntingQuery",
+            json=body, headers=graph_admin_headers,
+        )
+        qualified = client.post(
+            "/graph/v1.0/security/microsoft.graph.security.runHuntingQuery",
+            json=body, headers=graph_admin_headers,
+        )
+        assert qualified.status_code == plain.status_code == 200
+        assert qualified.json()["Schema"] == plain.json()["Schema"]
+
+    def test_the_qualified_spelling_is_gated_the_same_way(
+        self, client: TestClient, graph_p1_headers: dict,
+    ) -> None:
+        """A second spelling must not be a way around the licence check."""
+        resp = client.post(
+            "/graph/v1.0/security/microsoft.graph.security.runHuntingQuery",
+            json={"Query": "DeviceInfo | take 10"},
+            headers=graph_p1_headers,
+        )
+        assert resp.status_code == 403
+
     def test_plan1_cannot_hunt(
         self, client: TestClient, graph_p1_headers: dict,
     ) -> None:
