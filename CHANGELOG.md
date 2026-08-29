@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**The threat-intelligence metrics were the wrong shape at every level.**
+`ThreatIntelligenceMetricsList` is a *list*: `{"value": [{"properties":
+{...}}]}`, and every metric entry is `{metricName, metricValue}`. mockdr
+answered the properties object alone and named its entries `patternType` and
+`source` beside a bare `value`, so a client reading
+`value[0].properties.patternTypeMetrics[0].metricName` found nothing at any
+level — and `threatTypeMetrics` was absent altogether. Found by
+`schema_drift`, which could not reach the route at all while mockdr served
+it on `POST`: correcting the verb is what made the comparison possible.
+
+**`schema_drift` runs in CI now**, for all three mounts it supports — 20
+Sentinel routes, 53 Graph, 39 SentinelOne, none drifting. It needs nothing
+but the mock and a specification, which is the audits job's whole premise,
+and it would have caught the metrics shape years earlier than a person did.
+
 **Sentinel's tag operations acted on a path and a field the vendor does not have.**
 `ThreatIntelligenceIndicator_AppendTags` and `_ReplaceTags` name one
 indicator in the path and take `{"threatIntelligenceTags": [...]}`. mockdr

@@ -130,18 +130,41 @@ def _sort_value(value: object) -> tuple[int, float, str]:
         return (1, 0.0, str(value))
 
 
+def _metric_entities(counts: dict[str, int]) -> list[dict]:
+    """`ThreatIntelligenceMetricEntity`: a name and a count, both named so."""
+    return [{"metricName": name, "metricValue": value}
+            for name, value in sorted(counts.items())]
+
+
 def get_metrics() -> dict:
-    """Get TI metrics summary."""
+    """Get TI metrics summary.
+
+    `ThreatIntelligenceMetricsList` is a *list*: `{"value": [{"properties":
+    {...}}]}`.  mockdr answered the properties object alone, and named the
+    entries `patternType`/`source` and `value` where the swagger names every
+    one of them `metricName` and `metricValue` — so a client reading
+    `value[0].properties.patternTypeMetrics[0].metricName` found nothing at
+    any level.  `threatTypeMetrics` was absent altogether (2024-03-01
+    SecurityInsights swagger, `ThreatIntelligence.json`).
+    """
     all_inds = sentinel_threat_indicator_repo.list_all()
     by_type: dict[str, int] = {}
     by_source: dict[str, int] = {}
+    by_threat: dict[str, int] = {}
+    last_updated = ""
     for ind in all_inds:
         by_type[ind.pattern_type] = by_type.get(ind.pattern_type, 0) + 1
         by_source[ind.source] = by_source.get(ind.source, 0) + 1
+        for threat_type in ind.threat_types:
+            by_threat[threat_type] = by_threat.get(threat_type, 0) + 1
+        last_updated = max(last_updated, ind.last_updated or "")
     return {
-        "properties": {
-            "patternTypeMetrics": [{"patternType": k, "value": v} for k, v in by_type.items()],
-            "sourceMetrics": [{"source": k, "value": v} for k, v in by_source.items()],
-            "lastUpdatedTimeUtc": "",
-        },
+        "value": [{
+            "properties": {
+                "lastUpdatedTimeUtc": last_updated,
+                "threatTypeMetrics": _metric_entities(by_threat),
+                "patternTypeMetrics": _metric_entities(by_type),
+                "sourceMetrics": _metric_entities(by_source),
+            },
+        }],
     }

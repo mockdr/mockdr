@@ -58,13 +58,33 @@ class TestThreatIndicators:
         assert "value" in resp.json()
 
     def test_get_metrics(self, client: TestClient) -> None:
-        """`ThreatIntelligenceIndicatorMetrics_List` is a GET, per the swagger."""
+        """A GET, and a *list* — every level of it measured against the swagger.
+
+        `ThreatIntelligenceMetricsList` wraps the properties object in
+        `value`, and every metric entry is `{metricName, metricValue}`.
+        mockdr answered the properties object alone and named the entries
+        `patternType`/`source` and `value`, so a client reading
+        `value[0].properties.patternTypeMetrics[0].metricName` found nothing
+        at any level.
+        """
         resp = client.get(
             f"{SENTINEL_PREFIX}{_WS}/threatIntelligence/main/metrics",
             headers=_auth(client),
         )
         assert resp.status_code == 200
-        assert "properties" in resp.json()
+        body = resp.json()
+        assert list(body) == ["value"]
+        assert len(body["value"]) == 1
+        properties = body["value"][0]["properties"]
+        assert set(properties) == {
+            "lastUpdatedTimeUtc", "threatTypeMetrics",
+            "patternTypeMetrics", "sourceMetrics",
+        }
+        for group in ("threatTypeMetrics", "patternTypeMetrics", "sourceMetrics"):
+            assert properties[group], f"{group} is empty"
+            for entry in properties[group]:
+                assert set(entry) == {"metricName", "metricValue"}, group
+                assert isinstance(entry["metricValue"], int), group
 
     def _an_indicator(self, client: TestClient, headers: dict) -> str:
         listed = client.get(

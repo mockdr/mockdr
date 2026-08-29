@@ -224,6 +224,18 @@ jobs:
       - name: Enum values the vendor declares
         run: python scripts/enum_drift.py
 
+      # Needs only the mock and a specification: the two Microsoft mounts read
+      # the swaggers vendored under data/vendor-specs, and SentinelOne reads
+      # the one fetched above.  It found a Sentinel response built to the
+      # wrong shape at every level — `{"properties": ...}` where the swagger
+      # says `{"value": [{"properties": ...}]}`, and `patternType`/`value`
+      # where it says `metricName`/`metricValue`.
+      - name: Responses carry what the specification declares
+        run: |
+          python scripts/schema_drift.py sentinel
+          python scripts/schema_drift.py graph
+          python scripts/schema_drift.py sentinelone
+
   field-drift:
     name: Field drift — swagger spec vs mock responses
     runs-on: ubuntu-latest
