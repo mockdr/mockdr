@@ -315,8 +315,19 @@ def reset() -> dict:
     Returns:
         Dict with ``data.status`` confirming the reset.
     """
+    from api.routers.splunk.splunk_hec import reset_ack_state
+    from application.webhooks.delivery_log import clear as clear_delivery_log
     from infrastructure.seed import generate_all
     generate_all()
+    # Two pieces of state the store does not hold and `generate_all` cannot
+    # reach, both of which the API serves back: HEC's per-channel ack ids and
+    # the webhook delivery log.  A reset that leaves them is a reset that
+    # answers 200 and hands the caller the previous scenario.
+    reset_ack_state()
+    clear_delivery_log()
+    # Deliberately *not* reset: the rate-limit and proxy configuration, which
+    # are simulation settings a user set on purpose rather than data, and the
+    # Prometheus counters, which are monotonic by definition.
     return {"data": {"status": "reset complete"}}
 
 

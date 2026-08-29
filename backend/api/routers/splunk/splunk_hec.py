@@ -30,6 +30,20 @@ _ACK_COUNTERS: dict[str, itertools.count] = {}
 _ISSUED_ACKS: dict[str, set[int]] = {}
 
 
+def reset_ack_state() -> None:
+    """Forget every channel's issued acknowledgements.
+
+    Ack ids are per channel and monotonic, so they are the one piece of HEC
+    state that cannot be rebuilt from the store.  `POST /_dev/reset` puts the
+    mock back to its initial state, in which nothing has been indexed and
+    nothing acknowledged; without this the next channel carried on counting
+    from the previous scenario and `/collector/ack` answered `true` for ids
+    issued before the reset.
+    """
+    _ACK_COUNTERS.clear()
+    _ISSUED_ACKS.clear()
+
+
 def _next_ack(channel: str) -> int:
     counter = _ACK_COUNTERS.setdefault(channel, itertools.count())
     ack_id: int = next(counter)
