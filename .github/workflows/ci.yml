@@ -224,14 +224,19 @@ jobs:
       - name: Enum values the vendor declares
         run: python scripts/enum_drift.py
 
-      # Needs only the mock and a specification: the two Microsoft mounts read
-      # the swaggers vendored under data/vendor-specs, and SentinelOne reads
-      # the one fetched above.  It found a Sentinel response built to the
-      # wrong shape at every level — `{"properties": ...}` where the swagger
-      # says `{"value": [{"properties": ...}]}`, and `patternType`/`value`
-      # where it says `metricName`/`metricValue`.
+      # All six mounts it supports: five read specifications vendored under
+      # data/vendor-specs, and SentinelOne reads the one fetched above — so
+      # this needs nothing but the mock, which is the premise of this job.
+      # It found a Sentinel response built to the wrong shape at every level:
+      # `{"properties": ...}` where the swagger says
+      # `{"value": [{"properties": ...}]}`, and `patternType`/`value` where
+      # it says `metricName`/`metricValue`.  It had never seen that route,
+      # because it exercises GETs and the route was served on POST alone.
       - name: Responses carry what the specification declares
         run: |
+          python scripts/schema_drift.py crowdstrike
+          python scripts/schema_drift.py mde
+          python scripts/schema_drift.py xdr
           python scripts/schema_drift.py sentinel
           python scripts/schema_drift.py graph
           python scripts/schema_drift.py sentinelone

@@ -18,10 +18,11 @@ level — and `threatTypeMetrics` was absent altogether. Found by
 `schema_drift`, which could not reach the route at all while mockdr served
 it on `POST`: correcting the verb is what made the comparison possible.
 
-**`schema_drift` runs in CI now**, for all three mounts it supports — 20
-Sentinel routes, 53 Graph, 39 SentinelOne, none drifting. It needs nothing
-but the mock and a specification, which is the audits job's whole premise,
-and it would have caught the metrics shape years earlier than a person did.
+**`schema_drift` runs in CI now**, for all six mounts it supports — 36
+CrowdStrike routes, 42 MDE, 52 Cortex XDR, 20 Sentinel, 53 Graph, 39
+SentinelOne, none drifting. It needs nothing but the mock and a
+specification, which is the audits job's whole premise, and it would have
+caught the metrics shape long before a person did.
 
 **Sentinel's tag operations acted on a path and a field the vendor does not have.**
 `ThreatIntelligenceIndicator_AppendTags` and `_ReplaceTags` name one
