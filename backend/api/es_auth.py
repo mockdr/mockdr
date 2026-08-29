@@ -83,6 +83,19 @@ _WRITE_ROLES: frozenset[str] = frozenset({"admin", "analyst"})
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+class BasicHeaderError(Exception):
+    """A `Basic` header the cluster cannot read, in its own words.
+
+    8.15 tells the two apart: bytes that are not base64 are an *encoding*
+    failure, and base64 that decodes to something without a colon is a
+    *value* failure.  Both are 401s, and a client that logs the reason sees
+    which half of its header is wrong.  Measured.
+    """
+
+    ENCODING = "invalid basic authentication header encoding"
+    VALUE = "invalid basic authentication header value"
+
+
 def _decode_basic(header_value: str) -> dict | None:
     """Decode a Basic auth header and validate credentials.
 
@@ -91,14 +104,17 @@ def _decode_basic(header_value: str) -> dict | None:
 
     Returns:
         Dict with ``user`` and ``role`` if valid, or ``None``.
+
+    Raises:
+        BasicHeaderError: If the header cannot be read at all.
     """
     try:
-        decoded = base64.b64decode(header_value).decode("utf-8")
-    except Exception:
-        return None
+        decoded = base64.b64decode(header_value, validate=True).decode("utf-8")
+    except Exception as exc:
+        raise BasicHeaderError(BasicHeaderError.ENCODING) from exc
 
     if ":" not in decoded:
-        return None
+        raise BasicHeaderError(BasicHeaderError.VALUE)
 
     username, password = decoded.split(":", 1)
     user = _USERS.get(username)
@@ -194,8 +210,38 @@ async def require_es_auth(
 
     lower = authorization.lower()
 
+    # A scheme with nothing after it, and a scheme the cluster does not know,
+    # are both *missing* credentials rather than bad ones — measured on 8.15
+    # with `Basic`, `ApiKey` and `Zzz abc`.
+    scheme, _, credentials = authorization.partition(" ")
+    if not credentials.strip():
+        raise HTTPException(
+            status_code=401,
+            detail=_auth_error(
+                request, 401, "security_exception",
+                f"missing authentication credentials for REST request [{request.url.path}]",
+            ),
+            headers=_auth_headers(request, 401),
+        )
+    if scheme.lower() not in ("basic", "apikey", "bearer"):
+        raise HTTPException(
+            status_code=401,
+            detail=_auth_error(
+                request, 401, "security_exception",
+                f"missing authentication credentials for REST request [{request.url.path}]",
+            ),
+            headers=_auth_headers(request, 401),
+        )
+
     if lower.startswith("basic "):
-        result = _decode_basic(authorization[6:])
+        try:
+            result = _decode_basic(authorization[6:])
+        except BasicHeaderError as exc:
+            raise HTTPException(
+                status_code=401,
+                detail=_auth_error(request, 401, "security_exception", str(exc)),
+                headers=_auth_headers(request, 401),
+            ) from exc
     elif lower.startswith("apikey "):
         result = _decode_api_key(authorization[7:])
     elif lower.startswith("bearer "):
@@ -214,13 +260,19 @@ async def require_es_auth(
         result = None
 
     if result is None:
+        # `ApiKey` and `Bearer` share one wording, which names neither the
+        # user nor the path; only `Basic` names the user it could not
+        # authenticate.  Measured on 8.15 for all three.
+        reason = (
+            f"unable to authenticate user {_attempted_user(authorization)}"
+            f"for REST request [{request.url.path}]"
+            if lower.startswith("basic ")
+            else "unable to authenticate with provided credentials and anonymous "
+                 "access is not allowed for this request"
+        )
         raise HTTPException(
             status_code=401,
-            detail=_auth_error(
-                request, 401, "security_exception",
-                f"unable to authenticate user {_attempted_user(authorization)}"
-                f"for REST request [{request.url.path}]",
-            ),
+            detail=_auth_error(request, 401, "security_exception", reason),
             headers=_auth_headers(request, 401),
         )
 

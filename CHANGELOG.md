@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**One 401, five reasons, and mockdr gave the same one to five of six.**
+Elasticsearch tells apart a request that carried no credentials, one whose
+header it could not read, and one whose credentials were wrong — and it
+words the two unreadable `Basic` cases differently again: bytes that are not
+base64 are an *encoding* failure, base64 without a colon a *value* failure.
+A scheme with nothing after it, and a scheme it does not know, are both
+`missing authentication credentials`, not bad ones. `ApiKey` and `Bearer`
+share a wording of their own that names neither user nor path. mockdr
+answered `unable to authenticate user for REST request [...]` to five of the
+six, so a connector with a mangled header was told its credentials were
+wrong. Seven headers compared against 8.15 afterwards, all agreeing.
+
+**`Accept` is ignored by all three products**, which is a finding of its own
+kind: Elasticsearch falls back to JSON for anything it cannot produce and
+never refuses, Kibana and splunkd answer JSON whatever is asked. mockdr
+already did the same, so nothing changed — the sweep is recorded so nobody
+asks again.
+
 **Kibana's three answers to a content type, and none of them Elasticsearch's.**
 Hapi decides after routing and only for the verbs that carry a payload, so a
 `GET` is never judged. A header that is not `type/subtype` — `json`,
