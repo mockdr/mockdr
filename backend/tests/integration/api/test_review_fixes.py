@@ -1030,3 +1030,143 @@ class TestAnEmptyClauseIsNotAMatchAll:
         assert error["reason"].endswith(f"[bool] failed to parse field [{arm}]")
         assert error["caused_by"]["type"] == "illegal_argument_exception"
         assert "empty clause found at" in error["caused_by"]["reason"]
+
+
+class TestAnAggregationThatNamesNothing:
+    """Fourteen of fifteen types refuse an empty body; mockdr ran them."""
+
+    ES = {
+        "Authorization": "Basic " + base64.b64encode(
+            b"elastic:mock-elastic-password").decode(),
+    }
+
+    @pytest.mark.parametrize("agg", [
+        "terms", "date_histogram", "histogram", "range", "missing",
+        "avg", "cardinality", "max", "min", "stats", "sum", "value_count",
+    ])
+    def test_an_empty_body_is_refused(self, client: TestClient, agg: str) -> None:
+        """A `terms` with no field grouped every document into one bucket and
+        reported that as the answer."""
+        resp = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {agg: {}}}},
+        )
+
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["type"] == "illegal_argument_exception"
+        # The trailing space after the full stop is Elasticsearch's own.
+        assert error["reason"] == (
+            "Required one of fields [field, script], but none were specified. "
+        )
+
+    def test_filters_says_it_its_own_way(self, client: TestClient) -> None:
+        error = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {"filters": {}}}},
+        ).json()["error"]
+
+        assert error["type"] == "illegal_argument_exception"
+        assert error["reason"] == "[filters] cannot be empty."
+
+    def test_a_filter_on_nothing_is_the_searchs_own_empty_clause(
+        self, client: TestClient,
+    ) -> None:
+        error = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {"filter": {}}}},
+        ).json()["error"]
+
+        assert error["type"] == "illegal_argument_exception"
+        assert error["reason"].startswith("query malformed, empty clause found at [1:")
+
+    def test_top_hits_takes_an_empty_body(self, client: TestClient) -> None:
+        assert client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {"top_hits": {}}}},
+        ).status_code == 200
+
+    def test_naming_none_and_naming_two_are_different_complaints(
+        self, client: TestClient,
+    ) -> None:
+        """mockdr made one of them, for both."""
+        none = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {}}},
+        ).json()["error"]
+        two = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {
+                "max": {"field": "sev"}, "min": {"field": "sev"}}}},
+        ).json()["error"]
+
+        assert none["reason"] == "Missing definition for aggregation [a]"
+        assert two["reason"] == (
+            "Found two aggregation type definitions in [a]: [max] and [min]"
+        )
+        # And neither carries the cause an unknown *type* does.
+        assert "caused_by" not in none
+        assert "caused_by" not in two
+
+    def test_an_unknown_type_still_carries_its_cause(
+        self, client: TestClient,
+    ) -> None:
+        error = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {"nosuchagg": {}}}},
+        ).json()["error"]
+
+        assert error["reason"] == "Unknown aggregation type [nosuchagg]"
+        assert error["caused_by"]["type"] == "named_object_not_found_exception"
+
+
+class TestSettingAnAlertStatus:
+    """The route a SOAR uses to close an alert."""
+
+    @pytest.mark.parametrize(("body", "message"), [
+        ({}, "[request body]: signal_ids: Required, status: Required, "
+             "query: Required, status: Required"),
+        ({"signal_ids": ["a"]},
+         "[request body]: status: Required, query: Required, status: Required"),
+        ({"status": "open"},
+         "[request body]: signal_ids: Required, query: Required"),
+        ({"signal_ids": [], "status": "open"},
+         "[request body]: signal_ids: Array must contain at least 1 element(s)"),
+        ({"signal_ids": "a", "status": "open"},
+         "[request body]: signal_ids: Expected array, received string, query: Required"),
+    ])
+    def test_each_arm_of_the_union_is_named(
+        self, client: TestClient, body: dict, message: str,
+    ) -> None:
+        """It answered one hand-written line for all of these."""
+        resp = client.post(
+            "/kibana/api/detection_engine/signals/status", headers=ES_AUTH, json=body,
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["message"] == message
+
+    def test_an_unknown_status_lists_the_ones_it_takes(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            "/kibana/api/detection_engine/signals/status", headers=ES_AUTH,
+            json={"signal_ids": ["a"], "status": "nope"},
+        )
+
+        assert "Expected 'open' | 'closed' | 'acknowledged' | 'in-progress'" in (
+            resp.json()["message"]
+        )
+
+    @pytest.mark.parametrize("body", [
+        {"signal_ids": ["a"], "status": "open"},
+        {"query": {"match_all": {}}, "status": "closed"},
+        {"signal_ids": ["a"], "status": "acknowledged", "zzzqqq": 1},
+    ])
+    def test_one_satisfied_arm_is_enough(
+        self, client: TestClient, body: dict,
+    ) -> None:
+        """And an undeclared member is stripped rather than refused — zod."""
+        assert client.post(
+            "/kibana/api/detection_engine/signals/status", headers=ES_AUTH, json=body,
+        ).status_code == 200

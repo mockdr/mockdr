@@ -110,6 +110,29 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**Setting an alert's status answered one hand-written line.**
+The route a SOAR uses to close an alert refused every malformed body with
+`signal_ids and status are required`, where 8.15 names each member of each
+arm of the union it accepts — alerts by id, or alerts by query — so a body
+with nothing in it reads as *four* failures rather than two. The status enum
+is listed in the message, an `signal_ids` of the wrong type is named as
+such, one satisfied arm is enough, and an undeclared member is stripped
+rather than refused, because this route validates with zod.
+
+**An aggregation that names nothing ran anyway.**
+The same question asked of the `aggs` block: fourteen of the fifteen types
+this mock serves refuse an empty body, and mockdr ran every one of them. A
+`terms` with no field grouped every document into a single bucket and
+reported that as the answer — a chart that draws, and means nothing. Twelve
+of them say `Required one of fields [field, script], but none were
+specified. ` (Elasticsearch's own trailing space included), `filters` has a
+line of its own, `filter` borrows the search's empty clause down to the
+position, and `top_hits` is the one that takes an empty body and means it.
+
+Naming *no* aggregation type and naming *two* are two different complaints
+and mockdr made one of them — and it attached the cause an unknown type
+carries to both.
+
 **An empty clause is not a match-all, and twelve of them were a 500.**
 `{"query": {}}` came back as every document in the index — a search that
 looks like it worked and returns the opposite of what an empty filter should

@@ -128,6 +128,7 @@ class ESQueryError(ValueError):
         shard_failure: bool = False, body: str = "",
         detail: dict | None = None, at_end: bool = False,
         caused_by: dict | None = None, position_in_message: bool = False,
+        position_format: bool = False,
     ) -> None:
         """Record the message, the clause if any, and Elasticsearch's exception type.
 
@@ -160,6 +161,10 @@ class ESQueryError(ValueError):
         ``position_in_message`` prefixes the reason with ``[line:col]`` and
         appends it to the cause, rather than carrying the two as fields —
         which is how the parse failures inside a ``bool`` read.
+
+        ``position_format`` substitutes ``{position}`` in the reason instead,
+        for the messages that end with the position rather than opening on
+        it.
         """
         super().__init__(message)
         self.clause = clause
@@ -171,6 +176,7 @@ class ESQueryError(ValueError):
         self.at_end = at_end
         self.caused_by = caused_by
         self.position_in_message = position_in_message
+        self.position_format = position_format
 
 # ---------------------------------------------------------------------------
 # Range comparison helper

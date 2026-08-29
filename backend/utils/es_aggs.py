@@ -77,17 +77,27 @@ class ESAggregationError(ValueError):
 
     def __init__(
         self, message: str, *, clause: str | None = None,
-        es_type: str = "parsing_exception",
+        es_type: str = "parsing_exception", at_end: bool = False,
+        named_object: bool = False,
     ) -> None:
         """Record the message, the clause if any, and the exception type.
 
         ``x_content_parse_exception`` is how Elasticsearch reports a field the
         aggregation does not have; it carries its position inside the reason
         text rather than as separate members, and no cause.
+
+        ``at_end`` moves the position to where an *empty* definition closes,
+        which is where the parser stood when it found nothing in it.
+
+        ``named_object`` marks the one that carries a cause: an aggregation
+        *type* Elasticsearch does not know. A definition naming none, or
+        naming two, is the same exception without one.
         """
         super().__init__(message)
         self.clause = clause
         self.es_type = es_type
+        self.at_end = at_end
+        self.named_object = named_object
 
 
 
@@ -133,21 +143,64 @@ def apply_aggregations(
 
 
 def _split_definition(name: str, definition: dict) -> tuple[str, dict, dict]:
-    """Separate the aggregation type from its nested sub-aggregations."""
+    """Separate the aggregation type from its nested sub-aggregations.
+
+    Naming none and naming two are two different complaints, and mockdr made
+    one of them: 8.15 says `Missing definition for aggregation [a]` for the
+    first — pointing at where the empty definition closes — and `Found two
+    aggregation type definitions in [a]: [max] and [min]` for the second,
+    pointing at the one it found last.
+    """
     sub = definition.get("aggs") or definition.get("aggregations") or {}
     types = [k for k in definition if k not in ("aggs", "aggregations", "meta")]
-    if len(types) != 1:
-        msg = f"[{name}] must declare exactly one aggregation type"
-        raise ESAggregationError(msg, clause=name)
+    if not types:
+        msg = f"Missing definition for aggregation [{name}]"
+        raise ESAggregationError(msg, clause=name, at_end=True)
+    if len(types) > 1:
+        first, second = types[0], types[1]
+        msg = (
+            f"Found two aggregation type definitions in [{name}]: "
+            f"[{first}] and [{second}]"
+        )
+        raise ESAggregationError(msg, clause=second)
     agg_type = types[0]
     body = definition[agg_type]
     return agg_type, body if isinstance(body, dict) else {}, sub
+
+
+#: What an aggregation says when its body names nothing. Fourteen of the
+#: fifteen types this mock serves refuse it and mockdr ran them anyway — a
+#: `terms` with no field grouped every document into one bucket and reported
+#: that as the answer. `top_hits` is the one that takes an empty body and
+#: means it. Measured type by type on 8.15, trailing space and all.
+_NOTHING_SPECIFIED = "Required one of fields [field, script], but none were specified. "
+_EMPTY_AGGREGATION: dict[str, str] = {
+    "terms": _NOTHING_SPECIFIED, "date_histogram": _NOTHING_SPECIFIED,
+    "histogram": _NOTHING_SPECIFIED, "range": _NOTHING_SPECIFIED,
+    "missing": _NOTHING_SPECIFIED, "avg": _NOTHING_SPECIFIED,
+    "cardinality": _NOTHING_SPECIFIED, "max": _NOTHING_SPECIFIED,
+    "min": _NOTHING_SPECIFIED, "stats": _NOTHING_SPECIFIED,
+    "sum": _NOTHING_SPECIFIED, "value_count": _NOTHING_SPECIFIED,
+    "filters": "[filters] cannot be empty.",
+}
 
 
 def _evaluate(
     name: str, definition: dict, records: list[dict], ctx: _Context, depth: int,
 ) -> dict:
     agg_type, body, sub = _split_definition(name, definition)
+    if not body and agg_type in _EMPTY_AGGREGATION:
+        raise ESAggregationError(
+            _EMPTY_AGGREGATION[agg_type], es_type="illegal_argument_exception",
+        )
+    if not body and agg_type == "filter":
+        # An aggregation filtering on nothing is the search's own empty
+        # clause, wording and position alike.
+        msg = "query malformed, empty clause found at {position}"
+        raise ESQueryError(
+            msg, clause="filter", at_end=True, position_format=True,
+            es_type="illegal_argument_exception",
+        )
 
     if agg_type in _BUCKET_TYPES:
         return _bucket(agg_type, body, sub, records, ctx, depth)
@@ -155,7 +208,7 @@ def _evaluate(
         return _metric(agg_type, body, records, ctx)
 
     msg = f"Unknown aggregation type [{agg_type}]"
-    raise ESAggregationError(msg, clause=agg_type)
+    raise ESAggregationError(msg, clause=agg_type, named_object=True)
 
 
 # ---------------------------------------------------------------------------

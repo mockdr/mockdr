@@ -737,16 +737,17 @@ async def es_aggregation_exception_handler(
         return JSONResponse(status_code=400, content=build_es_error_response(
             400, exc.es_type, f"[{line}:{col}] {exc}",
         ))
-    content = build_es_error_response(400, "parsing_exception", str(exc))
+    content = build_es_error_response(400, exc.es_type, str(exc))
     if exc.clause is not None:
-        line, col = _body_position(await _request.body(), exc.clause)
+        line, col = _body_position(await _request.body(), exc.clause, at_end=exc.at_end)
         for entry in (content["error"], *content["error"].get("root_cause", [])):
             entry["line"] = line
             entry["col"] = col
-        content["error"]["caused_by"] = {
-            "type": "named_object_not_found_exception",
-            "reason": f"[{line}:{col}] unknown field [{exc.clause}]",
-        }
+        if exc.named_object:
+            content["error"]["caused_by"] = {
+                "type": "named_object_not_found_exception",
+                "reason": f"[{line}:{col}] unknown field [{exc.clause}]",
+            }
     return JSONResponse(status_code=400, content=content)
 
 
@@ -882,7 +883,11 @@ async def es_query_exception_handler(
             or _request.query_params.get("source", "").encode()
         )
         line, col = _body_position(text, exc.clause, at_end=exc.at_end)
-        if exc.position_in_message:
+        if exc.position_format:
+            # The reason ends with the position rather than opening on it.
+            for entry in (content["error"], *content["error"].get("root_cause", [])):
+                entry["reason"] = entry["reason"].format(position=f"[{line}:{col}]")
+        elif exc.position_in_message:
             # `[line:col] …` in front of the reason, and on the end of the
             # cause, rather than as two fields of its own.
             for entry in (content["error"], *content["error"].get("root_cause", [])):

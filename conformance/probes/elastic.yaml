@@ -4575,3 +4575,147 @@ probes:
       path: /${seed_index}/_search
       json: {query: {bool: {should: [{}]}}}
       auth: basic
+
+  # ── An aggregation that names nothing (2.3.1) ─────────────────────────
+  #
+  # Fourteen of the fifteen types this mock serves refuse an empty body and
+  # mockdr ran them anyway: a `terms` with no field grouped every document
+  # into one bucket and reported that as the answer.
+
+  - id: es-empty-terms-aggregation
+    endpoint: search
+    needs_seed: true
+    why: The trailing space after the full stop is Elasticsearch's own.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 0, aggs: {a: {terms: {}}}}
+      auth: basic
+
+  - id: es-empty-max-aggregation
+    endpoint: search
+    needs_seed: true
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 0, aggs: {a: {max: {}}}}
+      auth: basic
+
+  - id: es-empty-filters-aggregation
+    endpoint: search
+    needs_seed: true
+    why: The one with a wording of its own.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 0, aggs: {a: {filters: {}}}}
+      auth: basic
+
+  - id: es-empty-filter-aggregation
+    endpoint: search
+    needs_seed: true
+    why: >
+      Filtering on nothing is the search's own empty clause, wording and
+      position alike.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 0, aggs: {a: {filter: {}}}}
+      auth: basic
+
+  - id: es-aggregation-with-no-definition
+    endpoint: search
+    needs_seed: true
+    why: >
+      Naming none and naming two are two different complaints, and mockdr
+      made one of them.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 0, aggs: {a: {}}}
+      auth: basic
+
+  - id: es-aggregation-with-two-definitions
+    endpoint: search
+    needs_seed: true
+    why: The position points at the second one, not the first.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json:
+        size: 0
+        aggs: {a: {max: {field: sev}, min: {field: sev}}}
+      auth: basic
+
+  - id: es-empty-top-hits-aggregation
+    endpoint: search
+    needs_seed: true
+    why: The one type that takes an empty body and means it.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      json: {size: 0, aggs: {a: {top_hits: {}}}}
+      auth: basic
+    ignore_paths:
+      - $.took
+
+  # ── Setting an alert's status (2.3.1) ─────────────────────────────────
+  #
+  # The route a SOAR uses to close an alert. mockdr answered one
+  # hand-written line — `signal_ids and status are required` — for every
+  # malformed body, where zod names each member of each arm of the union it
+  # accepts: alerts by id, or alerts by query.
+
+  - id: kbn-alert-status-with-nothing
+    endpoint: kibana
+    why: Four failures, not two — one arm's after the other's.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {}
+      auth: basic
+
+  - id: kbn-alert-status-with-only-ids
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {signal_ids: ["probe-alert"]}
+      auth: basic
+
+  - id: kbn-alert-status-with-only-a-status
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {status: "open"}
+      auth: basic
+
+  - id: kbn-alert-status-with-an-empty-id-list
+    endpoint: kibana
+    why: >
+      The one case that reports the first arm alone — measured rather than
+      derived, because the rule the others follow would have named the
+      second arm too.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {signal_ids: [], status: "open"}
+      auth: basic
+
+  - id: kbn-alert-status-with-an-unknown-status
+    endpoint: kibana
+    why: The enum, listed in the order the message lists it.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {signal_ids: ["probe-alert"], status: "nope"}
+      auth: basic
+
+  - id: kbn-alert-status-with-ids-of-the-wrong-type
+    endpoint: kibana
+    request:
+      method: POST
+      path: /api/detection_engine/signals/status
+      json: {signal_ids: "probe-alert", status: "open"}
+      auth: basic

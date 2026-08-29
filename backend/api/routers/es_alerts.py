@@ -50,17 +50,67 @@ def update_alert_status(
             "status": "closed"
         }
     """
-    signal_ids = body.get("signal_ids", [])
-    status = body.get("status")
-    if not signal_ids or not status:
-        raise HTTPException(
-            status_code=400,
-            detail=build_kbn_error_response(
-                400,
-                "signal_ids and status are required",
-            ),
+    _refuse_bad_status_body(body)
+    return alert_commands.update_alert_status(
+        body.get("signal_ids") or [], str(body.get("status") or ""),
+    )
+
+
+#: The workflow states 8.15 takes here, in the order its message lists them.
+_ALERT_STATUSES = ("open", "closed", "acknowledged", "in-progress")
+
+#: The two shapes this route accepts: alerts named by id, or alerts matched
+#: by a query. zod tries both and reports what each arm complained about, one
+#: after the other — which is why a body with nothing in it reads as four
+#: failures rather than two.
+_STATUS_ARMS: tuple[tuple[str, ...], ...] = (("signal_ids", "status"), ("query", "status"))
+
+
+def _status_issue(body: dict, field: str) -> str | None:
+    """What zod says about one member of one arm, or nothing if it is fine."""
+    if field not in body:
+        return f"{field}: Required"
+    value = body[field]
+    if field == "signal_ids" and not isinstance(value, list):
+        kind = {str: "string", int: "number", dict: "object", bool: "boolean"}
+        return f"signal_ids: Expected array, received {kind.get(type(value), 'string')}"
+    if field == "status" and value not in _ALERT_STATUSES:
+        allowed = " | ".join(f"'{s}'" for s in _ALERT_STATUSES)
+        return (
+            f"status: Invalid enum value. Expected {allowed}, received '{value}'"
         )
-    return alert_commands.update_alert_status(signal_ids, status)
+    return None
+
+
+def _refuse_bad_status_body(body: dict) -> None:
+    """Refuse a status update the way 8.15's schema refuses it.
+
+    mockdr answered one hand-written line — `signal_ids and status are
+    required` — for every one of these, where the product names each member
+    of each arm. An empty `signal_ids` is the one case that reports the first
+    arm alone; measured rather than derived, because the rule the others
+    follow would have named the second arm too.
+
+    Raises:
+        HTTPException: 400, in Kibana's own wording.
+    """
+    if isinstance(body.get("signal_ids"), list) and not body["signal_ids"]:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: signal_ids: Array must contain at least 1 element(s)",
+        ))
+    per_arm = [
+        [issue for field in arm if (issue := _status_issue(body, field)) is not None]
+        for arm in _STATUS_ARMS
+    ]
+    # One arm satisfied is enough; only when both fail does the message list
+    # what each of them wanted.
+    if any(not arm for arm in per_arm):
+        return
+    issues = [issue for arm in per_arm for issue in arm]
+    if issues:
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: " + ", ".join(issues),
+        ))
 
 
 # ── Tags ─────────────────────────────────────────────────────────────────────
