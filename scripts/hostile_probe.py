@@ -223,6 +223,49 @@ for path, methods in paths.items():
                             repr(body)[:30],
                         )
                     )
+# ── The credential header itself ────────────────────────────────────────────
+#
+# Everything above authenticates *correctly* and then sends hostile bodies and
+# queries, so the one header every client must get right was never hostile
+# input.  A `Basic` header that is not base64 reached a decoder that had just
+# been taught to raise, and `/kibana/api/status` — a route that serves anyone
+# — answered `500 Internal Server Error`.  The whole test suite passed.
+CREDENTIALS = [
+    "Basic",
+    "Basic !!!!",
+    "Basic " + base64.b64encode(b"nocolonhere").decode(),
+    "Basic " + base64.b64encode(b"\xff\xfe\x00").decode(),
+    "Basic " + "A" * 100000,
+    "Bearer",
+    "Bearer \x00",
+    "ApiKey !!!!",
+    "Zzz abc",
+    "",
+]
+for path, methods in paths.items():
+    if path.startswith("/web/api/v2.1/_dev") or "full_path" in path:
+        continue
+    mount = path.split("/")[1]
+    url = fill(path)
+    method = sorted(methods)[0].upper()
+    for credential in CREDENTIALS:
+        n += 1
+        try:
+            r = c.request(method, url, headers={"Authorization": credential})
+        except Exception as e:  # noqa: BLE001
+            flags.append((mount, method, url, "EXC",
+                          f"{type(e).__name__}: {str(e)[:60]}", repr(credential)[:30]))
+            continue
+        txt = r.text[:200]
+        if (
+            r.status_code >= 500
+            or "Traceback" in txt
+            or "Internal Server Error" in txt
+            or "RecursionError" in txt
+        ):
+            flags.append((mount, method, url, r.status_code,
+                          txt.replace("\n", " ")[:70], repr(credential)[:30]))
+
 print(f"=== HOSTILE RESULT === {n} requests over {len(paths)} paths")
 seen = set()
 for f in flags:

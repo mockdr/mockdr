@@ -92,3 +92,25 @@ class TestWhyTheClusterSaysNo:
     def test_the_scheme_is_case_insensitive(self, client: TestClient) -> None:
         assert _ask(client, f"basic {GOOD}").status_code == 200
         assert _ask(client, f"BASIC {GOOD}").status_code == 200
+
+
+class TestARouteThatServesAnyone:
+    """A malformed header must not become a 500 where the route needs none.
+
+    `/api/status` answers 200 to anyone, and more fully to a caller it
+    recognises.  Teaching the Basic decoder to *raise* — so the refusals
+    above could tell an encoding failure from a value one — turned every
+    malformed header on that route into `500 Internal Server Error`, and the
+    whole suite still passed.  `hostile_probe` had never sent a hostile
+    credential header; it does now.
+    """
+
+    def test_a_mangled_header_leaves_the_caller_anonymous(
+        self, client: TestClient,
+    ) -> None:
+        for header in ("Basic", "Basic !!!!", f"Basic {NO_COLON}", "Zzz abc"):
+            resp = client.get("/kibana/api/status",
+                              headers={"Authorization": header})
+            assert resp.status_code == 200, header
+            # The anonymous document, not the fuller one a known user gets.
+            assert set(resp.json()) == {"status"}, header

@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**`hostile_probe` never sent a hostile credential header, and a 500 walked through.**
+Everything it does authenticates *correctly* first and then sends hostile
+bodies and queries, so the one header every client must get right was the
+one input never made hostile. Teaching the Basic decoder to raise — so the
+five refusals below could be told apart — turned every malformed header on
+`/api/status`, a route that serves anyone, into `500 Internal Server Error`.
+The whole test suite passed. Ten malformed credentials are sent to every
+route now, 29912 requests over 515 paths, and the defect was put back once
+to watch the audit name it.
+
+splunkd was asked the same question and mockdr already matched it exactly on
+all seven headers: `ERROR "Unauthorized"` for anything Basic-shaped or
+unknown, `WARN "call not properly authenticated"` for the token schemes —
+two answers that differ in their message *type* as well as their text.
+
 **One 401, five reasons, and mockdr gave the same one to five of six.**
 Elasticsearch tells apart a request that carried no credentials, one whose
 header it could not read, and one whose credentials were wrong — and it

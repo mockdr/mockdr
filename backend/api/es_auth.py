@@ -174,7 +174,13 @@ async def optional_es_auth(request: Request) -> dict | None:
     authorization = request.headers.get("authorization") or ""
     scheme, _, value = authorization.partition(" ")
     if scheme.lower() == "basic":
-        return _decode_basic(value)
+        try:
+            return _decode_basic(value)
+        except BasicHeaderError:
+            # A header this route never had to read: it serves anyone, so a
+            # malformed one leaves the caller anonymous rather than refused.
+            # Kibana answers `/api/status` with 200 whatever the header says.
+            return None
     if scheme.lower() == "apikey":
         return _decode_api_key(value)
     return None
