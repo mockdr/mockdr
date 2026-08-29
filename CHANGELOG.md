@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A uri parameter fails as an `illegal_argument_exception`, not a parse error.**
+The reason text was already right — `Failed to parse int parameter [size]
+with value []` — but the *type* was `parsing_exception`, which is what a
+malformed body carries. A uri parameter is read before the body is parsed at
+all, and a client branching on the type saw a body error for a query it had
+not got wrong.
+
+**A time value is a number and one of seven units.**
+`nanos`, `micros`, `ms`, `s`, `m`, `h`, `d` — and not `w` or `y`, though
+other parts of the stack take those. A bare `5` is not one either. Anything
+else is `failed to parse setting [timeout] with value [5] as a time value:
+unit is missing or unrecognized`, and a negative one is fine. mockdr took
+`timeout` and `scroll` as any string at all and searched anyway, so a client
+that sent a duration the cluster refuses got results from the mock.
+Twenty-one values compared against 8.15 afterwards, none differing.
+
 **An empty query value is a zero to two validators and a string to the third.**
 `?perPage=` on the Cases, detection-engine and lists APIs answers 200 with
 the page size at 0 — the real `total` beside an empty page — and `?page=`

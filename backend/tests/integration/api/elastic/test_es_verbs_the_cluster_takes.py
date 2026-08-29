@@ -250,3 +250,60 @@ class TestABodyUnderAContentTypeTheClusterCannotRead:
         assert by_get.status_code == 200
         empty = self._search(client, "text/plain", body="")
         assert empty.status_code == 200
+
+
+class TestUriParametersTheClusterReadsBeforeTheBody:
+    """A uri parameter fails as an `illegal_argument_exception`, not a parse.
+
+    The reason text was already right; the *type* was `parsing_exception`,
+    which is what a malformed body carries.  A uri parameter is read before
+    the body is parsed at all, and a client branching on the type saw a body
+    error for a query it had not got wrong.
+
+    And a time value is a number and one of seven units — `nanos`, `micros`,
+    `ms`, `s`, `m`, `h`, `d`.  `w` and `y` are not among them here, though
+    other parts of the stack take them, and a bare number is not one either.
+    mockdr took anything at all.  Measured on 8.15 unit by unit.
+    """
+
+    def _search(self, client: TestClient, query: str):
+        return client.get(f"/elastic/logs-endpoint/_search?{query}", headers=AUTH)
+
+    def test_an_int_parameter_fails_as_an_illegal_argument(
+        self, client: TestClient,
+    ) -> None:
+        for name in ("size", "from", "terminate_after"):
+            resp = self._search(client, f"{name}=")
+            assert resp.status_code == 400, name
+            error = resp.json()["error"]
+            assert error["type"] == "illegal_argument_exception", name
+            assert error["reason"] == (
+                f"Failed to parse int parameter [{name}] with value []"
+            ), name
+
+    def test_the_seven_units_are_taken(self, client: TestClient) -> None:
+        for unit in ("nanos", "micros", "ms", "s", "m", "h", "d"):
+            assert self._search(client, f"timeout=5{unit}").status_code == 200, unit
+
+    def test_a_negative_time_is_still_a_time(self, client: TestClient) -> None:
+        assert self._search(client, "timeout=-1s").status_code == 200
+
+    def test_anything_else_is_a_unit_that_is_missing_or_unrecognised(
+        self, client: TestClient,
+    ) -> None:
+        for value in ("", "5", "abc", "5x", "5w", "5y"):
+            resp = self._search(client, f"timeout={value}")
+            assert resp.status_code == 400, value
+            error = resp.json()["error"]
+            assert error["type"] == "illegal_argument_exception", value
+            assert error["reason"] == (
+                f"failed to parse setting [timeout] with value [{value}] "
+                f"as a time value: unit is missing or unrecognized"
+            ), value
+
+    def test_scroll_is_a_time_value_too(self, client: TestClient) -> None:
+        assert self._search(client, "scroll=1m").status_code == 200
+        resp = self._search(client, "scroll=abc")
+        assert resp.status_code == 400
+        assert resp.json()["error"]["reason"].startswith(
+            "failed to parse setting [scroll] with value [abc]")

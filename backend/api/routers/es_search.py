@@ -7,6 +7,7 @@ use when configured to talk directly to Elasticsearch.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from fnmatch import fnmatch
 
@@ -560,8 +561,24 @@ _URI_SEARCH_PARAMS = frozenset({
 })
 
 
+#: A time value is a number and one of seven units — `w` and `y` are *not*
+#: among them here, though other parts of the stack take them.  A negative
+#: one is fine.  Anything else is `unit is missing or unrecognized`, measured
+#: on 8.15 unit by unit.
+_TIME_VALUE = re.compile(r"-?\d+(?:\.\d+)?(?:nanos|micros|ms|s|m|h|d)")
+
 def _with_uri_params(body: dict, query: Mapping[str, str]) -> dict:
     """Fold the URI-search parameters into the body they stand for."""
+    # Before the early return below: a time value is judged whether or not
+    # anything else in the query reaches the body.
+    for name in ("timeout", "scroll"):
+        value = query.get(name)
+        if value is not None and not _TIME_VALUE.fullmatch(value):
+            raise ESQueryError(
+                f"failed to parse setting [{name}] with value [{value}] "
+                f"as a time value: unit is missing or unrecognized",
+                es_type="illegal_argument_exception",
+            )
     given = {k: v for k, v in query.items() if k in _URI_SEARCH_PARAMS}
     if not given:
         return body
@@ -578,9 +595,13 @@ def _with_uri_params(body: dict, query: Mapping[str, str]) -> dict:
             try:
                 merged[name] = int(given[name])
             except ValueError as exc:
+                # `illegal_argument_exception`, not the `parsing_exception`
+                # the body's own failures carry: the uri parameters are read
+                # before the body is parsed at all.  Measured on 8.15.
                 raise ESQueryError(
                     f"Failed to parse int parameter [{name}] with value "
                     f"[{given[name]}]",
+                    es_type="illegal_argument_exception",
                 ) from exc
     if "sort" in given:
         merged["sort"] = [
