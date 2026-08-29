@@ -1028,6 +1028,10 @@ def get_field_mapping(
     return {index: {"mappings": fields}}
 
 
+# A mapping update is accepted on both verbs, and the two do the same
+# thing: `acknowledged` either way, and both fields land.  Measured on
+# 8.15 by putting one field and posting another to the same index.
+@router.post("/{index:esindex}/_mapping", operation_id="es_post_mapping")
 @router.put("/{index:esindex}/_mapping", operation_id="es_put_mapping")
 def put_mapping(
     index: str,
@@ -1189,6 +1193,19 @@ def get_source(
 _SHARD_ACK = {"_shards": {"total": 2, "successful": 1, "failed": 0}}
 
 
+# `_refresh` and `_flush` answer a GET exactly as they answer a POST — the
+# same body, byte for byte — while `_forcemerge` and `_cache/clear` below
+# refuse it with a 405.  Measured on 8.15; no rule accounts for the split.
+@router.get(
+    "/{index:esindex}/_refresh",
+    operation_id="es_refresh_get",
+    dependencies=[es_refuses_unknown(*_REFRESH_PARAMS, source=False)],
+)
+@router.get(
+    "/{index:esindex}/_flush",
+    operation_id="es_flush_get",
+    dependencies=[es_refuses_unknown(*_FLUSH_PARAMS, source=False)],
+)
 @router.post(
     "/{index:esindex}/_refresh",
     operation_id="es_refresh",
@@ -1218,6 +1235,11 @@ def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
     return dict(_SHARD_ACK)
 
 
+# Every search-shaped endpoint takes the body on a GET as readily as on a
+# POST, which is how a client that puts its query in the body and reads it
+# with a GET reaches them.  Measured identical on 8.15.
+@router.get("/_msearch", operation_id="es_msearch_all_get")
+@router.get("/{index:esindex}/_msearch", operation_id="es_msearch_get")
 @router.post("/_msearch", operation_id="es_msearch_all")
 @router.post("/{index:esindex}/_msearch", operation_id="es_msearch")
 async def msearch(request: Request, index: str = "", _: dict = Depends(require_es_auth)) -> dict:
@@ -1414,6 +1436,7 @@ def resolve_index(expression: str, _: dict = Depends(require_es_auth)) -> dict:
     return search_queries.resolve_index(expression)
 
 
+@router.get("/{index:esindex}/_analyze", operation_id="es_analyze_get")
 @router.post("/{index:esindex}/_analyze", operation_id="es_analyze")
 def analyze(
     index: str, body: dict = Body(default={}), _: dict = Depends(require_es_auth),
@@ -1429,6 +1452,11 @@ def analyze(
         )) from exc
 
 
+@router.get(
+    "/{index:esindex}/_validate/query",
+    operation_id="es_validate_query_get",
+    dependencies=[es_refuses_unknown(*_VALIDATE_QUERY_PARAMS)],
+)
 @router.post(
     "/{index:esindex}/_validate/query",
     operation_id="es_validate_query",
@@ -1471,6 +1499,7 @@ async def validate_query(
         )) from exc
 
 
+@router.get("/{index:esindex}/_terms_enum", operation_id="es_terms_enum_get")
 @router.post("/{index:esindex}/_terms_enum", operation_id="es_terms_enum")
 def terms_enum(
     index: str, body: dict = Body(default={}), _: dict = Depends(require_es_auth),
@@ -1630,13 +1659,24 @@ async def get_index(request: Request, index: str) -> Response:
     return JSONResponse(content=described)
 
 
+@router.delete("/", operation_id="es_delete_index_unnamed")
 @router.delete(
     "/{index:esindex}",
     operation_id="es_delete_index",
     dependencies=[es_refuses_unknown(*_DELETE_INDEX_PARAMS, source=False)],
 )
-def delete_index(index: str, _: dict = Depends(require_es_write)) -> dict:
-    """Delete an index and everything written to it."""
+def delete_index(index: str = "", _: dict = Depends(require_es_write)) -> dict:
+    """Delete an index and everything written to it.
+
+    `DELETE /` reaches the same endpoint with nothing named, and the cluster
+    says so rather than refusing the verb: a client that built its URL from
+    an empty variable gets told which argument is missing.  Measured on 8.15.
+    """
+    if not index:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "action_request_validation_exception",
+            "Validation Failed: 1: index / indices is missing;",
+        ))
     if index.startswith("_"):
         raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
     result = search_queries.delete_index(index)
