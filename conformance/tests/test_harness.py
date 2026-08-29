@@ -424,9 +424,12 @@ class TestSeededProbesLoad:
         spec = load_spec(ROOT / "probes" / "splunk.yaml")
         seeded = [p for p in spec.probes if p.needs_seed]
         assert seeded, "the splunk probes should include seeded ones"
-        # `compare: values` without data on both sides would compare a seeded
-        # mock against an empty install and report every row as a difference.
-        assert all(p.compare_values for p in seeded)
+        # A seeded probe need not compare values.  A *shape* probe can need
+        # the seed just as much: with nothing on one side there are no
+        # element paths to compare, and the comparator reports that emptiness
+        # as a finding only for probes that declared the two sides seeded
+        # alike.  What a seeded probe must not be is unscoped — see the
+        # sourcetype test below.
         for probe in spec.probes:
             if not probe.compare_values or probe.needs_seed:
                 continue
@@ -452,11 +455,22 @@ class TestSeededProbesLoad:
                 f"{probe.id} compares values without data on either side"
             )
 
-    def test_every_seeded_probe_uses_the_bootstrap_sourcetype(self) -> None:
+    def test_every_seeded_probe_is_scoped_to_the_run(self) -> None:
+        """Seeded means *these* documents, not whatever the install holds.
+
+        Two ways to say so: a search that names the run's sourcetype, or a
+        request addressed to the job the bootstrap dispatched — which was
+        itself scoped that way.  A seeded probe that says neither searches
+        whatever each install happens to hold, which is the thing seeding
+        exists to stop.
+        """
         spec = load_spec(ROOT / "probes" / "splunk.yaml")
         for probe in spec.probes:
-            if probe.needs_seed:
-                assert "${sourcetype}" in str(probe.request.content)
+            if not probe.needs_seed:
+                continue
+            scoped = ("${sourcetype}" in str(probe.request.content)
+                      or "${seed_sid}" in probe.request.path)
+            assert scoped, f"{probe.id} needs the seed but is scoped to neither"
 
     def test_the_volatile_field_list_is_loaded(self) -> None:
         spec = load_spec(ROOT / "probes" / "splunk.yaml")

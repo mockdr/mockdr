@@ -3470,7 +3470,7 @@ probes:
     request:
       method: POST
       path: /services/search/jobs
-      content: "search=search index=main | sort&output_mode=json&exec_mode=oneshot"
+      content: "search=search index=main sourcetype=${sourcetype} | sort&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 
@@ -3480,7 +3480,7 @@ probes:
     request:
       method: POST
       path: /services/search/jobs
-      content: "search=search index=main | table&output_mode=json&exec_mode=oneshot"
+      content: "search=search index=main sourcetype=${sourcetype} | table&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 
@@ -3490,7 +3490,7 @@ probes:
     request:
       method: POST
       path: /services/search/jobs
-      content: "search=search index=main | eval&output_mode=json&exec_mode=oneshot"
+      content: "search=search index=main sourcetype=${sourcetype} | eval&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 
@@ -3500,7 +3500,7 @@ probes:
     request:
       method: POST
       path: /services/search/jobs
-      content: "search=search index=main | dedup&output_mode=json&exec_mode=oneshot"
+      content: "search=search index=main sourcetype=${sourcetype} | dedup&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 
@@ -3513,7 +3513,7 @@ probes:
     request:
       method: POST
       path: /services/search/jobs
-      content: "search=search index=main | rex&output_mode=json&exec_mode=oneshot"
+      content: "search=search index=main sourcetype=${sourcetype} | rex&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 
@@ -3523,7 +3523,7 @@ probes:
     request:
       method: POST
       path: /services/search/jobs
-      content: "search=search index=main | timechart&output_mode=json&exec_mode=oneshot"
+      content: "search=search index=main sourcetype=${sourcetype} | timechart&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
 

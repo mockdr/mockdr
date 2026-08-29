@@ -540,6 +540,19 @@ _SPLUNK_TYPEAHEAD = re.compile(r"/splunk/services/search/typeahead")
 _SPLUNK_METHOD_NOT_ALLOWED = "Method Not Allowed"
 
 
+def _es_uri(request: Request, path: str) -> str:
+    """The uri Elasticsearch names in a 405, query string and all.
+
+    The cluster echoes what the client sent — `/{index}/_search?size=1`, not
+    `/{index}/_search` — and that message is what ends up in a client's log.
+    Dropping the query made the mock's 405 name a request nobody had made.
+    Measured on 8.15 on two unrelated endpoints.
+    """
+    inner = path[len("/elastic"):] if path.startswith("/elastic") else path
+    query = request.url.query
+    return f"{inner}?{query}" if query else inner
+
+
 def _splunk_wrong_method(
     request: Request, path: str, allowed: tuple[str, ...],
 ) -> JSONResponse:
@@ -1355,10 +1368,10 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
         # Elasticsearch's 405 carries a bare string, not the nested error
         # object every other status uses, and it names the verbs the uri does
         # take (measured on 8.15).
-        inner = path[len("/elastic"):] if path.startswith("/elastic") else path
         return JSONResponse(status_code=405, content={
-            "error": f"Incorrect HTTP method for uri [{inner}] and method "
-                     f"[{request.method}], allowed: [{', '.join(allowed)}]",
+            "error": f"Incorrect HTTP method for uri [{_es_uri(request, path)}] "
+                     f"and method [{request.method}], "
+                     f"allowed: [{', '.join(allowed)}]",
             "status": 405,
             # No space after the comma, which is how the cluster writes it.
         }, headers={"Allow": ",".join(allowed)})
@@ -1396,7 +1409,8 @@ def unmatched_route(request: Request, full_path: str = "") -> Response:
             segments = [seg for seg in inner.split("/") if seg]
             if segments and segments[0] == "_cat":
                 return JSONResponse(status_code=405, content={
-                    "error": f"Incorrect HTTP method for uri [{inner}] and method "
+                    "error": f"Incorrect HTTP method for uri "
+                             f"[{_es_uri(request, path)}] and method "
                              f"[{request.method}], allowed: [POST]",
                     "status": 405,
                 })

@@ -116,3 +116,32 @@ class TestDeleteWithNothingNamed:
             },
             "status": 400,
         }
+
+
+class TestThe405NamesWhatWasSent:
+    """The cluster echoes the uri with its query string, and clients log it."""
+
+    def test_a_wrong_verb_names_the_query_string(self, client: TestClient) -> None:
+        resp = client.request("DELETE", "/elastic/zzz-idx/_search",
+                              headers=AUTH, params={"size": 1})
+        assert resp.status_code == 405
+        assert resp.json()["error"] == (
+            "Incorrect HTTP method for uri [/zzz-idx/_search?size=1] and "
+            "method [DELETE], allowed: [GET, POST]"
+        )
+
+    def test_an_unknown_cat_endpoint_names_it_too(self, client: TestClient) -> None:
+        resp = client.get("/elastic/_cat/zzz", headers=AUTH,
+                          params={"format": "json", "v": "true"})
+        assert resp.status_code == 405
+        assert resp.json()["error"] == (
+            "Incorrect HTTP method for uri [/_cat/zzz?format=json&v=true] and "
+            "method [GET], allowed: [POST]"
+        )
+
+    def test_without_a_query_string_there_is_no_question_mark(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.request("DELETE", "/elastic/zzz-idx/_search", headers=AUTH)
+        assert resp.status_code == 405
+        assert "[/zzz-idx/_search]" in resp.json()["error"]

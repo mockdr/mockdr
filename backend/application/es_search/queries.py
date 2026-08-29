@@ -1010,7 +1010,13 @@ def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dic
 def es_cat_indices() -> list[dict]:
     """Return the ``_cat/indices`` rows, in the JSON form ``format=json`` gives."""
     rows = []
-    for prefix in _KNOWN_PREFIXES:
+    # The built-in indices, then every index a client has created.  Listing
+    # only the built-in ones meant a client could create an index, write to
+    # it, read the documents back and find it through `GET /{index}` — and
+    # then not see it in the listing it asks for to check its own work.  A
+    # cluster lists every index it holds, in no particular order.
+    created = sorted(store.get_all_with_keys("es_indices"))
+    for prefix in (*_KNOWN_PREFIXES, *(n for n in created if n not in _KNOWN_PREFIXES)):
         records, _, _written = _resolve_collection(prefix, ignore_unavailable=True)
         rows.append({
             "health": "green",

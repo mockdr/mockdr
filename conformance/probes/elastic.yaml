@@ -578,23 +578,34 @@ probes:
       query: {pretty: "", filter_path: zzz-nothing}
       auth: basic
 
+  # Both are scoped to the seeded index.  Unscoped, they listed every index
+  # the target happened to hold — on the mock four, on a real cluster all of
+  # Kibana's system indices too — and a cluster that has just started has one
+  # of those closed, where `store.size` is `null` along with `docs.count`,
+  # `docs.deleted`, `pri.store.size` and `dataset.size`.  The type union then
+  # read `null|string` against the mock's `string`, which says nothing about
+  # what these two probes ask and turned CI red on a cluster's startup
+  # timing.  mockdr has no closed index to answer `null` for, and inventing
+  # one to match would be inventing.
   - id: es-cat-bytes-raw
     endpoint: search
+    needs_seed: true
     why: >
       `bytes=b` asks for the raw count; mockdr wrote a rendered `180kb`
       whatever was asked, because the row carried a string and not a number.
     request:
       method: GET
-      path: /_cat/indices
+      path: /_cat/indices/${seed_index}
       query: {h: "store.size", bytes: b, format: json}
       auth: basic
 
   - id: es-cat-bytes-unit
     endpoint: search
+    needs_seed: true
     why: A unit divides and truncates — 77 kB in megabytes is 0.
     request:
       method: GET
-      path: /_cat/indices
+      path: /_cat/indices/${seed_index}
       query: {h: "store.size", bytes: mb, format: json}
       auth: basic
 

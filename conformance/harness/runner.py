@@ -189,6 +189,7 @@ def run_platform(
                         probe.id, responses["mock"], responses["real"],
                         spec.significant_keys,
                         (*spec.ignore_paths, *probe.ignore_paths), probe.why,
+                        seeded_alike=probe.needs_seed,
                     ))
 
     if not_run:

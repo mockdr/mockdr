@@ -196,6 +196,8 @@ def compare(
     significant_keys: frozenset[str],
     ignore_paths: tuple[str, ...] = (),
     why: str = "",
+    *,
+    seeded_alike: bool = False,
 ) -> list[Finding]:
     """Compare one probe's two responses, worst finding first."""
     findings: list[Finding] = []
@@ -237,7 +239,24 @@ def compare(
 
     mock_skeleton = skeleton(mock.body, significant_keys)
     real_skeleton = skeleton(real.body, significant_keys)
-    uncomparable = _empty_arrays(mock_skeleton) | _empty_arrays(real_skeleton)
+    mock_empty = _empty_arrays(mock_skeleton)
+    real_empty = _empty_arrays(real_skeleton)
+    uncomparable = mock_empty | real_empty
+
+    if seeded_alike:
+        # The probe says both targets hold the same data, so a collection
+        # empty on one side and not the other is not "nothing to compare" —
+        # it is the finding.  Skipping it silently is how a probe scoped to
+        # an index the mock did not list passed while comparing nothing at
+        # all: `[]` against a row, reported as agreement.
+        for path in sorted((mock_empty ^ real_empty) - set(ignore_paths)):
+            if _ignored(path, ignore_paths):
+                continue
+            findings.append(Finding(
+                probe_id, "type", path,
+                "<empty>" if path in mock_empty else "<populated>",
+                "<empty>" if path in real_empty else "<populated>", why,
+            ))
 
     for path in sorted(set(mock_skeleton) | set(real_skeleton)):
         if _ignored(path, ignore_paths) or _under_empty_array(path, uncomparable):
