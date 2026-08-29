@@ -3526,3 +3526,32 @@ probes:
       content: "search=search index=main | timechart&output_mode=json&exec_mode=oneshot"
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
+
+  - id: splunk-negative-count
+    endpoint: management
+    why: >
+      A negative count is not the same as zero: splunkd reads it as an
+      unsigned 64-bit integer and reports that as the page size, where
+      mockdr answered the `count=0` number.
+    request:
+      method: GET
+      path: /services/authorization/roles
+      query: {output_mode: json, count: "-1"}
+      auth: basic
+    ignore_paths:
+      - $.entry
+      - $.paging.total
+      - $.origin
+
+  - id: splunk-count-of-zero
+    endpoint: management
+    why: The other half — zero is splunkd's own maximum, not the width.
+    request:
+      method: GET
+      path: /services/authorization/roles
+      query: {output_mode: json, count: "0"}
+      auth: basic
+    ignore_paths:
+      - $.entry
+      - $.paging.total
+      - $.origin

@@ -78,7 +78,8 @@ class ESAggregationError(ValueError):
     def __init__(
         self, message: str, *, clause: str | None = None,
         es_type: str = "parsing_exception", at_end: bool = False,
-        named_object: bool = False,
+        named_object: bool = False, caused_by: dict | None = None,
+        value_position: bool = False,
     ) -> None:
         """Record the message, the clause if any, and the exception type.
 
@@ -92,12 +93,18 @@ class ESAggregationError(ValueError):
         ``named_object`` marks the one that carries a cause: an aggregation
         *type* Elasticsearch does not know. A definition naming none, or
         naming two, is the same exception without one.
+
+        ``caused_by`` is the reason underneath a member the aggregation would
+        not take, and ``value_position`` points the position at that member's
+        *value* rather than at its name.
         """
         super().__init__(message)
         self.clause = clause
         self.es_type = es_type
         self.at_end = at_end
         self.named_object = named_object
+        self.caused_by = caused_by
+        self.value_position = value_position
 
 
 
@@ -193,6 +200,8 @@ def _evaluate(
         raise ESAggregationError(
             _EMPTY_AGGREGATION[agg_type], es_type="illegal_argument_exception",
         )
+    if agg_type == "terms":
+        _refuse_bad_bounds(name, body)
     if not body and agg_type == "filter":
         # An aggregation filtering on nothing is the search's own empty
         # clause, wording and position alike.
@@ -262,6 +271,46 @@ def _bucket(
         return _with_sub({"doc_count": len(matched)}, sub, matched, ctx, depth)
     # filters
     return _filters(body, sub, records, ctx, depth)
+
+
+#: The numeric members a `terms` aggregation bounds, with the name its cause
+#: spells them by and the floor each has. mockdr took them at face value, so
+#: a `size` of zero produced every bucket and a negative one produced them
+#: in reverse — an answer to a request the cluster refuses outright.
+_TERMS_BOUNDS: tuple[tuple[str, str, int], ...] = (
+    ("size", "size", 1),
+    ("shard_size", "shardSize", 1),
+    ("min_doc_count", "minDocCount", 0),
+    ("shard_min_doc_count", "shardMinDocCount", 0),
+)
+
+
+def _refuse_bad_bounds(name: str, body: dict) -> None:
+    """Refuse a `terms` member outside the range the cluster takes.
+
+    Raises:
+        ESAggregationError: Carrying the reason underneath, as 8.15 does.
+    """
+    for member, spelled, floor in _TERMS_BOUNDS:
+        if member not in body:
+            continue
+        value = body[member]
+        if not isinstance(value, int) or isinstance(value, bool) or value >= floor:
+            continue
+        comparison = (
+            "greater than 0" if floor == 1 else "greater than or equal to 0"
+        )
+        raise ESAggregationError(
+            f"[terms] failed to parse field [{member}]",
+            clause=f"terms.{member}", es_type="x_content_parse_exception",
+            value_position=True,
+            caused_by={
+                "type": "illegal_argument_exception",
+                "reason": (
+                    f"[{spelled}] must be {comparison}. Found [{value}] in [{name}]"
+                ),
+            },
+        )
 
 
 def _terms(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int) -> dict:

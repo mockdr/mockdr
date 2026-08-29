@@ -110,6 +110,23 @@ lookup of nothing. 8.15 tells the two empties apart: no body is a
 naming no documents an `action_request_validation_exception`. The route that
 takes an index made neither distinction.
 
+**Numbers outside the range a paginating client reaches.**
+`from: -1` and `size: -1` are worded differently and mockdr used one formula
+for both — the cluster says `, found [-1]` for one and ` but was [-1]` for
+the other. A negative `terminate_after` is refused where zero means no
+limit; mockdr read it as a limit and answered nothing. And a `terms`
+aggregation's four numeric bounds were taken at face value, so a `size` of
+zero produced every bucket and a negative one produced them in reverse — the
+cluster refuses each, with the member spelled in camel case in the cause and
+in snake case in the reason, and the position pointing at the *value* rather
+than the name. Finding that position needed the search for a member to take
+a path: the `size` inside the aggregation is not the `size` a search body
+carries at the top.
+
+On splunkd, a negative `count` is not the same as zero: it is read as an
+unsigned 64-bit integer and reported as the page size, where mockdr answered
+the `count=0` number for both.
+
 **Ten SPL commands ran on no argument at all.**
 The same question, third product: `| sort`, `| table`, `| eval`, `| dedup`,
 `| top`, `| rare`, `| rename`, `| regex`, `| rex` and `| timechart` with

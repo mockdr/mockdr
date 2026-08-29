@@ -1219,3 +1219,98 @@ class TestACommandGivenNoArgument:
         ).json()
 
         assert not [m for m in body.get("messages", []) if m["type"] == "FATAL"]
+
+
+class TestNumbersOutsideTheRange:
+    """Bounds a paginating client actually reaches."""
+
+    ES = {
+        "Authorization": "Basic " + base64.b64encode(
+            b"elastic:mock-elastic-password").decode(),
+    }
+
+    def test_from_and_size_are_worded_differently(self, client: TestClient) -> None:
+        """mockdr used one formula for both."""
+        low_from = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={"from": -1},
+        ).json()["error"]
+        low_size = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES, json={"size": -1},
+        ).json()["error"]
+
+        assert low_from["reason"] == "[from] parameter cannot be negative but was [-1]"
+        assert low_size["reason"] == "[size] parameter cannot be negative, found [-1]"
+
+    def test_terminate_after_takes_zero_and_refuses_below(
+        self, client: TestClient,
+    ) -> None:
+        """Zero means no limit; below it mockdr answered nothing at all."""
+        assert client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"terminate_after": 0},
+        ).status_code == 200
+
+        refused = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"terminate_after": -1},
+        )
+        assert refused.status_code == 400
+        assert refused.json()["error"]["reason"] == "terminateAfter must be > 0"
+
+    @pytest.mark.parametrize(("member", "spelled", "value", "comparison"), [
+        ("size", "size", 0, "greater than 0"),
+        ("shard_size", "shardSize", -1, "greater than 0"),
+        ("min_doc_count", "minDocCount", -1, "greater than or equal to 0"),
+        ("shard_min_doc_count", "shardMinDocCount", -1,
+         "greater than or equal to 0"),
+    ])
+    def test_a_terms_bound_outside_its_range_is_refused(
+        self, client: TestClient, member: str, spelled: str, value: int,
+        comparison: str,
+    ) -> None:
+        """A `size` of zero produced every bucket, a negative one reversed them."""
+        resp = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {"terms": {
+                "field": "host.name", member: value}}}},
+        )
+
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["type"] == "x_content_parse_exception"
+        assert error["reason"].endswith(f"[terms] failed to parse field [{member}]")
+        # The cause spells it in camel case where the reason spells it in snake.
+        assert error["caused_by"]["reason"] == (
+            f"[{spelled}] must be {comparison}. Found [{value}] in [a]"
+        )
+
+    def test_the_position_points_at_the_value_not_the_name(
+        self, client: TestClient,
+    ) -> None:
+        """And at the `size` inside the aggregation, not the one at the top."""
+        reason = client.post(
+            "/elastic/.siem-signals/_search", headers=self.ES,
+            json={"size": 0, "aggs": {"a": {"terms": {
+                "field": "host.name", "size": 0}}}},
+        ).json()["error"]["reason"]
+
+        assert reason.startswith("[1:")
+        column = int(reason.split(":")[1].split("]")[0])
+        assert column > 40
+
+    def test_a_negative_count_is_not_a_count_of_zero(
+        self, client: TestClient,
+    ) -> None:
+        """splunkd reads it as an unsigned 64-bit integer and reports that as
+        the page size; mockdr answered the `count=0` number for both."""
+        negative = client.get(
+            "/splunk/services/authorization/roles", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "count": -1},
+        ).json()["paging"]
+        zero = client.get(
+            "/splunk/services/authorization/roles", headers=SPLUNK_AUTH,
+            params={"output_mode": "json", "count": 0},
+        ).json()["paging"]
+
+        assert negative["perPage"] == 18446744073709552000
+        assert zero["perPage"] == 10000000

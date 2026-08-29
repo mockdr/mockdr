@@ -29,6 +29,13 @@ _DEFAULT_COUNT = 30
 #: fourteen entries or none).
 _UNLIMITED_PER_PAGE = 10000000
 
+#: What it reports for a *negative* count, which is not the same thing: the
+#: value read as an unsigned 64-bit integer, and serialised through a double
+#: — so `count=-1` and `count=-5` both come back as this. mockdr answered
+#: the `count=0` number for both, which says "all of them, by the maximum"
+#: where splunkd says "all of them, by the width of the number".
+_NEGATIVE_PER_PAGE = 18446744073709552000
+
 
 class SplunkPagingMiddleware:
     """Slice Atom ``entry`` lists per the request's ``count``/``offset``."""
@@ -91,4 +98,9 @@ def _apply_paging(payload: dict, offset: int, count: int) -> None:
     if isinstance(paging, dict):
         paging["total"] = paging.get("total", total)
         paging["offset"] = offset
-        paging["perPage"] = count if count > 0 else _UNLIMITED_PER_PAGE
+        if count > 0:
+            paging["perPage"] = count
+        else:
+            paging["perPage"] = (
+                _UNLIMITED_PER_PAGE if count == 0 else _NEGATIVE_PER_PAGE
+            )

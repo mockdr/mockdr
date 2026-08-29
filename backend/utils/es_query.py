@@ -78,6 +78,14 @@ def validate_search_body(body: dict) -> None:
             if value is False:
                 token = "VALUE_FALSE"
             raise ESQueryError(f"Unknown key for a {token} in [{key}].", clause=key)
+    terminate_after = body.get("terminate_after")
+    if isinstance(terminate_after, int) and not isinstance(terminate_after, bool) \
+            and terminate_after < 0:
+        # Zero means "no limit" and is fine; below it is not. mockdr read a
+        # negative one as a limit and answered nothing at all.
+        raise ESQueryError(
+            "terminateAfter must be > 0", es_type="illegal_argument_exception",
+        )
     search_after = body.get("search_after")
     if search_after is not None:
         sort_keys = parse_sort_keys(body.get("sort") or [])
@@ -1737,7 +1745,13 @@ def _as_bound(value: Any, name: str) -> int | None:
         msg = f'For input string: "{value}"'
         raise ESQueryError(msg, es_type="number_format_exception") from exc
     if bound < 0:
-        msg = f"[{name}] parameter cannot be negative, found [{bound}]"
+        # The two are worded differently and mockdr used one formula for
+        # both: `size` says `, found [-1]`, `from` says ` but was [-1]`
+        # (measured on 8.15).
+        msg = (
+            f"[size] parameter cannot be negative, found [{bound}]" if name == "size"
+            else f"[{name}] parameter cannot be negative but was [{bound}]"
+        )
         raise ESQueryError(msg, es_type="illegal_argument_exception")
     return bound
 

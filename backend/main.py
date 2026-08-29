@@ -729,14 +729,20 @@ async def es_aggregation_exception_handler(
     unknown query type does (measured on 8.15).
     """
     if exc.es_type == "x_content_parse_exception":
-        # This one carries its position inside the reason text and nothing
-        # else — no line/col members, no cause.
-        # This exception points at the field name itself, where the others
-        # point at the value the parser was reading (measured on 8.15).
-        line, col = _key_position(await _request.body(), exc.clause or "")
-        return JSONResponse(status_code=400, content=build_es_error_response(
-            400, exc.es_type, f"[{line}:{col}] {exc}",
-        ))
+        # This one carries its position inside the reason text and no line or
+        # col members. It points at the field *name* where the others point
+        # at the value the parser was reading — except when the complaint is
+        # about the value itself, which is where the parser then stands
+        # (measured on 8.15).
+        raw = await _request.body()
+        line, col = (
+            _body_position(raw, exc.clause or "") if exc.value_position
+            else _key_position(raw, exc.clause or "")
+        )
+        content = build_es_error_response(400, exc.es_type, f"[{line}:{col}] {exc}")
+        if exc.caused_by is not None:
+            content["error"]["caused_by"] = dict(exc.caused_by)
+        return JSONResponse(status_code=400, content=content)
     content = build_es_error_response(400, exc.es_type, str(exc))
     if exc.clause is not None:
         line, col = _body_position(await _request.body(), exc.clause, at_end=exc.at_end)
@@ -779,10 +785,19 @@ def _body_position(body: bytes, clause: str, *, at_end: bool = False) -> tuple[i
     *empty* clause body closes — `"query":{}` and `"must":[{}]` alike.
     """
     text = body.decode("utf-8", errors="replace")
-    key = text.find(f'"{clause}"')
+    # A dotted path finds each name after the one before it: `terms.size`
+    # points at the `size` *inside* the aggregation, not at the `size` a
+    # search body carries at the top.
+    names = clause.split(".")
+    key, offset = -1, 0
+    for name in names:
+        key = text.find(f'"{name}"', offset)
+        if key < 0:
+            return 1, 1
+        offset = key + len(name) + 2
     if key < 0:
         return 1, 1
-    offset = key + len(clause) + 2
+    offset = key + len(names[-1]) + 2
     while offset < len(text) and text[offset] in ": \t\r\n":
         offset += 1
     if at_end:
