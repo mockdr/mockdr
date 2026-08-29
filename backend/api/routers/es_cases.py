@@ -250,16 +250,16 @@ def get_case_comments(
     case_id: str,
     _: dict = Depends(require_es_auth),
 ) -> list[dict]:
-    """List all comments for a case."""
-    result = case_queries.get_case_comments(case_id)
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=build_kbn_error_response(
-                404, f"Saved object [cases/{case_id}] not found",
-            ),
-        )
-    return result
+    """List all comments for a case.
+
+    A case that does not exist is an empty list, not a refusal: this route
+    never resolves the case, where `GET /api/cases/{id}` beside it does and
+    answers `404 Saved object [cases/{id}] not found`.  mockdr borrowed that
+    404, so a client listing the comments of a case it had just failed to
+    create was told the wrong thing about which call went wrong.  Measured
+    on 8.15.
+    """
+    return case_queries.get_case_comments(case_id) or []
 
 
 @router.post("/api/cases/{case_id}/comments", dependencies=[Depends(require_kbn_xsrf)])

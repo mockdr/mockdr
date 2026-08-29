@@ -280,9 +280,24 @@ def list_timelines(_: dict = Depends(require_es_auth)) -> dict:
 )
 def get_timeline(
     _id: str | None = Query(default=None, alias="id"),
+    _template_timeline_id: str | None = Query(default=None,
+                                              alias="template_timeline_id"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """One timeline. A timeline that is not there is an empty object there."""
+    """One timeline. A timeline that is not there is an empty object there.
+
+    Naming *no* timeline is different from naming one that does not exist:
+    Kibana answers `500 please provide id or template_timeline_id` when
+    neither parameter is there at all, and `200 {}` as soon as either is —
+    an empty `id=` included.  mockdr answered `{}` to both, so a client that
+    built its URL without the id read "no such timeline" where the product
+    told it what it had forgotten.  Measured on 8.15, absent against empty.
+    """
+    if _id is None and _template_timeline_id is None:
+        raise HTTPException(status_code=500, detail={
+            "message": "please provide id or template_timeline_id",
+            "status_code": 500,
+        })
     return {}
 
 

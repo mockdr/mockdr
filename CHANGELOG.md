@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Three Kibana routes that resolved an object the product does not.**
+Every verb each of the 72 Kibana routes does not take, asked of 8.15 and of
+the mock — 123 of 128 questions already identical, and 218 left unasked
+because a destructive verb at a path with no parameter names nothing to
+miss. Four of the five differences turned out to be about the `GET` behind
+the `HEAD`, not the verb. `GET /api/timeline` answers `500 please provide id
+or template_timeline_id` when *neither* `id` nor `template_timeline_id` is
+there at all, and `200 {}` as soon as either is — an empty `id=` included;
+mockdr answered `{}` to both, so a client that had built its URL without the
+id read "no such timeline" where the product told it what it had forgotten.
+`/api/cases/{id}/comments` and `/api/cases/{id}/user_actions` never look the
+case up: a case that does not exist is `200 []`, where mockdr borrowed the
+saved-object 404 that `GET /api/cases/{id}` beside them does answer — so a
+client listing the comments of a case it had just failed to create was told
+the wrong call had gone wrong. Two repo tests had asserted the invented 404
+and are now the measurement. Left measured and not served:
+`GET /api/cases/{id}/alerts`, which Kibana routes and mockdr answers from the
+unmatched-route fallback. Deliberately not imitated: `GET /api/endpoint/action`,
+where the probe container answers `403 Endpoint authorization failure`
+because response actions need a licence it does not have.
+
 **`_cat/indices` listed the indices foreseen, not the ones that exist.**
 It walked a fixed table of built-in prefixes, so a client could create an
 index, write documents to it, read them back and find it through

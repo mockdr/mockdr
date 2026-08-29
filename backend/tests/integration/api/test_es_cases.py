@@ -359,13 +359,20 @@ class TestCaseComments:
         for field in required:
             assert field in comment, f"Missing comment field: {field}"
 
-    def test_list_comments_for_nonexistent_case_returns_404(self, client: TestClient) -> None:
-        """Listing comments for a non-existent case should return 404."""
+    def test_list_comments_for_nonexistent_case_is_an_empty_list(
+        self, client: TestClient,
+    ) -> None:
+        """Measured on 8.15: the comments route never resolves the case.
+
+        A client listing the comments of a case it had just failed to create
+        was told the wrong call had gone wrong.
+        """
         resp = client.get(
             "/kibana/api/cases/nonexistent-id/comments",
             headers=ES_AUTH,
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        assert resp.json() == []
 
     def test_add_comment_without_kbn_xsrf_returns_400(self, client: TestClient) -> None:
         """Missing kbn-xsrf header on POST comment should return 400."""

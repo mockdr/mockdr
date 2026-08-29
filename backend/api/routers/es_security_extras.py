@@ -540,10 +540,10 @@ def case_user_actions(
     """
     case = case_queries.get_case(case_id)
     if case is None:
-        raise HTTPException(
-            status_code=404,
-            detail=build_security_solution_error(404, f"Case {case_id} not found"),
-        )
+        # Kibana does not resolve the case here either: an audit trail for a
+        # case that does not exist is `200 []`, the same as the comments
+        # route beside it.  Measured on 8.15.
+        return []
 
     actions: list[dict] = [{
         "id": f"{case_id}-create",

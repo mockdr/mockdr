@@ -230,6 +230,15 @@ Rules that follow from it:
 - Aim destructive probing at a throwaway object you create and drop yourself,
   never at the seeded index, the admin user, or anything the harness needs.
   `scripts/es_param_audit.py` makes and drops `mockdr-param-probe` for this.
+- A sweep that fills path parameters with a name nothing has is safe only for
+  the paths that *have* a parameter. A verb aimed at a collection endpoint
+  names nothing to miss, and the product does it: a verb sweep that guarded
+  `PUT` and `POST` this way but not `DELETE` sent
+  `DELETE /api/detection_engine/index` to the running Kibana, which answered
+  200. (It removes the legacy `.siem-signals` index, absent on 8.15, so
+  nothing was lost — the guard was still wrong.) Skip every destructive verb
+  at a path with no parameter, and count what you skipped in the report, so
+  "not asked" cannot read as "agreed".
 - Order a sweep so anything destructive runs last. A sweep that deletes the
   index it is iterating over reports every later route as missing — which
   reads as a mock defect and is not one.

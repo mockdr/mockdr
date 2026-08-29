@@ -315,10 +315,21 @@ class TestCaseExtras:
         assert actions
         assert actions[0]["type"] == "create_case"
 
-    def test_user_actions_for_a_missing_case_is_404(self, client: TestClient) -> None:
-        assert client.get(
+    def test_user_actions_for_a_missing_case_is_an_empty_list(
+        self, client: TestClient,
+    ) -> None:
+        """Measured on 8.15: this route never resolves the case.
+
+        `GET /api/cases/{id}` beside it does, and answers `404 Saved object
+        [cases/{id}] not found`.  The audit trail does not, and a case that
+        does not exist has `200 []`.  The 404 asserted here before came from
+        the neighbouring route's behaviour rather than this one's.
+        """
+        resp = client.get(
             "/kibana/api/cases/no-such-case/user_actions", headers=ES_AUTH,
-        ).status_code == 404
+        )
+        assert resp.status_code == 200
+        assert resp.json() == []
 
 
 class TestEndpointExtras:
