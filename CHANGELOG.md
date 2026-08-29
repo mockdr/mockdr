@@ -8,6 +8,118 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**`_cat/indices` listed the indices foreseen, not the ones that exist.**
+It walked a fixed table of built-in prefixes, so a client could create an
+index, write documents to it, read them back and find it through
+`GET /{index}` — and then not see it in the listing it asks for to check its
+own work. Four answers, three of them right, and the wrong one a 200 with an
+empty place where the index should be.
+
+**Six verbs the cluster serves and mockdr refused.**
+Every verb each Elasticsearch route does not take, asked of 8.15 and of the
+mock: 177 questions, 161 already identical. `_flush`, `_refresh`, `_analyze`,
+`_validate/query`, `_terms_enum` and `_msearch` answer a `GET` with the same
+body as a `POST`, byte for byte, because a client may carry its query in the
+body of a GET — while `_forcemerge` and `_cache/clear` sit right beside them
+and refuse it with a 405. No rule accounts for the split, so both halves are
+the measurement. A mapping update is accepted on `POST` as well as `PUT`, and
+`DELETE /` is the delete-index endpoint reached with nothing named: the
+cluster says which argument is missing where mockdr refused the verb, sending
+a client that had built its URL from an empty variable to look in the wrong
+place. Left measured and not served: the writable alias family and
+`GET /_cat/aliases`, which are a feature and not a refusal to reword.
+
+**Elasticsearch's 405 names the uri with its query string.**
+`[/{index}/_search?size=1]`, not `[/{index}/_search]` — and that message is
+what ends up in a client's log. Measured on two unrelated endpoints.
+
+**splunkd decides in an order, and the order is visible from outside.**
+For every splunk route mockdr serves, the verb it does not take, asked of
+10.4.2 and of the mock: 27 of 31 agreed. The search service says FATAL
+`Method Not Allowed` for the job collections *and everything addressed
+through a job* — `{sid}`, `control`, `results`, `events`, `summary`,
+`timeline`, `search.log` — while `jobs/export`, `parser` and `timeparser`
+say `The method is not allowed.`; mockdr matched only the bare collections.
+`/jobs/{sid}` and `/jobs/{sid}/control` take a write, so the handler runs and
+looks the job up: an unknown sid is `404 Unknown sid.` before the verb is
+judged at all, where every read-only sub-resource refuses the verb first and
+answers 405 with `Allow` even for a sid that never existed, and `PUT` and
+`PATCH` are refused above the handler and never reach the lookup. And an EAI
+handler maps the verb to an eai action — `DELETE` is `remove` — then looks
+for the trailing segment among that action's custom actions, so
+`DELETE /saved/searches/{name}/dispatch` is a 404 naming all three and not
+the 400 saying there is no target name, on a path that plainly carries one.
+Left measured and not served: splunkd takes `DELETE` on
+`/authorization/roles/{name}`, `/apps/local/{name}` and
+`/admin/macros/{name}`, where mockdr keeps three read-only catalogues.
+
+**`http_contract_audit` was wrong on eight counts, which is why it was never in CI.**
+It expected `Allow` on splunkd's search 405s (splunkd sends none, on any
+verb), expected the EAI 400 for `PATCH` (a bare 405 everywhere), took
+Elasticsearch not to serve `HEAD /{index}/_source/{id}` (it does, 200/404),
+and sent `output_mode` and `api-version` to every mount — which
+Elasticsearch refuses with a 400, so what it measured there was its own
+parameter. Corrected against both live products, it reports nothing, and now
+runs in CI.
+
+**A reset that left behind what the API serves back.**
+`POST /_dev/reset` promises the initial state and cleared the store, which
+does not hold HEC's per-channel acknowledgement ids or the webhook delivery
+log. After a reset the next event on a channel carried on counting, and
+`/collector/ack` answered `{"acks": {"0": true}}` for an event the reset had
+thrown away. Deliberately still not reset, and now said so in the code: the
+rate-limit and proxy configuration, which are settings a user set on purpose
+rather than data, and the Prometheus counters, which are monotonic by
+definition.
+
+**A `runHuntingQuery` spelling the Graph SDKs send and mockdr answered 404 for.**
+The documented request line is `POST /security/runHuntingQuery`. The
+published v1.0 OpenAPI carries only the namespace-qualified
+`/security/microsoft.graph.security.runHuntingQuery`, because the action
+lives in `microsoft.graph.security` — and the official SDKs are generated
+from that OpenAPI, so an SDK client sends the qualified segment and nothing
+else. Both spellings now reach the same endpoint, gated the same way. The
+other 59 v1.0 routes were swept for the same shape and for verbs the vendor
+does not declare; this was the only one.
+
+**A download that failed is not a specification.**
+`data/vendor-specs/sentinel__DataConnectors.json` held 14 bytes reading
+`404: Not Found`, committed under a spec's name when a version placeholder
+came out empty. Nothing read it, so it answered nothing wrongly — it sat in
+the directory the whole repository rests on. One test over all 175 remaining
+files now asks that a vendored spec parse and hold something: a file that
+cannot be parsed is worse than a missing one, because an audit that globs the
+directory counts it as judged.
+
+**Throttling outlived the test that switched it on.**
+The rate limiter keeps its config and counters in module globals, outside the
+store the re-seed clears. A test switched throttling on at 120 rpm through
+the `_dev` route and relied on a later test *in the same file* to switch it
+off — which holds right up until xdist puts the two in different workers. It
+then throttled everything else that worker ran, and a test asserting on a
+response body received the 429 envelope instead: a red build with nothing
+wrong in the code under test, seen once in five full runs. The root conftest
+puts the limiter back after every test now, and the guard has its own test.
+
+**An empty side is not agreement.**
+The conformance comparator skips every path inside a collection that is empty
+on either side, and rightly: a fresh Kibana with no rules against a seeded
+mock with twenty would report every field of every rule, which is true and
+useless. But a probe that declares `needs_seed` has said both targets hold
+the same data, and for those a collection empty on one side is not "nothing
+to compare" — it is the finding. Skipping it is how a probe scoped to an
+index the mock did not list passed while comparing nothing at all. Two `_cat`
+probes were also unscoped and listed whatever each target happened to hold: a
+cluster that has just started has a closed index, whose `store.size`,
+`docs.count`, `docs.deleted`, `pri.store.size` and `dataset.size` are all
+null, and the type union then read `null|string` against the mock's `string`
+— a CI failure decided by a container's startup timing. Two harness tests
+were red on main besides, asserting that every seeded splunk probe compares
+values and carries `${sourcetype}`, neither of which fits a probe that reads
+a seeded *job* by sid; what a seeded probe must not be is unscoped, which is
+what they check now, and six probes that searched all of `index=main` while
+claiming the seed now name the run's sourcetype.
+
 **A query member Kibana does not know is a refusal, not something to ignore.**
 8.15 checks a route's query schema before the handler runs, and refuses a
 member the route does not declare — in three wordings, one per validator:
