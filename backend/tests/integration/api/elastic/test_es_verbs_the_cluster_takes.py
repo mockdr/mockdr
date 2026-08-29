@@ -307,3 +307,60 @@ class TestUriParametersTheClusterReadsBeforeTheBody:
         assert resp.status_code == 400
         assert resp.json()["error"]["reason"].startswith(
             "failed to parse setting [scroll] with value [abc]")
+
+
+class TestAPathThatEndsInASlash:
+    """Two products serve it, one redirects, and mockdr refused all three.
+
+    A client that builds its URL by joining a base and a path lands on one
+    constantly.  Measured: Elasticsearch serves `/{index}/_search/` and every
+    other shape tried, splunkd serves `/services/...` and `/servicesNS/...`
+    alike, and Kibana answers `302` pointing at the path with its slashes
+    percent-encoded — `/api/cases/_find/` becomes `/api%2Fcases%2F_find`,
+    which then answers 404 when followed.  mockdr answered 404 to all of
+    them.
+    """
+
+    def test_elasticsearch_serves_it(self, client: TestClient) -> None:
+        for path in ("/elastic/logs-endpoint/_search/", "/elastic/_cat/indices/",
+                     "/elastic/logs-endpoint/_mapping/", "/elastic/_alias/"):
+            assert client.get(path, headers=AUTH).status_code == 200, path
+
+    def test_the_mount_root_keeps_its_slash(self, client: TestClient) -> None:
+        """`/elastic/` is the cluster's `/`, not a path with one too many."""
+        assert client.get("/elastic/", headers=AUTH).status_code == 200
+
+    def test_splunkd_serves_it(self, client: TestClient) -> None:
+        splunk = {"Authorization": "Basic YWRtaW46bW9ja2RyLWFkbWlu"}
+        for path in ("/splunk/services/data/indexes/",
+                     "/splunk/services/search/jobs/"):
+            resp = client.get(path, headers=splunk, params={"output_mode": "json"})
+            assert resp.status_code == 200, path
+
+    def test_kibana_redirects_with_its_slashes_encoded(
+        self, client: TestClient,
+    ) -> None:
+        kibana = {**AUTH, "kbn-xsrf": "true"}
+        for path, target in (("/kibana/api/cases/_find/", "/api%2Fcases%2F_find"),
+                             ("/kibana/api/status/", "/api%2Fstatus"),
+                             ("/kibana/api/fleet/agents/setup/",
+                              "/api%2Ffleet%2Fagents%2Fsetup")):
+            resp = client.get(path, headers=kibana, follow_redirects=False)
+            assert resp.status_code == 302, path
+            assert resp.headers["location"] == target, path
+
+
+class TestEveryIndexAndItsAliases:
+    """`GET /_alias` is a route the cluster has and mockdr did not.
+
+    Read as an index name, `_alias` answered `invalid_index_name_exception`.
+    Found by asking what a trailing slash does: `/_alias/` strips to
+    `/_alias`, and that turned out to be nobody's route.
+    """
+
+    def test_it_lists_every_index_and_its_aliases(self, client: TestClient) -> None:
+        client.put("/elastic/zzz-alias-probe", headers=AUTH)
+        client.put("/elastic/zzz-alias-probe/_alias/zzz-the-alias", headers=AUTH)
+        resp = client.get("/elastic/_alias", headers=AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["zzz-alias-probe"] == {"aliases": {"zzz-the-alias": {}}}

@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A path that ends in a slash: two products serve it, one redirects.**
+A client that builds its URL by joining a base and a path lands on one
+constantly. Elasticsearch serves `/{index}/_search/` and every other shape
+tried; splunkd serves `/services/...` and `/servicesNS/...` alike; Kibana
+answers `302` pointing at the path with its slashes percent-encoded —
+`/api/cases/_find/` becomes `location: /api%2Fcases%2F_find`, which then
+answers 404 when followed. mockdr answered 404 to all three. `/elastic/` is
+the cluster's own root and keeps its slash.
+
+**`GET /_alias` was nobody's route.**
+Read as an index name, `_alias` answered `invalid_index_name_exception`
+where the cluster lists every index and the aliases it carries. Found by
+asking what a trailing slash does: `/_alias/` strips to `/_alias`. The query
+behind it already existed and its docstring already said "for `GET
+/_alias`"; only the route was missing.
+
+**splunkd's argument values are already exact**, which is worth recording
+as the negative it is: `count=abc`, `count=`, `count=-1`, `offset=abc` and
+`count=1.5` all answer 200 with the same paging on both sides — including
+`count=-1`, where `perPage` comes back as 18446744073709552000.
+
 **A uri parameter fails as an `illegal_argument_exception`, not a parse error.**
 The reason text was already right — `Failed to parse int parameter [size]
 with value []` — but the *type* was `parsing_exception`, which is what a

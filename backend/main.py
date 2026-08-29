@@ -42,6 +42,7 @@ from api.middleware.splunk_search import SplunkSearchMiddleware
 from api.middleware.splunk_sort import SplunkSortMiddleware
 from api.middleware.tenant_scope import TenantScopeMiddleware
 from api.middleware.token_cache import TokenCacheMiddleware
+from api.middleware.trailing_slash import TrailingSlashMiddleware
 from api.routers import (
     accounts,
     activities,
@@ -451,6 +452,8 @@ app.add_middleware(SplunkJobLinkMiddleware)
 app.add_middleware(KibanaApiVersionMiddleware)
 # Before routing: the cluster refuses the header without looking at the body.
 app.add_middleware(ElasticContentTypeMiddleware)
+# Before routing, and before the namespace rewrite reads the path.
+app.add_middleware(TrailingSlashMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped

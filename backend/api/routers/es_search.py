@@ -1453,6 +1453,22 @@ def update_aliases(body: dict = Body(...), _: dict = Depends(require_es_write)) 
 
 
 @router.get(
+    "/_alias",
+    operation_id="es_get_all_aliases",
+    dependencies=[es_refuses_unknown(*_ALIAS_PARAMS, source=False)],
+)
+def get_all_aliases(_: dict = Depends(require_es_auth)) -> dict:
+    """Every index and the aliases it carries.
+
+    The cluster serves this; mockdr read `_alias` as an index name and
+    answered `invalid_index_name_exception`.  Found by asking what a trailing
+    slash does — `/_alias/` strips to `/_alias`, which turned out to be a
+    route nobody had.
+    """
+    return search_queries.alias_map()
+
+
+@router.get(
     "/_alias/{alias}",
     operation_id="es_get_alias",
     dependencies=[es_refuses_unknown(*_ALIAS_PARAMS, source=False)],
