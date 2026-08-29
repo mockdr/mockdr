@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Kibana's three answers to a content type, and none of them Elasticsearch's.**
+Hapi decides after routing and only for the verbs that carry a payload, so a
+`GET` is never judged. A header that is not `type/subtype` — `json`,
+`text/`, `/plain` — is `400 Invalid content-type header`; `text/*` and the
+four it parses reach the route, which answers about the body; every other
+syntactically valid media type — `application/yaml`, `application/xml`,
+`foo/bar`, `*/*`, `application/*` — is `415 Unsupported Media Type`. A
+header that is *absent* is parsed, not refused, and the body need not be
+there at all, which is where this differs from Elasticsearch's 406. mockdr
+answered pydantic's 400 to all of them. Fourteen types compared against 8.15
+afterwards, all agreeing. The Boom envelope's status-title table had no 415
+either, so every one of them would have read `Internal Server Error`.
+
 **A body under a content type Elasticsearch cannot read is refused, not parsed.**
 8.15 answers `406` — not the `415` one would guess — with the bare-string
 error it also uses for a 405: `{"error": "Content-Type header [text/plain] is

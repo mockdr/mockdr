@@ -274,6 +274,9 @@ _KBN_TITLES: dict[int, str] = {
     404: "Not Found",
     405: "Method Not Allowed",
     409: "Conflict",
+    # Hapi's answer to a media type it has no parser for, title and message
+    # both (measured on 8.15).
+    415: "Unsupported Media Type",
     429: "Too Many Requests",
     500: "Internal Server Error",
 }

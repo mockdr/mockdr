@@ -165,3 +165,65 @@ class TestTheVersionedRoutesSaySo:
                           params={"zzzUnknownMember": "1"})
         assert resp.status_code == 400
         assert "elastic-api-version" not in {k.lower() for k in resp.headers}
+
+
+class TestAContentTypeHapiCannotParse:
+    """Kibana's three answers, measured on 8.15 type by type.
+
+    Hapi decides after routing and only for the verbs that carry a payload,
+    so a `GET` is never judged.  A header that is not `type/subtype` is a
+    400 naming the header; one it has no parser for is a 415; `text/*` and
+    the four it does parse reach the route, which answers about the body.
+    A header that is *absent* is parsed, not refused — absent is not
+    invalid — and the body need not be there at all, which is where this
+    differs from Elasticsearch's 406.
+    """
+
+    def _post(self, client: TestClient, content_type: str | None, body: str = "{}"):
+        headers = dict(ES_AUTH, **{"kbn-xsrf": "true"})
+        if content_type is not None:
+            headers["Content-Type"] = content_type
+        return client.post("/kibana/api/cases", headers=headers, content=body)
+
+    def test_a_media_type_it_cannot_parse_is_415(self, client: TestClient) -> None:
+        for content_type in ("application/yaml", "application/xml", "foo/bar",
+                             "*/*", "application/*"):
+            resp = self._post(client, content_type)
+            assert resp.status_code == 415, content_type
+            assert resp.json() == {
+                "statusCode": 415, "error": "Unsupported Media Type",
+                "message": "Unsupported Media Type",
+            }, content_type
+
+    def test_a_malformed_header_is_400_naming_the_header(
+        self, client: TestClient,
+    ) -> None:
+        for content_type in ("json", "text/", "/plain"):
+            resp = self._post(client, content_type)
+            assert resp.status_code == 400, content_type
+            assert resp.json()["message"] == "Invalid content-type header", content_type
+
+    def test_what_it_parses_reaches_the_route(self, client: TestClient) -> None:
+        """A 400 about the *body*, not about the header."""
+        for content_type in ("application/json", "APPLICATION/JSON",
+                             "application/json; foo=bar", "text/plain",
+                             "text/html", "application/x-www-form-urlencoded",
+                             "multipart/form-data", "application/octet-stream"):
+            resp = self._post(client, content_type)
+            assert resp.status_code == 400, content_type
+            assert resp.json()["message"] != "Invalid content-type header", content_type
+
+    def test_an_absent_header_is_not_a_refusal(self, client: TestClient) -> None:
+        resp = self._post(client, None)
+        assert resp.status_code == 400
+        assert resp.json()["message"] != "Invalid content-type header"
+
+    def test_no_body_is_judged_all_the_same(self, client: TestClient) -> None:
+        """Unlike Elasticsearch, the header alone decides."""
+        resp = self._post(client, "foo/bar", body="")
+        assert resp.status_code == 415
+
+    def test_a_get_is_never_judged(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/cases/_find",
+                          headers={**ES_AUTH, "Content-Type": "foo/bar"})
+        assert resp.status_code == 200

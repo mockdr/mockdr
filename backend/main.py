@@ -350,6 +350,7 @@ from utils.es_response import (
     build_es_index_not_found,
     build_kbn_error_response,
 )
+from utils.kibana_content_type import refuse_unreadable_content_type
 from utils.logging import setup_logging
 from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
@@ -1118,7 +1119,13 @@ for _es_module in [
     es_cases_router,
     es_exception_lists_router,
 ]:
-    app.include_router(_es_module.router, prefix=KBN_PREFIX)
+    # Hapi judges the content type after routing and only for the verbs that
+    # carry a payload, which is what a router dependency does: it runs once
+    # the route is known, and before the body is read.
+    app.include_router(
+        _es_module.router, prefix=KBN_PREFIX,
+        dependencies=[Depends(refuse_unreadable_content_type)],
+    )
 
 # ── Cortex XDR mock endpoints (mounted at /xdr/public_api/v1) ────────────────
 XDR_PREFIX = "/xdr/public_api/v1"
