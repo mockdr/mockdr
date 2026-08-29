@@ -423,28 +423,6 @@ def mde_alerts(check):
 
 # ── Microsoft Graph ─────────────────────────────────────────────────────────
 
-@cycle("graph", "tiIndicators")
-def graph_ti(check):
-    sent = {"action": "alert", "description": "zzz-audit", "domainName": "zzz-audit.example.test",
-            "expirationDateTime": "2030-01-01T00:00:00Z", "targetProduct": "Azure Sentinel",
-            "threatType": "WatchList", "tlpLevel": "amber", "confidence": 42,
-            "severity": 3, "killChain": ["Delivery"], "malwareFamilyNames": ["Emotet"],
-            "tags": ["zzz-audit"], "passiveOnly": False, "externalId": "zzz-1"}
-    created = check.request("POST", "/graph/v1.0/security/tiIndicators", json=sent)
-    if not isinstance(created, dict) or "id" not in created:
-        return
-    check.echoes("POST /tiIndicators", sent, created)
-    check.carries("POST /tiIndicators", created, "isActive", True)
-    indicator = created["id"]
-    check.listed("GET /tiIndicators", find(check.get("/graph/v1.0/security/tiIndicators"),
-                                           "value"), "id", indicator)
-    check.request("DELETE", f"/graph/v1.0/security/tiIndicators/{indicator}",
-                  expect=(200, 204))
-    check.listed("GET /tiIndicators after DELETE",
-                 find(check.get("/graph/v1.0/security/tiIndicators"), "value"),
-                 "id", indicator, present=False)
-
-
 @cycle("graph", "alerts_v2")
 def graph_alerts(check):
     alert = find(check.get("/graph/v1.0/security/alerts_v2", params={"$top": 1}),

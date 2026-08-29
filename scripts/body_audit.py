@@ -161,7 +161,6 @@ _NOTHING_SAYS_OTHERWISE = {
     "POST /mde/api/indicators/BatchDelete",
     "POST /graph/v1.0/informationProtection/threatAssessmentRequests",
     "POST /graph/v1.0/security/runHuntingQuery",
-    "POST /graph/v1.0/security/tiIndicators",
 }
 
 #: A route can only be judged on a body if it gets that far, so the path

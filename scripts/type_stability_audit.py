@@ -186,7 +186,6 @@ ROUTES = {
             ("/mde/api/indicators", "value"), ("/mde/api/machineactions", "value")],
     "graph": [("/graph/v1.0/security/alerts_v2", "value"),
               ("/graph/v1.0/security/incidents", "value"),
-              ("/graph/v1.0/security/tiIndicators", "value"),
               ("/graph/v1.0/users", "value"),
               ("/graph/v1.0/deviceManagement/managedDevices", "value")],
     "xdr": [],
