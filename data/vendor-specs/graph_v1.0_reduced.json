@@ -6,12 +6,6 @@
   "spec": null
  },
  "GET /beta/reports/authenticationMethods/userRegistrationDetails": {
-  "spec": "/reports/authenticationMethods/userRegistrationDetails",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "id",
@@ -30,15 +24,15 @@
    "userPreferredMethodForSecondaryAuthentication",
    "userPrincipalName",
    "userType"
-  ]
- },
- "GET /beta/users": {
-  "spec": "/users",
+  ],
+  "spec": "/reports/authenticationMethods/userRegistrationDetails",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /beta/users": {
   "item": [
    "@odata.type",
    "aboutMe",
@@ -178,30 +172,30 @@
    "usageLocation",
    "userPrincipalName",
    "userType"
-  ]
- },
- "GET /v1.0/admin/serviceAnnouncement/healthOverviews": {
-  "spec": "/admin/serviceAnnouncement/healthOverviews",
+  ],
+  "spec": "/users",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/admin/serviceAnnouncement/healthOverviews": {
   "item": [
    "@odata.type",
    "id",
    "issues",
    "service",
    "status"
-  ]
- },
- "GET /v1.0/applications": {
-  "spec": "/applications",
+  ],
+  "spec": "/admin/serviceAnnouncement/healthOverviews",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/applications": {
   "item": [
    "@odata.type",
    "addIns",
@@ -257,15 +251,15 @@
    "uniqueName",
    "verifiedPublisher",
    "web"
-  ]
- },
- "GET /v1.0/auditLogs/directoryAudits": {
-  "spec": "/auditLogs/directoryAudits",
+  ],
+  "spec": "/applications",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/auditLogs/directoryAudits": {
   "item": [
    "@odata.type",
    "activityDateTime",
@@ -280,15 +274,15 @@
    "result",
    "resultReason",
    "targetResources"
-  ]
- },
- "GET /v1.0/auditLogs/signIns": {
-  "spec": "/auditLogs/signIns",
+  ],
+  "spec": "/auditLogs/directoryAudits",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/auditLogs/signIns": {
   "item": [
    "@odata.type",
    "appDisplayName",
@@ -321,15 +315,15 @@
    "userDisplayName",
    "userId",
    "userPrincipalName"
-  ]
- },
- "GET /v1.0/deviceAppManagement/managedAppPolicies": {
-  "spec": "/deviceAppManagement/managedAppPolicies",
+  ],
+  "spec": "/auditLogs/signIns",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceAppManagement/managedAppPolicies": {
   "item": [
    "@odata.type",
    "createdDateTime",
@@ -338,15 +332,15 @@
    "id",
    "lastModifiedDateTime",
    "version"
-  ]
- },
- "GET /v1.0/deviceAppManagement/mobileApps": {
-  "spec": "/deviceAppManagement/mobileApps",
+  ],
+  "spec": "/deviceAppManagement/managedAppPolicies",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceAppManagement/mobileApps": {
   "item": [
    "@odata.type",
    "assignments",
@@ -365,15 +359,15 @@
    "privacyInformationUrl",
    "publisher",
    "publishingState"
-  ]
- },
- "GET /v1.0/deviceManagement/detectedApps": {
-  "spec": "/deviceManagement/detectedApps",
+  ],
+  "spec": "/deviceAppManagement/mobileApps",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/detectedApps": {
   "item": [
    "@odata.type",
    "deviceCount",
@@ -384,15 +378,15 @@
    "publisher",
    "sizeInByte",
    "version"
-  ]
- },
- "GET /v1.0/deviceManagement/detectedApps/{app_id}/managedDevices": {
-  "spec": "/deviceManagement/detectedApps/{detectedApp-id}/managedDevices",
+  ],
+  "spec": "/deviceManagement/detectedApps",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/detectedApps/{app_id}/managedDevices": {
   "item": [
    "@odata.type",
    "activationLockBypassCode",
@@ -457,29 +451,29 @@
    "users",
    "wiFiMacAddress",
    "windowsProtectionState"
-  ]
- },
- "GET /v1.0/deviceManagement/deviceCategories": {
-  "spec": "/deviceManagement/deviceCategories",
+  ],
+  "spec": "/deviceManagement/detectedApps/{detectedApp-id}/managedDevices",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/deviceCategories": {
   "item": [
    "@odata.type",
    "description",
    "displayName",
    "id"
-  ]
- },
- "GET /v1.0/deviceManagement/deviceCompliancePolicies": {
-  "spec": "/deviceManagement/deviceCompliancePolicies",
+  ],
+  "spec": "/deviceManagement/deviceCategories",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/deviceCompliancePolicies": {
   "item": [
    "@odata.type",
    "assignments",
@@ -495,15 +489,15 @@
    "userStatusOverview",
    "userStatuses",
    "version"
-  ]
- },
- "GET /v1.0/deviceManagement/deviceConfigurations": {
-  "spec": "/deviceManagement/deviceConfigurations",
+  ],
+  "spec": "/deviceManagement/deviceCompliancePolicies",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/deviceConfigurations": {
   "item": [
    "@odata.type",
    "assignments",
@@ -518,15 +512,15 @@
    "userStatusOverview",
    "userStatuses",
    "version"
-  ]
- },
- "GET /v1.0/deviceManagement/deviceEnrollmentConfigurations": {
-  "spec": "/deviceManagement/deviceEnrollmentConfigurations",
+  ],
+  "spec": "/deviceManagement/deviceConfigurations",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/deviceEnrollmentConfigurations": {
   "item": [
    "@odata.type",
    "assignments",
@@ -537,15 +531,15 @@
    "lastModifiedDateTime",
    "priority",
    "version"
-  ]
- },
- "GET /v1.0/deviceManagement/managedDevices": {
-  "spec": "/deviceManagement/managedDevices",
+  ],
+  "spec": "/deviceManagement/deviceEnrollmentConfigurations",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/deviceManagement/managedDevices": {
   "item": [
    "@odata.type",
    "activationLockBypassCode",
@@ -610,9 +604,16 @@
    "users",
    "wiFiMacAddress",
    "windowsProtectionState"
+  ],
+  "spec": "/deviceManagement/managedDevices",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/deviceManagement/managedDevices/{device_id}": {
+  "item": [],
   "spec": "/deviceManagement/managedDevices/{managedDevice-id}",
   "top": [
    "@odata.type",
@@ -678,16 +679,9 @@
    "users",
    "wiFiMacAddress",
    "windowsProtectionState"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/deviceManagement/windowsAutopilotDeviceIdentities": {
-  "spec": "/deviceManagement/windowsAutopilotDeviceIdentities",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "addressableUserName",
@@ -707,15 +701,15 @@
    "skuNumber",
    "systemFamily",
    "userPrincipalName"
-  ]
- },
- "GET /v1.0/directory/administrativeUnits": {
-  "spec": "/directory/administrativeUnits",
+  ],
+  "spec": "/deviceManagement/windowsAutopilotDeviceIdentities",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/directory/administrativeUnits": {
   "item": [
    "@odata.type",
    "deletedDateTime",
@@ -730,15 +724,15 @@
    "membershipType",
    "scopedRoleMembers",
    "visibility"
-  ]
- },
- "GET /v1.0/directoryRoles": {
-  "spec": "/directoryRoles",
+  ],
+  "spec": "/directory/administrativeUnits",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/directoryRoles": {
   "item": [
    "@odata.type",
    "deletedDateTime",
@@ -748,28 +742,28 @@
    "members",
    "roleTemplateId",
    "scopedMembers"
+  ],
+  "spec": "/directoryRoles",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/directoryRoles/{role_id}/members": {
+  "item": [
+   "@odata.type",
+   "deletedDateTime",
+   "id"
+  ],
   "spec": "/directoryRoles/{directoryRole-id}/members",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
-  "item": [
-   "@odata.type",
-   "deletedDateTime",
-   "id"
   ]
  },
  "GET /v1.0/groups": {
-  "spec": "/groups",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "acceptedSenders",
@@ -853,9 +847,16 @@
    "unseenMessagesCount",
    "visibility",
    "welcomeMessageEnabled"
+  ],
+  "spec": "/groups",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/groups/{group_id}": {
+  "item": [],
   "spec": "/groups/{group-id}",
   "top": [
    "@odata.type",
@@ -940,29 +941,22 @@
    "unseenMessagesCount",
    "visibility",
    "welcomeMessageEnabled"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/groups/{group_id}/members": {
+  "item": [
+   "@odata.type",
+   "deletedDateTime",
+   "id"
+  ],
   "spec": "/groups/{group-id}/members",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
-  "item": [
-   "@odata.type",
-   "deletedDateTime",
-   "id"
   ]
  },
  "GET /v1.0/identity/conditionalAccess/namedLocations": {
-  "spec": "/identity/conditionalAccess/namedLocations",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "createdDateTime",
@@ -970,15 +964,15 @@
    "displayName",
    "id",
    "modifiedDateTime"
-  ]
- },
- "GET /v1.0/identity/conditionalAccess/policies": {
-  "spec": "/identity/conditionalAccess/policies",
+  ],
+  "spec": "/identity/conditionalAccess/namedLocations",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/identity/conditionalAccess/policies": {
   "item": [
    "@odata.type",
    "conditions",
@@ -992,9 +986,16 @@
    "sessionControls",
    "state",
    "templateId"
+  ],
+  "spec": "/identity/conditionalAccess/policies",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/identity/conditionalAccess/policies/{policy_id}": {
+  "item": [],
   "spec": "/identity/conditionalAccess/policies/{conditionalAccessPolicy-id}",
   "top": [
    "@odata.type",
@@ -1009,16 +1010,9 @@
    "sessionControls",
    "state",
    "templateId"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/identityProtection/riskDetections": {
-  "spec": "/identityProtection/riskDetections",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "activity",
@@ -1041,15 +1035,15 @@
    "userDisplayName",
    "userId",
    "userPrincipalName"
-  ]
- },
- "GET /v1.0/identityProtection/riskyUsers": {
-  "spec": "/identityProtection/riskyUsers",
+  ],
+  "spec": "/identityProtection/riskDetections",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/identityProtection/riskyUsers": {
   "item": [
    "@odata.type",
    "history",
@@ -1062,9 +1056,16 @@
    "riskState",
    "userDisplayName",
    "userPrincipalName"
+  ],
+  "spec": "/identityProtection/riskyUsers",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/identityProtection/riskyUsers/{user_id}": {
+  "item": [],
   "spec": "/identityProtection/riskyUsers/{riskyUser-id}",
   "top": [
    "@odata.type",
@@ -1078,16 +1079,9 @@
    "riskState",
    "userDisplayName",
    "userPrincipalName"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/informationProtection/threatAssessmentRequests": {
-  "spec": "/informationProtection/threatAssessmentRequests",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "category",
@@ -1099,9 +1093,16 @@
    "requestSource",
    "results",
    "status"
+  ],
+  "spec": "/informationProtection/threatAssessmentRequests",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/me": {
+  "item": [],
   "spec": "/me",
   "top": [
    "@odata.type",
@@ -1242,16 +1243,9 @@
    "usageLocation",
    "userPrincipalName",
    "userType"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/organization": {
-  "spec": "/organization",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "assignedPlans",
@@ -1283,15 +1277,15 @@
    "technicalNotificationMails",
    "tenantType",
    "verifiedDomains"
-  ]
- },
- "GET /v1.0/security/alerts_v2": {
-  "spec": "/security/alerts_v2",
+  ],
+  "spec": "/organization",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/security/alerts_v2": {
   "item": [
    "@odata.type",
    "actorDisplayName",
@@ -1330,9 +1324,16 @@
    "threatDisplayName",
    "threatFamilyName",
    "title"
+  ],
+  "spec": "/security/alerts_v2",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/security/alerts_v2/{alert_id}": {
+  "item": [],
   "spec": "/security/alerts_v2/{alert-id}",
   "top": [
    "@odata.type",
@@ -1372,16 +1373,9 @@
    "threatDisplayName",
    "threatFamilyName",
    "title"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/security/attackSimulation/simulations": {
-  "spec": "/security/attackSimulation/simulations",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "attackTechnique",
@@ -1409,15 +1403,15 @@
    "report",
    "status",
    "trainingSetting"
-  ]
- },
- "GET /v1.0/security/incidents": {
-  "spec": "/security/incidents",
+  ],
+  "spec": "/security/attackSimulation/simulations",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/security/incidents": {
   "item": [
    "@odata.type",
    "alerts",
@@ -1441,9 +1435,16 @@
    "summary",
    "systemTags",
    "tenantId"
+  ],
+  "spec": "/security/incidents",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/security/incidents/{incident_id}": {
+  "item": [],
   "spec": "/security/incidents/{incident-id}",
   "top": [
    "@odata.type",
@@ -1468,16 +1469,9 @@
    "summary",
    "systemTags",
    "tenantId"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/security/secureScores": {
-  "spec": "/security/secureScores",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "activeUserCount",
@@ -1491,18 +1485,15 @@
    "licensedUserCount",
    "maxScore",
    "vendorInformation"
-  ]
- },
- "GET /v1.0/security/tiIndicators": {
-  "spec": null
- },
- "GET /v1.0/servicePrincipals": {
-  "spec": "/servicePrincipals",
+  ],
+  "spec": "/security/secureScores",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/servicePrincipals": {
   "item": [
    "@odata.type",
    "accountEnabled",
@@ -1561,15 +1552,15 @@
    "tokenLifetimePolicies",
    "transitiveMemberOf",
    "verifiedPublisher"
-  ]
- },
- "GET /v1.0/sites": {
-  "spec": "/sites",
+  ],
+  "spec": "/servicePrincipals",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/sites": {
   "item": [
    "@odata.type",
    "analytics",
@@ -1605,15 +1596,15 @@
    "termStore",
    "termStores",
    "webUrl"
-  ]
- },
- "GET /v1.0/subscribedSkus": {
-  "spec": "/subscribedSkus",
+  ],
+  "spec": "/sites",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/subscribedSkus": {
   "item": [
    "@odata.type",
    "accountId",
@@ -1627,15 +1618,15 @@
    "skuId",
    "skuPartNumber",
    "subscriptionIds"
-  ]
- },
- "GET /v1.0/teams": {
-  "spec": "/teams",
+  ],
+  "spec": "/subscribedSkus",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/teams": {
   "item": [
    "@odata.type",
    "allChannels",
@@ -1668,9 +1659,16 @@
    "tenantId",
    "visibility",
    "webUrl"
+  ],
+  "spec": "/teams",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/teams/{team_id}": {
+  "item": [],
   "spec": "/teams/{team-id}",
   "top": [
    "@odata.type",
@@ -1704,16 +1702,9 @@
    "tenantId",
    "visibility",
    "webUrl"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/teams/{team_id}/channels": {
-  "spec": "/teams/{team-id}/channels",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "allMembers",
@@ -1737,15 +1728,15 @@
    "tabs",
    "tenantId",
    "webUrl"
-  ]
- },
- "GET /v1.0/teams/{team_id}/channels/{channel_id}/messages": {
-  "spec": "/teams/{team-id}/channels/{channel-id}/messages",
+  ],
+  "spec": "/teams/{team-id}/channels",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/teams/{team_id}/channels/{channel_id}/messages": {
   "item": [
    "@odata.type",
    "attachments",
@@ -1773,15 +1764,15 @@
    "subject",
    "summary",
    "webUrl"
-  ]
- },
- "GET /v1.0/users": {
-  "spec": "/users",
+  ],
+  "spec": "/teams/{team-id}/channels/{channel-id}/messages",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
+  ]
+ },
+ "GET /v1.0/users": {
   "item": [
    "@odata.type",
    "aboutMe",
@@ -1921,9 +1912,16 @@
    "usageLocation",
    "userPrincipalName",
    "userType"
+  ],
+  "spec": "/users",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/users/{user_id}": {
+  "item": [],
   "spec": "/users/{user-id}",
   "top": [
    "@odata.type",
@@ -2064,10 +2062,10 @@
    "usageLocation",
    "userPrincipalName",
    "userType"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/users/{user_id}/drive": {
+  "item": [],
   "spec": "/users/{user-id}/drive",
   "top": [
    "@odata.type",
@@ -2094,19 +2092,12 @@
    "special",
    "system",
    "webUrl"
-  ],
-  "item": []
+  ]
  },
  "GET /v1.0/users/{user_id}/drive/root/children": {
   "spec": null
  },
  "GET /v1.0/users/{user_id}/mailFolders": {
-  "spec": "/users/{user-id}/mailFolders",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "childFolderCount",
@@ -2121,31 +2112,31 @@
    "singleValueExtendedProperties",
    "totalItemCount",
    "unreadItemCount"
+  ],
+  "spec": "/users/{user-id}/mailFolders",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/users/{user_id}/mailFolders/inbox/messageRules": {
   "spec": null
  },
  "GET /v1.0/users/{user_id}/memberOf": {
+  "item": [
+   "@odata.type",
+   "deletedDateTime",
+   "id"
+  ],
   "spec": "/users/{user-id}/memberOf",
   "top": [
    "@odata.count",
    "@odata.nextLink",
    "value"
-  ],
-  "item": [
-   "@odata.type",
-   "deletedDateTime",
-   "id"
   ]
  },
  "GET /v1.0/users/{user_id}/messages": {
-  "spec": "/users/{user-id}/messages",
-  "top": [
-   "@odata.count",
-   "@odata.nextLink",
-   "value"
-  ],
   "item": [
    "@odata.type",
    "attachments",
@@ -2183,9 +2174,16 @@
    "toRecipients",
    "uniqueBody",
    "webLink"
+  ],
+  "spec": "/users/{user-id}/messages",
+  "top": [
+   "@odata.count",
+   "@odata.nextLink",
+   "value"
   ]
  },
  "GET /v1.0/users/{user_id}/messages/{message_id}": {
+  "item": [],
   "spec": "/users/{user-id}/messages/{message-id}",
   "top": [
    "@odata.type",
@@ -2224,10 +2222,10 @@
    "toRecipients",
    "uniqueBody",
    "webLink"
-  ],
-  "item": []
+  ]
  },
  "PATCH /v1.0/security/alerts_v2/{alert_id}": {
+  "item": [],
   "spec": "/security/alerts_v2/{alert-id}",
   "top": [
    "@odata.type",
@@ -2267,18 +2265,30 @@
    "threatDisplayName",
    "threatFamilyName",
    "title"
-  ],
-  "item": []
+  ]
+ },
+ "POST /v1.0/informationProtection/threatAssessmentRequests": {
+  "item": [],
+  "spec": "/informationProtection/threatAssessmentRequests",
+  "top": [
+   "@odata.type",
+   "category",
+   "contentType",
+   "createdBy",
+   "createdDateTime",
+   "expectedAssessment",
+   "id",
+   "requestSource",
+   "results",
+   "status"
+  ]
  },
  "POST /v1.0/security/runHuntingQuery": {
   "spec": null
  },
- "POST /v1.0/security/tiIndicators": {
-  "spec": null
- },
  "POST /v1.0/users/{user_id}/sendMail": {
+  "item": [],
   "spec": "/users/{user-id}/sendMail",
-  "top": [],
-  "item": []
+  "top": []
  }
 }

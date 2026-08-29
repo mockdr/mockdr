@@ -117,11 +117,19 @@ def described():
 
 
 def _route_keys(node, found=None):
-    """Every `METHOD /path` key anywhere in a reduced reference."""
+    """Every `METHOD /path` key a reduced reference *judges*.
+
+    An entry whose `spec` is null names the route and carries nothing to
+    judge it by — Graph has seven of those. Counting them made the coverage
+    read as though a reference described what they answer, when all it
+    records is that someone looked and found no schema.
+    """
     found = set() if found is None else found
     if isinstance(node, dict):
         for key, value in node.items():
-            if re.match(r"^(GET|POST|PUT|PATCH|DELETE) /", str(key)):
+            judged = not (isinstance(value, dict) and "spec" in value
+                          and value["spec"] is None)
+            if judged and re.match(r"^(GET|POST|PUT|PATCH|DELETE) /", str(key)):
                 found.add(str(key))
             _route_keys(value, found)
     elif isinstance(node, list):

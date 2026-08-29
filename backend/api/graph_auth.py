@@ -37,7 +37,6 @@ FEATURE_GATES: dict[str, set[str] | str] = {
     "security/incidents": {"plan2", "defender_for_business"},
     "security/secureScores": {"plan2"},
     "security/runHuntingQuery": {"plan2"},
-    "security/tiIndicators": {"plan2"},
     # Identity Protection (Entra P2 — Plan 2 or E5)
     "identityProtection": {"plan2"},
     # Audit logs (Entra P1+ — Plan 2, E5, or E3)

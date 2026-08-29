@@ -182,7 +182,6 @@ class InMemoryStore:
             "graph_security_alerts": {},
             "graph_security_incidents": {},
             "graph_secure_scores": {},
-            "graph_ti_indicators": {},
             # M365 Productivity
             "graph_mail_messages": {},          # keyed by "{user_id}:{message_id}"
             "graph_mail_folders": {},           # keyed by "{user_id}:{folder_id}"

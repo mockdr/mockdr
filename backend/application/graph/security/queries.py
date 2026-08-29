@@ -1,15 +1,10 @@
 """Read-side handlers for Microsoft Graph Security API."""
 from __future__ import annotations
 
-import dataclasses
-
 from application.mde_advanced_hunting.queries import run_query as run_hunt
-from domain.graph.ti_indicator import GraphTiIndicator
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
 from repository.graph.security_incident_repo import graph_security_incident_repo
-from repository.graph.ti_indicator_repo import graph_ti_indicator_repo
-from utils.dt import utc_now
 from utils.graph_odata import (
     apply_graph_filter,
     apply_odata_orderby,
@@ -240,99 +235,3 @@ def list_secure_scores(
         context="https://graph.microsoft.com/v1.0/$metadata#security/secureScores",
         next_link=next_link,
     )
-
-
-# ── TI Indicators ────────────────────────────────────────────────────────────
-
-def list_ti_indicators(
-    filter_str: str | None = None,
-    top: int = 100,
-    skip: int = 0,
-) -> dict:
-    """Return threat intelligence indicators with OData query support.
-
-    Args:
-        filter_str: OData ``$filter`` expression.
-        top:        Page size (``$top``).
-        skip:       Number of records to skip (``$skip``).
-
-    Returns:
-        OData list response dict.
-    """
-    records = [record_dict(ti) for ti in graph_ti_indicator_repo.list_all()]
-
-    if filter_str:
-        records = apply_graph_filter(records, filter_str)
-
-    total = len(records)
-    page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/security/tiIndicators?$skip={skip + top}"
-        if skip + top < total
-        else None
-    )
-    return build_graph_list_response(
-        value=page,
-        context="https://graph.microsoft.com/v1.0/$metadata#security/tiIndicators",
-        next_link=next_link,
-    )
-
-
-#: The members ``tiIndicator`` declares, minus ``id``, which the service
-#: assigns. Taken from ``data/vendor-specs/graph_beta_csdl_types.json``.
-_TI_INDICATOR_FIELDS = frozenset(
-    f.name for f in dataclasses.fields(GraphTiIndicator) if f.name != "id"
-)
-
-
-def create_ti_indicator(body: dict) -> dict:
-    """Create a TI indicator from the properties the body carries.
-
-    Every declared property is taken from the body — an observable named by
-    its own property (``domainName``, ``url``, ``fileHashValue`` …), the
-    scoring in ``confidence`` and ``severity``, the context in ``killChain``,
-    ``malwareFamilyNames`` and ``tags``. The service fills in what it owns:
-    the ``id``, the tenant, and ``ingestedDateTime``.
-
-    Args:
-        body: The ``tiIndicator`` to create.
-
-    Returns:
-        Created indicator dict.
-    """
-    from infrastructure.seeders.graph.graph_shared import GRAPH_TENANT_ID, graph_uuid
-
-    now = utc_now()
-    sent = {k: v for k, v in body.items() if k in _TI_INDICATOR_FIELDS}
-    ti = GraphTiIndicator(
-        id=graph_uuid(),
-        **{
-            "action": "alert",
-            "azureTenantId": GRAPH_TENANT_ID,
-            "isActive": True,
-            "ingestedDateTime": now,
-            "lastReportedDateTime": now,
-            "targetProduct": "Microsoft Defender ATP",
-            "threatType": "Malware",
-            "tlpLevel": "green",
-            **sent,
-        },
-    )
-    graph_ti_indicator_repo.save(ti)
-    return record_dict(ti)
-
-
-def delete_ti_indicator(indicator_id: str) -> bool:
-    """Delete a TI indicator by ID.
-
-    Args:
-        indicator_id: The indicator's ``id``.
-
-    Returns:
-        ``True`` if deleted, ``False`` if not found.
-    """
-    existing = graph_ti_indicator_repo.get(indicator_id)
-    if existing is None:
-        return False
-    graph_ti_indicator_repo.delete(indicator_id)
-    return True

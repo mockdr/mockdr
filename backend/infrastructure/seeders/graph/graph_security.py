@@ -8,16 +8,13 @@ from faker import Faker
 from domain.graph.secure_score import GraphSecureScore
 from domain.graph.security_alert import GraphSecurityAlert
 from domain.graph.security_incident import GraphSecurityIncident
-from domain.graph.ti_indicator import GraphTiIndicator
 from domain.mde_alert import MdeAlert
 from infrastructure.seeders._shared import ago, rand_ago
 from infrastructure.seeders.graph.graph_shared import GRAPH_TENANT_ID, graph_uuid
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
 from repository.graph.security_incident_repo import graph_security_incident_repo
-from repository.graph.ti_indicator_repo import graph_ti_indicator_repo
 from repository.mde_alert_repo import mde_alert_repo
-from repository.mde_indicator_repo import mde_indicator_repo
 from repository.mde_machine_repo import mde_machine_repo
 
 _MITRE_TECHNIQUES: list[str] = ["T1059", "T1053", "T1071", "T1082", "T1105"]
@@ -295,37 +292,3 @@ def seed_graph_security(fake: Faker) -> None:
             controlScores=control_scores,
         )
         graph_secure_score_repo.save(score)
-
-    # ── TI Indicators (mapped from MDE indicators) ────────────────────────
-    mde_indicators = mde_indicator_repo.list_all()
-    for mde_ind in mde_indicators:
-        indicator_id = graph_uuid()
-        observable, hash_type = _MDE_OBSERVABLE_MAP.get(
-            mde_ind.indicatorType, ("fileHashValue", "sha256"))
-        action = _MDE_ACTION_MAP.get(mde_ind.action, "alert")
-
-        ti = GraphTiIndicator(
-            id=indicator_id,
-            action=action,
-            azureTenantId=GRAPH_TENANT_ID,
-            confidence=random.randint(50, 100),
-            description=mde_ind.description,
-            expirationDateTime=mde_ind.expirationTime or ago(days=-90),
-            externalId=mde_ind.id,
-            ingestedDateTime=mde_ind.creationTimeDateTimeUtc or rand_ago(max_days=60),
-            isActive=True,
-            killChain=random.choice([[], ["Delivery"], ["Installation"], ["C2"]]),
-            malwareFamilyNames=random.choice([[], ["Emotet"], ["Trickbot"]]),
-            passiveOnly=False,
-            severity=random.randint(1, 5),
-            tags=[],
-            targetProduct="Microsoft Defender ATP",
-            threatType="Malware",
-            tlpLevel=random.choice(["white", "green", "amber", "red"]),
-            lastReportedDateTime=mde_ind.lastUpdateTime or rand_ago(max_days=10),
-            fileHashType=hash_type,
-        )
-        # The observable belongs in the property that names it, and which
-        # property that is depends on the indicator's kind.
-        setattr(ti, observable, mde_ind.indicatorValue)
-        graph_ti_indicator_repo.save(ti)

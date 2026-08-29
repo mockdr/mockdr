@@ -219,73 +219,23 @@ class TestGraphSecureScores:
         assert "controlScores" in score
 
 
-class TestGraphTiIndicators:
-    """Tests for /graph/v1.0/security/tiIndicators."""
+class TestGraphTiIndicatorsAreGone:
+    """Microsoft removed the threat-intelligence indicator API from v1.0."""
 
-    def test_list_ti_indicators_returns_20(
+    def test_the_three_routes_answer_404(
         self, client: TestClient, graph_admin_headers: dict,
     ) -> None:
-        """Seed data should contain 20 TI indicators (mapped from MDE)."""
-        resp = client.get(
-            "/graph/v1.0/security/tiIndicators",
+        """The name `tiIndicator` appears nowhere in the v1.0 OpenAPI, and
+        beta carries it deprecated with a removal date now passed. mockdr
+        served all three, so a client could build against a path the product
+        answers 404 for."""
+        assert client.get(
+            "/graph/v1.0/security/tiIndicators", headers=graph_admin_headers,
+        ).status_code == 404
+        assert client.post(
+            "/graph/v1.0/security/tiIndicators", headers=graph_admin_headers, json={},
+        ).status_code == 404
+        assert client.request(
+            "DELETE", "/graph/v1.0/security/tiIndicators/any",
             headers=graph_admin_headers,
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert "@odata.context" in body
-        assert len(body["value"]) == 20
-
-    def test_create_ti_indicator(
-        self, client: TestClient, graph_admin_headers: dict,
-    ) -> None:
-        """POST /v1.0/security/tiIndicators should create a new indicator.
-
-        The observable is named by its own property — Graph declares
-        ``domainName``, ``url``, ``fileHashValue`` and the rest, and has
-        never had an ``indicatorValue``.
-        """
-        resp = client.post(
-            "/graph/v1.0/security/tiIndicators",
-            json={
-                "action": "block",
-                "description": "Test indicator",
-                "domainName": "evil.example.com",
-                "confidence": 80,
-                "severity": 3,
-                "killChain": ["Delivery"],
-                "targetProduct": "Microsoft Defender ATP",
-                "threatType": "Malware",
-                "tlpLevel": "amber",
-            },
-            headers=graph_admin_headers,
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["action"] == "block"
-        assert body["domainName"] == "evil.example.com"
-        assert body["confidence"] == 80
-        assert body["severity"] == 3
-        assert body["killChain"] == ["Delivery"]
-        # The service fills in what it owns.
-        assert body["isActive"] is True
-        assert body["ingestedDateTime"]
-        assert "indicatorValue" not in body
-        assert "id" in body
-
-    def test_delete_ti_indicator(
-        self, client: TestClient, graph_admin_headers: dict,
-    ) -> None:
-        """DELETE /v1.0/security/tiIndicators/{id} should return 204."""
-        # Get an existing indicator
-        list_resp = client.get(
-            "/graph/v1.0/security/tiIndicators",
-            params={"$top": 1},
-            headers=graph_admin_headers,
-        )
-        indicator_id = list_resp.json()["value"][0]["id"]
-
-        resp = client.delete(
-            f"/graph/v1.0/security/tiIndicators/{indicator_id}",
-            headers=graph_admin_headers,
-        )
-        assert resp.status_code == 204
+        ).status_code == 404

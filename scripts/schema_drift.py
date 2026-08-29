@@ -802,6 +802,22 @@ PLATFORMS = {
     "graph": {
         "mount": "/graph",
         "reduced": SPECS / "graph_v1.0_reduced.json",
+        # The two writes the reference carries a schema for. Without a body
+        # to send they were never exercised at all: the loop compared GETs
+        # alone, so a schema sat in the reference judging nothing.
+        "requests": {
+            "POST /v1.0/informationProtection/threatAssessmentRequests": {
+                "json": {
+                    "@odata.type": "#microsoft.graph.mailAssessmentRequest",
+                    "recipientEmail": "analyst@acmecorp.internal",
+                    "expectedAssessment": "block",
+                    "category": "phishing",
+                },
+            },
+            "PATCH /v1.0/security/alerts_v2/{alert_id}": {
+                "json": {"status": "inProgress"},
+            },
+        },
         "auth": lambda c: {
             "Authorization": "Bearer "
             + c.post(
@@ -1169,14 +1185,26 @@ def main(platform: str) -> int:
             if not entry.get("spec"):
                 continue
             method, route = key.split(" ", 1)
-            if method != "GET":
-                continue
             if route.startswith("/beta/") and entry.get("spec") != "beta":
                 print(f"  -  {method} {route}: beta route, v1.0 metadata cannot judge it (skipped)")
                 continue
+            if method != "GET" and key not in cfg.get("requests", {}):
+                # A write with no body to send is not judged rather than sent
+                # an empty one and recorded as skipped: the reference has a
+                # schema for it, and saying so is the point.
+                print(f"  -  {method} {route}: no request body declared for it (skipped)")
+                continue
             url = _fill(client, route, headers, cfg["params"], cfg["fill"], mount)
-            r = client.get(mount + url, headers=headers, params=cfg["params"])
-            if r.status_code != 200:
+            sent = _substitute(cfg.get("requests", {}).get(key, {}), {})
+            r = (
+                client.get(mount + url, headers=headers, params=cfg["params"])
+                if method == "GET" else
+                client.request(
+                    method, mount + url, headers=headers, params=cfg["params"],
+                    json=sent.get("json"),
+                )
+            )
+            if r.status_code not in (200, 201):
                 print(f"  -  {method} {route}: HTTP {r.status_code} (skipped) — {_reason(r)}")
                 continue
             body = r.json()

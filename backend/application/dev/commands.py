@@ -74,7 +74,6 @@ from domain.graph.sign_in_log import GraphSignInLog
 from domain.graph.subscribed_sku import GraphSubscribedSku
 from domain.graph.team import GraphTeam
 from domain.graph.threat_assessment import GraphThreatAssessment
-from domain.graph.ti_indicator import GraphTiIndicator
 from domain.graph.update_ring import GraphUpdateRing
 from domain.graph.user import GraphUser
 from domain.graph.user_registration_detail import GraphUserRegistrationDetail
@@ -230,7 +229,6 @@ _TYPED_COLLECTIONS: dict[str, type] = {
     "graph_subscribed_skus": GraphSubscribedSku,
     "graph_teams": GraphTeam,
     "graph_threat_assessments": GraphThreatAssessment,
-    "graph_ti_indicators": GraphTiIndicator,
     "graph_update_rings": GraphUpdateRing,
     "graph_user_registration_details": GraphUserRegistrationDetail,
     "graph_users": GraphUser,

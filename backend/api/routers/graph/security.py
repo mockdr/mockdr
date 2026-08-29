@@ -1,7 +1,7 @@
 """Microsoft Graph Security API endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from api.graph_auth import require_graph_feature, require_graph_write
 from application.graph.security import queries as sec_queries
@@ -126,46 +126,12 @@ async def list_secure_scores(
     return sec_queries.list_secure_scores(top=top, skip=skip)
 
 
-# ── TI Indicators ────────────────────────────────────────────────────────────
-
-@router.get("/v1.0/security/tiIndicators")
-async def list_ti_indicators(
-    filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
-    _: dict = Depends(require_graph_feature("security/tiIndicators")),
-) -> dict:
-    """List threat intelligence indicators."""
-    return sec_queries.list_ti_indicators(
-        filter_str=filter_str, top=top, skip=skip,
-    )
+# Microsoft removed the threat-intelligence indicator API from v1.0: the
+# name `tiIndicator` appears nowhere in the v1.0 OpenAPI, and beta carries it
+# marked `deprecated` with a removal date of 2026-04-10 and the note that the
+# legacy Graph Security API stopped returning data on 31 January 2025
+# (measured, both documents fetched from msgraph-metadata). mockdr served
+# `GET`, `POST` and `DELETE` under `/v1.0/security/tiIndicators`, so a client
+# could build against a path the product answers 404 for.
 
 
-@router.post("/v1.0/security/tiIndicators", dependencies=[Depends(require_graph_write)])
-async def create_ti_indicator(
-    body: dict = Body(...),
-    _: dict = Depends(require_graph_feature("security/tiIndicators")),
-) -> dict:
-    """Create a new threat intelligence indicator."""
-    return sec_queries.create_ti_indicator(body=body)
-
-
-@router.delete(
-    "/v1.0/security/tiIndicators/{indicator_id}",
-    dependencies=[Depends(require_graph_write)],
-)
-async def delete_ti_indicator(
-    indicator_id: str,
-    _: dict = Depends(require_graph_feature("security/tiIndicators")),
-) -> Response:
-    """Delete a threat intelligence indicator."""
-    deleted = sec_queries.delete_ti_indicator(indicator_id=indicator_id)
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail=build_graph_error_response(
-                "notFound",
-                f"Resource '{indicator_id}' does not exist or cannot be found.",
-            ),
-        )
-    return Response(status_code=204)

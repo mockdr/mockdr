@@ -347,6 +347,32 @@ configuration, which mockdr does not serve as a collection, so the number
 can only ever resolve by collision — marked opaque, like the two fields
 before it.
 
+**Graph's threat-intelligence indicator API is gone from v1.0, and so is
+mockdr's.** The name `tiIndicator` appears nowhere in the v1.0 OpenAPI, and
+beta carries it marked `deprecated`, with a removal date of 2026-04-10 and
+the note that the legacy Graph Security API stopped returning data on 31
+January 2025 — both documents fetched from `msgraph-metadata` and measured,
+not recalled. mockdr served `GET`, `POST` and `DELETE` under
+`/v1.0/security/tiIndicators`, so a client could build against a path the
+product answers 404 for. The routes are gone, with the repository, the
+seeder and the store collection that only they reached — and the two entries
+in the reduced reference that claimed them, which carried no schema and so
+judged nothing anyway.
+
+**Two Graph writes carried a schema that judged nothing.**
+`schema_drift.py` compared GETs alone on that platform, so the `PATCH` on an
+alert sat in the reference with a full property list and was never sent. It
+is sent now, with the body the route documents, and so is the `POST` that
+creates a threat assessment request — a route the vendor's own OpenAPI
+describes and the repo's reduced reference had not recorded, which is why it
+counted as watched by nothing but this repo's tests.
+
+`audit_coverage.py` stopped counting an entry whose `spec` is null as
+judged. Seven Graph routes are named by a reference that carries nothing to
+judge them by, and counting them read as though a reference described what
+they answer. The number went down: 383 judged became 377, and the vendor
+routes on tests alone went from 20 to 26.
+
 ### Changed
 
 **The seventeen audits that need nothing but the mock now run in CI.**
