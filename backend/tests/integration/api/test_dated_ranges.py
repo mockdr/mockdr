@@ -94,3 +94,57 @@ class TestTheNumericRangesAreUnchanged:
         self, client: TestClient, auth_headers: dict,
     ) -> None:
         assert _agents(client, auth_headers, coreCount__between="100-200") == []
+
+
+class TestAnUnreadableTimestampIsRefused:
+    """The old answers were a 200 either way, and both of them were a lie.
+
+    A value the mock could not read left `gte_dt`/`lte_dt` unapplied — 200
+    with the whole collection, telling a client that had asked to narrow that
+    nothing narrowed it — while the ordered comparisons fell through to text,
+    where `"2026-07-21T08:22:15.000Z" > "not-a-date"` is false for every
+    record and the answer was 200 with none. Of the 99 dated filters this
+    mock takes, 47 answered with everything, 50 with nothing, and 2 with an
+    accident of alphabetical order.
+    """
+
+    def test_a_value_that_is_not_a_timestamp_is_refused(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        response = client.get(f"{BASE}/agents?createdAt__gte=not-a-date", headers=auth_headers)
+        assert response.status_code == 400, response.text
+        error = response.json()["errors"][0]
+        assert error["code"] == 4000010
+        assert "valid datetime" in error["detail"]
+        assert "createdAt__gte" in error["detail"]
+
+    def test_both_directions_agree(self, client: TestClient, auth_headers: dict) -> None:
+        """`__lt` dropping the filter while `__gt` matched nothing was the tell."""
+        codes = {
+            client.get(f"{BASE}/agents?createdAt__{op}=not-a-date", headers=auth_headers)
+            .status_code
+            for op in ("lt", "lte", "gt", "gte")
+        }
+        assert codes == {400}
+
+    def test_a_range_with_an_unreadable_half_is_refused(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        response = client.get(
+            f"{BASE}/agents?createdAt__between=abc-def", headers=auth_headers,
+        )
+        assert response.status_code == 400, response.text
+
+    def test_every_iso_spelling_the_vendor_could_send_is_taken(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """Being stricter must not mean refusing a value the product accepts."""
+        for spelling in (
+            "2000-01-01",
+            "2000-01-01T00:00:00Z",
+            "2000-01-01T00:00:00.000Z",
+            "2000-01-01T00:00:00+00:00",
+            "2000-01-01 00:00:00",
+        ):
+            found = _agents(client, auth_headers, createdAt__gte=spelling)
+            assert found, f"{spelling} was not accepted as a timestamp"

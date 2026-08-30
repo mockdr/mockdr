@@ -38,12 +38,37 @@ def _reject_wrong_type(param: str, kind: str, raw: object) -> None:
         # A JSON body supplied a real integer or boolean; there is nothing to
         # parse and nothing to refuse.
         return
+    if kind == "date-time":
+        for half in _range_halves(raw):
+            if _parse_dt(half) is None and _epoch_ms(half) is None:
+                raise RequestValidationError([{
+                    "type": "datetime_parsing",
+                    "loc": ("query", param),
+                    "msg": "Input should be a valid datetime, "
+                           "unable to parse string as a datetime",
+                    "input": raw,
+                }])
+        return
     try:
         TypeAdapter(_DECLARED_TYPES[kind]).validate_python(raw)
     except ValidationError as exc:
         raise RequestValidationError(
             [{**err, "loc": ("query", param)} for err in exc.errors()],
         ) from exc
+
+
+def _range_halves(raw: str) -> list[str]:
+    """The one or two timestamps a value carries.
+
+    A ``__between`` value is ``<from>-<to>``, and the vendor spells both halves
+    as epoch milliseconds — so the separator is unambiguous there. Everything
+    else is a single timestamp, and an ISO one is full of hyphens, so it must
+    not be split.
+    """
+    low, _, high = raw.partition("-")
+    if low.isdigit() and high.isdigit():
+        return [low, high]
+    return [raw]
 
 
 @dataclass
@@ -150,7 +175,15 @@ def _parse_dt(value: str) -> datetime | None:
             return datetime.strptime(value, fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
-    return None
+    # Anything else ISO-8601 spells: an explicit offset (`+00:00`), a space
+    # separator, seconds without fractions. Refusing a value the vendor takes
+    # would be the worse half of the trade this parser is now part of — what
+    # it cannot read is refused outright, so it has to read everything real.
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
@@ -202,15 +235,15 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
             want = str(raw).lower() in ("true", "1", "yes")
             result = [r for r in result if bool(_get_field(r, spec.field)) == want]
 
-        elif spec.type == "gte_dt":
-            dt = _parse_dt(str(raw))
+        elif spec.type in ("gte_dt", "lte_dt"):
+            # A value this cannot read used to skip the filter, which answered
+            # 200 with the whole collection — the client asked to narrow and
+            # was told, with a success, that nothing narrowed it.
+            _reject_wrong_type(spec.param, "date-time", raw)
+            dt = _parse_dt(str(raw)) or _epoch_ms(str(raw))
             if dt:
-                result = [r for r in result if _compare_dt(_get_field(r, spec.field), dt, "gte")]
-
-        elif spec.type == "lte_dt":
-            dt = _parse_dt(str(raw))
-            if dt:
-                result = [r for r in result if _compare_dt(_get_field(r, spec.field), dt, "lte")]
+                op = "gte" if spec.type == "gte_dt" else "lte"
+                result = [r for r in result if _compare_dt(_get_field(r, spec.field), dt, op)]
 
         elif spec.type == "nin":
             if isinstance(raw, (list, tuple, set)):

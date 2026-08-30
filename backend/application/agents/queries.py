@@ -148,7 +148,6 @@ def list_applications_for_agents(
     cursor: str | None,
     limit: int,
     agent_is_decommissioned: str | None = None,
-    installed_at_between: str | None = None,
     documented: dict | None = None,
 ) -> dict:
     """Return installed applications across multiple agents (global endpoint).
@@ -160,7 +159,6 @@ def list_applications_for_agents(
         cursor: Pagination cursor.
         limit: Page size.
         agent_is_decommissioned: Filter by agent decommission status (``"true"``/``"false"``).
-        installed_at_between: Date range filter ``"START,END"`` for ``installedDate``.
         documented: The other filters the swagger declares for this route.
     """
     apps = store.get_all("installed_apps")
@@ -177,22 +175,6 @@ def list_applications_for_agents(
             if agent.isDecommissioned == want_decomm:
                 decomm_agents.add(agent.id)
         apps = [r for r in apps if r.get("agentId") in decomm_agents]
-
-    # Filter by installedAt date range
-    if installed_at_between:
-        from utils.filtering import _parse_dt
-
-        parts = installed_at_between.split(",", 1)
-        if len(parts) == 2:
-            start_dt = _parse_dt(parts[0].strip())
-            end_dt = _parse_dt(parts[1].strip())
-            if start_dt and end_dt:
-                filtered: list[dict] = []
-                for r in apps:
-                    dt = _parse_dt(str(r.get("installedDate", "") or ""))
-                    if dt and start_dt <= dt <= end_dt:
-                        filtered.append(r)
-                apps = filtered
 
     # Enriched before the documented filters run: half of them name an agent
     # column (osType, agentMachineType), which the application record itself

@@ -1,5 +1,10 @@
 """Unit tests for utils.filtering — FilterSpec and apply_filters."""
 
+from datetime import UTC, datetime
+
+import pytest
+from fastapi.exceptions import RequestValidationError
+
 from utils.filtering import FilterSpec, apply_filters
 
 RECORDS = [
@@ -81,10 +86,18 @@ class TestFilterSpecDatetime:
         result = apply_filters(RECORDS, {"to": "2024-06-01"}, spec)
         assert {r["id"] for r in result} == {"a", "b"}
 
-    def test_invalid_date_returns_all(self) -> None:
+    def test_invalid_date_is_refused(self) -> None:
+        """It used to return all three, which is a 200 saying the filter ran."""
         spec = [FilterSpec("from", "createdAt", "gte_dt")]
-        result = apply_filters(RECORDS, {"from": "not-a-date"}, spec)
-        assert len(result) == 3
+        with pytest.raises(RequestValidationError):
+            apply_filters(RECORDS, {"from": "not-a-date"}, spec)
+
+    def test_the_epoch_spelling_is_a_date(self) -> None:
+        """`__between` travels as milliseconds, so the comparison must read them."""
+        spec = [FilterSpec("from", "createdAt", "gte_dt")]
+        stamp = int(datetime(2024, 6, 1, tzinfo=UTC).timestamp() * 1000)
+        result = apply_filters(RECORDS, {"from": str(stamp)}, spec)
+        assert {r["id"] for r in result} == {"b", "c"}
 
 
 class TestFilterSpecFullText:

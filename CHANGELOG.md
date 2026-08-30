@@ -8,6 +8,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A timestamp filter no longer answers 200 to a value it cannot read.**
+Of the 99 dated filters this mock takes, 47 answered with the whole
+collection and 50 with none, for the same unreadable value — `gte_dt` and
+`lte_dt` skipped the filter outright, telling a client that had asked to
+narrow that nothing narrowed it, while the ordered comparisons fell through
+to text, where `"2026-07-21T08:22:15.000Z" > "not-a-date"` is false for
+every record ever written. Two more returned an accident of alphabetical
+order. All 99 refuse now, in the validation envelope `?limit=abc` already
+used. Which parameters are dated is decided on evidence, not on their
+spelling: the swagger declares `format: date-time` on 20 of them, and for
+the rest the mock's own answer decides — a field whose sampled values are
+ISO-8601 is compared as a timestamp. Only ordering operators are affected;
+`eq` and `contains` on a dated field are left alone.
+
+Being stricter had to not mean refusing what the product takes, so
+`_parse_dt` now reads every ISO-8601 spelling — an explicit `+00:00` offset,
+a space separator, seconds without fractions — where it knew three formats
+before. All of those filter; only what no ISO spelling and no epoch reading
+can parse is refused.
+
+**`installedAt__between` filtered nothing, whatever it was sent.**
+It was read here as `START,END` — a spelling nothing documents — while the
+swagger gives `<from_timestamp>-<to_timestamp>` in epoch milliseconds, so a
+client following the documentation had its range dropped and was handed all
+100 applications with a 200. The bespoke implementation is gone and the
+parameter goes through the same derived filter as the other ten dated
+ranges. The comma spelling is refused: it was mockdr's own invention, and
+nothing in the repository used it.
+
+**The generated filter table is sampled from more than one record.**
+`gen_documented_filters.py` read a single record to decide what a field
+holds, so a field only some records carry — `lastSuccessfulScanDate`, on 29
+of 60 agents — looked like anything but a timestamp and its five filters
+kept comparing dates as text. It samples a hundred now.
+
 **Every dated range filter answered with an empty list.**
 The swagger spells each dated `__between` as
 `<from_timestamp>-<to_timestamp>` and gives a 13-digit example

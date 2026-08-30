@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import warnings
 from pathlib import Path
@@ -32,6 +33,9 @@ OUT = ROOT / "backend" / "application" / "documented_filters.py"
 PREFIX = "/web/api/v2.1"
 
 #: Suffix → filter strategy. Order matters: the longest match wins.
+#: An ISO-8601 date this mock's own records carry, as its answers spell them.
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}|$)")
+
 #: ruff's limit for the file this writes.
 LINE_LIMIT = 100
 
@@ -76,6 +80,47 @@ def _field_paths(value: object, prefix: str = "", depth: int = 0) -> dict[str, s
     elif isinstance(value, list) and value:
         found.update(_field_paths(value[0], prefix, depth + 1))
     return found
+
+
+def _records(body: object) -> list[dict]:
+    """Every record of a list response, whatever envelope it wears."""
+    data = body.get("data") if isinstance(body, dict) else None
+    if isinstance(data, list):
+        return [r for r in data if isinstance(r, dict)]
+    if isinstance(data, dict):
+        for value in data.values():
+            if isinstance(value, list) and value and isinstance(value[0], dict):
+                return [r for r in value if isinstance(r, dict)]
+    return []
+
+
+def _is_dated(declared: dict, records: list[dict], field: str, op: str) -> bool:
+    """Whether this parameter compares timestamps, on evidence rather than name.
+
+    Two sources, and neither is the parameter's spelling: the swagger declares
+    `format: date-time` on 20 of them, and for the rest the mock's own answer
+    is the evidence — a field whose sampled value is an ISO-8601 timestamp is
+    compared as one. A parameter that does not order anything (`eq`,
+    `contains`, `in`) is left alone: refusing a substring for not being a
+    timestamp would be a new wrongness in place of the old one.
+    """
+    if op not in ("gt", "gte", "lt", "lte", "between", "gte_dt", "lte_dt"):
+        return False
+    if declared.get("format") == "date-time":
+        return True
+    return any(_ISO_DATE.match(v) for v in (_value(r, field) for r in records) if v)
+
+
+def _value(record: dict, field: str) -> str | None:
+    """The record's value at a dot-path, when it is a string."""
+    value: object = record
+    for part in field.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+        if isinstance(value, list) and value:
+            value = value[0]
+    return value if isinstance(value, str) else None
 
 
 def _sample(body: object) -> dict | None:
@@ -131,10 +176,15 @@ def main() -> int:
             missing = sorted(set(documented) - taken - NOT_FILTERS)
             if not missing:
                 continue
-            response = client.get(f"{path}?limit=1", headers=headers)
+            # More than one record, because a field only some records carry
+            # reads as absent in the first one: sampling a single agent left
+            # `lastSuccessfulScanDate` looking like anything but a timestamp,
+            # and its filters kept comparing dates as text.
+            response = client.get(f"{path}?limit=100", headers=headers)
             if response.status_code != 200:
                 continue
-            sample = _sample(response.json())
+            records = _records(response.json())
+            sample = records[0] if records else None
             if sample is None:
                 continue
             paths = _field_paths(sample)
@@ -157,7 +207,12 @@ def main() -> int:
                 # two the mock can check are carried; `array` is
                 # `collectionFormat: csv` throughout and arrives as text.
                 declared_type = declared.get("type")
-                kind = declared_type if declared_type in ("integer", "boolean") else "string"
+                if declared_type in ("integer", "boolean"):
+                    kind = declared_type
+                elif _is_dated(declared, records, field, op):
+                    kind = "date-time"
+                else:
+                    kind = "string"
                 derived.setdefault(path[len(PREFIX):], []).append(
                     (name, field, op, enum, kind),
                 )
@@ -193,7 +248,17 @@ def main() -> int:
                 # generator wraps rather than leaving a line for a human to
                 # fix by hand in a file whose header forbids that.
                 lines.append("        FilterSpec(")
-                lines.append(f'            "{name}", "{field}", "{op}"{enum_arg}{kind_arg},')
+                packed = f'            "{name}", "{field}", "{op}"{enum_arg}{kind_arg},'
+                if len(packed) <= LINE_LIMIT:
+                    lines.append(packed)
+                else:
+                    lines.append(f'            "{name}",')
+                    lines.append(f'            "{field}",')
+                    lines.append(f'            "{op}",')
+                    # Each extra argument already carries its leading ", ".
+                    lines += [
+                        f"            {arg.lstrip(', ')}," for arg in (enum_arg, kind_arg) if arg
+                    ]
                 lines.append("        ),")
         lines.append("    ],")
     lines.append("}")

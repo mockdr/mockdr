@@ -93,7 +93,6 @@ def list_installed_applications(
     ids: str = Query(None),
     agentIds: str = Query(None),
     agentIsDecommissioned: str = Query(None),
-    installedAt__between: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
     skip: int = Query(None),
@@ -103,8 +102,11 @@ def list_installed_applications(
     """Return a paginated list of installed applications (top-level endpoint).
 
     Accepts ``?ids=`` (application-level) or ``?agentIds=`` for agent-scoped queries.
-    Supports ``?agentIsDecommissioned=false`` and ``?installedAt__between=START,END``
-    filters matching the real S1 API contract.
+    ``?agentIsDecommissioned=false`` narrows to an agent's state; the dated
+    and other documented filters come from the swagger, ``installedAt__between``
+    among them — it used to be read here as ``START,END`` while the vendor
+    documents ``<from_timestamp>-<to_timestamp>``, so the documented spelling
+    was dropped and the route answered with every application.
     """
     agent_ids = [i.strip() for i in agentIds.split(",") if i.strip()] if agentIds else []
     answer = agent_queries.list_applications_for_agents(
@@ -112,7 +114,6 @@ def list_installed_applications(
         cursor,
         limit,
         agent_is_decommissioned=agentIsDecommissioned,
-        installed_at_between=installedAt__between,
         documented={
             **documented_params(request, "/installed-applications"),
             **{

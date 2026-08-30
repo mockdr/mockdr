@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from application.documented_filters import DOCUMENTED_FILTERS
-from utils.filtering import FilterSpec
+from utils.filtering import FilterSpec, _parse_dt
 from utils.nested import get_nested
 
 BASE = "/web/api/v2.1"
@@ -77,7 +77,18 @@ class TestGeneratedFiltersNarrow:
         elif spec.type == "bool":
             sent = "true"
         elif spec.type == "between":
-            sent = f"{sample}-{sample}"
+            # The vendor spells a range as `<from>-<to>`, and for a dated one
+            # both halves are epoch milliseconds — joining two ISO timestamps
+            # with a hyphen is a value it never documents, and reads as
+            # `2026` to `07-21T08:22:15.000Z` to anything that splits on the
+            # separator. Send what the swagger's own examples send.
+            if spec.kind == "date-time":
+                moment = _parse_dt(str(sample))
+                assert moment is not None, f"{route} {spec.param}: {sample!r} is not a timestamp"
+                stamp = int(moment.timestamp() * 1000)
+                sent = f"{stamp}-{stamp}"
+            else:
+                sent = f"{sample}-{sample}"
 
         narrowed = _records(client, route, auth_headers, **{spec.param: sent})
         assert len(narrowed) <= len(everything), f"{route} {spec.param} widened the result"
