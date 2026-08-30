@@ -21,7 +21,7 @@ FILTER_SPECS = [
     FilterSpec("networkStatuses", "networkStatus", "in"),
     FilterSpec("isActive", "isActive", "bool"),
     FilterSpec("isDecommissioned", "isDecommissioned", "bool"),
-    FilterSpec("infected", "infected", "bool"),
+    FilterSpec("infected", "infected", "bool", kind="boolean"),
     FilterSpec("isPendingUninstall", "isPendingUninstall", "bool"),
     FilterSpec("isUpToDate", "isUpToDate", "bool"),
     FilterSpec("computerName", "computerName", "contains"),

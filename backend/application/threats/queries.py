@@ -21,7 +21,7 @@ FILTER_SPECS = [
     FilterSpec("analystVerdicts", "threatInfo.analystVerdict", "in"),
     FilterSpec("incidentStatuses", "threatInfo.incidentStatus", "in"),
     FilterSpec("confidenceLevels", "threatInfo.confidenceLevel", "in"),
-    FilterSpec("resolved", "threatInfo.resolved", "bool"),
+    FilterSpec("resolved", "threatInfo.resolved", "bool", kind="boolean"),
     FilterSpec("contentHashes", "threatInfo.sha1", "in"),
     FilterSpec("threatName", "threatInfo.threatName", "contains"),
     FilterSpec(

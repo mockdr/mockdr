@@ -8,6 +8,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A filter the swagger types now refuses a value that type cannot hold.**
+The 2.1 swagger declares forty-odd query filters `integer` or `boolean`;
+mockdr took every one of them as text and compared whatever arrived.
+`?resolved=maybe` was read as false and answered `200` with all 25
+unresolved threats, `?twoFaEnabled=maybe` answered `200` with none, and
+`?coreCount__lt=abc` answered `200` with the whole estate — a client with a
+formatting bug was handed a filtered-looking result and never told the
+filter had not been applied. `?limit=abc` on this same mount has always
+answered `400` in SentinelOne's validation envelope; the typed filters now
+answer the same way, down to the wording, because they raise pydantic's own
+error and let the one measured handler build the body. 87 parameters refuse
+a value their type cannot hold where 0 did; the specs carry the declared
+type, so `documented_openapi` advertises it too instead of a blanket
+`string`. Valid values are untouched: `coreCount__lt=10` still returns
+`[2, 4, 8]` and not the lexicographic answer, and an empty value still means
+"unset" rather than a type error.
+
+**`param_drift.py` compared parameter names and not their types.**
+That is why the above could sit in plain sight: `resolved` and
+`coreCount__lt` were on both lists, so they counted as agreed while the mock
+read one as text and the other as a string comparison. It now reports the
+parameters both sides declare with different types — 4 remain, down from 45.
+`array` is excluded by measurement rather than assumption: all 16 222 array
+parameters in this swagger are `collectionFormat: csv`, so they travel as
+one comma-separated string and a mock that takes a string is right.
+
+**Not fixed, and stated: three parameters whose advertised type still says
+`string`.** `infected` on `/agents` and `/agents/count`, and `resolved` on
+`/threats`, are declared in the route signature rather than derived from the
+swagger. Their *behaviour* is now correct — a non-boolean is refused — but
+retyping the signature would also make `?resolved=` a `400`, where every
+other filter here treats an empty value as unset. The behaviour is
+consistent; the declaration is not, and `param_drift.py` lists it.
+`containerizedWorkloadCounts` is the fourth: the swagger declares an
+`object` in a query string and nothing measured says how it is spelled.
+
+**`gen_documented_filters.py` emptied its own table on a second run.**
+The mock advertises the previous run's output through `documented_openapi`,
+so the generator saw its own 343 filters as parameters the routes already
+took, found nothing missing, and wrote an empty file — which is what
+happened here on the first regeneration. What the generator produced is not
+evidence that the route takes it, so its own output is now subtracted before
+the comparison, and two consecutive runs produce the same table. It also
+wraps the lines it emits, since ruff lints the generated file like any
+other and the file's header forbids fixing it by hand.
+
 **Measured and not built: which responses are chunked.**
 mockdr sends `Content-Length` on everything, which is splunkd's policy
 exactly — that one is right. Kibana sends a length uncompressed and chunks

@@ -32,6 +32,9 @@ OUT = ROOT / "backend" / "application" / "documented_filters.py"
 PREFIX = "/web/api/v2.1"
 
 #: Suffix → filter strategy. Order matters: the longest match wins.
+#: ruff's limit for the file this writes.
+LINE_LIMIT = 100
+
 SUFFIX_OPS: list[tuple[str, str]] = [
     ("__contains", "contains"),
     ("__between", "between"),
@@ -96,6 +99,7 @@ def main() -> int:
     logging.disable(logging.CRITICAL)
     warnings.filterwarnings("ignore")
     sys.path.insert(0, str(ROOT / "backend"))
+    from application.documented_filters import DOCUMENTED_FILTERS  # noqa: PLC0415
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from main import app  # noqa: PLC0415
 
@@ -103,7 +107,7 @@ def main() -> int:
     mock = app.openapi()
     headers = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
 
-    derived: dict[str, list[tuple[str, str, str, bool]]] = {}
+    derived: dict[str, list[tuple[str, str, str, bool, str]]] = {}
     skipped = 0
     with TestClient(app) as client:
         for path, operations in sorted(spec["paths"].items()):
@@ -117,9 +121,13 @@ def main() -> int:
                 for p in operations["get"].get("parameters", [])
                 if p.get("in") == "query"
             }
+            # The mock advertises the previous run's output through
+            # `documented_openapi`, so a second consecutive run saw its own
+            # filters as already taken and wrote an empty table. What this
+            # generator produced is not evidence that the route takes it.
             taken = {
                 p["name"] for p in mocked_op.get("parameters", []) if p.get("in") == "query"
-            }
+            } - {s.param for s in DOCUMENTED_FILTERS.get(path[len(PREFIX):], ())}
             missing = sorted(set(documented) - taken - NOT_FILTERS)
             if not missing:
                 continue
@@ -144,7 +152,15 @@ def main() -> int:
                     op = "in" if declared.get("type") == "array" else "eq"
                     if declared.get("type") == "boolean":
                         op = "bool"
-                derived.setdefault(path[len(PREFIX):], []).append((name, field, op, enum))
+                # The declared scalar type travels with the spec so the
+                # filter layer can refuse a value it cannot hold. Only the
+                # two the mock can check are carried; `array` is
+                # `collectionFormat: csv` throughout and arrives as text.
+                declared_type = declared.get("type")
+                kind = declared_type if declared_type in ("integer", "boolean") else "string"
+                derived.setdefault(path[len(PREFIX):], []).append(
+                    (name, field, op, enum, kind),
+                )
 
     lines = [
         '"""Filters the SentinelOne swagger declares, generated — do not edit by hand.',
@@ -152,8 +168,9 @@ def main() -> int:
         "    backend/.venv/bin/python scripts/gen_documented_filters.py",
         "",
         "Each entry is a parameter the vendor documents whose field this mock's own",
-        "response carries. The suffix decides the operator; a parameter whose field",
-        "we do not have is not here and stays in `scripts/param_drift.py`'s count.",
+        "response carries. The suffix decides the operator, `kind` carries the scalar",
+        "type the swagger declares; a parameter whose field we do not have is",
+        "not here and stays in `scripts/param_drift.py`'s count.",
         '"""',
         "",
         "from __future__ import annotations",
@@ -165,9 +182,19 @@ def main() -> int:
     ]
     for route, specs in sorted(derived.items()):
         lines.append(f'    "{route}": [')
-        for name, field, op, enum in sorted(specs):
+        for name, field, op, enum, kind in sorted(specs):
             enum_arg = ", enum=True" if enum else ""
-            lines.append(f'        FilterSpec("{name}", "{field}", "{op}"{enum_arg}),')
+            kind_arg = f', kind="{kind}"' if kind != "string" else ""
+            one_line = f'        FilterSpec("{name}", "{field}", "{op}"{enum_arg}{kind_arg}),'
+            if len(one_line) <= LINE_LIMIT:
+                lines.append(one_line)
+            else:
+                # ruff lints the generated file like any other, so the
+                # generator wraps rather than leaving a line for a human to
+                # fix by hand in a file whose header forbids that.
+                lines.append("        FilterSpec(")
+                lines.append(f'            "{name}", "{field}", "{op}"{enum_arg}{kind_arg},')
+                lines.append("        ),")
         lines.append("    ],")
     lines.append("}")
     lines.append("")

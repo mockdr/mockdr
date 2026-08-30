@@ -57,6 +57,50 @@ def _shape(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "{}", path)
 
 
+def _scalar(schema: dict) -> str | None:
+    """The scalar type a mock parameter's schema settles on, if it settles."""
+    for key in ("anyOf", "oneOf"):
+        if key in schema:
+            kinds = {member.get("type") for member in schema[key]} - {"null"}
+            return next(iter(kinds)) if len(kinds) == 1 else None
+    kind = schema.get("type")
+    return str(kind) if isinstance(kind, str) else None
+
+
+def _type_drift(
+    path: str, method: str, documented: dict, mocked: dict,
+) -> list[str]:
+    """Parameters both sides declare, where the mock's type is not the vendor's.
+
+    Comparing names alone was not enough: `resolved` and `coreCount__lt` were
+    on both lists and so counted as agreed, while the mock took them as text
+    and read `resolved=maybe` as false — a 200 with every unresolved threat
+    for a client whose value was nonsense. Only the type said so.
+
+    `array` is excluded, and by measurement rather than assumption: every one
+    of the 16 222 array parameters in this swagger is `collectionFormat: csv`,
+    so it travels as one comma-separated string and a mock that takes a string
+    is right.
+    """
+    vendor = {
+        p["name"]: p.get("type")
+        for p in documented.get("parameters", []) or []
+        if p.get("in") == "query"
+    }
+    drift = []
+    for parameter in mocked.get("parameters", []) or []:
+        if parameter.get("in") != "query":
+            continue
+        want = vendor.get(parameter["name"])
+        got = _scalar(parameter.get("schema", {}))
+        if want and got and want != got and want != "array":
+            drift.append(
+                f"{method.upper()} {path[len(PREFIX):]} {parameter['name']}: "
+                f"swagger {want}, mock {got}",
+            )
+    return drift
+
+
 def _undocumented_routes(spec: dict, mock: dict) -> list[str]:
     """Every route the mock serves under the vendor's prefix that it does not."""
     documented = {
@@ -123,6 +167,7 @@ def main() -> int:
     mock = app.openapi()
 
     routes = ignored_total = mock_only_total = 0
+    mistyped: list[str] = []
     for path, operations in sorted(spec["paths"].items()):
         if path not in mock["paths"]:
             continue
@@ -137,6 +182,7 @@ def main() -> int:
             mock_only = sorted(mocked - documented)
             ignored_total += len(ignored)
             mock_only_total += len(mock_only)
+            mistyped += _type_drift(path, method, operation, mocked_operation)
             if args.verbose and (ignored or mock_only):
                 print(f"  {method.upper()} {path[len(PREFIX):]}")
                 if ignored:
@@ -150,8 +196,11 @@ def main() -> int:
         f"\n=== PARAMETER DRIFT === {routes} routes compared\n"
         f"  {ignored_total} documented parameter(s) this mock does not take\n"
         f"  {mock_only_total} parameter(s) this mock takes that the swagger does not declare\n"
+        f"  {len(mistyped)} parameter(s) both sides declare, with different types\n"
         f"  {len(undocumented)} route(s) this mock serves that the swagger does not publish"
     )
+    for entry in mistyped:
+        print(f"      {entry}")
     for route in undocumented:
         print(f"      {route}")
     print(f"  {len(unserved)} documented method(s) answered 405 on a path this mock serves")

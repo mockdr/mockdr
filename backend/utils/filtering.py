@@ -9,7 +9,41 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from fastapi.exceptions import RequestValidationError
+from pydantic import TypeAdapter, ValidationError
+
 from utils.nested import get_nested as _get_field
+
+#: Declared scalar types this module can check, and what checks them.
+_DECLARED_TYPES: dict[str, Any] = {"integer": int, "boolean": bool}
+
+
+def _reject_wrong_type(param: str, kind: str, raw: object) -> None:
+    """Refuse a value the type the vendor declares cannot hold.
+
+    The swagger types forty-odd of these parameters ``integer`` or
+    ``boolean``; this mock took them all as text and compared whatever
+    arrived. ``resolved=maybe`` was read as false and answered 200 with every
+    unresolved threat, and ``coreCount__lt=abc`` answered 200 with the whole
+    estate — in both cases a client with a formatting bug was handed a
+    filtered-looking result and never told the filter had not been applied.
+
+    ``limit=abc`` on this same mount has always answered 400 in
+    SentinelOne's validation envelope; this is that rule reaching the filters
+    the swagger types. Raising pydantic's own error rather than building the
+    body here is deliberate: the envelope then comes from the one handler
+    that was measured against the vendor, so the two cannot drift apart.
+    """
+    if not isinstance(raw, str):
+        # A JSON body supplied a real integer or boolean; there is nothing to
+        # parse and nothing to refuse.
+        return
+    try:
+        TypeAdapter(_DECLARED_TYPES[kind]).validate_python(raw)
+    except ValidationError as exc:
+        raise RequestValidationError(
+            [{**err, "loc": ("query", param)} for err in exc.errors()],
+        ) from exc
 
 
 @dataclass
@@ -30,12 +64,18 @@ class FilterSpec:
               in a filter and another in a response — SentinelOne accepts
               ``incidentStatus=UNRESOLVED`` and answers
               ``"incidentStatus": "Unresolved"``. Both forms then match.
+        kind: The scalar type the swagger declares for the parameter, when it
+              declares one this mock can check: ``"integer"``, ``"boolean"``,
+              or ``"string"`` for everything it cannot. Array parameters are
+              ``collectionFormat: csv`` throughout the swagger, so they arrive
+              as text and stay ``"string"``.
     """
 
     param: str
     field: str
     type: str
     enum: bool = False
+    kind: str = "string"
 
 
 def _ordered(field_value: object, target: object, op: str) -> bool:
@@ -110,6 +150,8 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
         raw = params.get(spec.param)
         if raw is None or raw == "":
             continue
+        if spec.kind != "string":
+            _reject_wrong_type(spec.param, spec.kind, raw)
 
         if spec.type == "eq":
             result = [r for r in result if str(_get_field(r, spec.field) or "") == str(raw)]

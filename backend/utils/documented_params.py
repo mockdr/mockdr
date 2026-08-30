@@ -43,7 +43,11 @@ def documented_openapi(route: str) -> dict[str, Any]:
                 "name": spec.param,
                 "in": "query",
                 "required": False,
-                "schema": {"type": "string"},
+                # The type the swagger declares, not a blanket `string`:
+                # this block *is* what the mock advertises for these
+                # parameters, so declaring them all as text told every reader
+                # the opposite of what the filter layer now enforces.
+                "schema": {"type": spec.kind},
                 "description": f"Documented filter on {spec.field} ({spec.type}).",
             }
             for spec in specs
