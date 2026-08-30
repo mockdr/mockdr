@@ -212,9 +212,16 @@ def seed_agents(
             ),
             registeredAt=registered_at,
             createdAt=registered_at,
-            updatedAt=rand_ago(1),
-            groupUpdatedAt=rand_ago(30),
-            lastActiveDate=rand_ago(5) if is_active else rand_ago(30),
+            # An agent checks in often, so this is recent — but it must not
+            # precede the day the agent registered. Both were drawn
+            # independently (`rand_ago(200)` beside `rand_ago(1)`), so an
+            # agent registered within the last day could report having been
+            # updated before it existed. `test_seed_referential_integrity`
+            # catches it only on the draws where it happens.
+            updatedAt=max(rand_ago(1), registered_at),
+            groupUpdatedAt=max(rand_ago(30), registered_at),
+            lastActiveDate=max(rand_ago(5) if is_active else rand_ago(30),
+                              registered_at),
             licenseKey="",
             isActive=is_active,
             isDecommissioned=False,

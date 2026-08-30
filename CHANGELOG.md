@@ -30,6 +30,34 @@ guess.
 
 ### Fixed
 
+**A site's active licences were a random number between 50 and 200.**
+"Number of active licenses for the site", and the licence surface each site
+answers beside it is named `Total Agents` with a count equal to
+`totalLicenses` — so the unit is an agent and an active licence is an agent
+using one. The seeder drew a random number instead, and a site holding 18
+agents answered 76, a figure no other answer of this mock agreed with and
+that never moved when an agent did. It is the agent count now, and
+`allSites.activeLicenses` adds up to the sixty agents that exist.
+
+Stored rather than counted on the way out, and that distinction cost a
+round: computing it in the query left `?activeLicenses=18` and
+`?sortBy=activeLicenses` reading the record while the answer said something
+else — which is the exact defect this release spent the day removing, one
+field over. Agents are seeded after their sites, so the count is written
+once both exist.
+
+**An agent could report having been updated before it existed.**
+`createdAt` was drawn as "some point in the last 200 days" and `updatedAt`
+as "some point in the last day", independently, so an agent registered
+within the last day could carry the later date first. `rand_after` was
+written for exactly this and the agent seeder had never been converted;
+`groupUpdatedAt` and `lastActiveDate` had the same shape. Ten consecutive
+runs of `test_seed_referential_integrity` pass where the eighth had failed.
+
+It surfaced by accident: removing the random draw above shifted every
+subsequent draw, and a different sequence hit it. A test that only fails on
+some seeds had been passing on the seeds it was given.
+
 **An account's licence total did not follow its sites.**
 `totalLicenses` is "the total number of licenses on all Surfaces for all
 Bundles" and nothing kept it: adding a fourth site of ten licences left the

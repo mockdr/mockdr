@@ -74,7 +74,7 @@ from infrastructure.seeders.graph.graph_files import seed_graph_files
 from infrastructure.seeders.graph.graph_teams import seed_graph_teams
 from infrastructure.seeders.sentinel.incident_seeder import seed_sentinel_incidents
 from infrastructure.seeders.sentinel.sentinel_seeder import seed_sentinel_infrastructure
-from infrastructure.seeders.sites import seed_sites
+from infrastructure.seeders.sites import resync_site_licences, seed_sites
 from infrastructure.seeders.splunk.edr_event_seeder import seed_edr_events
 from infrastructure.seeders.splunk.splunk_seeder import seed_splunk_infrastructure
 from infrastructure.seeders.tags import seed_tags
@@ -126,6 +126,9 @@ def generate_all() -> None:
     admin_user_id = user_ids[0] if user_ids else ""
     seed_tags(fake, account_id, account_name, site_ids, group_ids_by_site, admin_user_id)
     agent_ids = seed_agents(fake, account_id, account_name, group_ids_by_site)
+    # A site's active licences are the agents installed on it, and the agents
+    # only exist now.
+    resync_site_licences()
 
     seed_threats(fake, agent_ids)
     seed_alerts(fake, agent_ids)

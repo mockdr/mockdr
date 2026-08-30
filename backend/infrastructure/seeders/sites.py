@@ -1,5 +1,4 @@
 """Sites seeder — seeds three sites and their default policies."""
-import random
 
 from faker import Faker
 
@@ -42,7 +41,11 @@ def seed_sites(fake: Faker, account_id: str, account_name: str) -> list[str]:
         sid = new_id()
         site_ids.append(sid)
         total_lic = SITE_TOTAL_LICENSES
-        active_lic = random.randint(50, 200)
+        # Counted from the agents on the way out (see
+        # `application/sites/queries.py`), because agents are seeded after the
+        # sites they belong to. A random 50-200 here had a site of 18 agents
+        # answering 76 active licences, and the number never moved.
+        active_lic = 0
         site_repo.save(Site(
             id=sid,
             name=site_name,
@@ -103,3 +106,30 @@ def seed_sites(fake: Faker, account_id: str, account_name: str) -> list[str]:
     policy_repo.save_for_tenant(make_policy(account_id, "account"))
 
     return site_ids
+
+
+def resync_site_licences() -> None:
+    """Set each site's `activeLicenses` to the agents installed on it.
+
+    "Number of active licenses for the site", and the licence surface each
+    site answers beside it is named `Total Agents` with a count equal to
+    `totalLicenses` — so the unit is an agent and an active licence is an
+    agent using one. The seeder drew a random 50-200 instead, and a site
+    holding 18 agents answered 76.
+
+    It is stored rather than counted on the way out, because the documented
+    `activeLicenses` filter and sort read the record: computing it in the
+    query made `?activeLicenses=18` and `?sortBy=activeLicenses` disagree
+    with the answer, which is the defect this repo spent the day removing.
+    Agents are seeded after their sites, so this runs once both exist.
+    """
+    from repository.agent_repo import agent_repo
+
+    counts: dict[str, int] = {}
+    for agent in agent_repo.list_all():
+        site_id = str(getattr(agent, "siteId", "") or "")
+        if site_id:
+            counts[site_id] = counts.get(site_id, 0) + 1
+    for site in site_repo.list_all():
+        site.activeLicenses = counts.get(site.id, 0)
+        site_repo.save(site)

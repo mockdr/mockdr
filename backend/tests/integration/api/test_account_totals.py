@@ -88,3 +88,50 @@ class TestActiveAgentsMeansWhatTheSwaggerSaysItMeans:
         active = [a for a in agents if a.get("isActive")]
         assert len(active) < len(agents), "the seed cannot tell the two apart"
         assert _account(client, auth_headers)["activeAgents"] == len(agents)
+
+
+class TestASiteCountsTheAgentsUsingItsLicences:
+    """"Number of active licenses for the site", and a licence is an agent.
+
+    Each site answers a licence surface named `Total Agents` whose count
+    equals `totalLicenses`, so the unit is an agent and an active licence is
+    an agent using one. The seeder drew a random 50-200 instead, and a site
+    holding 18 agents answered 76 — a number that never moved when an agent
+    did, and that no other answer of this mock agreed with.
+    """
+
+    def _agents_per_site(self, client: TestClient, headers: dict) -> dict[str, int]:
+        agents = client.get(
+            f"{BASE}/agents", headers=headers, params={"limit": "100"},
+        ).json()["data"]
+        counts: dict[str, int] = {}
+        for agent in agents:
+            counts[agent["siteId"]] = counts.get(agent["siteId"], 0) + 1
+        return counts
+
+    def test_each_site_reports_the_agents_it_holds(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        held = self._agents_per_site(client, auth_headers)
+        assert len(held) > 1, "one site cannot show the difference"
+        for site in _sites(client, auth_headers):
+            assert site["activeLicenses"] == held.get(site["id"], 0), site["name"]
+
+    def test_the_summary_adds_them_up(self, client: TestClient, auth_headers: dict) -> None:
+        response = client.get(f"{BASE}/sites", headers=auth_headers, params={"limit": "100"})
+        summary = response.json()["data"]["allSites"]
+        agents = client.get(
+            f"{BASE}/agents", headers=auth_headers, params={"limit": "100"},
+        ).json()["data"]
+        assert summary["activeLicenses"] == len(agents)
+
+    def test_the_documented_filter_finds_what_the_answer_says(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """It is stored, not computed on the way out, so the filter can read it."""
+        site = _sites(client, auth_headers)[0]
+        found = client.get(
+            f"{BASE}/sites", headers=auth_headers,
+            params={"activeLicenses": str(site["activeLicenses"])},
+        ).json()["data"]["sites"]
+        assert any(s["id"] == site["id"] for s in found)
