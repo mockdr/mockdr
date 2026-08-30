@@ -15,14 +15,10 @@ validation envelope. These tests hold the typed filters to that same rule.
 
 from __future__ import annotations
 
-import json
-import pathlib
-
 import pytest
 from fastapi.testclient import TestClient
 
 BASE = "/web/api/v2.1"
-SWAGGER = pathlib.Path(__file__).resolve().parents[4] / "data" / "swagger_2_1.json"
 
 
 def _errors(response) -> dict:  # noqa: ANN001
@@ -110,29 +106,46 @@ class TestTheValuesTheTypeDoesHoldStillFilter:
 class TestTheClassStaysClosed:
     """Every typed parameter this mock takes, not the three that were found."""
 
-    def test_no_declared_integer_or_boolean_filter_accepts_garbage(
+    def test_no_typed_filter_accepts_a_value_its_type_cannot_hold(
         self, client: TestClient, auth_headers: dict,
     ) -> None:
-        swagger = json.loads(SWAGGER.read_text())
-        mock = client.app.openapi()
+        """Sourced from the mock itself: the swagger is fetched, not committed."""
+        from application.documented_filters import DOCUMENTED_FILTERS
+
         silent = []
-        for path, operations in swagger["paths"].items():
-            documented = operations.get("get")
-            mocked = mock["paths"].get(path, {}).get("get")
-            if not documented or not mocked or "{" in path:
-                continue
-            takes = {p["name"] for p in mocked.get("parameters", []) if p.get("in") == "query"}
-            for parameter in documented.get("parameters", []):
-                name, kind = parameter["name"], parameter.get("type")
-                if parameter.get("in") != "query" or kind not in ("integer", "boolean"):
+        for route, specs in DOCUMENTED_FILTERS.items():
+            for spec in specs:
+                if spec.kind == "string":
                     continue
-                if name not in takes:
-                    # Not taken at all: `scripts/param_drift.py` counts these,
-                    # and a parameter that is dropped cannot be validated.
-                    continue
-                response = client.get(path, headers=auth_headers, params={name: "zzz-garbage"})
+                response = client.get(
+                    f"{BASE}{route}", headers=auth_headers,
+                    params={spec.param: "zzz-garbage"},
+                )
                 if response.status_code != 400:
-                    silent.append(f"{path}?{name} -> {response.status_code}")
+                    silent.append(f"{route}?{spec.param} ({spec.kind}) -> {response.status_code}")
+        assert not silent, f"typed filters that swallow garbage: {silent}"
+
+    def test_no_typed_query_parameter_the_mock_declares_accepts_garbage(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """The ones declared in a route signature rather than derived."""
+        silent = []
+        for path, operations in client.app.openapi()["paths"].items():
+            operation = operations.get("get")
+            if not operation or not path.startswith(BASE) or "{" in path:
+                continue
+            for parameter in operation.get("parameters", []):
+                if parameter.get("in") != "query":
+                    continue
+                schema = parameter.get("schema", {})
+                kinds = {member.get("type") for member in schema.get("anyOf", [schema])}
+                if not kinds & {"integer", "boolean"}:
+                    continue
+                response = client.get(
+                    path, headers=auth_headers, params={parameter["name"]: "zzz-garbage"},
+                )
+                if response.status_code != 400:
+                    silent.append(f"{path}?{parameter['name']} -> {response.status_code}")
         assert not silent, f"typed parameters that swallow garbage: {silent}"
 
     def test_the_mock_advertises_the_type_it_enforces(self) -> None:
