@@ -40,15 +40,21 @@ all forty are clean.
 
 ### Fixed
 
-**Three Defender records named their machine and reported no name for it.**
+**Two Defender records named their machine and reported no name for it.**
 The docs' own property tables record `computerDnsName` beside `machineId`
-on an alert, an investigation and a machine action, and this mock set it on
-none of the three — every one answered an empty string while
+on an alert, an investigation and a machine action. The investigation had
+carried it from the first commit, seeded from the machine; the alert and the
+machine action did not, and both answered an empty string while
 `/api/machines` had the name all along. A client reading an alert to find
 the affected host found nothing, and one correlating alerts to machines by
 name matched nothing at all. `rbacGroupName` on an alert was the same: the
-group belongs to the machine and the alert reported none. All three carry
-the machine's name now, seeded and on a fresh action alike.
+group belongs to the machine and the alert reported none. Both carry the
+name now, seeded and on a fresh action alike, which is what the
+investigation beside them had been doing all along.
+
+(The commit that made this change says "none of the three". Two: the
+investigation was already right, and it is the precedent the other two
+should have followed.)
 
 A machine action also drew `creationDateTimeUtc` and
 `lastUpdateDateTimeUtc` independently, so it could report having been
