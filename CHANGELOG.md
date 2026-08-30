@@ -30,6 +30,27 @@ guess.
 
 ### Fixed
 
+**An account's licence total did not follow its sites.**
+`totalLicenses` is "the total number of licenses on all Surfaces for all
+Bundles" and nothing kept it: adding a fourth site of ten licences left the
+account answering the 1500 the first three hold, and raising that site to 90
+changed nothing either. `numberOfSites` beside it was kept by an increment
+and a decrement, which is one missed call site away from the same drift.
+Both are counted from the sites now — on a create, an update and a delete —
+so the account and its sites cannot come apart.
+
+**Measured and already right: `activeAgents` is every agent.**
+The name reads like a subset and the answer says 60 where 48 agents are
+active, which looked wrong until the swagger's own description settled it:
+"Total Agents in the Account". `numberOfAgents` and `numberOfUsers` are
+absent from the answer for the same kind of reason — the account's response
+schema does not declare either.
+
+**Measured and already right: an API token is shown once.**
+A user's `apiToken` comes back from the create and is `null` in the list and
+in a fetch by id, which is what the code's own comment claims and what the
+critical test holds it to.
+
 **A user scoped to one site saw every site.**
 `scope` is declared with the enum `["tenant", "account", "site"]`, and this
 mock answered `scope: "site"` and the site roles that go with it while

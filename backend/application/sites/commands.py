@@ -5,7 +5,7 @@ PUT  /sites/{id} → update_site
 DELETE /sites/{id} → delete_site
 """
 
-from application.accounts.commands import decrement_site_count, increment_site_count
+from application.accounts.commands import resync_account_totals
 from domain.site import Site
 from repository.account_repo import account_repo
 from repository.agent_repo import agent_repo
@@ -60,7 +60,7 @@ def create_site(data: dict) -> dict:
         usageType=data.get("usageType"),
     )
     site_repo.save(site)
-    increment_site_count(account_id)
+    resync_account_totals(account_id)
     return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
@@ -90,6 +90,8 @@ def update_site(site_id: str, data: dict) -> dict | None:
             setattr(site, field, data[field])
     site.updatedAt = utc_now()
     site_repo.save(site)
+    # `totalLicenses` is one of the members above, and the account sums it.
+    resync_account_totals(site.accountId)
     return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
@@ -182,5 +184,5 @@ def delete_site(site_id: str) -> dict | None:
             agent_repo.save(agent)
 
     site_repo.delete(site_id)
-    decrement_site_count(site.accountId)
+    resync_account_totals(site.accountId)
     return {"data": {"success": True}}

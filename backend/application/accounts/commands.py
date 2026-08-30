@@ -50,28 +50,27 @@ def create_account(data: dict) -> dict:
     return {"data": record_dict(account)}
 
 
-def increment_site_count(account_id: str) -> None:
-    """Increment the numberOfSites counter on an account.
+def resync_account_totals(account_id: str) -> None:
+    """Recompute what an account says about its sites, from the sites.
+
+    `numberOfSites` was kept by an increment beside a decrement, which is one
+    call site away from drifting; `totalLicenses` — "the total number of
+    licenses on all Surfaces for all Bundles" — was kept by nothing at all, so
+    adding a fourth site of ten licences left the account still answering the
+    1500 the first three hold. Counting is cheap here and cannot come apart.
 
     Args:
         account_id: The account's unique identifier.
     """
+    from repository.site_repo import site_repo  # noqa: PLC0415 - avoids a cycle
+
     account = account_repo.get(account_id)
-    if account:
-        account.numberOfSites = (account.numberOfSites or 0) + 1
-        account_repo.save(account)
-
-
-def decrement_site_count(account_id: str) -> None:
-    """Decrement the numberOfSites counter on an account.
-
-    Args:
-        account_id: The account's unique identifier.
-    """
-    account = account_repo.get(account_id)
-    if account:
-        account.numberOfSites = max(0, (account.numberOfSites or 0) - 1)
-        account_repo.save(account)
+    if not account:
+        return
+    sites = [s for s in site_repo.list_all() if s.accountId == account_id]
+    account.numberOfSites = len(sites)
+    account.totalLicenses = sum(int(s.totalLicenses or 0) for s in sites)
+    account_repo.save(account)
 
 
 def update_account(account_id: str, data: dict) -> dict | None:
