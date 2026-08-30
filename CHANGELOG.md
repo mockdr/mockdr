@@ -30,6 +30,23 @@ guess.
 
 ### Fixed
 
+**Measured and already right: an action route's `filter` selects.**
+136 SentinelOne write bodies document a `filter`, and 8 of those routes
+answer with a count this can be read from. Given an id nothing has, each
+affects 0; given a real one, each affects 1 — in both directions, which is
+the pair `filter_effect.py` established for body filters. Three of them
+looked wrong at first and were not: the probe had been sending a *threat* id
+to the two alert routes and to `/users/delete-users`.
+
+**Measured and already right: a delete removes the record.**
+Six delete routes were exercised — take a record, delete it, re-read the
+listing — and none of them left it there. Three answer `200` to a second
+delete rather than `404`, and that is not a defect either: `DELETE
+/users/{id}` is documented with `200`, `401` and `403` and no `404` at all,
+`/exclusions/{id}` is one of the nine routes `param_drift.py` already counts
+as unpublished, and `/_dev/` is mockdr's own surface, which imitates
+nothing.
+
 **Seven more members a write accepted and dropped.** `billingMode` and
 `usageType` on `POST /accounts`; `externalId`, `salesforceId`,
 `unlimitedExpiration` and `makeSocDefaultUi` on the account create and
