@@ -224,6 +224,14 @@ jobs:
       - name: Enum values the vendor declares
         run: python scripts/enum_drift.py
 
+      # `body_audit.py` above asks whether a write route reads its body at
+      # all. This asks whether the members it accepts are applied, which is a
+      # different question: `PUT /tenant/policy` refused an empty body and an
+      # undeclared member, and then ignored 43 of the 51 members the swagger
+      # documents. It needs the spec fetched above for the body schemas.
+      - name: Members a write route accepts take effect
+        run: python scripts/write_effect.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.

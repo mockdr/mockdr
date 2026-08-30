@@ -3,6 +3,7 @@ from application.webhooks import commands as webhook_commands
 from domain.webhook import ALERT_UPDATED
 from repository.alert_repo import alert_repo
 from repository.store import store
+from repository.user_repo import user_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 from utils.serde import record_dict
@@ -32,6 +33,14 @@ def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None 
         webhook_commands.fire_event(ALERT_UPDATED, record_dict(alert))
         affected += 1
     return {"data": {"affected": affected}}
+
+
+def _full_name(user_id: str | None) -> str:
+    """The acting user's full name, as the rule document spells its author."""
+    if not user_id:
+        return ""
+    user = user_repo.get(user_id)
+    return getattr(user, "fullName", "") if user else ""
 
 
 def create_star_rule(body: dict, user_id: str | None) -> dict:
@@ -66,10 +75,23 @@ def create_star_rule(body: dict, user_id: str | None) -> dict:
         "expirationMode": data.get("expirationMode", "Permanent"),
         "expiration": data.get("expiration"),
         "networkQuarantine": data.get("networkQuarantine", False),
+        # Documented on the create body and kept by nothing, so a rule made
+        # from a template answered without the template it came from.
+        "templateRuleId": data.get("templateRuleId"),
         "createdAt": now,
         "updatedAt": now,
-        "creator": user_id or "",
+        # The swagger reads "the full name of the user that created the rule"
+        # for `creator` and "the ID" for `creatorId`; both were the id here,
+        # so a rule made through the API named its author differently from
+        # every rule this mock seeds.
+        "creator": _full_name(user_id),
         "creatorId": user_id or "",
+        "updaterId": user_id or "",
+        "scope": data.get("scopeLevel", "site"),
+        "siteId": (data.get("siteIds") or [""])[0],
+        "accountId": (data.get("accountIds") or [""])[0],
+        "generatedAlerts": 0,
+        "lastAlertTime": None,
     }
     store.save("star_rules", rule_id, rule)
     return {"data": rule}

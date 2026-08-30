@@ -6,7 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+**`scripts/write_effect.py` — the members a write route accepts must do
+something.** `body_audit.py` asks whether a route *reads* its body, by
+refusing `{}` and a member it does not declare. Whether the members it
+accepts are *applied* is a different question, and the gap between the two
+held every write defect fixed above: `PUT /tenant/policy` refused both of
+those bodies and then ignored 43 of the 51 members the swagger documents.
+Each route is now sent every member of its documented body, typed from the
+swagger's own schema, and the answer is compared member by member. Server-
+owned members (`id`, `createdAt`, who last acted) and write-only ones (a
+password, a one-time code) are listed in the script with the reason rather
+than guessed at, as is the one body whose two members contradict each other
+by design — `reactivate`'s `unlimited` and `expiration`. It runs in CI after
+the spec is fetched, and reports 0.
+
+Only SentinelOne is covered, by measurement rather than choice: it is the
+one vendor whose vendored reference gives body schemas with types. The
+CrowdStrike and Cortex references name their members and not their types, so
+a generated body would be a guess, and a guess that answers 400 measures the
+guess.
+
 ### Fixed
+
+**Seven more members a write accepted and dropped.** `billingMode` and
+`usageType` on `POST /accounts`; `externalId`, `salesforceId`,
+`unlimitedExpiration` and `makeSocDefaultUi` on the account create and
+update, all four declared in the account's own answer schema and held by
+nothing; and `templateRuleId` on a STAR rule, so a rule made from a template
+answered without the template it came from.
+
+A rule created through the API also named its author differently from every
+rule this mock seeds: `creator` carried the user's *id* where the swagger
+reads "the full name of the user that created the rule". It carries the name
+now, and the rule gets the same `scope`, `siteId`, `accountId` and counters a
+seeded one has, so the two are the same kind of document.
 
 **The updates dropped what the creates had just been taught to keep.**
 Each update command lists the members it applies, and the lists were shorter

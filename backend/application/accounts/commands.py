@@ -36,6 +36,15 @@ def create_account(data: dict) -> dict:
         accountType=data.get("accountType", "Trial"),
         isDefault=False,
         expiration=data.get("expiration"),
+        # The rest of what `POST /accounts` documents and this record holds.
+        # They were left out, so a create naming a billing mode was answered
+        # 200 with the swagger's example instead.
+        billingMode=data.get("billingMode", "subscription"),
+        usageType=data.get("usageType", "customer"),
+        externalId=data.get("externalId", ""),
+        salesforceId=data.get("salesforceId", ""),
+        unlimitedExpiration=bool(data.get("unlimitedExpiration", False)),
+        makeSocDefaultUi=bool(data.get("makeSocDefaultUi", False)),
     )
     account_repo.save(account)
     return {"data": record_dict(account)}
@@ -84,7 +93,8 @@ def update_account(account_id: str, data: dict) -> dict | None:
     # hold. `billingMode` and `usageType` were left out, so a change to
     # either was answered 200 and dropped. `state` is not documented here
     # and is kept: this mock's own expire/reactivate routes move it.
-    updatable = ("name", "accountType", "expiration", "state", "billingMode", "usageType")
+    updatable = ("name", "accountType", "expiration", "state", "billingMode", "usageType",
+                 "externalId", "salesforceId", "unlimitedExpiration", "makeSocDefaultUi")
     for field in updatable:
         if field in data:
             setattr(account, field, data[field])
