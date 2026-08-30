@@ -40,6 +40,54 @@ all forty are clean.
 
 ### Fixed
 
+**The console's route sweep proved a page had rendered, not that it worked.**
+75 of the 92 end-to-end cases visited a route and ran axe over it. axe
+reports what is wrong with the markup a page rendered and finds nothing
+wrong with markup a page never rendered — so a blank shell, a view whose
+data call was refused, and a page whose script threw all passed. The sweep
+now also requires the page to show its own heading (or, on a detail page,
+some content: those eight views carry no `h1`) and refuses to pass a page
+that asked the backend for something it was told no to.
+
+It failed on 33 of 92 the first time it ran, and every finding was the
+console's, not the mock's:
+
+* **Graph, Sentinel and Defender could not authenticate at all.** All three
+  omitted `scope` from their client-credentials grant, which Entra requires
+  and answers `AADSTS900144` without. Every page in those three sections
+  showed its empty state — "No users found" over a store holding users,
+  "0 of 0 incidents" over fifty.
+* **`/alerts` was a blank page.** The view read
+  `alert.agentRealtimeInfo.agentComputerName`, and the swagger declares
+  `agentRealtimeInfo` on a cloud-detection alert as a *null schema* — the
+  endpoint is in `agentDetectionInfo`. It threw, Vue rendered nothing, and
+  the old sweep passed it because there was no markup to find fault with.
+  The unit test that covered this view fed it a fixture with the shape the
+  product does not answer, so it passed too, and its name said
+  "renders endpoint names from agentRealtimeInfo". The `Alert` type says
+  `agentRealtimeInfo: null` now, which is what found the same read in the
+  top bar's alert dropdown.
+* **Two Kibana calls used the wrong spelling.** The Cases API takes
+  `perPage` on the way in and answers `per_page` on the way out — an
+  asymmetry Kibana really has, and the detection engine and exception lists
+  beside it take `per_page`. The console sent `per_page` and the snake_case
+  `sortField=created_at`. Kibana 8.15 refuses both, in the same words this
+  mock does: `invalid keys "per_page"` and
+  `Invalid value "created_at" supplied to "sortField"`.
+* **The Defender dashboard counted a page and called it a total.** Its cards
+  read "Total Machines" over 50 of 60, and its two doughnuts were drawn from
+  the same 50. The indicators card asked for `$top: 0` and then counted the
+  rows it got back — zero by construction — and was refused outright, since
+  that API takes `$top` from 1.
+* **Two Graph pages asked for routes Graph does not have.** Autopilot
+  deployment profiles are a beta resource, requested under `/v1.0`; the
+  file list asked for `drive/items/root/children` where the reference
+  records `drive/root/children`. Both answered 404 and both pages showed
+  their empty state.
+
+The mock was right in every one of them, which is the outcome its own rule
+asks for: a client that would break against the product breaks against this.
+
 **Two Defender records named their machine and reported no name for it.**
 The docs' own property tables record `computerDnsName` beside `machineId`
 on an alert, an investigation and a machine action. The investigation had

@@ -99,7 +99,12 @@ async function fetchAll(): Promise<void> {
       esEndpointsApi.list({ pageSize: 50 }),
       esRulesApi.find({ per_page: 50 }),
       esAlertsApi.search({ query: { match_all: {} }, size: 50 }),
-      esCasesApi.find({ per_page: 1 }),
+      // Kibana's Cases API takes `perPage` on the way in and answers
+      // `per_page` on the way out — an asymmetry it really has. The detection
+      // engine and exception lists beside it take `per_page`, which is why
+      // this was easy to get wrong: `per_page` here came back
+      // `invalid keys "per_page"` and the card showed nothing.
+      esCasesApi.find({ perPage: 1 }),
     ])
 
     endpoints.value = epRes.data ?? []

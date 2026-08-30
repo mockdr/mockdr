@@ -26,9 +26,48 @@ const PAGES = Array.from(new Set(STATIC))
 
 test.describe.configure({ mode: 'parallel' })
 
-async function audit(page: import('@playwright/test').Page, path: string): Promise<void> {
+/**
+ * Visit a page and hold it to three things.
+ *
+ * axe on its own was not enough: it reports what is wrong with the markup a
+ * page rendered, and finds nothing wrong with markup a page never rendered.
+ * A blank shell, a view whose data call was refused, a permanent loading
+ * skeleton — every one of those passed a sweep of 75 routes that only asked
+ * whether the accessibility tree had serious violations.
+ *
+ * So the page must also show its own header (or, on a detail page, some
+ * content: those eight views carry no `h1`), and nothing it asked the
+ * backend for may have been refused.
+ */
+async function audit(
+  page: import('@playwright/test').Page,
+  path: string,
+  options: { heading?: boolean } = {},
+): Promise<void> {
+  const { heading = true } = options
+  const refused: string[] = []
+  const onResponse = (response: import('@playwright/test').Response): void => {
+    const url = new URL(response.url())
+    if (response.status() >= 400 && !url.pathname.includes('favicon')) {
+      refused.push(`${response.status()} ${response.request().method()} ${url.pathname}`)
+    }
+  }
+  page.on('response', onResponse)
   await page.goto(path)
   await page.waitForLoadState('networkidle')
+  page.off('response', onResponse)
+
+  if (heading) {
+    const title = page.locator('h1').first()
+    await expect(title, `${path} rendered no heading`).toBeVisible()
+    expect((await title.innerText()).trim(), `${path} has an empty heading`).not.toBe('')
+  } else {
+    const body = (await page.locator('main').first().innerText()).trim()
+    expect(body.length, `${path} rendered ${body.length} characters of content`)
+      .toBeGreaterThan(40)
+  }
+  expect(refused, `${path} asked for something it was refused`).toEqual([])
+
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze()
@@ -65,6 +104,8 @@ for (const list of DETAIL_LISTS) {
     await row.click()
     await page.waitForLoadState('networkidle')
     expect(page.url()).not.toContain(list + '?')
-    await audit(page, page.url().replace(/^https?:\/\/[^/]+/, ''))
+    // A detail view carries no `h1` — none of the eight do — so it is held
+    // to having rendered content instead.
+    await audit(page, page.url().replace(/^https?:\/\/[^/]+/, ''), { heading: false })
   })
 }

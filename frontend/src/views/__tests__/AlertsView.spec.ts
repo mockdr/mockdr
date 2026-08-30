@@ -21,12 +21,19 @@ const FAKE_ALERTS = [
   {
     alertInfo: { alertId: 'a1', source: 'STAR', incidentStatus: 'Unresolved', createdAt: '2025-06-01T12:00:00Z' },
     ruleInfo: { name: 'Suspicious PowerShell', severity: 'High', description: 'Detected encoded command' },
-    agentRealtimeInfo: { agentComputerName: 'WS-FINANCE-01' },
+    // The product answers `agentRealtimeInfo: null` on this alert — the
+    // swagger declares it as a null schema — and puts the endpoint in
+    // `agentDetectionInfo`. This fixture claimed the opposite, so the view
+    // read `.agentComputerName` off null against the real backend and
+    // rendered nothing at all, while this test went on passing.
+    agentDetectionInfo: { name: 'WS-FINANCE-01' },
+    agentRealtimeInfo: null,
   },
   {
     alertInfo: { alertId: 'a2', source: 'Engine', incidentStatus: 'Resolved', createdAt: '2025-06-02T08:00:00Z' },
     ruleInfo: { name: 'Lateral Movement', severity: 'Critical', description: 'PsExec detected' },
-    agentRealtimeInfo: { agentComputerName: 'DC-PRIMARY' },
+    agentDetectionInfo: { name: 'DC-PRIMARY' },
+    agentRealtimeInfo: null,
   },
 ]
 
@@ -66,7 +73,7 @@ describe('AlertsView', () => {
     expect(w.text()).toContain('2')
   })
 
-  it('renders endpoint names from agentRealtimeInfo', async () => {
+  it('renders endpoint names from agentDetectionInfo', async () => {
     const w = mount(AlertsView, { global: { stubs } })
     await flushPromises()
     expect(w.text()).toContain('WS-FINANCE-01')

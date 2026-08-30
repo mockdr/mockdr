@@ -33,6 +33,9 @@ sentinelClient.interceptors.request.use(async (config) => {
       client_id: SENTINEL_CLIENT_ID,
       client_secret: SENTINEL_CLIENT_SECRET,
       grant_type: 'client_credentials',
+      // Required by Entra; without it the token call is refused and every
+      // Sentinel page answers with its empty state. See `graph.ts`.
+      scope: 'https://management.azure.com/.default',
     }))
     accessToken = tokenRes.data.access_token
   }

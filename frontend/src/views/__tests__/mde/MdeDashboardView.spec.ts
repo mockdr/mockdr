@@ -149,9 +149,9 @@ describe('MdeDashboardView', () => {
       global: { plugins: [router], stubs: STUBS },
     })
     await flushPromises()
-    expect(mdeMachinesApi.list).toHaveBeenCalledWith({ $top: 50 })
-    expect(mdeAlertsApi.list).toHaveBeenCalledWith({ $top: 50 })
-    expect(mdeIndicatorsApi.list).toHaveBeenCalledWith({ $top: 0 })
+    expect(mdeMachinesApi.list).toHaveBeenCalledWith({ $top: 1000 })
+    expect(mdeAlertsApi.list).toHaveBeenCalledWith({ $top: 1000 })
+    expect(mdeIndicatorsApi.list).toHaveBeenCalledWith({ $top: 1000 })
   })
 
   it('sets loading to false after fetchAll completes', async () => {

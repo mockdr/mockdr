@@ -62,7 +62,12 @@ describe('Topbar', () => {
       data: [{
         alertInfo: { alertId: '1', createdAt: '2025-01-01T00:00:00Z', updatedAt: '', incidentStatus: 'Unresolved', analystVerdict: '', source: '' },
         ruleInfo: { id: 'r1', name: 'Test Rule', severity: 'High', description: null },
-        agentRealtimeInfo: { agentComputerName: 'host1', id: 'a1' },
+        // The shape the product answers: `agentRealtimeInfo` is a null schema
+        // on this alert, and the endpoint is in `agentDetectionInfo`. The old
+        // fixture claimed the opposite, which is why no unit test saw the
+        // view crash on it.
+        agentDetectionInfo: { name: 'host1', uuid: null, siteId: null, accountId: null, osName: null },
+        agentRealtimeInfo: null,
         sourceProcessInfo: null,
       }],
       pagination: { totalItems: 1, nextCursor: null },
@@ -91,7 +96,12 @@ describe('Topbar', () => {
       data: [{
         alertInfo: { alertId: 'a1', createdAt: '2025-01-01T00:00:00Z', updatedAt: '', incidentStatus: 'Unresolved', analystVerdict: '', source: '' },
         ruleInfo: { id: 'r1', name: 'Rule', severity: 'Critical', description: 'desc' },
-        agentRealtimeInfo: { agentComputerName: 'host1', id: 'a1' },
+        // The shape the product answers: `agentRealtimeInfo` is a null schema
+        // on this alert, and the endpoint is in `agentDetectionInfo`. The old
+        // fixture claimed the opposite, which is why no unit test saw the
+        // view crash on it.
+        agentDetectionInfo: { name: 'host1', uuid: null, siteId: null, accountId: null, osName: null },
+        agentRealtimeInfo: null,
         sourceProcessInfo: null,
       }],
       pagination: { totalItems: 1, nextCursor: null },

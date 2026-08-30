@@ -108,7 +108,7 @@ describe('EsDashboardView', () => {
     expect(esAlertsApi.search).toHaveBeenCalledWith(
       expect.objectContaining({ query: { match_all: {} }, size: 50 })
     )
-    expect(esCasesApi.find).toHaveBeenCalledWith({ per_page: 1 })
+    expect(esCasesApi.find).toHaveBeenCalledWith({ perPage: 1 })
   })
 
   it('displays the Endpoints summary card with correct count', async () => {

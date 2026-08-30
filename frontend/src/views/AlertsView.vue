@@ -105,7 +105,7 @@ const SEVERITY_COLOR: Record<string, string> = {
               <div class="text-s1-text font-medium">{{ alert.ruleInfo.name }}</div>
               <div class="text-xs text-s1-muted truncate max-w-xs">{{ alert.ruleInfo.description }}</div>
             </td>
-            <td class="px-4 py-3 text-s1-text">{{ alert.agentRealtimeInfo.agentComputerName }}</td>
+            <td class="px-4 py-3 text-s1-text">{{ alert.agentDetectionInfo?.name ?? '—' }}</td>
             <td class="px-4 py-3">
               <div class="text-xs text-s1-muted">{{ alert.alertInfo.source }}</div>
             </td>

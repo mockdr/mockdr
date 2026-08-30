@@ -33,7 +33,11 @@ async function fetchData(): Promise<void> {
     await ensureGraphAuth()
     const [devicesRes, profilesRes] = await Promise.all([
       graphIntuneApi.listAutopilot({ $top: 999 }),
-      graphClient.get('/v1.0/deviceManagement/windowsAutopilotDeploymentProfiles', { params: { $top: 999 } }) as Promise<{ value: AutopilotProfile[] }>,
+      // Deployment profiles are a beta resource in Graph — the vendored
+      // reference records `GET /beta/deviceManagement/windowsAutopilotDeploymentProfiles`
+      // and there is no v1.0 path for them, so this asked for something that
+      // does not exist and the page showed its empty state.
+      graphClient.get('/beta/deviceManagement/windowsAutopilotDeploymentProfiles', { params: { $top: 999 } }) as Promise<{ value: AutopilotProfile[] }>,
     ])
     devices.value = devicesRes.value ?? []
     profiles.value = profilesRes.value ?? []

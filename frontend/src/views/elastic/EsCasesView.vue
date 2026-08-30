@@ -46,7 +46,12 @@ async function fetchCases(p = 1): Promise<void> {
   loading.value = true
   page.value = p
   try {
-    const res = await esCasesApi.find({ page: p, per_page: perPage, sortField: 'created_at', sortOrder: 'desc' })
+    // `perPage`, not `per_page` — see EsDashboardView. And Kibana's cases
+    // sort accepts only createdAt, updatedAt, closedAt, title, status,
+    // severity and category: `created_at` is refused with
+    // `Invalid value "created_at" supplied to "sortField"`, so this list
+    // answered 400 and rendered empty.
+    const res = await esCasesApi.find({ page: p, perPage, sortField: 'createdAt', sortOrder: 'desc' })
     cases.value = res.data ?? []
     total.value = res.total ?? cases.value.length
   } finally {

@@ -95,9 +95,18 @@ async function fetchAll(): Promise<void> {
     await ensureMdeAuth()
 
     const [machinesRes, alertsRes, indicatorsRes] = await Promise.all([
-      mdeMachinesApi.list({ $top: 50 }),
-      mdeAlertsApi.list({ $top: 50 }),
-      mdeIndicatorsApi.list({ $top: 0 }),
+      // The cards below say "Total Machines" and "Alerts", and the two
+      // doughnuts are drawn from the same rows — so a page of 50 made both
+      // the totals and the charts describe part of the estate as if it were
+      // all of it: 50 of 60 machines. `$top: 1000` is this API's own ceiling.
+      //
+      // The indicators call asked for `$top: 0` and then counted the rows it
+      // got back, which is zero by construction. It was also refused
+      // outright — this API takes `$top` from 1 — so the card read 0 over a
+      // store holding 20.
+      mdeMachinesApi.list({ $top: 1000 }),
+      mdeAlertsApi.list({ $top: 1000 }),
+      mdeIndicatorsApi.list({ $top: 1000 }),
     ])
 
     machines.value = machinesRes.value ?? []

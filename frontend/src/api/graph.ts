@@ -72,6 +72,12 @@ export async function ensureGraphAuth(): Promise<void> {
   form.append('client_id', 'graph-mock-admin-client')
   form.append('client_secret', 'graph-mock-admin-secret')
   form.append('grant_type', 'client_credentials')
+  // Entra requires `scope` on a client-credentials grant and answers
+  // `AADSTS900144: The request body must contain the following parameter:
+  // 'scope'` without it. It was missing here, so the token call was refused
+  // and every page in this section showed its empty state — a console
+  // reading "No users found" over a store that had them.
+  form.append('scope', 'https://graph.microsoft.com/.default')
 
   const res = await axios.post<GraphTokenResponse>('/graph/oauth2/v2.0/token', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -210,7 +216,14 @@ export const graphFilesApi = {
 
   /** List children in the root of a drive. */
   listChildren: (userId = 'me', itemId = 'root', params?: Record<string, unknown>): Promise<ODataResponse<GraphDriveItem>> =>
-    graphClient.get(`/v1.0/${userId}/drive/items/${itemId}/children`, { params }) as Promise<ODataResponse<GraphDriveItem>>,
+    // `drive/root/children` for the root, which is the path the reference
+    // records; `drive/items/root/children` is not one Graph serves, so the
+    // file list asked for a route that answered 404 and rendered empty.
+    graphClient.get(
+      itemId === 'root' ? `/v1.0/${userId}/drive/root/children`
+                        : `/v1.0/${userId}/drive/items/${itemId}/children`,
+      { params },
+    ) as Promise<ODataResponse<GraphDriveItem>>,
 
   /** List SharePoint sites. */
   listSites: (params?: Record<string, unknown>): Promise<ODataResponse<GraphSharePointSite>> =>

@@ -59,6 +59,9 @@ export async function ensureMdeAuth(): Promise<void> {
   form.append('client_id', MDE_CLIENT_ID)
   form.append('client_secret', MDE_CLIENT_SECRET)
   form.append('grant_type', 'client_credentials')
+  // Required by Entra; without it the token call is refused and every
+  // Defender page answers with its empty state. See `graph.ts`.
+  form.append('scope', 'https://api.securitycenter.microsoft.com/.default')
   const res = await axios.post<MdeTokenResponse>('/mde/oauth2/v2.0/token', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   })

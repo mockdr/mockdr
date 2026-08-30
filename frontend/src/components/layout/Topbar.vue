@@ -115,7 +115,7 @@ function logout(): void {
             <div class="shrink-0 mt-1.5 w-2 h-2 rounded-full" :class="SEVERITY_DOT[alert.ruleInfo.severity] ?? 'bg-s1-muted'" />
             <div class="flex-1 min-w-0">
               <div class="text-sm text-s1-text font-medium truncate">{{ alert.ruleInfo.name }}</div>
-              <div class="text-xs text-s1-muted">{{ alert.agentRealtimeInfo.agentComputerName }} · {{ alert.alertInfo.createdAt?.slice(0, 10) }}</div>
+              <div class="text-xs text-s1-muted">{{ alert.agentDetectionInfo?.name ?? '—' }} · {{ alert.alertInfo.createdAt?.slice(0, 10) }}</div>
             </div>
             <span class="text-[10px] text-s1-muted shrink-0 mt-0.5">{{ alert.ruleInfo.severity }}</span>
           </div>

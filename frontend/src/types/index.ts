@@ -261,10 +261,21 @@ export interface Alert {
     severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info'
     description: string | null
   }
-  agentRealtimeInfo: {
-    agentComputerName: string | null
-    id: string | null
-  }
+  /**
+   * The swagger declares `agentRealtimeInfo` on a cloud-detection alert as a
+   * null schema — the product answers `null` there and this type claimed an
+   * object, so the view read `.agentComputerName` off it and the whole page
+   * rendered nothing. The endpoint an alert names is in `agentDetectionInfo`,
+   * which the alert does declare.
+   */
+  agentDetectionInfo: {
+    name: string | null
+    uuid: string | null
+    siteId: string | null
+    accountId: string | null
+    osName: string | null
+  } | null
+  agentRealtimeInfo: null
   sourceProcessInfo: {
     storyline: string | null
   } | null

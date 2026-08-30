@@ -108,10 +108,14 @@ describe('EsCasesView', () => {
       global: { plugins: [router], stubs: STUBS },
     })
     await flushPromises()
+    // The request takes `perPage` and a camelCase `sortField`; the *answer*
+    // carries `per_page`, which is the asymmetry Kibana really has. This
+    // asserted the response's spelling on the request, so it held the view
+    // to a call the product refuses with `invalid keys "per_page"`.
     expect(esCasesApi.find).toHaveBeenCalledWith({
       page: 1,
-      per_page: 25,
-      sortField: 'created_at',
+      perPage: 25,
+      sortField: 'createdAt',
       sortOrder: 'desc',
     })
     expect(wrapper.text()).toContain('Suspicious login detected')
