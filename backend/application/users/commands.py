@@ -114,6 +114,10 @@ def update_user(user_id: str, data: dict) -> dict | None:
         user.scope = data["scope"]
     if "twoFaEnabled" in data:
         user.twoFaEnabled = data["twoFaEnabled"]
+    # Three more the swagger documents on this body and the record holds.
+    for member in ("allowRemoteShell", "canGenerateApiToken", "siteRoles", "tenantRoles"):
+        if member in data:
+            setattr(user, member, data[member])
     if "role" in data:
         user.role = data["role"]
         user.lowestRole = data["role"]

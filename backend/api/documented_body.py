@@ -68,12 +68,18 @@ async def require_documented_body(request: Request) -> None:
     required, recognisable = contract
 
     raw = await request.body()
+    if not raw:
+        # No body at all is not an unrecognised body. A route whose body the
+        # reference marks required is enforced by its own model, which
+        # answers before this runs; a route whose body is optional — the
+        # swagger leaves `PUT /sites/{id}/reactivate` that way — must still
+        # take a bodyless call, which is how every client has always made it.
+        return
     body: object = {}
-    if raw:
-        try:
-            body = json.loads(raw)
-        except ValueError:
-            return  # Malformed JSON is the handler's own 400 to report.
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return  # Malformed JSON is the handler's own 400 to report.
     sent = set(body) if isinstance(body, dict) else set()
 
     accepted = required | recognisable | _ALSO_ACCEPTED.get(key, frozenset())

@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**The updates dropped what the creates had just been taught to keep.**
+Each update command lists the members it applies, and the lists were shorter
+than the bodies the swagger documents: `rank` and `isDefault` on a group,
+`allowRemoteShell` and the scoped roles on a user, `billingMode` and
+`usageType` on an account. Every one was answered `200` and discarded, and
+read back as the value it had before.
+
+**`PUT /sites/{id}/reactivate` cleared the expiration it was given.**
+The swagger documents two members on that body — `unlimited`, whose
+description reads "if false an expiration should be supplied", and
+`expiration`, "new expiration date for the site". The route took no body at
+all and always set the expiration to null, which is the opposite of what
+the two members are for: a client reactivating a site for another year was
+handed one with no expiry and told it had worked. It reads them now, and a
+bodyless call still works, because the swagger marks `data` required only
+*within* a body that is sent and every client here has always called it
+without one.
+
+Teaching the route a body made mockdr's own documented-body guard refuse
+that bodyless call with a `400` — an absent body is not an unrecognised
+body, and four of this repo's own tests said so. The guard judges only a
+body that was actually sent; a route whose reference marks the body required
+is refused by its own model before the guard runs.
+
 **`PUT /tenant/policy` answered 200 and changed nothing.**
 The swagger documents 51 members on that body and the policy record carried
 8, and `update_policy` sets what the record has and drops the rest — so a

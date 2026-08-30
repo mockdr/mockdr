@@ -150,7 +150,10 @@ def update_group(group_id: str, data: dict) -> dict | None:
     if not group:
         return None
 
-    updatable = ("name", "description", "type", "inherits", "filterId")
+    # `rank` and `isDefault` are documented on this body and the record has
+    # both; leaving them out meant a re-ranked group answered 200 and stayed
+    # where it was.
+    updatable = ("name", "description", "type", "inherits", "filterId", "rank", "isDefault")
     for field in updatable:
         if field in data:
             setattr(group, field, data[field])

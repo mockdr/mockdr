@@ -190,6 +190,11 @@ class TagUpdateBody(BaseModel):
 
 # ── Policies ────────────────────────────────────────────────────────────────
 
+class SiteReactivateBody(BaseModel):
+    """PUT /sites/{id}/reactivate — `unlimited` and `expiration`."""
+    data: dict = Field(default_factory=dict)
+
+
 class PolicyUpdateBody(BaseModel):
     """PUT /policies."""
     data: dict = Field(default_factory=dict)

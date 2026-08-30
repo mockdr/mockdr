@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
 
 from api.auth import require_admin
-from api.dto.requests import SiteCreateBody, SiteUpdateBody
+from api.dto.requests import SiteCreateBody, SiteReactivateBody, SiteUpdateBody
 from application.sites import commands as site_commands
 from application.sites import queries as site_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
@@ -46,15 +46,21 @@ def get_site(site_id: str) -> dict:
 
 
 @router.put("/sites/{site_id}/reactivate")
-def reactivate_site(site_id: str, _: dict = Depends(require_admin)) -> dict:
+def reactivate_site(
+    site_id: str,
+    body: SiteReactivateBody | None = None,
+    _: dict = Depends(require_admin),
+) -> dict:
     """Reactivate an expired or decommissioned site.
 
-    Sets state back to ``active`` and clears the expiration date.
+    Sets state back to ``active`` with the expiration the body asks for:
+    the swagger documents `unlimited` and `expiration` here, and this route
+    took no body at all and always cleared the date.
 
     Raises:
         HTTPException: 404 if the site is not found.
     """
-    result = site_commands.reactivate_site(site_id)
+    result = site_commands.reactivate_site(site_id, body.data if body else None)
     if not result:
         raise HTTPException(status_code=404, detail="Site not found")
     return result

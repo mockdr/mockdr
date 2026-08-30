@@ -93,11 +93,19 @@ def update_site(site_id: str, data: dict) -> dict | None:
     return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}
 
 
-def reactivate_site(site_id: str) -> dict | None:
-    """Set a site's state back to active and clear its expiration date.
+def reactivate_site(site_id: str, data: dict | None = None) -> dict | None:
+    """Set a site's state back to active, with the expiration it was given.
+
+    The swagger documents two members on this body: `unlimited`, whose
+    description reads "if false an expiration should be supplied", and
+    `expiration`, "new expiration date for the site". This route took no body
+    at all and always cleared the expiration — the opposite of what the two
+    members are for, and a 200 either way, so a client reactivating a site
+    for another year was given one with no expiry and told it had worked.
 
     Args:
         site_id: The site's unique identifier.
+        data: The body's `data` payload, if one was sent.
 
     Returns:
         Dict with ``data`` containing the updated site, or None if not found.
@@ -105,8 +113,17 @@ def reactivate_site(site_id: str) -> dict | None:
     site = site_repo.get(site_id)
     if not site:
         return None
+    payload = data or {}
     site.state = "active"
-    site.expiration = None
+    if payload.get("unlimited"):
+        site.expiration = None
+        site.unlimitedExpiration = True
+    elif payload.get("expiration"):
+        site.expiration = payload["expiration"]
+        site.unlimitedExpiration = False
+    else:
+        # No body, which is how this route has always been called here.
+        site.expiration = None
     site.updatedAt = utc_now()
     site_repo.save(site)
     return {"data": strip_fields(record_dict(site), SITE_INTERNAL_FIELDS)}

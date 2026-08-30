@@ -80,7 +80,11 @@ def update_account(account_id: str, data: dict) -> dict | None:
     if not account:
         return None
 
-    updatable = ("name", "accountType", "expiration", "state")
+    # Every member the swagger documents on this body that the record can
+    # hold. `billingMode` and `usageType` were left out, so a change to
+    # either was answered 200 and dropped. `state` is not documented here
+    # and is kept: this mock's own expire/reactivate routes move it.
+    updatable = ("name", "accountType", "expiration", "state", "billingMode", "usageType")
     for field in updatable:
         if field in data:
             setattr(account, field, data[field])
