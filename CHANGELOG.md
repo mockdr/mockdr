@@ -28,6 +28,16 @@ CrowdStrike and Cortex references name their members and not their types, so
 a generated body would be a guess, and a guess that answers 400 measures the
 guess.
 
+### Changed
+
+**The seed-ordering test tries twelve draws, not four.**
+It exists because a timestamp defect can hide in the one seed a suite
+happens to use, and it has now been beaten twice by exactly that: the
+Elasticsearch rule seeder the first time, the agent seeder the second, and
+neither of the four draws it tried had hit the overlap. Twelve draws cost
+five seconds; forty were swept by hand when the agent defect was fixed, and
+all forty are clean.
+
 ### Fixed
 
 **A site's active licences were a random number between 50 and 200.**

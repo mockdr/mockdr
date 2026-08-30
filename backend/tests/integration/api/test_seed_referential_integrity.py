@@ -166,11 +166,17 @@ class TestTimestampOrdering:
         created today and report an `updated_at` eleven hours earlier. It sat
         there until an unrelated seeder change shifted the random stream and
         the single seeded draw happened to hit it. Every draw has to hold.
+
+        It happened a second time, and four draws were not enough to stop it:
+        the agent seeder drew `createdAt` over 200 days and `updatedAt` over
+        one, independently, and none of the four seeds below had hit the
+        overlap until an unrelated change to the site seeder shifted the
+        stream. Twelve now, and forty were swept by hand when that was fixed.
         """
         from infrastructure import seed
 
         try:
-            for value in (7, 1337, 2024, 90210):
+            for value in (7, 11, 42, 99, 137, 512, 1337, 2024, 4096, 8191, 31337, 90210):
                 monkeypatch.setattr(seed, "SEED", value)
                 seed.generate_all()
                 assert not self._violations(), (value, self._violations()[:5])
