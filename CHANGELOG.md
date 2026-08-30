@@ -49,6 +49,23 @@ The doubled slash is a third answer again: splunkd collapses it and serves
 the request, Kibana answers its ordinary 404, and mockdr already matched
 Kibana.
 
+**A job that has not started carries 36 members, not 67.**
+Dispatching a search and polling `isDone` until it is true is the standard
+way a SOAR connector talks to Splunk, so the *first* answer that loop reads
+is a job that has not finished — and mockdr was answering it with a finished
+job's document. Measured on 10.4.2 state by state: a job carries 36 members
+while PARSING and 65 the moment it reaches RUNNING, 69 when done. The 34
+that appear at that one transition include every counter a client reaches
+for — `eventCount`, `resultCount`, `scanCount`, `runDuration` — so a
+connector reading them on its first poll got a number from the mock and a
+missing key from the product. mockdr sent 31 of the 34 from the first poll.
+
+The dispatch window that walks a job through the states already existed and
+is off by default, which is why this only ever showed on the installs that
+turn it on — the ones testing exactly that loop. QUEUED is treated like
+PARSING: it comes before it and cannot carry more, though it is too brief to
+catch on a live instance and is inferred rather than measured.
+
 **A write is not searchable until a refresh, and a delete still is.**
 Elasticsearch is near real time. `PUT /{index}/_doc/{id}` without a refresh
 answers 201 and the document is *not* in the next `_search`, though

@@ -79,6 +79,38 @@ _DISPATCH_STATES: tuple[tuple[float, str], ...] = (
 )
 
 
+#: What splunkd does *not* send while a job is still parsing.  It carries 36
+#: members then and 65 the moment it reaches RUNNING, 69 when done — so these
+#: 34 appear together, at that one transition.  A client polling in the loop
+#: the SDK documents reads its first answer here, and `eventCount` is exactly
+#: what it reaches for; mockdr sent 31 of them from the first poll, so the
+#: loop read a count that a real job has not got yet.  Measured on 10.4.2,
+#: state by state.  QUEUED is treated the same way: it comes before PARSING
+#: and cannot carry more, though it is too brief to catch and say so.
+_ONLY_ONCE_RUNNING: frozenset[str] = frozenset({
+    "canSummarize", "dropCount", "eventAvailableCount", "eventCount",
+    "eventFieldCount", "eventIsStreaming", "eventIsTruncated", "eventSearch",
+    "eventSorting", "fieldMetadataEvents", "fieldMetadataResults",
+    "fieldMetadataStatic", "indexEarliestTime", "indexLatestTime",
+    "isBatchModeSearch", "isRealTimeSearch", "isRemoteTimeline",
+    "isTimeCursored", "is_prjob", "keywords", "normalizedSearch",
+    "optimizedSearch", "phase0", "phase1", "remoteSearch", "reportSearch",
+    "resultCount", "resultIsStreaming", "runDuration", "scanCount",
+    "searchCanBeEventType", "searchTelemetry", "searchTotalBucketsCount",
+    "searchTotalEliminatedBucketsCount",
+})
+
+#: The states that carry the shorter document.
+_BEFORE_RUNNING = frozenset({"QUEUED", "PARSING"})
+
+
+def _while_parsing(content: dict, state: str) -> dict:
+    """Drop what splunkd has not worked out yet."""
+    if state not in _BEFORE_RUNNING:
+        return content
+    return {k: v for k, v in content.items() if k not in _ONLY_ONCE_RUNNING}
+
+
 def _progress(job: SearchJob) -> tuple[str, float, bool]:
     """Return the job's ``(dispatchState, doneProgress, isDone)`` right now.
 
@@ -162,7 +194,7 @@ def get_job(sid: str) -> dict | None:
     # has instead of edit/remove (measured on 10.4.2).
     entry = build_splunk_entry(
         job.sid,
-        _retime(complete(content, "search_jobs"), job),
+        _while_parsing(_retime(complete(content, "search_jobs"), job), state),
         collection="search/jobs",
         links=_JOB_LINKS,
         fields=False,
