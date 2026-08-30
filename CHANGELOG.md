@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Measured and not built: which responses are chunked.**
+mockdr sends `Content-Length` on everything, which is splunkd's policy
+exactly — that one is right. Kibana sends a length uncompressed and chunks
+when it compresses. Elasticsearch decides per endpoint, and not by size:
+`_search` chunks at 347 bytes while `_count` sends a length at 71. Of the 22
+routes that could be measured, 9 chunk — `_cat/*`, `_search`, `/{index}`,
+`_mapping`, `_settings`, `_stats` — and 13 send a length, the split falling
+exactly where the response size scales with what the cluster holds. Left
+alone: no client behaviour turns on it that I can name, every HTTP library
+handles both, and 12 further routes could not be measured with a probe id,
+so the table would be incomplete by construction.
+
 **Measured and not built: `%2F` inside a path segment.**
 All three products decode it to a slash and keep the segment whole — the
 cluster stores a document under the id `a/b` and reads it back, Kibana says
