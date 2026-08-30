@@ -36,6 +36,16 @@ string — and those are invisible to a sweep over the OpenAPI schema. They
 are listed here per route instead, and exercised the same way. Every one of
 them was ignored when the list was first written.
 
+The run prints its own denominator. "0 parameters with no effect" says
+nothing about a route this script never reached, and 38 of them are not
+reached: a path parameter it cannot resolve (`{sid}`, `{case_id}`,
+`{index}`), or a required query parameter it does not supply. Their
+declarations were read before that was accepted — they are `$select`,
+`page`, `per_page`, `count`, `offset`, `ids`, `queryId`, `cursor`, `limit`,
+almost all of them structural and excluded here anyway, with `paging_audit`
+covering the rest. The blind spot is smaller than the number, and the number
+is printed either way.
+
     backend/.venv/bin/python scripts/param_effect.py [mount ...]
 """
 
@@ -400,8 +410,11 @@ def _shaped(judgment, base, shaped):
 
 
 def main():
-    wanted = sys.argv[1:]
+    wanted = [a for a in sys.argv[1:] if not a.startswith("-")]
+    verbose = "--verbose" in sys.argv
     flags = []
+    unreachable: dict[str, list[str]] = {}
+    empty: dict[str, list[str]] = {}
     checked = 0
     for path, operations in app.openapi()["paths"].items():
         operation = operations.get("get")
@@ -422,13 +435,22 @@ def main():
         url = fill(path, mount)
         base = client.get(url, headers=headers)
         if base.status_code != 200:
+            # A path parameter this script cannot resolve answers 404 and the
+            # route drops out silently. `_IDS` names an id for four mounts;
+            # the other five get a random uuid, so every parameterised route
+            # on them was skipped while the summary still read "0 with no
+            # effect" — a count with no denominator, which is the shape of an
+            # audit that has stopped looking.
+            unreachable.setdefault(mount, []).append(f"{path} -> {base.status_code}")
             continue
         try:
             base_body = base.json()
         except ValueError:
+            unreachable.setdefault(mount, []).append(f"{path} -> not JSON")
             continue
         base_items = collection(base_body)
         if not base_items:
+            empty.setdefault(mount, []).append(path)
             continue
 
         for parameter in parameters:
@@ -498,6 +520,21 @@ def main():
         for path, name, kind, before, after in sorted(by_mount[mount]):
             print(f"  {kind:<7} {name:<22} {path:<58} {before} → {after}")
     print(f"\n  {len(flags)} parameter(s) with no effect")
+
+    # The denominator. "0 with no effect" over routes this script could not
+    # reach says nothing about them, and saying so is the point.
+    skipped = sum(len(v) for v in unreachable.values())
+    hollow = sum(len(v) for v in empty.values())
+    print(f"  {skipped} route(s) not reached: a path parameter this script "
+          f"cannot resolve, or a refusal")
+    for mount in sorted(unreachable):
+        print(f"      {mount}: {len(unreachable[mount])}")
+        if verbose:
+            for entry in sorted(unreachable[mount]):
+                print(f"        {entry}")
+    print(f"  {hollow} route(s) whose collection is empty, so nothing could be narrowed")
+    for mount in sorted(empty):
+        print(f"      {mount}: {len(empty[mount])}")
     return 1 if flags else 0
 
 
