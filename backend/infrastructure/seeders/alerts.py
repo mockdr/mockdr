@@ -16,6 +16,7 @@ from infrastructure.seeders._shared import (
 from repository.agent_repo import agent_repo
 from repository.alert_repo import alert_repo
 from repository.store import store
+from repository.user_repo import user_repo
 from utils.id_gen import new_id
 
 #: The swagger's own rule statuses; most rules in a console are live, so the
@@ -30,6 +31,12 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
         fake: Shared :class:`~faker.Faker` instance (seeded externally).
         agent_ids: Pool of agent IDs to randomly associate alerts with.
     """
+    # The rules below name their author; resolve the real record once so the
+    # id they carry is one a client can look up.
+    admin = next((u for u in user_repo.list_all() if u.fullName == "Admin User"), None)
+    creator_name = admin.fullName if admin else "Admin User"
+    creator_id = admin.id if admin else ""
+
     for index in range(SEED_COUNT_ALERTS):
         alid = new_id()
         rule_id = new_id()
@@ -156,6 +163,20 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
             "networkQuarantine": False,
             "createdAt": created,
             "updatedAt": created,
-            "creator": "Admin User",
-            "creatorId": "",
+            "creator": creator_name,
+            # A user by this name exists in the store, and the rule pointed at
+            # nobody: `creatorId` was empty, so the answer carried the
+            # swagger's example id and a client resolving the rule's author
+            # found no such user. `updatedAt` equals `createdAt` here — the
+            # rule has never been changed since — so its last updater is the
+            # one who made it.
+            "creatorId": creator_id,
+            # `updater` itself is declared as a null schema, so the answer
+            # carries null there whatever is stored; only the id is a field.
+            "updaterId": creator_id,
+            # Every seeded rule has exactly one alert, and the answer said it
+            # had none and had last fired in 2018 — the swagger's example
+            # date, in an estate seeded around today.
+            "generatedAlerts": 1,
+            "lastAlertTime": created,
         })

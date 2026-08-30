@@ -8,6 +8,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every STAR rule said it had never fired.**
+Nothing set `generatedAlerts`, `lastAlertTime`, `creatorId` or `updaterId`,
+so all four came from the swagger's examples: all twenty rules answered
+`generatedAlerts: 0` and `lastAlertTime: "2018-02-27T04:49:26.257525Z"` —
+one 2018 timestamp, in an estate seeded around today — while each of them
+had an alert seeded within the last few weeks. Both id fields carried the
+swagger's example user id, which resolves to no user this mock serves, so a
+client following a rule to its author found nobody. The counters come from
+the alert the rule actually generated now, and the author is the `Admin
+User` record in the store. `updater` itself is declared as a null schema in
+the swagger, so the answer carries `null` there whatever is stored, and
+nothing is.
+
+**Measured and not built: `editable` is `false` on every rule.**
+The swagger reads "true if the rule can be modified at this scope level",
+and this mock serves `GET`, `POST` and `DELETE` for these rules but no
+update — so `false` is the honest answer for as long as that is true. It
+becomes wrong the day an update route is added.
+
+**Two probe artifacts, recorded so they are not rediscovered as defects.**
+`installed-applications` looked like it answered `agentNetworkStatus:
+"connected"` for every row; over the whole 707-row collection it is 501
+connected, 146 disconnected and 60 disconnecting, and only the first hundred
+rows happen to belong to connected agents. And `/sites` looked like its
+`state`, `siteType` and `suite` filters returned everything for an
+undeclared value; that route answers a nested envelope, and the probe was
+counting the envelope's keys rather than its records.
+
 **A filter could not match a value the answer carries.**
 Eighteen documented filters, given a value taken straight out of a record the
 same route had just returned, answered `200` with nothing. Three causes, all
