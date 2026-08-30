@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Measured and not built: `%2F` inside a path segment.**
+All three products decode it to a slash and keep the segment whole — the
+cluster stores a document under the id `a/b` and reads it back, Kibana says
+`Saved object [cases/a/b] not found`, splunkd `Could not find object id=a/b`.
+mockdr decodes it and *splits*, because Starlette decodes the path before
+routing, so `/{index}/_doc/a%2Fb` becomes three segments. The answer is at
+least the product's own now — `no handler found for uri [/zzz/_doc/a/b] and
+method [PUT]` — but an id with a slash in it works against all three
+products and fails against their mock. Keeping the segment whole means
+changing how every path parameter is read, which is a bigger change than
+this is worth today. The other four encodings agree: `%20` is a space, `%3F`
+a question mark, and `+` stays a literal plus, since a path is not a query.
+
 **Elasticsearch has no "resource not found" for a path.**
 What it cannot route is a `400` naming the uri and the verb — `no handler
 found for uri [/a/b/c/d] and method [GET]` — in the bare-string error shape
