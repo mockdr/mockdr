@@ -15,6 +15,10 @@ class MdeMachineAction:
     type: str = ""  # Isolate|Unisolate|RunAntiVirusScan|...
     status: str = "Pending"  # Pending|InProgress|Succeeded|Failed|TimeOut|Cancelled
     machineId: str = ""  # noqa: N815
+    # The docs' `machineaction` table records this beside `machineId`, and
+    # nothing set it: all fifteen seeded actions named their machine by id
+    # and reported no name for it.
+    computerDnsName: str = ""  # noqa: N815
     creationDateTimeUtc: str = ""  # noqa: N815
     lastUpdateDateTimeUtc: str = ""  # noqa: N815
     requestor: str = ""

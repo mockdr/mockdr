@@ -25,6 +25,12 @@ class MdeAlert:
 
     # ── Links ─────────────────────────────────────────────────────────────────
     machineId: str = ""  # noqa: N815
+    # The docs record both on an alert's own answer, and neither was here, so
+    # every alert named its machine by id and reported no name for it — a
+    # client reading an alert to find the affected host found an empty
+    # string. `rbacGroupName` is the machine's group, for the same reason.
+    computerDnsName: str = ""  # noqa: N815
+    rbacGroupName: str = ""  # noqa: N815
     incidentId: int = 0  # noqa: N815
     investigationId: int = 0  # noqa: N815
     investigationState: str = ""  # noqa: N815

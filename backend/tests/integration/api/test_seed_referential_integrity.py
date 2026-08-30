@@ -131,6 +131,9 @@ class TestTimestampOrdering:
         ("alertCreationTime", "lastUpdateTime"),
         ("start", "end"),
         ("created_timestamp", "modified_timestamp"),
+        # Defender's machine actions, which drew both ends independently.
+        ("creationDateTimeUtc", "lastUpdateDateTimeUtc"),
+        ("dateJoined", "lastLogin"),
     ]
 
     def _violations(self) -> list[str]:

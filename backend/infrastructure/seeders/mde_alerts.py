@@ -17,6 +17,7 @@ from infrastructure.seeders.mde_shared import (
     mde_guid,
 )
 from repository.mde_alert_repo import mde_alert_repo
+from repository.mde_machine_repo import mde_machine_repo
 
 _STATUS_CHOICES: list[str] = (
     ["New"] * 5
@@ -134,6 +135,7 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
                 "Malware", "NotMalware", "Phishing", "Other",
             ])
 
+        machine = mde_machine_repo.get(machine_id)
         mde_alert_repo.save(MdeAlert(
             alertId=alert_id,
             title=title,
@@ -144,6 +146,12 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
             determination=determination,
             assignedTo=assigned_to,
             machineId=machine_id,
+            # Copied from the machine the alert names, so the two agree. The
+            # incident and investigation ids below were fixed for the same
+            # reason: a record must not name something the install cannot
+            # show, and an empty name is a name nothing matches.
+            computerDnsName=getattr(machine, "computerDnsName", ""),
+            rbacGroupName=getattr(machine, "rbacGroupName", ""),
             # Both are set once the records they name exist: the incident
             # this alert belongs to, and the investigation it triggered.
             # They used to be `random.randint`, so an alert named an

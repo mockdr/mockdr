@@ -32,3 +32,17 @@ def to_mde_resource(record: dict[str, Any], primary_key: str) -> dict[str, Any]:
         ("id" if key == primary_key else key): value
         for key, value in record.items()
     }
+
+def machine_name(machine_id: str) -> str:
+    """The DNS name of the machine an id names, or an empty string.
+
+    An alert, an investigation and a machine action all carry
+    `computerDnsName` beside `machineId` in Defender's own property tables,
+    and this mock set it on none of them — so a client reading any of the
+    three to find the affected host got an empty string while
+    `/api/machines` had the name all along.
+    """
+    from repository.mde_machine_repo import mde_machine_repo  # noqa: PLC0415
+
+    machine = mde_machine_repo.get(str(machine_id or ""))
+    return str(getattr(machine, "computerDnsName", "") or "") if machine else ""

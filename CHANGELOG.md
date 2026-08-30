@@ -40,6 +40,28 @@ all forty are clean.
 
 ### Fixed
 
+**Three Defender records named their machine and reported no name for it.**
+The docs' own property tables record `computerDnsName` beside `machineId`
+on an alert, an investigation and a machine action, and this mock set it on
+none of the three — every one answered an empty string while
+`/api/machines` had the name all along. A client reading an alert to find
+the affected host found nothing, and one correlating alerts to machines by
+name matched nothing at all. `rbacGroupName` on an alert was the same: the
+group belongs to the machine and the alert reported none. All three carry
+the machine's name now, seeded and on a fresh action alike.
+
+A machine action also drew `creationDateTimeUtc` and
+`lastUpdateDateTimeUtc` independently, so it could report having been
+updated before it was requested. That pair — and `dateJoined`/`lastLogin` —
+are in the ordering test's list now; neither was.
+
+**Measured and already right: what a threat says about its agent.**
+Ten denormalised members on a SentinelOne threat — the computer name, the
+OS, the agent version, the uuid, the site and account — agree with the agent
+record on all thirty threats, as do the alerts. Referential integrity holds
+across twenty seeds as well: no alert, threat, agent, group, exclusion, rule
+or tag names a record the install does not have.
+
 **A site's active licences were a random number between 50 and 200.**
 "Number of active licenses for the site", and the licence surface each site
 answers beside it is named `Total Agents` with a count equal to

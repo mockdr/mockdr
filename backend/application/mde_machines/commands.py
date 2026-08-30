@@ -12,7 +12,7 @@ from repository.mde_machine_action_repo import mde_machine_action_repo
 from repository.mde_machine_repo import mde_machine_repo
 from utils.dt import utc_now
 from utils.mde_fixtures import complete_mde
-from utils.mde_serde import to_mde_resource
+from utils.mde_serde import machine_name, to_mde_resource
 from utils.serde import record_dict
 
 
@@ -52,6 +52,7 @@ def _create_action(
     """
     now = utc_now()
     action = MdeMachineAction(
+        computerDnsName=machine_name(machine_id),
         actionId=str(uuid.uuid4()),
         type=action_type,
         status="Pending",

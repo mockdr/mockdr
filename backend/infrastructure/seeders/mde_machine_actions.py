@@ -9,6 +9,7 @@ from domain.mde_machine_action import MdeMachineAction
 from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.mde_shared import MDE_MACHINE_ACTION_TYPES, mde_guid
 from repository.mde_machine_action_repo import mde_machine_action_repo
+from utils.mde_serde import machine_name
 
 _REQUEST_COMMENTS: list[str] = [
     "Isolating endpoint due to active malware infection.",
@@ -41,13 +42,18 @@ def seed_mde_machine_actions(
         machine_id = random.choice(machine_ids)
         action_type = random.choice(MDE_MACHINE_ACTION_TYPES)
         creation_time = rand_ago(30)
-        last_update = rand_ago(5)
+        # Not another independent draw: an action updated before it was
+        # requested is the same defect the agent seeder carried, and
+        # `lastUpdateDateTimeUtc`/`creationDateTimeUtc` is not one of the
+        # pairs the ordering test knows to look at.
+        last_update = max(rand_ago(5), creation_time)
 
         scope = "Full"
         if action_type == "RunAntiVirusScan":
             scope = random.choice(["Full", "Quick"])
 
         mde_machine_action_repo.save(MdeMachineAction(
+            computerDnsName=machine_name(machine_id),
             actionId=action_id,
             type=action_type,
             status="Succeeded",
