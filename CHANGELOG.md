@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every Elastic case was filed by a user no Elastic install has.**
+`elastic` is Elasticsearch's reserved superuser and carries no profile: the
+cluster answers `GET /_security/user/elastic` with `"full_name": null,
+"email": null, "metadata": {"_reserved": true}`, and Kibana repeats that
+wherever it names a user. `utils.es_case_serde` already held the shape,
+measured against 8.15 — and the case seeder wrote an invented
+`"Elastic Admin" <elastic-admin@acmecorp.internal>` beside it, so every
+case's `created_by`, `updated_by` and `closed_by` carried a name and an
+address that exist nowhere, and `/api/cases/reporters` published them to the
+filter drop-down. Two copies of one measured fact is how they came apart;
+the seeder uses the constant now, and a test asserts they are the same
+object. `GET /api/cases/reporters` is byte-identical to Kibana 8.15's answer
+again, and the Elastic conformance suite is back to 0 findings from 2.
+
 **Four Defender resources answered one property under two spellings.**
 Microsoft's property tables are camelCase almost everywhere and not quite —
 the `machine` table lists `onboardingstatus`, `software` lists `Vendor` and
