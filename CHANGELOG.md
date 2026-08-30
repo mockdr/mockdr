@@ -30,6 +30,28 @@ guess.
 
 ### Fixed
 
+**A user scoped to one site saw every site.**
+`scope` is declared with the enum `["tenant", "account", "site"]`, and this
+mock answered `scope: "site"` and the site roles that go with it while
+showing that caller all sixty agents across all three sites. It was
+answering a boundary it did not have, so a client testing least privilege
+against it got a pass it would not get from the product.
+
+`TenantScopeMiddleware` already enforced the account axis, and its own
+comment records why: "the scoping was inert and every caller saw the whole
+store". That is this sentence one axis over. A caller whose user is
+`scope: "site"` is now confined to the sites their roles name — 18 agents
+for one site, 39 for two — and asking for a site they do not hold returns
+their own rather than the one they asked for, which is how the account
+branch beside it already guarded its axis. The user record is read rather
+than the token, so a scope changed after a token was issued takes effect on
+the next request rather than the next token.
+
+Nothing seeded changes: all three seeded users are `scope: "tenant"` with no
+site roles, and the account axis stays invisible because this mock seeds one
+account, so confining to it removes nothing. Three sites is what made the
+site axis measurable at all.
+
 **Measured and already right: an action route's `filter` selects.**
 136 SentinelOne write bodies document a `filter`, and 8 of those routes
 answer with a count this can be read from. Given an id nothing has, each
