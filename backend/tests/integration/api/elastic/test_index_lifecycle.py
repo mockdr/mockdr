@@ -69,7 +69,7 @@ class TestIndexLifecycle:
 
     def test_deleting_it_takes_the_documents_with_it(self, client: TestClient) -> None:
         client.put(INDEX, headers=AUTH, json={})
-        client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"a": 1})
+        client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"a": 1})
         assert client.delete(INDEX, headers=AUTH).json() == {"acknowledged": True}
         assert client.post(f"{INDEX}/_search", headers=AUTH, json={}).status_code == 404
 
@@ -84,40 +84,42 @@ class TestWrittenDocuments:
         # It was readable by id and invisible to every search: an ingest that
         # looks like it worked and a dashboard that stays empty.
         client.put(INDEX, headers=AUTH, json={})
-        client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"host": "srv-1", "sev": 7})
+        client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"host": "srv-1", "sev": 7})
         hits = client.post(f"{INDEX}/_search", headers=AUTH, json={"size": 5}).json()["hits"]
         assert hits["total"]["value"] == 1
         assert hits["hits"][0]["_source"] == {"host": "srv-1", "sev": 7}
 
     def test_a_query_filters_written_documents(self, client: TestClient) -> None:
         client.put(INDEX, headers=AUTH, json={})
-        client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"host": "srv-1"})
-        client.put(f"{INDEX}/_doc/2", headers=AUTH, json={"host": "srv-2"})
+        client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"host": "srv-1"})
+        client.put(f"{INDEX}/_doc/2", headers=AUTH, params={"refresh": "true"}, json={"host": "srv-2"})
         body = {"size": 5, "query": {"term": {"host": "srv-2"}}}
         hits = client.post(f"{INDEX}/_search", headers=AUTH, json=body).json()["hits"]
         assert hits["total"]["value"] == 1
 
     def test_count_sees_them_too(self, client: TestClient) -> None:
         client.put(INDEX, headers=AUTH, json={})
-        client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"a": 1})
+        client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"a": 1})
         assert client.post(f"{INDEX}/_count", headers=AUTH, json={}).json()["count"] == 1
 
     def test_a_deleted_document_leaves_the_search(self, client: TestClient) -> None:
         client.put(INDEX, headers=AUTH, json={})
-        client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"a": 1})
-        client.delete(f"{INDEX}/_doc/1", headers=AUTH)
+        client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"a": 1})
+        # A delete needs the refresh as much as a write does: without one the
+        # document is gone to a get and still there to a search.
+        client.delete(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"})
         total = client.post(f"{INDEX}/_search", headers=AUTH, json={}).json()["hits"]["total"]
         assert total["value"] == 0
 
     def test_writing_creates_the_index(self, client: TestClient) -> None:
         # Elasticsearch creates an index on first write.
-        client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"a": 1})
+        client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"a": 1})
         assert client.head(INDEX, headers=AUTH).status_code == 200
 
     def test_a_create_is_201_and_a_replacement_200(self, client: TestClient) -> None:
         # How a client tells the two apart without reading the body.
-        assert client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"a": 1}).status_code == 201
-        assert client.put(f"{INDEX}/_doc/1", headers=AUTH, json={"a": 2}).status_code == 200
+        assert client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"a": 1}).status_code == 201
+        assert client.put(f"{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"}, json={"a": 2}).status_code == 200
 
 
 class TestRefreshParameter:

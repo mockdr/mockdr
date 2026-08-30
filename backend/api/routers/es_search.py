@@ -712,6 +712,7 @@ async def es_mget_all(
 @router.put("/_bulk", operation_id="es_bulk_put")
 async def es_bulk(
     request: Request,
+    refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
     """Index documents from NDJSON action/source pairs.
@@ -734,6 +735,10 @@ async def es_bulk(
             400, "parse_exception", "request body is required",
         ))
     items: list[dict] = []
+    # `_bulk` obeys the same near-real-time rule as a single write: nothing
+    # it indexes is searchable until a refresh, and nothing it deletes stops
+    # being searchable until one.  Measured on 8.15.
+    forced = _makes_visible(refresh)
     i = 0
     while i < len(lines):
         try:
@@ -764,7 +769,8 @@ async def es_bulk(
                     )) from exc
         index = str(meta.get("_index") or "")
         doc_id = str(meta.get("_id") or new_hex()[:20])
-        items.append({verb: _bulk_action(verb, index, doc_id, doc)})
+        items.append({verb: _bulk_action(verb, index, doc_id, doc,
+                                         refresh=forced)})
         i += 1
     errors = any(
         int(next(iter(item.values())).get("status", 200)) >= 400 for item in items
@@ -785,10 +791,11 @@ def _bulk_item_error(index: str, doc_id: str, status: int,
     }
 
 
-def _bulk_action(verb: str, index: str, doc_id: str, doc: dict) -> dict:
+def _bulk_action(verb: str, index: str, doc_id: str, doc: dict, *,
+                 refresh: bool = False) -> dict:
     """Carry out one bulk action, in the shape its own verb answers with."""
     if verb == "delete":
-        result = search_queries.es_delete_doc(index, doc_id)
+        result = search_queries.es_delete_doc(index, doc_id, refresh=refresh)
         if result is not None:
             return {**result, "status": 200}
         # A delete that found nothing still moves the shard's sequence, and
@@ -818,7 +825,7 @@ def _bulk_action(verb: str, index: str, doc_id: str, doc: dict) -> dict:
             )
         return {**result, "status": 200}
 
-    result = search_queries.es_index_doc(index, doc_id, doc)
+    result = search_queries.es_index_doc(index, doc_id, doc, refresh=refresh)
     return {**result, "status": 201 if result.get("result") == "created" else 200}
 
 
@@ -1270,12 +1277,21 @@ _SHARD_ACK = {"_shards": {"total": 2, "successful": 1, "failed": 0}}
     operation_id="es_cache_clear",
     dependencies=[es_refuses_unknown(*_CACHE_CLEAR_PARAMS, source=False)],
 )
-def refresh_index(index: str, _: dict = Depends(require_es_auth)) -> dict:
-    """Answer the maintenance calls that follow a write."""
+def refresh_index(request: Request, index: str,
+                  _: dict = Depends(require_es_auth)) -> dict:
+    """Answer the maintenance calls that follow a write.
+
+    `_refresh` is the one that does something: it makes pending writes
+    searchable and drops what was deleted.  The others are acknowledged and
+    change nothing, which is what a mock holding its documents in memory has
+    to do with a flush or a force-merge.
+    """
     try:
         search_queries.es_get_stats(index)
     except IndexNotFoundError as exc:
         raise _missing_index(exc) from exc
+    if request.url.path.endswith("/_refresh"):
+        search_queries.refresh_index(index)
     return dict(_SHARD_ACK)
 
 
@@ -1642,13 +1658,20 @@ def index_doc(
     """
     forced = _forced_refresh(refresh)
     search_queries.check_precondition(index, doc_id, if_seq_no, if_primary_term)
-    result = search_queries.es_index_doc(index, doc_id, body)
+    result = search_queries.es_index_doc(
+        index, doc_id, body, refresh=_makes_visible(refresh))
     if forced:
         result["forced_refresh"] = True
     # 201 the first time, 200 for a replacement — which is how a client tells
     # a create from an update without reading the body.
     created = result.get("result") == "created"
     return JSONResponse(status_code=201 if created else 200, content=result)
+
+
+def _makes_visible(refresh: str | None) -> bool:
+    """Whether the write is searchable at once, refusing a value ES refuses."""
+    _forced_refresh(refresh)          # the same values, refused the same way
+    return search_queries.refresh_makes_visible(refresh)
 
 
 def _forced_refresh(refresh: str | None) -> bool:
@@ -1762,7 +1785,8 @@ def delete_doc(
     """Delete a document written through the index API."""
     forced = _forced_refresh(refresh)
     search_queries.check_precondition(index, doc_id, if_seq_no, if_primary_term)
-    result = search_queries.es_delete_doc(index, doc_id)
+    result = search_queries.es_delete_doc(
+        index, doc_id, refresh=_makes_visible(refresh))
     if result is not None and forced:
         result["forced_refresh"] = True
     if result is None:

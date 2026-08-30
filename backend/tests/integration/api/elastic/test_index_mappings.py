@@ -29,7 +29,7 @@ def client() -> TestClient:
         test_client.delete(f"/elastic/{INDEX}", headers=AUTH)
         test_client.put(f"/elastic/{INDEX}", headers=AUTH, json=MAPPING)
         test_client.put(
-            f"/elastic/{INDEX}/_doc/1", headers=AUTH,
+            f"/elastic/{INDEX}/_doc/1", headers=AUTH, params={"refresh": "true"},
             json={"host": "srv-1", "msg": "a b", "sev": 1, "extra": "dynamic"},
         )
         yield test_client

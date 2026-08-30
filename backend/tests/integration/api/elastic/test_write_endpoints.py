@@ -34,7 +34,7 @@ def client() -> TestClient:
         }}})
         for i in (1, 2, 3):
             test_client.put(
-                f"/elastic/{INDEX}/_doc/{i}", headers=AUTH,
+                f"/elastic/{INDEX}/_doc/{i}", headers=AUTH, params={"refresh": "true"},
                 json={"host": f"h{i}", "sev": i * 10, "status": "open"},
             )
         yield test_client

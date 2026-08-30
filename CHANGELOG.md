@@ -49,6 +49,24 @@ The doubled slash is a third answer again: splunkd collapses it and serves
 the request, Kibana answers its ordinary 404, and mockdr already matched
 Kibana.
 
+**A write is not searchable until a refresh, and a delete still is.**
+Elasticsearch is near real time. `PUT /{index}/_doc/{id}` without a refresh
+answers 201 and the document is *not* in the next `_search`, though
+`GET /_doc/{id}` finds it at once: a get reads the live state, a search
+reads a snapshot. A delete is the mirror — gone to the get, still there to
+the search — until a refresh. `_bulk` obeys the same rule.
+
+mockdr made every write searchable immediately, which is the dangerous
+direction: a client that wrote and immediately searched worked against the
+mock and failed against the product. Fifteen of this repo's own tests were
+doing exactly that, and now send the `refresh=true` a real client must.
+
+`refresh=wait_for` turned out to be two questions, not one: it makes the
+write searchable — it waits for the next refresh and *then* answers — but
+the response carries no `forced_refresh`, which `refresh=true` and a bare
+`?refresh` both do. mockdr had one function answering both; it has two now,
+each naming what it decides. Measured on 8.15 for writes, deletes and bulk.
+
 **A path that ends in a slash: two products serve it, one redirects.**
 A client that builds its URL by joining a base and a path lands on one
 constantly. Elasticsearch serves `/{index}/_search/` and every other shape

@@ -233,10 +233,15 @@ def _written_documents(index: str) -> list[tuple[str, dict]]:
     if not entry.get("docs"):
         return []
     prefix = f"{index}:"
+    # Near real time: a write is not searchable until a refresh, and a delete
+    # is *still* searchable until one.  A get by id reads the live state and
+    # sees the opposite of both.  Measured on 8.15, for writes, deletes and
+    # `_bulk` alike.  A record with neither mark — the seeded data — is
+    # searchable, which is what an install that has been running is.
     return [
         (key[len(prefix):], dict(record.get("_source") or {}))
         for key, record in store.get_all_with_keys("es_documents").items()
-        if key.startswith(prefix)
+        if key.startswith(prefix) and not record.get("_pending")
     ]
 
 
@@ -1145,6 +1150,10 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
         raise MultipleIndicesError(msg)
 
     written = store.get("es_documents", f"{index}:{doc_id}")
+    if written and written.get("_deleted"):
+        # Deleted but not yet refreshed: gone to a get, still there to a
+        # search.  The mirror of an unrefreshed write.
+        written = None
     if written:
         return {
             "_index": index,
@@ -1181,6 +1190,38 @@ def es_get_doc(index: str, doc_id: str) -> dict | None:
 _REFRESH_VALUES: dict[str, bool] = {
     "": True, "true": True, "false": False, "wait_for": False,
 }
+
+
+def refresh_makes_visible(value: str | None) -> bool:
+    """Whether this ``refresh`` value makes the write searchable at once.
+
+    Not the same question as `refresh_forced`, which is about the
+    `forced_refresh` member the answer echoes: `wait_for` waits for the next
+    refresh and *then* answers, so the document is searchable — but the echo
+    is absent, where `refresh=true` and a bare `?refresh` both report it.
+    Both measured on 8.15.
+    """
+    if value is None:
+        return False
+    return value.lower() in ("", "true", "wait_for")
+
+
+def refresh_index(index: str) -> None:
+    """Make pending writes searchable and drop the documents pending deletion.
+
+    This is what `POST /{index}/_refresh` does, and what `?refresh=true` on a
+    write does for that one document.  Everything a client wrote without one
+    is invisible to search until it happens.
+    """
+    prefix = f"{index}:"
+    for key, record in list(store.get_all_with_keys("es_documents").items()):
+        if not key.startswith(prefix):
+            continue
+        if record.get("_deleted"):
+            store.delete("es_documents", key)
+            _count_document(index, -1)
+        elif record.get("_pending"):
+            store.save("es_documents", key, {**record, "_pending": False})
 
 
 def refresh_forced(value: str | None) -> bool:
@@ -1500,7 +1541,7 @@ def check_precondition(
             index, doc_id, if_seq_no, if_primary_term, seq_no, primary_term)
 
 
-def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
+def es_index_doc(index: str, doc_id: str, body: dict, *, refresh: bool = False) -> dict:
     """Store a document so a subsequent read finds it.
 
     The handler previously returned ``result: created`` without writing
@@ -1511,6 +1552,8 @@ def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
         index:  Target index name.
         doc_id: Document id.
         body:   The document.
+        refresh: Whether the write is searchable at once, which is what
+            `?refresh=true` and `?refresh=wait_for` ask for.
 
     Returns:
         The Elasticsearch index-API response.
@@ -1521,6 +1564,9 @@ def es_index_doc(index: str, doc_id: str, body: dict) -> dict:
     seq_no = _next_seq_no(index)
     store.save("es_documents", key, {
         "_version": version, "_seq_no": seq_no, "_source": dict(body),
+        # Unsearchable until a refresh, which is what `?refresh=true` and
+        # `?refresh=wait_for` are for.
+        "_pending": not refresh,
     })
     if not existing:
         _count_document(index, 1)
@@ -1588,14 +1634,23 @@ def _count_document(index: str, delta: int) -> None:
     store.save("es_indices", index, entry)
 
 
-def es_delete_doc(index: str, doc_id: str) -> dict | None:
-    """Delete a document written through the index API."""
+def es_delete_doc(index: str, doc_id: str, *, refresh: bool = False) -> dict | None:
+    """Delete a document written through the index API.
+
+    Without a refresh the document is gone to a get by id and still there to
+    a search, which is the mirror of what a write does.  Measured on 8.15.
+    """
     key = f"{index}:{doc_id}"
     existing = store.get("es_documents", key)
-    if not existing:
+    if not existing or existing.get("_deleted"):
         return None
-    store.delete("es_documents", key)
-    _count_document(index, -1)
+    if refresh:
+        store.delete("es_documents", key)
+        _count_document(index, -1)
+    else:
+        # The count follows the search, not the get: an unrefreshed delete
+        # leaves both alone until the refresh comes.
+        store.save("es_documents", key, {**existing, "_deleted": True})
     return {
         "_index": index,
         "_id": doc_id,
