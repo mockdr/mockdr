@@ -45,6 +45,13 @@ def create_exclusion(body: dict, user_id: str | None) -> dict:
         description=data.get("description", ""),
         siteId=data.get("siteId", ""),
         scope=data.get("scope", {"tenant": True}),
+        # Three members the swagger documents and the record already had a
+        # place for. The create listed the ones it read and these were not
+        # among them, so `?inject=true` and a `pathExclusionType` were
+        # answered 200, dropped, and read back as the defaults.
+        actions=data.get("actions", []),
+        inject=bool(data.get("inject", False)),
+        pathExclusionType=data.get("pathExclusionType"),
     )
     exclusion_repo.save(exclusion)
     activity_repo.create(128, "Exclusion added", user_id=user_id, site_id=exclusion.siteId)

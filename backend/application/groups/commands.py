@@ -44,8 +44,11 @@ def create_group(data: dict) -> dict:
         createdAt=now,
         updatedAt=now,
         totalAgents=0,
-        isDefault=False,
-        rank=None,
+        # Both are documented on the create body and were hard-coded here, so
+        # a client asking for a ranked or default group was answered 200 and
+        # got neither.
+        isDefault=bool(data.get("isDefault", False)),
+        rank=data.get("rank"),
         inherits=bool(data.get("inherits", True)),
         description=data.get("description"),
         filterId=data.get("filterId"),

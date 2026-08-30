@@ -8,6 +8,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**`PUT /tenant/policy` answered 200 and changed nothing.**
+The swagger documents 51 members on that body and the policy record carried
+8, and `update_policy` sets what the record has and drops the rest — so a
+client turning on anti-tampering, enabling snapshots, setting a
+decommission window or any of 43 other settings was told it had worked, and
+read back the value it had before. Not even a careful client that re-reads
+could see it: the answer came from the fixture completion, which never
+changes. The record carries all 43 now, with the defaults it was already
+answering, so nothing a client reads is different — what changed is that a
+write to them sticks. The nested settings stay one line each: an empty
+object is completed from the fixture on the way out, exactly as `engines`
+already was.
+
+Four members of that same body belong to the server and now refuse it:
+`createdAt`, `updatedAt`, `userId` and `userFullName`. Sending the whole
+document back would otherwise have let a client rewrite its own audit trail.
+`createdAt` also answered `2018-02-27T04:49:26.257525Z` — the swagger's
+example, on every policy in an estate seeded around today — and `userId` the
+example account id, which names no user this mock serves. Both are seeded
+now, and an update records who made it.
+
+**Three creates dropped eight documented members between them.**
+`inject`, `pathExclusionType` and `actions` on an exclusion; `rank` and
+`isDefault` on a group; `allowRemoteShell`, `siteRoles` and `tenantRoles` on
+a user. Every one of them is documented on the create body, every record
+already had a place for it, and each create listed the members it read with
+these left out — so they were answered `200`, discarded, and read back as
+the defaults.
+
+`body_audit.py` could not see any of this and still cannot: it asks whether
+a route *reads* its body, by refusing `{}` and an undeclared member, and
+every route here refuses both. Whether the members it accepts are *applied*
+is a different question, and `tests/integration/api/test_write_takes_effect.py`
+is where it is now asked.
+
 **Every Elastic case was filed by a user no Elastic install has.**
 `elastic` is Elasticsearch's reserved superuser and carries no profile: the
 cluster answers `GET /_security/user/elastic` with `"full_name": null,

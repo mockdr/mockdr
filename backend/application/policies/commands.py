@@ -3,8 +3,13 @@ from collections.abc import Callable
 from domain.policy import Policy
 from repository.activity_repo import activity_repo
 from repository.policy_repo import policy_repo
+from repository.user_repo import user_repo
 from utils.dt import utc_now
 from utils.serde import record_dict
+
+#: Members of the policy document the caller may not set.
+_SERVER_OWNED = frozenset({"createdAt", "updatedAt", "userId", "userFullName", "id",
+                           "scopeId", "scopeType"})
 
 
 def update_policy(
@@ -57,9 +62,20 @@ def update_policy(
     wrapped = updates.get("data")
     changes: dict = wrapped if isinstance(wrapped, dict) else updates
     for field, value in changes.items():
+        # Four members the record carries belong to the server, not the
+        # caller: when the policy was made, and who last changed it. The
+        # swagger lists them in the body schema alongside the settings, so a
+        # client sending the whole document back would otherwise rewrite its
+        # own audit trail.
+        if field in _SERVER_OWNED:
+            continue
         if hasattr(policy, field):
             setattr(policy, field, value)
     policy.updatedAt = utc_now()
+    if user_id:
+        policy.userId = user_id
+        user = user_repo.get(user_id)
+        policy.userFullName = getattr(user, "fullName", "") if user else ""
     save_fn(policy)
     activity_repo.create(120, "Policy updated", user_id=user_id)
     return {"data": record_dict(policy)}

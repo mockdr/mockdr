@@ -69,12 +69,16 @@ def create_user(data: dict) -> dict:
         fullNameReadOnly=False,
         groupsReadOnly=False,
         canGenerateApiToken=True,
+        allowRemoteShell=bool(data.get("allowRemoteShell", False)),
         isSystem=False,
         scopeRoles=data.get("scopeRoles", [
             {"id": scope_role_id, "roleId": role_id, "roleName": role, "roles": [role]}
         ]),
-        siteRoles=[],
-        tenantRoles=[],
+        # All three are documented on the create body. They were hard-coded,
+        # so a user created with `allowRemoteShell` or with scoped roles came
+        # back without them and read back the same way.
+        siteRoles=data.get("siteRoles", []),
+        tenantRoles=data.get("tenantRoles", []),
         apiToken=None,
         role=role,
         accountId=acct_id,

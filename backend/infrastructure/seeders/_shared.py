@@ -354,6 +354,14 @@ def passphrase() -> str:
     )
 
 
+def _seeding_admin() -> tuple[str, str]:
+    """The admin record's id and name, or blanks before users are seeded."""
+    from repository.user_repo import user_repo  # noqa: PLC0415 - avoids a cycle
+
+    admin = next((u for u in user_repo.list_all() if u.fullName == "Admin User"), None)
+    return (admin.id, admin.fullName) if admin else ("", "")
+
+
 def make_policy(scope_id: str, scope_type: str) -> Policy:
     """Construct a default ``Policy`` domain object for a site or group.
 
@@ -364,6 +372,7 @@ def make_policy(scope_id: str, scope_type: str) -> Policy:
     Returns:
         A fully-populated :class:`~domain.policy.Policy` instance.
     """
+    creator = _seeding_admin()
     return Policy(
         id=new_id(),
         scopeId=scope_id,
@@ -378,6 +387,15 @@ def make_policy(scope_id: str, scope_type: str) -> Policy:
         scanOnWritten=True,
         autoMitigate=True,
         updatedAt=rand_ago(30),
+        # Declared on the policy and set by nothing, so the answer carried
+        # the swagger's example — `2018-02-27T04:49:26.257525Z` on every
+        # policy in an estate seeded around today.
+        createdAt=ago(days=365),
+        # And who made it. `userId` answered the swagger's example id, which
+        # names no user this mock serves; a client following the policy to
+        # its author found nobody.
+        userId=creator[0],
+        userFullName=creator[1],
         engines={
             "reputation": True, "staticAi": True, "behavioralAi": True,
             "cloud": True, "filelessAttack": True, "networkAttack": True,
