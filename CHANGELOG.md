@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**`nextCursor` carried a percent-encoded padding character.**
+The code claimed "S1 URL-encodes the base64 padding character" and nothing
+supported it: 66 response definitions in the swagger give `nextCursor` as
+`YWdlbnRfaWQ6NTgwMjkzODE=`, with a literal `=`, and the offset encoder a few
+lines below never encoded it either — the two disagreed with each other. A
+body is not a URL, and a client that correctly escapes this value for the
+query string it goes back into was escaping an escape. Cursors are raw
+base64 now; the percent-encoded spelling, and the doubly-encoded one a
+careful client made of it, are still read, so anything holding an older
+cursor still pages.
+
+**Measured and not built: a cursor this mock never issued returns page one.**
+`garbage`, an empty value, base64 of something else, a real cursor with four
+characters cut off, and forty nines all answer `200` with the first page —
+so a client whose cursor is corrupted in a log, a database column or a retry
+pages forever without learning anything is wrong. Both decoders do this
+deliberately (`returns 0 on any error`, `yields {}`), and they at least
+agree with each other. Left alone because nothing measured says what
+SentinelOne answers here: the swagger documents `cursor` as a string and
+declares no error for it, and inventing a `400` is the same rule violation
+as inventing a route. A real measurement would settle it in one request.
+
 **A timestamp filter no longer answers 200 to a value it cannot read.**
 Of the 99 dated filters this mock takes, 47 answered with the whole
 collection and 50 with none, for the same unreadable value — `gte_dt` and

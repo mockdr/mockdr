@@ -110,9 +110,14 @@ def _encode_keyset(item: object, spec: CursorSpec) -> str:
         # The record's own id disambiguates.
         "_tiebreak": get_nested(item, "id"),
     }
-    b64 = base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
-    # S1 URL-encodes the base64 padding character
-    return b64.replace("=", "%3D")
+    # Raw base64, padding and all. The comment here used to claim S1
+    # percent-encodes the padding character, and 66 response definitions in
+    # the swagger say otherwise: every one gives `nextCursor` as
+    # `YWdlbnRfaWQ6NTgwMjkzODE=` with a literal `=`. `_encode_offset` a few
+    # lines down never encoded it either, so the two disagreed with each
+    # other. A body is not a URL; a client that correctly escapes this value
+    # for the query string it goes back into was escaping an escape.
+    return base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
 
 
 def _decode_keyset(cursor: str) -> Any:
@@ -123,7 +128,9 @@ def _decode_keyset(cursor: str) -> Any:
 def _decode_keyset_payload(cursor: str) -> dict:
     """Decode the whole cursor payload; an unreadable cursor yields ``{}``."""
     try:
-        normalized = cursor.replace("%3D", "=")
+        # Still read the percent-encoded spelling this mock used to emit, and
+        # the doubly-encoded one a careful client made of it.
+        normalized = cursor.replace("%253D", "=").replace("%3D", "=")
         data = json.loads(base64.b64decode(normalized.encode()).decode())
     except (ValueError, KeyError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
@@ -138,7 +145,8 @@ def _encode_offset(offset: int) -> str:
 def _decode_offset(cursor: str) -> int:
     """Decode a legacy offset cursor; returns 0 on any error."""
     try:
-        data = json.loads(base64.b64decode(cursor.replace("%3D", "=").encode()).decode())
+        normalized = cursor.replace("%253D", "=").replace("%3D", "=")
+        data = json.loads(base64.b64decode(normalized.encode()).decode())
         return int(data.get("offset", 0))
     except (ValueError, KeyError, json.JSONDecodeError, UnicodeDecodeError):
         return 0

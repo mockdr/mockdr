@@ -86,16 +86,31 @@ class TestPaginateKeyset:
         assert cursor is None
         assert total == 0
 
-    def test_cursor_has_no_raw_padding(self) -> None:
-        # S1 URL-encodes '=' as '%3D' — raw '=' must not appear
+    def test_cursor_carries_raw_base64(self) -> None:
+        """66 response definitions give `nextCursor` as `...gzODE=`, with a `=`.
+
+        This used to assert the opposite — that the padding is percent-encoded
+        — on a claim nothing in the swagger supports, while `_encode_offset`
+        beside it emitted raw base64 all along. A body is not a URL.
+        """
         _, cursor, _ = paginate(ITEMS, None, 5, AGENT_CURSOR)
         assert cursor is not None
-        assert "=" not in cursor
+        assert "%" not in cursor
+        base64.b64decode(cursor.encode(), validate=True)
+
+    def test_the_percent_encoded_spelling_is_still_read(self) -> None:
+        """Anything holding a cursor this mock issued before must still page."""
+        page_one, cursor, _ = paginate(ITEMS, None, 5, AGENT_CURSOR)
+        assert cursor is not None
+        from_raw, _, _ = paginate(ITEMS, cursor, 5, AGENT_CURSOR)
+        from_encoded, _, _ = paginate(ITEMS, cursor.replace("=", "%3D"), 5, AGENT_CURSOR)
+        assert from_raw == from_encoded
+        assert from_raw != page_one
 
     def test_cursor_encodes_s1_view_name(self) -> None:
         _, cursor, _ = paginate(ITEMS, None, 5, AGENT_CURSOR)
         assert cursor is not None
-        decoded = json.loads(base64.b64decode(cursor.replace("%3D", "=").encode()).decode())
+        decoded = json.loads(base64.b64decode(cursor.encode()).decode())
         assert decoded["id_column"] == "AgentView.id"
         assert decoded["id_sort_order"] == "asc"
         assert "id_value" in decoded
