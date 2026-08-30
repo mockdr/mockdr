@@ -41,12 +41,22 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
     # Scalars are immutable and shared; a nested object is rebuilt from its
     # template so the caller can mutate the result freely.
     out: dict = {}
+    # Microsoft's property tables are camelCase almost everywhere and not
+    # quite: `machine` lists `onboardingstatus`, `investigation` `State`,
+    # `software` `Vendor` and `Weaknesses`. Matching keys exactly meant the
+    # record's spelling and the table's both reached the answer, so a machine
+    # carried `onboardingStatus: "Onboarded"` *and* `onboardingstatus: ""` —
+    # and a client whose JSON mapper ignores case could bind the empty one and
+    # read the machine as not onboarded. No API answers a property twice.
+    by_lower = {key.lower(): key for key in actual}
     for key, template in defaults.items():
-        if key not in actual:
+        spelling = key if key in actual else by_lower.get(key.lower())
+        if spelling is None:
             # Only a key the record lacks needs a default built for it.
             out[key] = _blank(template)
             continue
-        value = actual[key]
+        value = actual[spelling]
+        key = spelling
         if isinstance(value, dict) and isinstance(template, dict):
             out[key] = deep_complete(template, value)
         elif (

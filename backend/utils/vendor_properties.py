@@ -76,8 +76,36 @@ def _mde_properties() -> dict[str, frozenset[str]]:
                     routes[_MDE_PREFIX + key[len("GET "):]] = frozenset(names)
             walk(value)
 
-    walk(json.loads(path.read_text()))
+    reference = json.loads(path.read_text())
+    walk(reference)
+
+    # A route's recorded sample is a subset of what the entity carries: the
+    # `machines` sample records 18 names while the docs' own `machine`
+    # property table lists 21, `deviceValue` and `ipAddresses` among them. The
+    # route's table alone refused `$filter=deviceValue eq 'Normal'` with
+    # "Could not find a property named 'deviceValue'" on a route that answers
+    # exactly that property.
+    entities = reference.get("entities")
+    if isinstance(entities, dict):
+        for route, names in list(routes.items()):
+            entity = _entity_of(route, entities)
+            if entity:
+                routes[route] = names | frozenset(entities[entity])
     return routes
+
+
+def _entity_of(route: str, entities: dict) -> str:
+    """The docs entity a route answers, by its last path segment.
+
+    `/mde/api/machines` -> `machine`, `/mde/api/software` -> `software`,
+    `/mde/api/investigations` -> `investigation`. A route whose segment names
+    no entity keeps its own recorded list and nothing is assumed for it.
+    """
+    segment = route.rstrip("/").rsplit("/", 1)[-1].lower()
+    for candidate in (segment, segment.rstrip("s"), segment + "s"):
+        if candidate in entities and isinstance(entities[candidate], list):
+            return candidate
+    return ""
 
 
 @functools.cache

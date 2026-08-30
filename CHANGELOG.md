@@ -8,6 +8,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Four Defender resources answered one property under two spellings.**
+Microsoft's property tables are camelCase almost everywhere and not quite —
+the `machine` table lists `onboardingstatus`, `software` lists `Vendor` and
+`Weaknesses`, `investigation` lists `ID` and `State` — and the completion
+matched those keys exactly, so the record's spelling and the table's both
+reached the answer. A machine carried `onboardingStatus: "Onboarded"` *and*
+`onboardingstatus: ""`, and a client whose JSON mapper ignores case (the
+default in .NET, and common elsewhere) could bind the empty one and read the
+machine as never onboarded. `software` did it twice and `investigations`
+once. The completion matches case-insensitively now and keeps the spelling
+the record carries — the one every neighbouring name in the same table
+shares, and the one the products answer.
+
+**`$filter` refused properties the same route answers.**
+The OData property table was built from each route's *recorded sample*,
+which is a subset of the entity's: the `machines` sample records 18 names
+where the docs' own `machine` table lists 21. So
+`$filter=deviceValue eq 'Normal'` came back `400 Could not find a property
+named 'deviceValue'` from a route that answers `deviceValue` on every
+record, and `ipAddresses` and `osArchitecture` were refused the same way.
+The entity's table joins the route's now, matched case-insensitively for the
+same reason as above. A name that exists in no spelling is still refused.
+
+**Measured and stated: five machine properties nothing documents.**
+`osVersion`, `sensorHealthState`, `managedBy`, `managedByStatus` and
+`vmMetadata` come from this mock's own domain model and appear in no
+vendored Defender reference — `scripts/schema_drift.py mde` has been listing
+them as undocumented all along, and `$filter` on them is refused because
+nothing speaks for them. Left as they are: removing a field is the kind of
+scope decision that has always been made deliberately here, not in passing.
+
 **Every STAR rule said it had never fired.**
 Nothing set `generatedAlerts`, `lastAlertTime`, `creatorId` or `updaterId`,
 so all four came from the swagger's examples: all twenty rules answered

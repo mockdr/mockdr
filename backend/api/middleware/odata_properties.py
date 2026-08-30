@@ -99,8 +99,15 @@ def unknown_property(path: str, query: str) -> str:
             named |= {_named(clause) for clause in value.split(",")}
         elif key == "$filter" and value:
             named |= _filter_fields(value)
+    # Case-insensitively, because the reference's own casing is not reliable:
+    # its `machine` table says `onboardingstatus`, `software` says `Vendor`
+    # and `Weaknesses`, `investigation` says `ID` and `State`, while every
+    # neighbouring name in the same list is camelCase and the products answer
+    # camelCase. Refusing a real property over a docs typo is the worse error
+    # of the two, and a name that appears in no spelling is still refused.
+    folded = {name.lower() for name in allowed}
     for name in sorted(named - _NOT_A_PROPERTY):
-        if name and name not in allowed:
+        if name and name.lower() not in folded:
             return name
     return ""
 
