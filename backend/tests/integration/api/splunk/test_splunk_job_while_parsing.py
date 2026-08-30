@@ -85,3 +85,56 @@ class TestAFinishedJobCarriesThemAll:
         assert content["isDone"] is True
         for name in ("eventCount", "resultCount", "scanCount", "runDuration"):
             assert name in content, name
+
+
+class TestWhatAControlActionLeavesBehind:
+    """Two states a client branches on, measured rather than guessed.
+
+    `pause` puts the job in `PAUSE` — not the `PAUSED` that reads naturally,
+    which is exactly why mockdr had it wrong — and `unpause` returns it to
+    whatever it had reached.  `finalize` stops the search early and sets
+    `isFinalized`, which a job that ran to the end does not have: a client
+    reading it is asking whether the results it holds are the whole answer,
+    and mockdr answered `false` to both.  Measured on 10.4.2, twice for the
+    spelling.
+    """
+
+    def test_a_paused_job_says_pause(
+        self, client: TestClient, dispatching: None,
+    ) -> None:
+        sid = _dispatch(client)
+        client.post(f"/splunk/services/search/jobs/{sid}/control",
+                    headers=AUTH, params=JSON, data={"action": "pause"})
+        content = _content(client, sid)
+        assert content["dispatchState"] == "PAUSE"
+        assert content["isPaused"] is True
+        assert content["isDone"] is False
+
+    def test_unpausing_takes_it_back(
+        self, client: TestClient, dispatching: None,
+    ) -> None:
+        sid = _dispatch(client)
+        for action in ("pause", "unpause"):
+            client.post(f"/splunk/services/search/jobs/{sid}/control",
+                        headers=AUTH, params=JSON, data={"action": action})
+        content = _content(client, sid)
+        assert content["dispatchState"] != "PAUSE"
+        assert content["isPaused"] is False
+
+    def test_finalizing_is_visible_and_completing_is_not(
+        self, client: TestClient, dispatching: None,
+    ) -> None:
+        finalized = _dispatch(client)
+        client.post(f"/splunk/services/search/jobs/{finalized}/control",
+                    headers=AUTH, params=JSON, data={"action": "finalize"})
+        content = _content(client, finalized)
+        assert content["isFinalized"] is True
+        assert content["isDone"] is True
+
+    def test_a_job_that_ran_to_the_end_is_not_finalized(
+        self, client: TestClient,
+    ) -> None:
+        """No dispatch window, so it completes on its own."""
+        content = _content(client, _dispatch(client))
+        assert content["isDone"] is True
+        assert content["isFinalized"] is False

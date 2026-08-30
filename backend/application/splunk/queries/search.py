@@ -136,7 +136,9 @@ def _progress(job: SearchJob) -> tuple[str, float, bool]:
     elapsed = now - (job.published_at or 0.0)
     fraction = min(max(elapsed / SPLUNK_DISPATCH_SECONDS, 0.0), 1.0)
     if job.is_paused:
-        return "PAUSED", round(fraction, 3), False
+        # `PAUSE`, not the `PAUSED` one would guess: measured twice on
+        # 10.4.2, and `unpause` puts it back to RUNNING.
+        return "PAUSE", round(fraction, 3), False
     state = next(name for threshold, name in reversed(_DISPATCH_STATES) if fraction >= threshold)
     return state, _whole(round(fraction, 3)), state == "DONE"
 
@@ -180,6 +182,10 @@ def get_job(sid: str) -> dict | None:
         "scanCount": job.scan_count,
         "isDone": done,
         "isFailed": job.is_failed,
+        # A job that ran to the end reports `false` here; only `finalize`
+        # sets it, and a client reading it asks whether the results it has
+        # are the whole answer.  The fixture said `false` for every job.
+        "isFinalized": job.is_finalized,
         "isPaused": job.is_paused,
         "isSaved": job.is_saved,
         "ttl": job.ttl,

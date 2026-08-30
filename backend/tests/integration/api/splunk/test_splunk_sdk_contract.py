@@ -217,7 +217,9 @@ class TestJobControl:
 
         content = _job_content(client, sid)
         assert content["isPaused"] is True
-        assert content["dispatchState"] == "PAUSED"
+        # `PAUSE`, not the `PAUSED` one would guess — measured twice on
+        # 10.4.2, and `unpause` puts the job back to RUNNING.
+        assert content["dispatchState"] == "PAUSE"
 
     def test_unpause_reverses_it(self, client: TestClient) -> None:
         sid = self._sid(client)

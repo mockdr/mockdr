@@ -93,7 +93,7 @@ class TestDispatchClockRespectsControlActions:
     ) -> None:
         sid = _dispatch(client)
         _control(client, sid, "pause")
-        assert _state(client, sid) == ("PAUSED", False)
+        assert _state(client, sid) == ("PAUSE", False)
 
     def test_pausing_stops_the_clock(
         self, client: TestClient, dispatch_window: None,
@@ -113,7 +113,7 @@ class TestDispatchClockRespectsControlActions:
         job.published_at = time.time() - 60.0
         job.paused_at = job.published_at + 2.0
         search_job_repo.save(job)
-        assert _state(client, sid) == ("PAUSED", False)
+        assert _state(client, sid) == ("PAUSE", False)
 
         _control(client, sid, "unpause")
         # Resumes two seconds in, where it stopped — not at the end.

@@ -54,6 +54,11 @@ class SearchJob:
     # A control action fixed the reported state (cancel, finalize). A settled
     # job reports what it was told to report, not what the clock would derive.
     settled: bool = False
+    #: Set by the `finalize` control action, which stops a search early and
+    #: reports whatever it had as final.  splunkd tells the two apart — a job
+    #: that ran to the end has `isFinalized: false` — and a client reading it
+    #: is asking whether the results it has are the whole answer.
+    is_finalized: bool = False
 
     @property
     def id(self) -> str:

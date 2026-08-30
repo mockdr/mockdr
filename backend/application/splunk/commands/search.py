@@ -213,7 +213,8 @@ def apply_control_action(sid: str, action: str, ttl: int = 0) -> bool:
         if not job.is_paused:
             job.paused_at = now
         job.is_paused = True
-        job.dispatch_state = "PAUSED"
+        # `PAUSE`, not `PAUSED` — measured twice on 10.4.2.
+        job.dispatch_state = "PAUSE"
     elif action == "unpause":
         # Resume where the job stopped. Shifting the dispatch origin forward
         # by the paused duration is what keeps a paused job from silently
@@ -229,6 +230,7 @@ def apply_control_action(sid: str, action: str, ttl: int = 0) -> bool:
         job.is_done = True
         job.done_progress = 1.0
         job.settled = True
+        job.is_finalized = True
     elif action == "save":
         job.is_saved = True
         job.ttl = SAVED_TTL

@@ -49,6 +49,16 @@ The doubled slash is a third answer again: splunkd collapses it and serves
 the request, Kibana answers its ordinary 404, and mockdr already matched
 Kibana.
 
+**A paused job says `PAUSE`, and a finalized one says so.**
+Two states a client branches on, both wrong for the same reason: they were
+the spelling and the value that read naturally rather than the ones
+splunkd sends. `pause` puts the job in `PAUSE` — not `PAUSED` — and
+`unpause` returns it to whatever progress it had reached. `finalize` stops
+the search early and sets `isFinalized: true`, where a job that ran to the
+end reports `false`; mockdr took that member from a fixture and answered
+`false` to both, so a client asking whether the results it holds are the
+whole answer was told they were. Measured on 10.4.2, the spelling twice.
+
 **A job that has not started carries 36 members, not 67.**
 Dispatching a search and polling `isDone` until it is true is the standard
 way a SOAR connector talks to Splunk, so the *first* answer that loop reads
