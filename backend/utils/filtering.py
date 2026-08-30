@@ -136,6 +136,36 @@ def _ordered(field_value: object, target: object, op: str) -> bool:
     return left <= right  # type: ignore[operator]
 
 
+def _as_text(value: object) -> str:
+    """A record's value in the spelling its own JSON answer uses.
+
+    `str(value or "")` read `False` and `0` as the empty string, so an `eq`
+    or `in` filter could never match either: `?activeThreats=0` answered 200
+    with nothing while every agent carried `"activeThreats": 0`, and eleven
+    boolean fields did the same for `false`. Absent is still the empty
+    string; present-and-falsy is not absent.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        # JSON spells these `true`/`false`, and so does the answer the client
+        # read the value out of.
+        return "true" if value else "false"
+    return str(value)
+
+
+def _matches(field_value: object, wanted: object) -> bool:
+    """Whether a record's value is the one the filter names.
+
+    A boolean is matched in any spelling the ``bool`` operator already
+    accepts, so ``?imported=0`` and ``?imported=false`` agree.
+    """
+    if isinstance(field_value, bool):
+        spelling = str(wanted).strip().lower()
+        return spelling in (("true", "1", "yes") if field_value else ("false", "0", "no"))
+    return _as_text(field_value) == str(wanted)
+
+
 def _enum_key(value: object) -> str:
     """A declared value in a form both spellings share (``TRUE_POSITIVE``/``True positive``)."""
     return str(value).strip().lower().replace("_", " ")
@@ -209,7 +239,7 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
             _reject_wrong_type(spec.param, spec.kind, raw)
 
         if spec.type == "eq":
-            result = [r for r in result if str(_get_field(r, spec.field) or "") == str(raw)]
+            result = [r for r in result if _matches(_get_field(r, spec.field), raw)]
 
         elif spec.type == "in":  # noqa: SIM114 - the enum branch differs below
             # Query params arrive comma-separated, request bodies as JSON
@@ -222,14 +252,20 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
             if spec.enum:
                 wanted = {_enum_key(v) for v in values}
                 result = [
-                    r for r in result if _enum_key(_get_field(r, spec.field) or "") in wanted
+                    r for r in result if _enum_key(_as_text(_get_field(r, spec.field))) in wanted
                 ]
             else:
-                result = [r for r in result if str(_get_field(r, spec.field) or "") in values]
+                result = [
+                    r for r in result
+                    if any(_matches(_get_field(r, spec.field), v) for v in values)
+                ]
 
         elif spec.type == "contains":
             needle = str(raw).lower()
-            result = [r for r in result if needle in str(_get_field(r, spec.field) or "").lower()]
+            result = [
+                r for r in result
+                if needle in _as_text(_get_field(r, spec.field)).lower()
+            ]
 
         elif spec.type == "bool":
             want = str(raw).lower() in ("true", "1", "yes")
@@ -254,10 +290,13 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
                 unwanted = {_enum_key(v) for v in values}
                 result = [
                     r for r in result
-                    if _enum_key(_get_field(r, spec.field) or "") not in unwanted
+                    if _enum_key(_as_text(_get_field(r, spec.field))) not in unwanted
                 ]
             else:
-                result = [r for r in result if str(_get_field(r, spec.field) or "") not in values]
+                result = [
+                    r for r in result
+                    if not any(_matches(_get_field(r, spec.field), v) for v in values)
+                ]
 
         elif spec.type in ("gt", "gte", "lt", "lte"):
             result = [r for r in result if _ordered(_get_field(r, spec.field), raw, spec.type)]

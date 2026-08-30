@@ -92,6 +92,20 @@ class TestGeneratedFiltersNarrow:
 
         narrowed = _records(client, route, auth_headers, **{spec.param: sent})
         assert len(narrowed) <= len(everything), f"{route} {spec.param} widened the result"
+        if spec.type in ("eq", "in"):
+            # The value came out of a record this route just answered with, so
+            # an empty answer means the mock cannot find what it publishes.
+            # Only "did not widen" was checked here, and an empty result
+            # passes that: `?billingMode=subscription` answered 200 with
+            # nothing while the one account read `"billingMode":
+            # "subscription"`, because the store held no such key and the
+            # value came from the swagger's example. Eighteen filters were in
+            # that state, twelve of them because `str(value or "")` read
+            # `False` and `0` as absent.
+            assert narrowed, (
+                f"{route} {spec.param}={sent} found none of the records that "
+                f"carry {spec.field}={sample!r}"
+            )
         for record in narrowed:
             assert _holds(spec, record, sent), (
                 f"{route} {spec.param}={sent} returned a record whose "

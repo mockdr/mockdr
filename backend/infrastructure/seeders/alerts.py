@@ -138,6 +138,14 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
             "siteIds": [agent.siteId],
             "groupIds": [],
             "accountIds": [agent.accountId],
+            # The swagger declares the rule's scope as three singular fields
+            # and none of the plural ones above. Only the plurals were
+            # written, so the answer carried the swagger's own example id —
+            # the same one for all twenty rules — and the documented
+            # `accountIds`, `siteIds` and `scopes` filters matched nothing.
+            "scope": "site",
+            "siteId": agent.siteId,
+            "accountId": agent.accountId,
             "treatAsThreat": "UNDEFINED",
             # The swagger's own enum. Seeding only "Active" left the
             # documented status filter untestable and the console's rule list

@@ -9,11 +9,20 @@ from repository.policy_repo import policy_repo
 from repository.site_repo import site_repo
 from utils.id_gen import new_id, new_uuid
 
+#: Licences each seeded site carries. The account's `totalLicenses` is
+#: "the total number of licenses on all Surfaces for all Bundles", so it is
+#: this times the number of sites — it answered 0 while three sites held 500
+#: each, and nothing could filter by the number it did answer.
+SITE_TOTAL_LICENSES = 500
+
 _SITE_DEFS: list[tuple[str, str]] = [
     ("Workstations", "New York"),
     ("Servers", "Global"),
     ("Cloud Infrastructure", "AWS US-East"),
 ]
+
+#: How many sites a seeded account has.
+SITE_COUNT = len(_SITE_DEFS)
 
 
 def seed_sites(fake: Faker, account_id: str, account_name: str) -> list[str]:
@@ -32,7 +41,7 @@ def seed_sites(fake: Faker, account_id: str, account_name: str) -> list[str]:
     for i, (site_name, location) in enumerate(_SITE_DEFS):
         sid = new_id()
         site_ids.append(sid)
-        total_lic = 500
+        total_lic = SITE_TOTAL_LICENSES
         active_lic = random.randint(50, 200)
         site_repo.save(Site(
             id=sid,

@@ -17,3 +17,9 @@ class Account:
     accountType: str
     isDefault: bool
     expiration: str | None = None
+    # Declared on the account response with enums of their own; nothing set
+    # them, so the answer carried the swagger's example values, identical for
+    # every account and matched by no filter.
+    billingMode: str = "subscription"
+    usageType: str = "customer"
+    totalLicenses: int = 0

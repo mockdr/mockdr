@@ -303,3 +303,48 @@ class TestFullTextEdgeCases:
         spec = [FilterSpec("q", "name|desc", "full_text")]
         result = apply_filters(records, {"q": "hello"}, spec)
         assert len(result) == 1
+
+
+class TestPresentAndFalsyIsNotAbsent:
+    """`str(value or "")` read `False` and `0` as the empty string.
+
+    Every `eq` and `in` comparison used that idiom, so a field holding
+    `False` or `0` could not be matched by any filter: `?activeThreats=0`
+    answered 200 with nothing while every agent carried `"activeThreats": 0`,
+    and eleven boolean fields did the same for `false`.
+    """
+
+    FALSY = [
+        {"id": "a", "flag": False, "count": 0, "name": ""},
+        {"id": "b", "flag": True, "count": 3, "name": "x"},
+        {"id": "c", "flag": None, "count": None, "name": None},
+    ]
+
+    def test_eq_finds_a_false(self) -> None:
+        spec = [FilterSpec("flag", "flag", "eq")]
+        assert {r["id"] for r in apply_filters(self.FALSY, {"flag": "false"}, spec)} == {"a"}
+
+    def test_eq_finds_a_zero(self) -> None:
+        spec = [FilterSpec("count", "count", "eq")]
+        assert {r["id"] for r in apply_filters(self.FALSY, {"count": "0"}, spec)} == {"a"}
+
+    def test_in_finds_a_false(self) -> None:
+        spec = [FilterSpec("flags", "flag", "in")]
+        assert {r["id"] for r in apply_filters(self.FALSY, {"flags": "false"}, spec)} == {"a"}
+
+    def test_a_boolean_is_matched_in_any_spelling_the_bool_operator_takes(self) -> None:
+        spec = [FilterSpec("flag", "flag", "eq")]
+        for spelling in ("false", "FALSE", "0", "no"):
+            assert {r["id"] for r in apply_filters(self.FALSY, {"flag": spelling}, spec)} == {"a"}
+        for spelling in ("true", "TRUE", "1", "yes"):
+            assert {r["id"] for r in apply_filters(self.FALSY, {"flag": spelling}, spec)} == {"b"}
+
+    def test_a_missing_field_is_still_absent(self) -> None:
+        """Absent must not become matchable as `false` or `0`."""
+        spec = [FilterSpec("count", "count", "eq")]
+        assert {r["id"] for r in apply_filters(self.FALSY, {"count": "0"}, spec)} == {"a"}
+        assert "c" not in {r["id"] for r in apply_filters(self.FALSY, {"count": "0"}, spec)}
+
+    def test_nin_excludes_a_false_it_can_now_see(self) -> None:
+        spec = [FilterSpec("flags", "flag", "nin")]
+        assert {r["id"] for r in apply_filters(self.FALSY, {"flags": "false"}, spec)} == {"b", "c"}

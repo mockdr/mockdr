@@ -8,6 +8,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**A filter could not match a value the answer carries.**
+Eighteen documented filters, given a value taken straight out of a record the
+same route had just returned, answered `200` with nothing. Three causes, all
+of them the same failure from a client's side — it reads a value, filters by
+it, and is told there is no such record:
+
+* `str(value or "")` read `False` and `0` as the empty string, so no `eq` or
+  `in` filter could ever match either. `?activeThreats=0` found none of the
+  agents carrying `"activeThreats": 0`, and eleven boolean fields did the
+  same for `false`. Absent is still the empty string; present-and-falsy is
+  not absent, and a boolean now matches in any spelling the `bool` operator
+  already took (`false`, `FALSE`, `0`, `no`).
+* The account record carried no `billingMode`, `usageType` or
+  `totalLicenses`, so the answer showed the swagger's example values for all
+  three and nothing could filter by them. They are seeded now, and
+  `totalLicenses` is the sum it is documented to be — 1500 across three sites
+  of 500 — where it answered `0`.
+* A STAR rule stored `accountIds`, `siteIds` and `scopeLevel`, none of which
+  the swagger declares, while the swagger declares the singular `accountId`,
+  `siteId` and `scope`, which nothing set. Every one of the twenty rules
+  therefore answered with the same example id, and the documented
+  `accountIds`, `siteIds` and `scopes` filters matched nothing. The declared
+  fields are seeded from the agent the rule was made for.
+
+`test_generated_filters.py` walked all 344 derived filters and could not see
+any of this: it asserted only that a filter does not *widen* the result, and
+an empty answer passes that. It now requires a value the route itself
+published to find at least one record — the rule `filter_effect.py` already
+applied to body filters, reaching the query filters it cannot see.
+
 **`nextCursor` carried a percent-encoded padding character.**
 The code claimed "S1 URL-encodes the base64 padding character" and nothing
 supported it: 66 response definitions in the swagger give `nextCursor` as
