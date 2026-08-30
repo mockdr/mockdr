@@ -92,6 +92,10 @@ def _ordered(field_value: object, target: object, op: str) -> bool:
         left, right = float(str(field_value)), float(str(target))
     except (TypeError, ValueError):
         left_dt, right_dt = _parse_dt(str(field_value)), _parse_dt(str(target))
+        if left_dt is not None and right_dt is None:
+            # A timestamp on one side and a bare number on the other is the
+            # epoch spelling, not two strings to sort alphabetically.
+            right_dt = _epoch_ms(str(target))
         if left_dt is None or right_dt is None:
             # Neither numbers nor timestamps: compare as text, which is what
             # an ordering over version strings and names amounts to.
@@ -110,6 +114,24 @@ def _ordered(field_value: object, target: object, op: str) -> bool:
 def _enum_key(value: object) -> str:
     """A declared value in a form both spellings share (``TRUE_POSITIVE``/``True positive``)."""
     return str(value).strip().lower().replace("_", " ")
+
+
+def _epoch_ms(value: str) -> datetime | None:
+    """Read a millisecond epoch, the spelling ``__between`` documents for dates.
+
+    Every dated ``__between`` in the swagger is documented as
+    ``<from_timestamp>-<to_timestamp>`` with a 13-digit example
+    (``1514978764288-1514978999999``), while the records this mock holds carry
+    ISO-8601. Comparing the two as text made *every* dated range answer with an
+    empty list and a 200 — a range spanning the years 2000 to 2100 returned
+    none of the sixty agents it must contain.
+    """
+    if not value.lstrip("-").isdigit():
+        return None
+    try:
+        return datetime.fromtimestamp(int(value) / 1000, UTC)
+    except (OSError, OverflowError, ValueError):
+        return None
 
 
 def _parse_dt(value: str) -> datetime | None:

@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+**Every dated range filter answered with an empty list.**
+The swagger spells each dated `__between` as
+`<from_timestamp>-<to_timestamp>` and gives a 13-digit example
+(`1514978764288-1514978999999`) — milliseconds since the epoch — while the
+records this mock holds carry ISO-8601. The two were compared as text, and
+`"2026-07-21T08:22:15.000Z" <= "1798761600000"` is false for every record
+ever written, so *every* dated range answered `200` with nothing: a range
+spanning the years 2000 to 2100 returned none of the sixty agents it must
+contain, and a client reading that concluded the estate was empty. A
+timestamp on one side and a bare number on the other is now read as the
+epoch spelling. 11 dated ranges select the range where 0 did; the numeric
+ranges the swagger spells the same way (`coreCount__between=2-8`) were never
+affected and are unchanged. One consequence worth stating: `createdAt__gt`
+and friends, which the swagger gives ISO examples for, now accept the epoch
+spelling too. They previously compared it as text, so nothing that worked
+has changed — but the mock is more permissive here than anything measured.
+
 **A filter the swagger types now refuses a value that type cannot hold.**
 The 2.1 swagger declares forty-odd query filters `integer` or `boolean`;
 mockdr took every one of them as text and compared whatever arrived.
