@@ -11,6 +11,7 @@ from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.es_shared import ES_CASE_TAGS, es_uuid
 from repository.es_case_comment_repo import es_case_comment_repo
 from repository.es_case_repo import es_case_repo
+from utils.es_case_serde import KIBANA_USER
 
 _STATUS_WEIGHTS: list[str] = (
     ["open"] * 10
@@ -46,11 +47,14 @@ _COMMENT_TEMPLATES: list[str] = [
     "Contacted affected user for interview. Awaiting response.",
 ]
 
-_MOCK_USER: dict[str, str] = {
-    "email": "elastic-admin@acmecorp.internal",
-    "full_name": "Elastic Admin",
-    "username": "elastic",
-}
+#: The user every seeded case is filed by. `utils.es_case_serde` already
+#: carries the shape measured against 8.15 — `elastic` is Elasticsearch's
+#: reserved superuser and has no profile, so the real cluster answers
+#: `"full_name": null, "email": null` for it, and so does Kibana wherever it
+#: names a user. Seeding an invented "Elastic Admin" here put those strings
+#: into every case's `created_by`, `updated_by` and `closed_by`, and out
+#: through `/api/cases/reporters`, where the live comparison caught them.
+_MOCK_USER = KIBANA_USER
 
 
 def seed_es_cases(fake: Faker, alert_ids: list[str]) -> None:
