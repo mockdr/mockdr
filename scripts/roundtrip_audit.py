@@ -205,7 +205,10 @@ def s1_sites(check):
 
 @cycle("web", "users")
 def s1_users(check):
-    sent = {"fullName": "ZZZ Audit", "email": "zzz-audit@example.test"}
+    # `scope` is required beside the other two, on the create and on the
+    # update: the swagger marks it so, and `documented_body.py` enforces it.
+    sent = {"fullName": "ZZZ Audit", "email": "zzz-audit@example.test",
+            "scope": "tenant"}
     created = find(check.request("POST", "/web/api/v2.1/users", json={"data": sent}), "data")
     if not created:
         return
@@ -215,7 +218,8 @@ def s1_users(check):
                   "email", "zzz-audit@example.test")
     check.listed("GET /users", find(check.get("/web/api/v2.1/users"), "data"), "id", user)
     check.request("PUT", f"/web/api/v2.1/users/{user}",
-                  json={"data": {"fullName": "ZZZ Audit Renamed"}})
+                  json={"data": {"fullName": "ZZZ Audit Renamed",
+                                 "scope": "tenant"}})
     check.carries("GET /users/{id} after PUT",
                   find(check.get(f"/web/api/v2.1/users/{user}"), "data"),
                   "fullName", "ZZZ Audit Renamed")
