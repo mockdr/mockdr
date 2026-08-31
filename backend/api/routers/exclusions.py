@@ -130,8 +130,13 @@ def update_exclusion_by_body(body: dict, current_user: dict = Depends(require_ad
             status_code=404,
             detail=build_vendor_error("sentinelone", 404, "Exclusion not found"),
         )
+    # The same schema the read path answers with. The name without `Get` has
+    # no fixture at all, so `restrict_s1` found no template and returned the
+    # record untouched — the write answered `siteId`, which the schema does
+    # not declare and the read does not return. Read and write disagreeing
+    # about a tenant field is worse than either being wrong alone.
     return restrict_s1(
-        {"data": [result["data"]]}, "exclusions.schemas_ExclusionSchema_many_200",
+        {"data": [result["data"]]}, "exclusions.schemas_ExclusionSchemaGet_many_200",
     )
 
 
@@ -242,8 +247,10 @@ def update_blocklist_entry(body: dict, _: dict = Depends(require_admin)) -> dict
             updated[key] = data[key]
     updated["updatedAt"] = utc_now()
     blocklist_repo.save_raw(entry_id, updated)
+    # As above: the name without `Get` has no fixture, so this answered
+    # `siteId` where the read path does not.
     return restrict_s1(
-        {"data": [updated]}, "exclusions.schemas_RestrictionSchema_many_200",
+        {"data": [updated]}, "exclusions.schemas_RestrictionSchemaGet_many_200",
     )
 
 
