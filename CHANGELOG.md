@@ -38,6 +38,47 @@ neither of the four draws it tried had hit the overlap. Twelve draws cost
 five seconds; forty were swept by hand when the agent defect was fixed, and
 all forty are clean.
 
+### Added
+
+**The Graph console has tests.** It had none — 24 views, its store and its
+API client — and all three defects the strengthened end-to-end sweep found
+were in it. Every other vendor section of this console is covered; that one
+never was, and its `0 | 0 | 0 | 0` line had been sitting in the coverage
+report all along.
+
+The fixtures are not written by hand. `scripts/gen_graph_fixtures.py` asks
+the mock exactly what the console asks it — 30 paths, 526 records — and
+writes the answers down, because a hand-written fixture is a guess at what
+the backend answers and one of them guessed wrong: `AlertsView`'s gave
+`agentRealtimeInfo` an object where the product answers `null`, so the view
+read a property off null, rendered nothing, and 2 103 unit tests passed over
+a blank page. `scripts/frontend_fixture_drift.py` re-asks the mock the same
+questions and reports a key that appeared, a key that vanished, and a key
+that turned null in *either* direction — the last one being the shape of the
+defect that started this. It runs in CI.
+
+Each of the 21 views is held to two things: it renders its heading, and it
+puts a value from the captured answer on the page. The second is what an
+empty state, a crashed setup and a refused request all fail. Both were
+checked by breaking them — an empty answer fails three cases, a
+wrong-shaped one fails a fourth.
+
+`src/api/__tests__/graph.spec.ts` covers the token call itself, since that
+is where the defect lived: it asserts the grant carries the `scope` Entra
+requires, and fails if the line is removed again.
+
+### Removed
+
+**`src/stores/graph.ts`, which nothing imported.** 143 lines, `0 %` covered,
+holding the only `TODO` in the tree — and `useGraphStore` appeared in no
+file but its own, where every other store is used by three to eight. The
+Graph dashboard computes the one figure it needed locally. Writing tests for
+code nothing calls would have added debt rather than removed it.
+
+Frontend coverage is 91.2 % of statements, from 81.0 %: `stores` 70.3 % →
+98.5 % (the dead file was most of the gap), `views/graph` 0 % → 74.2 %. 2 144
+unit tests, from 2 103.
+
 ### Fixed
 
 **`date-time` is a format, not a type.** Advertising the declared kind of

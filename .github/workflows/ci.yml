@@ -232,6 +232,15 @@ jobs:
       - name: Members a write route accepts take effect
         run: python scripts/write_effect.py
 
+      # The frontend's Graph tests mount their views over answers captured
+      # from this mock rather than hand-written ones, because a hand-written
+      # fixture is a guess and one of them guessed wrong — a view read a
+      # property off a null the product really answers, rendered nothing, and
+      # 2 103 unit tests passed over the blank page. Captured is not current,
+      # so the capture is re-asked here.
+      - name: The frontend's captured fixtures still match the mock
+        run: python scripts/frontend_fixture_drift.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.
