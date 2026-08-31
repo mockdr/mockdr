@@ -43,9 +43,12 @@ export const threatsApi = {
     client.post(`/threats/${id}/notes`, { text }) as Promise<SingleResponse<ThreatNote>>,
 
   /** Set the analyst verdict for a list of threats. */
-  setVerdict: (ids: string[], verdict: string): Promise<ActionResponse> =>
+  setVerdict: (ids: string[], analystVerdict: string): Promise<ActionResponse> =>
     client.post('/threats/analyst-verdict', {
-      data: { verdict },
+      // `analystVerdict` is what the swagger names, and what the route
+      // reads. Sent as `verdict` it was ignored: 200, "affected: 1", and
+      // every verdict left where it was.
+      data: { analystVerdict },
       filter: { ids },
     }) as Promise<ActionResponse>,
 
@@ -67,7 +70,10 @@ export const threatsApi = {
       filter: { ids },
     }) as Promise<ActionResponse>,
 
-  /** Generic bulk action (e.g. mark-as-threat, mark-as-benign, resolve). */
-  action: (actionPath: string, body: unknown): Promise<ActionResponse> =>
-    client.post(`/threats/actions/${actionPath}`, body) as Promise<ActionResponse>,
+  // There was a generic `action(path)` here, posting to
+  // `/threats/actions/<name>`. SentinelOne has no such family — only
+  // `/threats/actions/container-network-connect` and its disconnect twin —
+  // so every call 404'd. The four the console makes are named above, and
+  // they differ in body as well as in path, which is why one dispatcher
+  // could never have served them.
 }

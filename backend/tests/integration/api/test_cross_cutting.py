@@ -34,7 +34,9 @@ class TestRoleChangeInvalidatesPrivileges:
         user = self._soc_user(client, auth_headers)
         client.put(
             f"{PREFIX}/users/{user['id']}",
-            json={"data": {"role": role}},
+            # `scope` is required on this update body, so the role change
+            # names the scope it applies to.
+            json={"data": {"role": role, "scope": "tenant"}},
             headers=auth_headers,
         )
 

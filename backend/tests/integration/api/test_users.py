@@ -125,18 +125,20 @@ class TestUpdateUser:
     def test_returns_200(self, client: TestClient, auth_headers: dict) -> None:
         uid = self._create(client, auth_headers)
         resp = client.put(f"{BASE}/{uid}", headers=auth_headers,
-                          json={"data": {"fullName": "Updated Name"}})
+                          json={"data": {"fullName": "Updated Name",
+                                         "scope": "tenant"}})
         assert resp.status_code == 200
 
     def test_updates_full_name(self, client: TestClient, auth_headers: dict) -> None:
         uid = self._create(client, auth_headers)
         body = client.put(f"{BASE}/{uid}", headers=auth_headers,
-                          json={"data": {"fullName": "Renamed User"}}).json()["data"]
+                          json={"data": {"fullName": "Renamed User",
+                                         "scope": "tenant"}}).json()["data"]
         assert body["fullName"] == "Renamed User"
 
     def test_unknown_id_returns_404(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.put(f"{BASE}/999999999999999999", headers=auth_headers,
-                          json={"data": {"fullName": "x"}})
+                          json={"data": {"fullName": "x", "scope": "tenant"}})
         assert resp.status_code == 404
 
     def test_requires_auth(self, client: TestClient, auth_headers: dict) -> None:

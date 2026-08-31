@@ -111,22 +111,19 @@ export const mdeAlertsApi = {
 
 // ── Indicators API ──────────────────────────────────────────────────────────
 
+// Defender documents five indicator operations and neither a read nor an
+// update of one by id: `GET /api/indicators`, `POST /api/indicators`,
+// `DELETE /api/indicators/{id}`, `POST /api/indicators/BatchDelete` and
+// `POST /api/indicators/import`. A `get` and an `update` by id lived here
+// and called routes the product does not have.
 export const mdeIndicatorsApi = {
   /** List indicators. */
   list: (params?: Record<string, unknown>): Promise<MdeODataResponse<MdeIndicator>> =>
     mdeClient.get('/api/indicators', { params }) as Promise<MdeODataResponse<MdeIndicator>>,
 
-  /** Get a single indicator by ID. */
-  get: (id: string): Promise<MdeIndicator> =>
-    mdeClient.get(`/api/indicators/${id}`) as Promise<MdeIndicator>,
-
   /** Create an indicator. */
   create: (body: Partial<MdeIndicator>): Promise<MdeIndicator> =>
     mdeClient.post('/api/indicators', body) as Promise<MdeIndicator>,
-
-  /** Update an indicator. */
-  update: (id: string, body: Partial<MdeIndicator>): Promise<MdeIndicator> =>
-    mdeClient.patch(`/api/indicators/${id}`, body) as Promise<MdeIndicator>,
 
   /** Delete an indicator. */
   delete: (id: string): Promise<unknown> =>

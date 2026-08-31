@@ -70,11 +70,12 @@ export const splunkSearchApi = {
       params: { count, offset },
     }) as Promise<SplunkSearchResults>,
 
-  /** One-shot export search. */
+  /** One-shot export search. POST: splunkd answers GET here with 405. */
   exportSearch: (search: string): Promise<SplunkSearchResults> =>
-    splunkClient.get('/services/search/jobs/export', {
-      params: { search },
-    }) as Promise<SplunkSearchResults>,
+    splunkClient.post(
+      '/services/search/jobs/export',
+      new URLSearchParams({ search, output_mode: 'json' }),
+    ) as Promise<SplunkSearchResults>,
 }
 
 // ── Notable Events API ────────────────────────────────────────────────────

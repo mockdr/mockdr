@@ -9,13 +9,20 @@ a body the vendor's own reference says is not one.
 every member that shows the client meant this route at all — for
 SentinelOne that includes the members of the `data` payload, because
 this mock takes the flat form of those documents as well.
+
+`payload_required` is what the swagger marks required *inside*
+`data`. The top-level `required` is `data, filter` on almost every
+SentinelOne action and says nothing about what the payload holds;
+the payload's own `required` says exactly that.
 """
 from __future__ import annotations
 
-#: ``(vendor, method, route path)`` → ``(required, recognisable)``.
+#: ``(vendor, method, route path)`` →
+#: ``(required, recognisable, payload_required)``.
 #: The path is the one the router carries — no mount prefix.
 DOCUMENTED_BODIES: dict[
-    tuple[str, str, str], tuple[frozenset[str], frozenset[str]],
+    tuple[str, str, str],
+    tuple[frozenset[str], frozenset[str], frozenset[str]],
 ] = {
     ("sentinelone", "POST", "/accounts"): (
         frozenset({
@@ -27,6 +34,9 @@ DOCUMENTED_BODIES: dict[
             "makeSocDefaultUi", "name", "policy", "skus",
             "unlimitedExpiration", "usageType"
         }),
+        frozenset({
+            "name"
+        }),
     ),
     ("sentinelone", "PUT", "/accounts/{account_id}"): (
         frozenset({
@@ -37,6 +47,8 @@ DOCUMENTED_BODIES: dict[
             "externalId", "inherits", "irFields", "licenses",
             "makeSocDefaultUi", "name", "policy", "salesforceId",
             "skus", "unlimitedExpiration", "usageType"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/accounts/{account_id}/policy"): (
@@ -69,6 +81,8 @@ DOCUMENTED_BODIES: dict[
             "unsignedDriverBlockingOn", "updatedAt", "userFullName",
             "userId"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/accounts/{account_id}/reactivate"): (
         frozenset({
@@ -76,6 +90,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "expiration", "unlimited"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/accounts/{account_id}/uninstall-password/generate"): (
@@ -85,6 +101,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "expiration"
         }),
+        frozenset({
+            "expiration"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/abort-scan"): (
         frozenset({
@@ -92,6 +111,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/approve-stateless-upgrade"): (
@@ -101,6 +122,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "expiration", "filter"
         }),
+        frozenset({
+            "expiration"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/approve-uninstall"): (
         frozenset({
@@ -108,6 +132,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/broadcast"): (
@@ -117,6 +143,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "message"
         }),
+        frozenset({
+            "message"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/can-start-remote-shell"): (
         frozenset({
@@ -124,6 +153,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/clear-remote-shell-session"): (
@@ -133,6 +164,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/connect"): (
         frozenset({
@@ -141,6 +174,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/decommission"): (
         frozenset({
@@ -148,6 +183,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/disable-agent"): (
@@ -158,6 +195,9 @@ DOCUMENTED_BODIES: dict[
             "data", "expiration", "expirationTimezone", "filter",
             "shouldReboot"
         }),
+        frozenset({
+            "shouldReboot"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/disconnect"): (
         frozenset({
@@ -165,6 +205,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/enable-agent"): (
@@ -174,6 +216,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "shouldReboot"
         }),
+        frozenset({
+            "shouldReboot"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/fetch-firewall-rules"): (
         frozenset({
@@ -182,6 +227,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "format", "state"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/fetch-installed-apps"): (
         frozenset({
@@ -189,6 +236,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/fetch-logs"): (
@@ -199,6 +248,8 @@ DOCUMENTED_BODIES: dict[
             "agentLogs", "customerFacingLogs", "data", "filter",
             "platformLogs"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/firewall-logging"): (
         frozenset({
@@ -206,6 +257,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "reportLog", "reportMgmt"
+        }),
+        frozenset({
+            "reportLog", "reportMgmt"
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/initiate-scan"): (
@@ -215,6 +269,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/local-upgrade-authorization"): (
         frozenset({
@@ -222,6 +278,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "agentAuthorization", "data", "filter"
+        }),
+        frozenset({
+            "agentAuthorization"
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/manage-tags"): (
@@ -231,6 +290,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "operation", "tagId"
         }),
+        frozenset({
+            "operation", "tagId"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/mark-up-to-date"): (
         frozenset({
@@ -238,6 +300,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/move-to-console"): (
@@ -247,6 +311,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "token"
         }),
+        frozenset({
+            "token"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/move-to-site"): (
         frozenset({
@@ -254,6 +321,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "targetSiteId"
+        }),
+        frozenset({
+            "targetSiteId"
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/randomize-uuid"): (
@@ -263,6 +333,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/ranger-disable"): (
         frozenset({
@@ -270,6 +342,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/ranger-enable"): (
@@ -279,6 +353,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/reject-uninstall"): (
         frozenset({
@@ -286,6 +362,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/reset-local-config"): (
@@ -295,6 +373,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/reset-passphrase"): (
         frozenset({
@@ -302,6 +382,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/reset-passphrase/capability"): (
@@ -311,6 +393,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/restart-machine"): (
         frozenset({
@@ -318,6 +402,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/set-config"): (
@@ -327,6 +413,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "config", "data", "filter"
         }),
+        frozenset({
+            "config"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/set-external-id"): (
         frozenset({
@@ -334,6 +423,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "externalId", "filter"
+        }),
+        frozenset({
+            "externalId"
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/shutdown"): (
@@ -343,6 +435,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/start-profiling"): (
         frozenset({
@@ -350,6 +444,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "timeout"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/start-remote-shell"): (
@@ -360,6 +456,9 @@ DOCUMENTED_BODIES: dict[
             "columns", "data", "filter", "historyPassword",
             "passwordFromScope", "rows", "twoFaCode"
         }),
+        frozenset({
+            "columns", "rows"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/stop-profiling"): (
         frozenset({
@@ -367,6 +466,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/terminate-remote-shell"): (
@@ -376,6 +477,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "channelId", "data", "filter"
         }),
+        frozenset({
+            "channelId"
+        }),
     ),
     ("sentinelone", "POST", "/agents/actions/uninstall"): (
         frozenset({
@@ -383,6 +487,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/actions/update-software"): (
@@ -394,6 +500,8 @@ DOCUMENTED_BODIES: dict[
             "ignoreConflicts", "isScheduled", "osType", "packageId",
             "packageType", "path"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/disable-hyper-automation-pna"): (
         frozenset({
@@ -401,6 +509,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/agents/enable-hyper-automation-pna"): (
@@ -410,6 +520,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/agents/{agent_id}/actions/fetch-files"): (
         frozenset({
@@ -418,6 +530,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "files", "password"
         }),
+        frozenset({
+            "files", "password"
+        }),
     ),
     ("sentinelone", "POST", "/application-management/scan"): (
         frozenset({
@@ -425,6 +540,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/application-management/settings"): (
@@ -436,6 +553,8 @@ DOCUMENTED_BODIES: dict[
             "extensiveScanEnabled", "filter", "isDefaultPolicy",
             "scanSchedule", "vulnerabilitiesScanEnabled"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/cloud-detection/alerts/analyst-verdict"): (
         frozenset({
@@ -444,6 +563,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "analystVerdict", "data", "filter"
         }),
+        frozenset({
+            "analystVerdict"
+        }),
     ),
     ("sentinelone", "POST", "/cloud-detection/alerts/incident"): (
         frozenset({
@@ -451,6 +573,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "incidentStatus"
+        }),
+        frozenset({
+            "incidentStatus"
         }),
     ),
     ("sentinelone", "POST", "/cloud-detection/rules"): (
@@ -464,6 +589,10 @@ DOCUMENTED_BODIES: dict[
             "queryType", "s1ql", "scheduledParams", "severity",
             "status", "templateRuleId", "treatAsThreat"
         }),
+        frozenset({
+            "expirationMode", "name", "queryType", "severity",
+            "status"
+        }),
     ),
     ("sentinelone", "PUT", "/cloud-detection/rules/disable"): (
         frozenset({
@@ -472,6 +601,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/cloud-detection/rules/enable"): (
         frozenset({
@@ -479,6 +610,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/cloud-detection/rules/{rule_id}"): (
@@ -492,6 +625,10 @@ DOCUMENTED_BODIES: dict[
             "queryType", "s1ql", "scheduledParams", "severity",
             "status", "templateRuleId", "treatAsThreat"
         }),
+        frozenset({
+            "expirationMode", "name", "queryType", "severity",
+            "status"
+        }),
     ),
     ("sentinelone", "POST", "/cloud-funnel/estimator"): (
         frozenset({
@@ -499,6 +636,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "accountIds", "data", "desiredFields", "query", "siteIds"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/cloud-funnel/onboarding"): (
@@ -511,6 +650,8 @@ DOCUMENTED_BODIES: dict[
             "query", "roleToAssume", "secretAccessKey", "siteIds",
             "useAssumeRole"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/cloud-funnel/validate-bucket-permissions"): (
         frozenset({
@@ -521,6 +662,9 @@ DOCUMENTED_BODIES: dict[
             "data", "roleToAssume", "secretAccessKey", "siteId",
             "useAssumeRole"
         }),
+        frozenset({
+            "bucketUrl"
+        }),
     ),
     ("sentinelone", "POST", "/cloud-funnel/validate-query"): (
         frozenset({
@@ -528,6 +672,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "query"
+        }),
+        frozenset({
+            "query"
         }),
     ),
     ("sentinelone", "PUT", "/cnapp/vcs/integration/{integrationId}/repos/disable-scan"): (
@@ -537,6 +684,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "repositoryIds"
         }),
+        frozenset({
+            "repositoryIds"
+        }),
     ),
     ("sentinelone", "PUT", "/cnapp/vcs/integration/{integrationId}/repos/edit-tags"): (
         frozenset({
@@ -544,6 +694,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "data", "repositoryIds", "tagIds"
+        }),
+        frozenset({
+            "action", "repositoryIds", "tagIds"
         }),
     ),
     ("sentinelone", "PUT", "/cnapp/vcs/integration/{integrationId}/repos/enable-scan"): (
@@ -553,6 +706,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "repositoryIds"
         }),
+        frozenset({
+            "repositoryIds"
+        }),
     ),
     ("sentinelone", "POST", "/cnapp/vcs/integration/{integrationId}/repos/get-tags"): (
         frozenset({
@@ -561,6 +717,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "repositoryIds"
         }),
+        frozenset({
+            "repositoryIds"
+        }),
     ),
     ("sentinelone", "PUT", "/cnapp/vcs/integrations/edit-tags"): (
         frozenset({
@@ -568,6 +727,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "data", "integrationIds", "tagIds"
+        }),
+        frozenset({
+            "action", "integrationIds", "tagIds"
         }),
     ),
     ("sentinelone", "POST", "/cnapp/vcs/onboarding"): (
@@ -581,6 +743,9 @@ DOCUMENTED_BODIES: dict[
             "gitlabPersonalAccessToken", "provider", "serverHost",
             "serverPort", "settings", "tags", "title"
         }),
+        frozenset({
+            "provider", "tags"
+        }),
     ),
     ("sentinelone", "POST", "/cnapp/vcs/scanner-policy"): (
         frozenset({
@@ -589,6 +754,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "branch", "data", "description", "name", "priority",
             "scope"
+        }),
+        frozenset({
+            "priority", "scope"
         }),
     ),
     ("sentinelone", "PUT", "/cnapp/vcs/scanner-policy/{policyId}"): (
@@ -600,6 +768,9 @@ DOCUMENTED_BODIES: dict[
             "priority", "secretConfig", "tagIds",
             "vulnerabilityConfig"
         }),
+        frozenset({
+            "name", "priority", "tagIds"
+        }),
     ),
     ("sentinelone", "POST", "/cnapp/vcs/tunnel/user"): (
         frozenset({
@@ -608,6 +779,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "gitlabPersonalAccessToken", "provider",
             "serverHost", "serverPort"
+        }),
+        frozenset({
+            "provider", "serverPort"
         }),
     ),
     ("sentinelone", "POST", "/config-override"): (
@@ -619,6 +793,9 @@ DOCUMENTED_BODIES: dict[
             "description", "filter", "group", "name", "osType",
             "scope", "site", "versionOption"
         }),
+        frozenset({
+            "config", "name", "osType", "scope"
+        }),
     ),
     ("sentinelone", "PUT", "/config-override/{override_id}"): (
         frozenset({
@@ -629,6 +806,8 @@ DOCUMENTED_BODIES: dict[
             "description", "filter", "group", "name", "osType",
             "scope", "site", "versionOption"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/detection-library/platform-rules/settings"): (
         frozenset({
@@ -636,6 +815,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "disableInheritance", "scopeId", "scopeLevel"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/device-control"): (
@@ -651,6 +832,9 @@ DOCUMENTED_BODIES: dict[
             "minorClasses", "productId", "ruleName", "ruleType",
             "serviceClass", "status", "uid", "vendorId", "version"
         }),
+        frozenset({
+            "action", "interface", "ruleName", "ruleType", "status"
+        }),
     ),
     ("sentinelone", "PUT", "/device-control/configuration"): (
         frozenset({
@@ -662,6 +846,8 @@ DOCUMENTED_BODIES: dict[
             "inheritedFrom", "inherits", "reportApproved",
             "reportBlocked", "reportReadOnly"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/device-control/copy-rules"): (
         frozenset({
@@ -669,6 +855,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "accountId", "data", "filter", "groupIds", "siteId"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/device-control/enable"): (
@@ -678,6 +866,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "status"
         }),
+        frozenset({
+            "status"
+        }),
     ),
     ("sentinelone", "POST", "/device-control/move-rules"): (
         frozenset({
@@ -686,6 +877,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "accountId", "data", "filter", "groupIds", "siteId"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/device-control/reorder"): (
         frozenset({
@@ -693,6 +886,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "id", "order"
+        }),
+        frozenset({
+            "id", "order"
         }),
     ),
     ("sentinelone", "PUT", "/device-control/{rule_id}"): (
@@ -708,6 +904,8 @@ DOCUMENTED_BODIES: dict[
             "minorClasses", "productId", "ruleName", "ruleType",
             "serviceClass", "status", "uid", "vendorId", "version"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/dv/cancel-query"): (
         frozenset({
@@ -715,6 +913,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "queryId"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/dv/events/pq"): (
@@ -725,6 +925,8 @@ DOCUMENTED_BODIES: dict[
             "accountIds", "fromDate", "limit", "query", "siteIds",
             "toDate"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/dv/init-query"): (
         frozenset({
@@ -733,6 +935,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "accountIds", "fromDate", "isVerbose", "limit", "query",
             "queryType", "siteIds", "timeFrame", "toDate"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/exclusions"): (
@@ -744,6 +948,9 @@ DOCUMENTED_BODIES: dict[
             "mode", "osType", "pathExclusionType", "source", "type",
             "value"
         }),
+        frozenset({
+            "osType", "type", "value"
+        }),
     ),
     ("sentinelone", "PUT", "/exclusions"): (
         frozenset({
@@ -754,6 +961,9 @@ DOCUMENTED_BODIES: dict[
             "osType", "pathExclusionType", "sha256Value", "source",
             "type", "value"
         }),
+        frozenset({
+            "id", "osType", "type"
+        }),
     ),
     ("sentinelone", "POST", "/exclusions/validate"): (
         frozenset({
@@ -762,6 +972,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "exclusionType", "osType", "value"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/export/agents-passphrases"): (
         frozenset({
@@ -769,6 +981,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/filters"): (
@@ -779,6 +993,9 @@ DOCUMENTED_BODIES: dict[
             "data", "filter", "filterFields", "name", "scopeLevel",
             "siteId"
         }),
+        frozenset({
+            "filterFields", "name"
+        }),
     ),
     ("sentinelone", "POST", "/filters/dv"): (
         frozenset({
@@ -787,6 +1004,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "filterFields", "frequency", "name",
             "notifications", "recipients"
+        }),
+        frozenset({
+            "filterFields", "name"
         }),
     ),
     ("sentinelone", "PUT", "/filters/dv/{filter_id}"): (
@@ -797,6 +1017,9 @@ DOCUMENTED_BODIES: dict[
             "data", "filter", "filterFields", "frequency", "name",
             "notifications", "recipients"
         }),
+        frozenset({
+            "filterFields", "name"
+        }),
     ),
     ("sentinelone", "PUT", "/filters/{filter_id}"): (
         frozenset({
@@ -804,6 +1027,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filterFields", "name"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/firewall-control"): (
@@ -817,6 +1042,9 @@ DOCUMENTED_BODIES: dict[
             "remoteHost", "remoteHosts", "remotePort", "status",
             "tag", "tagIds"
         }),
+        frozenset({
+            "action", "name", "status"
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/add-tags"): (
         frozenset({
@@ -824,6 +1052,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "tagIds"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/firewall-control/configuration"): (
@@ -835,6 +1065,8 @@ DOCUMENTED_BODIES: dict[
             "inheritSettings", "inheritedFrom", "inherits",
             "locationAware", "reportBlocked", "selectedTags"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/copy-rules"): (
         frozenset({
@@ -844,6 +1076,8 @@ DOCUMENTED_BODIES: dict[
             "accountId", "accountIds", "data", "filter", "groupId",
             "groupIds", "siteId", "siteIds", "tenant"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/firewall-control/enable"): (
         frozenset({
@@ -851,6 +1085,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "status"
+        }),
+        frozenset({
+            "status"
         }),
     ),
     ("sentinelone", "POST", "/firewall-control/move-rules"): (
@@ -861,6 +1098,8 @@ DOCUMENTED_BODIES: dict[
             "accountId", "accountIds", "data", "filter", "groupId",
             "groupIds", "siteId", "siteIds", "tenant"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/remove-tags"): (
         frozenset({
@@ -868,6 +1107,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "tagIds"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/firewall-control/reorder"): (
@@ -877,6 +1118,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "id", "order"
         }),
+        frozenset({
+            "id", "order"
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/set-location"): (
         frozenset({
@@ -884,6 +1128,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "type", "values"
+        }),
+        frozenset({
+            "type"
         }),
     ),
     ("sentinelone", "POST", "/firewall-control/{firewall_rule_category}"): (
@@ -897,6 +1144,9 @@ DOCUMENTED_BODIES: dict[
             "remoteHost", "remoteHosts", "remotePort", "status",
             "tag", "tagIds"
         }),
+        frozenset({
+            "action", "name", "status"
+        }),
     ),
     ("sentinelone", "PUT", "/firewall-control/{firewall_rule_category}"): (
         frozenset({
@@ -908,6 +1158,8 @@ DOCUMENTED_BODIES: dict[
             "osType", "osTypes", "protocol", "remoteHost",
             "remoteHosts", "remotePort", "status", "tag", "tagIds"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/{firewall_rule_category}/add-tags"): (
         frozenset({
@@ -915,6 +1167,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "tagIds"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/firewall-control/{firewall_rule_category}/configuration"): (
@@ -926,6 +1180,8 @@ DOCUMENTED_BODIES: dict[
             "inheritSettings", "inheritedFrom", "inherits",
             "locationAware", "reportBlocked", "selectedTags"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/{firewall_rule_category}/copy-rules"): (
         frozenset({
@@ -935,6 +1191,8 @@ DOCUMENTED_BODIES: dict[
             "accountId", "accountIds", "data", "filter", "groupId",
             "groupIds", "siteId", "siteIds", "tenant"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/firewall-control/{firewall_rule_category}/enable"): (
         frozenset({
@@ -942,6 +1200,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "status"
+        }),
+        frozenset({
+            "status"
         }),
     ),
     ("sentinelone", "POST", "/firewall-control/{firewall_rule_category}/move-rules"): (
@@ -952,6 +1213,8 @@ DOCUMENTED_BODIES: dict[
             "accountId", "accountIds", "data", "filter", "groupId",
             "groupIds", "siteId", "siteIds", "tenant"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/{firewall_rule_category}/remove-tags"): (
         frozenset({
@@ -959,6 +1222,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "tagIds"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/firewall-control/{firewall_rule_category}/reorder"): (
@@ -968,6 +1233,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter", "id", "order"
         }),
+        frozenset({
+            "id", "order"
+        }),
     ),
     ("sentinelone", "POST", "/firewall-control/{firewall_rule_category}/set-location"): (
         frozenset({
@@ -975,6 +1243,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "type", "values"
+        }),
+        frozenset({
+            "type"
         }),
     ),
     ("sentinelone", "POST", "/groups"): (
@@ -986,6 +1257,9 @@ DOCUMENTED_BODIES: dict[
             "isDefault", "name", "policy", "rank", "siteId", "source",
             "type"
         }),
+        frozenset({
+            "inherits", "name", "siteId"
+        }),
     ),
     ("sentinelone", "PUT", "/groups/ranks"): (
         frozenset({
@@ -994,6 +1268,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "accountIds", "data", "filter", "ranks", "siteIds"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/groups/{group_id}/move-agents"): (
         frozenset({
@@ -1001,6 +1277,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/groups/{group_id}/policy"): (
@@ -1033,6 +1311,8 @@ DOCUMENTED_BODIES: dict[
             "unsignedDriverBlockingOn", "updatedAt", "userFullName",
             "userId"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/hyper-automate/api/public/workflow-import-export/import/batch"): (
         frozenset({
@@ -1041,6 +1321,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "body", "file", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/licenses/update-sites-modules"): (
         frozenset({
@@ -1048,6 +1330,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "modules", "operation"
+        }),
+        frozenset({
+            "operation"
         }),
     ),
     ("sentinelone", "POST", "/locations"): (
@@ -1059,6 +1344,9 @@ DOCUMENTED_BODIES: dict[
             "filter", "ipAddresses", "name", "networkInterfaces",
             "operator", "registryKeys", "serverConnectivity"
         }),
+        frozenset({
+            "name", "operator"
+        }),
     ),
     ("sentinelone", "PUT", "/locations/{location_id}"): (
         frozenset({
@@ -1068,6 +1356,9 @@ DOCUMENTED_BODIES: dict[
             "data", "description", "dnsLookup", "dnsServers",
             "ipAddresses", "name", "networkInterfaces", "operator",
             "registryKeys", "serverConnectivity"
+        }),
+        frozenset({
+            "name"
         }),
     ),
     ("sentinelone", "POST", "/log-collection/rules"): (
@@ -1079,6 +1370,8 @@ DOCUMENTED_BODIES: dict[
             "macosParams", "name", "scopeId", "scopeLevel",
             "windowsParams"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/log-collection/rules/activation"): (
         frozenset({
@@ -1086,6 +1379,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "activate", "data", "filter"
+        }),
+        frozenset({
+            "activate"
         }),
     ),
     ("sentinelone", "PUT", "/log-collection/rules/{rule_id}"): (
@@ -1097,6 +1393,8 @@ DOCUMENTED_BODIES: dict[
             "macosParams", "name", "scopeId", "scopeLevel",
             "windowsParams"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/mobile-integration/mssp-provisioning/partner"): (
         frozenset({
@@ -1106,6 +1404,9 @@ DOCUMENTED_BODIES: dict[
             "adminEmail", "adminFirstName", "adminLastName",
             "adminNotificationEmail", "data", "filter"
         }),
+        frozenset({
+            "adminEmail", "adminFirstName", "adminLastName"
+        }),
     ),
     ("sentinelone", "POST", "/mobile-integration/provisioning/partner-key"): (
         frozenset({
@@ -1114,6 +1415,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "clientId", "data", "filter", "secret"
         }),
+        frozenset({
+            "clientId", "secret"
+        }),
     ),
     ("sentinelone", "PUT", "/mobile-integration/provisioning/partner-key"): (
         frozenset({
@@ -1121,6 +1425,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "clientId", "data", "filter", "secret"
+        }),
+        frozenset({
+            "clientId", "secret"
         }),
     ),
     ("sentinelone", "POST", "/mobile-integration/provisioning/tenant"): (
@@ -1131,6 +1438,9 @@ DOCUMENTED_BODIES: dict[
             "adminEmail", "adminFirstName", "adminLastName",
             "adminNotificationEmail", "data", "filter"
         }),
+        frozenset({
+            "adminEmail", "adminFirstName", "adminLastName"
+        }),
     ),
     ("sentinelone", "POST", "/ranger-ad/get-affected-objects"): (
         frozenset({
@@ -1138,6 +1448,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/ranger-ad/set-ack-status"): (
@@ -1147,6 +1459,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/ranger-ad/set-skipped-exposures"): (
         frozenset({
@@ -1155,6 +1469,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/ranger-ad/trigger-assessment"): (
         frozenset({
@@ -1162,6 +1478,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/ranger/cred-groups"): (
@@ -1172,6 +1490,9 @@ DOCUMENTED_BODIES: dict[
             "data", "domain", "groupName", "groupPassphrase",
             "scopeId", "targetOs"
         }),
+        frozenset({
+            "groupName", "groupPassphrase", "scopeId"
+        }),
     ),
     ("sentinelone", "PUT", "/ranger/cred-groups/details/{detail_id}"): (
         frozenset({
@@ -1180,6 +1501,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "credType", "data", "encryptedCred", "encryptedKey",
             "title"
+        }),
+        frozenset({
+            "credType", "encryptedCred", "encryptedKey", "title"
         }),
     ),
     ("sentinelone", "POST", "/ranger/device-review"): (
@@ -1190,6 +1514,9 @@ DOCUMENTED_BODIES: dict[
             "data", "deviceReview", "filter", "reason",
             "reasonDetails"
         }),
+        frozenset({
+            "deviceReview"
+        }),
     ),
     ("sentinelone", "PUT", "/ranger/device-review/{inventory_id}"): (
         frozenset({
@@ -1198,6 +1525,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "deviceReview", "reason", "reasonDetails"
         }),
+        frozenset({
+            "deviceReview"
+        }),
     ),
     ("sentinelone", "POST", "/ranger/enable-self-management"): (
         frozenset({
@@ -1205,6 +1535,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "enable", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/ranger/enablement"): (
@@ -1215,6 +1547,8 @@ DOCUMENTED_BODIES: dict[
             "data", "filter", "rangerEnabled", "rangerProEnabled",
             "roguesEnabled"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/ranger/enablement/defaults"): (
         frozenset({
@@ -1224,6 +1558,8 @@ DOCUMENTED_BODIES: dict[
             "data", "filter", "rangerEnabled", "rangerProEnabled",
             "roguesEnabled"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/ranger/gateways/update"): (
         frozenset({
@@ -1232,6 +1568,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "allowScan", "archived", "data", "filter",
             "inheritSettings", "scanOnlyLocalSubnets"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/ranger/gateways/{gateway_id}"): (
@@ -1244,6 +1582,8 @@ DOCUMENTED_BODIES: dict[
             "networkName", "rdnsScan", "restrictions",
             "scanOnlyLocalSubnets", "siteId", "smbScan", "snmpScan",
             "tcpPortScan", "tcpPorts", "udpPortScan", "udpPorts"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/ranger/settings"): (
@@ -1261,6 +1601,8 @@ DOCUMENTED_BODIES: dict[
             "udpPorts", "useFullDnsScan", "usePeriodicSnapshots",
             "useSpecificPorts"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/ranger/tags"): (
         frozenset({
@@ -1268,6 +1610,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "description", "filter", "id", "kind", "name"
+        }),
+        frozenset({
+            "id"
         }),
     ),
     ("sentinelone", "POST", "/rbac/role"): (
@@ -1277,6 +1622,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "description", "filter", "name", "permissionIds"
         }),
+        frozenset({
+            "description", "name"
+        }),
     ),
     ("sentinelone", "PUT", "/rbac/role/{role_id}"): (
         frozenset({
@@ -1284,6 +1632,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "description", "filter", "name", "permissionIds"
+        }),
+        frozenset({
+            "description", "name"
         }),
     ),
     ("sentinelone", "POST", "/remote-ops/data-exporter/destination-profiles"): (
@@ -1295,6 +1646,8 @@ DOCUMENTED_BODIES: dict[
             "apiKey", "apiUrl", "destination", "isDefault", "name",
             "scopeId", "scopeLevel"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/remote-ops/data-exporter/destination-profiles/set-default"): (
         frozenset({
@@ -1303,6 +1656,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "profileId", "scopeId", "scopeLevel"
         }),
+        frozenset({
+            "profileId", "scopeLevel"
+        }),
     ),
     ("sentinelone", "PUT", "/remote-ops/data-exporter/destination-profiles/{profile_id}"): (
         frozenset({
@@ -1310,6 +1666,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "apiKey", "apiUrl", "data", "isDefault", "name"
+        }),
+        frozenset({
+            "apiKey", "apiUrl", "name"
         }),
     ),
     ("sentinelone", "POST", "/remote-ops/forensics/collection-profiles"): (
@@ -1320,6 +1679,9 @@ DOCUMENTED_BODIES: dict[
             "artifacts", "data", "description", "name", "scopeId",
             "scopeLevel"
         }),
+        frozenset({
+            "artifacts", "name", "scopeLevel"
+        }),
     ),
     ("sentinelone", "PUT", "/remote-ops/forensics/collection-profiles/{profile_id}"): (
         frozenset({
@@ -1327,6 +1689,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "artifacts", "data", "description", "name"
+        }),
+        frozenset({
+            "artifacts", "name"
         }),
     ),
     ("sentinelone", "POST", "/remote-ops/forensics/start-collection"): (
@@ -1337,6 +1702,9 @@ DOCUMENTED_BODIES: dict[
             "collectionProfileId", "data", "description",
             "destination", "filter", "tag"
         }),
+        frozenset({
+            "collectionProfileId", "destination"
+        }),
     ),
     ("sentinelone", "POST", "/remote-ops/schedule/forensics"): (
         frozenset({
@@ -1344,6 +1712,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "data", "filter", "scheduling"
+        }),
+        frozenset({
+            "action", "scheduling"
         }),
     ),
     ("sentinelone", "POST", "/remote-ops/schedule/remote-script"): (
@@ -1353,6 +1724,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action", "data", "filter", "scheduling"
         }),
+        frozenset({
+            "action", "scheduling"
+        }),
     ),
     ("sentinelone", "PUT", "/remote-ops/scheduled-tasks/{scheduled_task_id}"): (
         frozenset({
@@ -1360,6 +1734,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "scheduling"
+        }),
+        frozenset({
+            "scheduling"
         }),
     ),
     ("sentinelone", "POST", "/remote-scripts/execute"): (
@@ -1375,6 +1752,9 @@ DOCUMENTED_BODIES: dict[
             "singularityxdrKeyword", "singularityxdrUrl",
             "taskDescription"
         }),
+        frozenset({
+            "outputDestination", "scriptId", "taskDescription"
+        }),
     ),
     ("sentinelone", "POST", "/remote-scripts/fetch-files"): (
         frozenset({
@@ -1383,6 +1763,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "computerNames", "data", "taskIds"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/remote-scripts/guardrails/check"): (
         frozenset({
@@ -1390,6 +1772,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "agentIds", "data", "scriptId"
+        }),
+        frozenset({
+            "agentIds", "scriptId"
         }),
     ),
     ("sentinelone", "POST", "/remote-scripts/guardrails/configuration"): (
@@ -1400,6 +1785,10 @@ DOCUMENTED_BODIES: dict[
             "data", "enabled", "endpointsQuantity", "scopeId",
             "scopeLevel", "scriptTypes"
         }),
+        frozenset({
+            "enabled", "endpointsQuantity", "scopeId", "scopeLevel",
+            "scriptTypes"
+        }),
     ),
     ("sentinelone", "PUT", "/remote-scripts/pending-executions/{pending_execution_id}"): (
         frozenset({
@@ -1407,6 +1796,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "data"
+        }),
+        frozenset({
+            "action"
         }),
     ),
     ("sentinelone", "PUT", "/remote-scripts/{script_id}"): (
@@ -1421,6 +1813,11 @@ DOCUMENTED_BODIES: dict[
             "scriptName", "scriptRuntimeTimeoutSeconds", "scriptType",
             "sendActivity"
         }),
+        frozenset({
+            "inputExample", "inputInstructions", "inputRequired",
+            "osTypes", "scriptName", "scriptRuntimeTimeoutSeconds",
+            "scriptType"
+        }),
     ),
     ("sentinelone", "POST", "/report-tasks"): (
         frozenset({
@@ -1431,6 +1828,9 @@ DOCUMENTED_BODIES: dict[
             "fromDate", "insightTypes", "isTrend", "name",
             "recipients", "scheduleType", "toDate"
         }),
+        frozenset({
+            "insightTypes", "name", "scheduleType"
+        }),
     ),
     ("sentinelone", "POST", "/restrictions"): (
         frozenset({
@@ -1439,6 +1839,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "description", "filter", "osType", "sha256Value",
             "source", "type", "value"
+        }),
+        frozenset({
+            "osType", "type"
         }),
     ),
     ("sentinelone", "PUT", "/restrictions"): (
@@ -1449,6 +1852,9 @@ DOCUMENTED_BODIES: dict[
             "data", "description", "filter", "id", "osType",
             "sha256Value", "source", "type", "value"
         }),
+        frozenset({
+            "id", "osType", "type"
+        }),
     ),
     ("sentinelone", "POST", "/restrictions/validate"): (
         frozenset({
@@ -1456,6 +1862,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "osType", "sha256Value", "value"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/rogues/settings"): (
@@ -1467,6 +1875,8 @@ DOCUMENTED_BODIES: dict[
             "minAgentsInNetworkToScan", "restrictions",
             "specificPorts", "useSpecificPorts"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/service-users"): (
         frozenset({
@@ -1476,6 +1886,9 @@ DOCUMENTED_BODIES: dict[
             "data", "description", "expirationDate", "forceLegacy",
             "name", "scope", "scopeRoles"
         }),
+        frozenset({
+            "expirationDate", "name", "scope"
+        }),
     ),
     ("sentinelone", "POST", "/service-users/delete-service-users"): (
         frozenset({
@@ -1484,6 +1897,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/service-users/{service_user_id}"): (
         frozenset({
@@ -1491,6 +1906,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "description", "scope", "scopeRoles"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/settings/active-directory"): (
@@ -1501,6 +1918,8 @@ DOCUMENTED_BODIES: dict[
             "data", "enabled", "host", "password", "port", "rootDn",
             "ssl", "username"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/settings/active-directory/scope-mapping"): (
         frozenset({
@@ -1508,6 +1927,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "admin", "data", "filter", "viewer"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/settings/active-directory/test"): (
@@ -1518,6 +1939,8 @@ DOCUMENTED_BODIES: dict[
             "data", "enabled", "host", "password", "port", "rootDn",
             "ssl", "username"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/settings/microsoft"): (
         frozenset({
@@ -1526,6 +1949,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "enabled", "expiryDate", "filter", "inherits",
             "url"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/settings/microsoft/test"): (
@@ -1536,6 +1961,8 @@ DOCUMENTED_BODIES: dict[
             "data", "enabled", "expiryDate", "filter", "inherits",
             "url"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/settings/notifications"): (
         frozenset({
@@ -1545,6 +1972,8 @@ DOCUMENTED_BODIES: dict[
             "configurations", "data", "filter", "lastModified",
             "notifications"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/settings/notifications/cancel-pending-emails"): (
         frozenset({
@@ -1552,6 +1981,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/settings/recipients"): (
@@ -1562,6 +1993,8 @@ DOCUMENTED_BODIES: dict[
             "createdAt", "data", "email", "filter", "id", "name",
             "sms", "updatedAt"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/settings/sms"): (
         frozenset({
@@ -1569,6 +2002,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "enabled", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/settings/smtp"): (
@@ -1579,6 +2014,8 @@ DOCUMENTED_BODIES: dict[
             "data", "enabled", "encryption", "filter", "host",
             "inherits", "noReplyEmail", "password", "port", "username"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/settings/smtp/test"): (
         frozenset({
@@ -1587,6 +2024,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "enabled", "encryption", "filter", "host",
             "inherits", "noReplyEmail", "password", "port", "username"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/settings/sso"): (
@@ -1601,6 +2040,9 @@ DOCUMENTED_BODIES: dict[
             "ssoElevatedSessionReauthType", "ssoInheritDomainsFrom",
             "ssoPropagateDomainsToChildren"
         }),
+        frozenset({
+            "enabled"
+        }),
     ),
     ("sentinelone", "POST", "/settings/sso/test"): (
         frozenset({
@@ -1614,6 +2056,9 @@ DOCUMENTED_BODIES: dict[
             "ssoElevatedSessionReauthType", "ssoInheritDomainsFrom",
             "ssoPropagateDomainsToChildren"
         }),
+        frozenset({
+            "enabled"
+        }),
     ),
     ("sentinelone", "PUT", "/settings/syslog"): (
         frozenset({
@@ -1624,6 +2069,8 @@ DOCUMENTED_BODIES: dict[
             "clientKeyName", "data", "enabled", "filter", "format",
             "host", "port", "serverCertContent", "serverCertName",
             "ssl", "token"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/settings/syslog/test"): (
@@ -1636,6 +2083,8 @@ DOCUMENTED_BODIES: dict[
             "host", "port", "serverCertContent", "serverCertName",
             "ssl", "token"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/singularity-marketplace/applications"): (
         frozenset({
@@ -1644,6 +2093,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "applicationInstanceName", "configurations", "data",
             "filter"
+        }),
+        frozenset({
+            "configurations"
         }),
     ),
     ("sentinelone", "PUT", "/singularity-marketplace/applications"): (
@@ -1654,6 +2106,9 @@ DOCUMENTED_BODIES: dict[
             "applicationIdToNameMap", "configurations", "data",
             "filter"
         }),
+        frozenset({
+            "configurations"
+        }),
     ),
     ("sentinelone", "POST", "/singularity-marketplace/applications/{applicationMode}"): (
         frozenset({
@@ -1661,6 +2116,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/site-with-admin"): (
@@ -1675,6 +2132,9 @@ DOCUMENTED_BODIES: dict[
             "unlimitedExpiration", "unlimitedLicenses", "usageType",
             "user"
         }),
+        frozenset({
+            "name", "user"
+        }),
     ),
     ("sentinelone", "POST", "/sites"): (
         frozenset({
@@ -1687,6 +2147,9 @@ DOCUMENTED_BODIES: dict[
             "siteType", "sku", "suite", "totalLicenses",
             "unlimitedExpiration", "unlimitedLicenses", "usageType"
         }),
+        frozenset({
+            "name"
+        }),
     ),
     ("sentinelone", "POST", "/sites/duplicate-site"): (
         frozenset({
@@ -1695,6 +2158,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "copyUsers", "data", "name", "policy", "policySource",
             "sourceSiteId", "totalLicenses", "unlimitedLicenses"
+        }),
+        frozenset({
+            "copyUsers", "name", "policySource", "sourceSiteId"
         }),
     ),
     ("sentinelone", "PUT", "/sites/update-bulk"): (
@@ -1705,6 +2171,8 @@ DOCUMENTED_BODIES: dict[
             "data", "description", "expiration", "filter",
             "inheritAccountExpiration", "inherits", "licenses",
             "siteType", "unlimitedExpiration"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/sites/{site_id}"): (
@@ -1717,6 +2185,8 @@ DOCUMENTED_BODIES: dict[
             "licenses", "name", "policy", "siteType", "suite",
             "totalLicenses", "unlimitedExpiration",
             "unlimitedLicenses", "usageType"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/sites/{site_id}/policy"): (
@@ -1749,6 +2219,8 @@ DOCUMENTED_BODIES: dict[
             "unsignedDriverBlockingOn", "updatedAt", "userFullName",
             "userId"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/sites/{site_id}/reactivate"): (
         frozenset({
@@ -1756,6 +2228,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "expiration", "unlimited"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/system/configuration"): (
@@ -1770,6 +2244,8 @@ DOCUMENTED_BODIES: dict[
             "passwordExpiration", "rememberMeLength",
             "tfaEnrollmentExpiration", "uiInactivityTimeoutSeconds"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/tag-manager"): (
         frozenset({
@@ -1778,6 +2254,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "description", "filter", "key", "type", "value"
         }),
+        frozenset({
+            "key", "type", "value"
+        }),
     ),
     ("sentinelone", "PUT", "/tag-manager/{tag_id}"): (
         frozenset({
@@ -1785,6 +2264,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "description", "key", "value"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/tags"): (
@@ -1795,6 +2276,9 @@ DOCUMENTED_BODIES: dict[
             "data", "description", "filter", "id", "kind", "name",
             "type"
         }),
+        frozenset({
+            "name", "type"
+        }),
     ),
     ("sentinelone", "PUT", "/tags/{tag_id}"): (
         frozenset({
@@ -1803,6 +2287,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "description", "id", "kind", "name"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/tasks-configuration"): (
         frozenset({
@@ -1810,6 +2296,11 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "inheritParentConcurrencyConfig",
+            "inheritParentMaintenanceConfig",
+            "maintenanceWindowsByDay", "maxConcurrent", "timezoneGmt"
+        }),
+        frozenset({
+            "inheritParentConcurrencyConfig",
             "inheritParentMaintenanceConfig",
             "maintenanceWindowsByDay", "maxConcurrent", "timezoneGmt"
         }),
@@ -1823,6 +2314,11 @@ DOCUMENTED_BODIES: dict[
             "inheritParentConcurrencyConfig",
             "inheritParentMaintenanceConfig", "interval",
             "maxConcurrent", "rules", "startsOn", "timezone"
+        }),
+        frozenset({
+            "end", "frequency", "inheritParentConcurrencyConfig",
+            "inheritParentMaintenanceConfig", "maxConcurrent",
+            "rules", "timezone"
         }),
     ),
     ("sentinelone", "PUT", "/tenant/policy"): (
@@ -1855,6 +2351,8 @@ DOCUMENTED_BODIES: dict[
             "unsignedDriverBlockingOn", "updatedAt", "userFullName",
             "userId"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/threat-intelligence/iocs"): (
         frozenset({
@@ -1869,6 +2367,9 @@ DOCUMENTED_BODIES: dict[
             "source", "threatActorTypes", "threatActors", "type",
             "validUntil", "value"
         }),
+        frozenset({
+            "source", "type", "value"
+        }),
     ),
     ("sentinelone", "POST", "/threat-intelligence/iocs/stix"): (
         frozenset({
@@ -1876,6 +2377,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "bundle", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/threat-intelligence/user-config"): (
@@ -1887,6 +2390,8 @@ DOCUMENTED_BODIES: dict[
             "enableXdrMatching", "excludeTii", "filter",
             "threatExcludeFields", "threatMinScore"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/threats/actions/container-network-connect"): (
         frozenset({
@@ -1894,6 +2399,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "containerId", "data", "filter"
+        }),
+        frozenset({
+            "containerId"
         }),
     ),
     ("sentinelone", "POST", "/threats/actions/container-network-disconnect"): (
@@ -1903,6 +2411,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "containerId", "data", "filter"
         }),
+        frozenset({
+            "containerId"
+        }),
     ),
     ("sentinelone", "POST", "/threats/add-to-blacklist"): (
         frozenset({
@@ -1911,6 +2422,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "description", "externalTicketId", "filter",
             "note", "targetScope"
+        }),
+        frozenset({
+            "targetScope"
         }),
     ),
     ("sentinelone", "POST", "/threats/add-to-exclusions"): (
@@ -1922,6 +2436,9 @@ DOCUMENTED_BODIES: dict[
             "filter", "macroModules", "mode", "note",
             "pathExclusionType", "targetScope", "type", "value"
         }),
+        frozenset({
+            "targetScope", "type"
+        }),
     ),
     ("sentinelone", "POST", "/threats/analyst-verdict"): (
         frozenset({
@@ -1929,6 +2446,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "analystVerdict", "data", "filter"
+        }),
+        frozenset({
+            "analystVerdict"
         }),
     ),
     ("sentinelone", "POST", "/threats/dv-add-to-blacklist"): (
@@ -1938,6 +2458,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "hashes", "targetScope"
         }),
+        frozenset({
+            "hashes", "targetScope"
+        }),
     ),
     ("sentinelone", "POST", "/threats/dv-mark-as-threat"): (
         frozenset({
@@ -1945,6 +2468,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "events", "initiatedBy", "status"
+        }),
+        frozenset({
+            "events", "status"
         }),
     ),
     ("sentinelone", "POST", "/threats/external-ticket-id"): (
@@ -1954,6 +2480,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "externalTicketId", "filter"
         }),
+        frozenset({
+            "externalTicketId"
+        }),
     ),
     ("sentinelone", "POST", "/threats/fetch-file"): (
         frozenset({
@@ -1961,6 +2490,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "password"
+        }),
+        frozenset({
+            "password"
         }),
     ),
     ("sentinelone", "POST", "/threats/incident"): (
@@ -1970,6 +2502,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "analystVerdict", "data", "filter", "incidentStatus"
         }),
+        frozenset({
+            "incidentStatus"
+        }),
     ),
     ("sentinelone", "POST", "/threats/mitigate-alerts"): (
         frozenset({
@@ -1977,6 +2512,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "alerts", "data"
+        }),
+        frozenset({
+            "alerts"
         }),
     ),
     ("sentinelone", "POST", "/threats/mitigate/{action}"): (
@@ -1986,6 +2524,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/threats/notes"): (
         frozenset({
@@ -1993,6 +2533,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "text"
+        }),
+        frozenset({
+            "text"
         }),
     ),
     ("sentinelone", "PUT", "/threats/{threat_id}/notes/{note_id}"): (
@@ -2002,6 +2545,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "text"
         }),
+        frozenset({
+            "text"
+        }),
     ),
     ("sentinelone", "POST", "/unified-exclusions/bulk"): (
         frozenset({
@@ -2009,6 +2555,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "PUT", "/update/agent/packages/{package_id}"): (
@@ -2020,6 +2568,8 @@ DOCUMENTED_BODIES: dict[
             "rangerVersion", "scopeLevel", "siteIds", "status",
             "supportedOsVersions", "version"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/users"): (
         frozenset({
@@ -2030,6 +2580,9 @@ DOCUMENTED_BODIES: dict[
             "forceCredentialAuth", "fullName", "password", "scope",
             "scopeRoles", "siteRoles", "tenantRoles", "twoFaEnabled"
         }),
+        frozenset({
+            "email", "fullName", "scope"
+        }),
     ),
     ("sentinelone", "POST", "/users/2fa/disable"): (
         frozenset({
@@ -2037,6 +2590,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "currentPassword", "data", "id", "twoFaCode"
+        }),
+        frozenset({
+            "id"
         }),
     ),
     ("sentinelone", "POST", "/users/2fa/enable"): (
@@ -2046,6 +2602,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "currentPassword", "data", "id", "twoFaCode"
         }),
+        frozenset({
+            "id"
+        }),
     ),
     ("sentinelone", "POST", "/users/auth/app"): (
         frozenset({
@@ -2054,6 +2613,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "code", "data", "rememberMe"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/users/auth/elevate"): (
         frozenset({
@@ -2061,6 +2622,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "code", "data"
+        }),
+        frozenset({
+            "code"
         }),
     ),
     ("sentinelone", "POST", "/users/change-password"): (
@@ -2071,6 +2635,9 @@ DOCUMENTED_BODIES: dict[
             "confirmNewPassword", "currentPassword", "data", "id",
             "newPassword", "twoFaCode"
         }),
+        frozenset({
+            "id"
+        }),
     ),
     ("sentinelone", "POST", "/users/delete-2fa"): (
         frozenset({
@@ -2078,6 +2645,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "ids"
+        }),
+        frozenset({
+            "ids"
         }),
     ),
     ("sentinelone", "POST", "/users/delete-users"): (
@@ -2087,6 +2657,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/users/enable-app"): (
         frozenset({
@@ -2095,6 +2667,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "code", "data", "id"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/users/enroll-2fa"): (
         frozenset({
@@ -2102,6 +2676,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "ids"
+        }),
+        frozenset({
+            "ids"
         }),
     ),
     ("sentinelone", "POST", "/users/generate-iframe-token"): (
@@ -2112,6 +2689,9 @@ DOCUMENTED_BODIES: dict[
             "accountId", "agentUuids", "data", "role", "roleName",
             "userName"
         }),
+        frozenset({
+            "accountId"
+        }),
     ),
     ("sentinelone", "POST", "/users/login"): (
         frozenset({
@@ -2119,6 +2699,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "password", "rememberMe", "username"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/users/login-continue"): (
@@ -2128,6 +2710,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "dontShowAgain", "resetPassword", "token"
         }),
+        frozenset({
+            "token"
+        }),
     ),
     ("sentinelone", "POST", "/users/login/force-reset-password-on-login"): (
         frozenset({
@@ -2135,6 +2720,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/users/login/send-reset-password-email"): (
@@ -2144,6 +2731,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/users/login/set-password"): (
         frozenset({
@@ -2151,6 +2740,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "password", "token"
+        }),
+        frozenset({
+            "password", "token"
         }),
     ),
     ("sentinelone", "POST", "/users/onboarding/send-verification-email"): (
@@ -2160,6 +2752,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/users/onboarding/verify"): (
         frozenset({
@@ -2167,6 +2761,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "password", "resetPasswordFlow", "token"
+        }),
+        frozenset({
+            "password", "token"
         }),
     ),
     ("sentinelone", "POST", "/users/reset-2fa"): (
@@ -2176,6 +2773,9 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "enroll", "ids"
         }),
+        frozenset({
+            "ids"
+        }),
     ),
     ("sentinelone", "POST", "/users/revoke-api-token"): (
         frozenset({
@@ -2183,6 +2783,9 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "currentPassword", "data", "id", "twoFaCode"
+        }),
+        frozenset({
+            "id"
         }),
     ),
     ("sentinelone", "PUT", "/users/{user_id}"): (
@@ -2195,6 +2798,9 @@ DOCUMENTED_BODIES: dict[
             "password", "scope", "scopeRoles", "siteRoles",
             "tenantRoles", "twoFaCode", "twoFaEnabled"
         }),
+        frozenset({
+            "scope"
+        }),
     ),
     ("sentinelone", "POST", "/xdr/action-controller/perform-unified-action"): (
         frozenset({
@@ -2202,6 +2808,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionPath", "id__in", "id__nin", "payload"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/action-controller/perform-unified-action/notify"): (
@@ -2211,6 +2819,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "actionPath", "id__in", "id__nin", "notifyOnly", "payload"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets"): (
         frozenset({
@@ -2218,6 +2828,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/account"): (
@@ -2227,6 +2839,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/account/action"): (
         frozenset({
@@ -2234,6 +2848,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/action"): (
@@ -2243,6 +2859,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "actionName", "id__in", "id__nin"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/actions/perform-unified-action"): (
         frozenset({
@@ -2250,6 +2868,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionPath", "id__in", "id__nin", "payload"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/ai-ml"): (
@@ -2259,6 +2879,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/ai-ml/action"): (
         frozenset({
@@ -2266,6 +2888,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/application-integration"): (
@@ -2275,6 +2899,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/application-integration/action"): (
         frozenset({
@@ -2282,6 +2908,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/cloud-application"): (
@@ -2291,6 +2919,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/cloud-application/action"): (
         frozenset({
@@ -2298,6 +2928,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/container"): (
@@ -2307,6 +2939,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/container/action"): (
         frozenset({
@@ -2314,6 +2948,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/data-analysis"): (
@@ -2323,6 +2959,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/data-analysis/action"): (
         frozenset({
@@ -2330,6 +2968,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/data-store"): (
@@ -2339,6 +2979,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/data-store/action"): (
         frozenset({
@@ -2346,6 +2988,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/developer-tool"): (
@@ -2355,6 +2999,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/developer-tool/action"): (
         frozenset({
@@ -2362,6 +3008,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/device"): (
@@ -2371,6 +3019,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/device/action"): (
         frozenset({
@@ -2378,6 +3028,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/function"): (
@@ -2387,6 +3039,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/function/action"): (
         frozenset({
@@ -2394,6 +3048,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/governance"): (
@@ -2403,6 +3059,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/governance/action"): (
         frozenset({
@@ -2410,6 +3068,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/identity"): (
@@ -2419,6 +3079,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/identity/action"): (
         frozenset({
@@ -2426,6 +3088,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/network"): (
@@ -2435,6 +3099,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/network/action"): (
         frozenset({
@@ -2442,6 +3108,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/server"): (
@@ -2451,6 +3119,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/server/action"): (
         frozenset({
@@ -2458,6 +3128,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/storage"): (
@@ -2467,6 +3139,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/storage/action"): (
         frozenset({
@@ -2474,6 +3148,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/surface/cloud/action"): (
@@ -2483,6 +3159,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "actionName", "id__in", "id__nin"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/surface/endpoint"): (
         frozenset({
@@ -2490,6 +3168,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/surface/endpoint/action"): (
@@ -2499,6 +3179,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "actionName", "id__in", "id__nin"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/surface/identity/action"): (
         frozenset({
@@ -2507,6 +3189,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "actionName", "id__in", "id__nin"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/surface/networkDiscovery/action"): (
         frozenset({
@@ -2514,6 +3198,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/tags/rules"): (
@@ -2526,6 +3212,8 @@ DOCUMENTED_BODIES: dict[
             "mgmtId", "name", "scopes", "siteId", "status", "tags",
             "updatedAt", "updatedByEmail", "updatedById"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/xdr/assets/tags/rules"): (
         frozenset({
@@ -2536,6 +3224,8 @@ DOCUMENTED_BODIES: dict[
             "createdById", "description", "excludedAssets", "id",
             "mgmtId", "name", "scopes", "siteId", "status", "tags",
             "updatedAt", "updatedByEmail", "updatedById"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/assets/tags/rules/test"): (
@@ -2548,6 +3238,8 @@ DOCUMENTED_BODIES: dict[
             "mgmtId", "name", "scopes", "siteId", "status", "tags",
             "updatedAt", "updatedByEmail", "updatedById"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/workstation"): (
         frozenset({
@@ -2556,6 +3248,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/assets/workstation/action"): (
         frozenset({
@@ -2563,6 +3257,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actionName", "id__in", "id__nin"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/filters"): (
@@ -2573,6 +3269,9 @@ DOCUMENTED_BODIES: dict[
             "data", "filter", "filterFields", "name", "scopeId",
             "scopeLevel", "visibility"
         }),
+        frozenset({
+            "filterFields", "name"
+        }),
     ),
     ("sentinelone", "PUT", "/xdr/filters/{filter_id}"): (
         frozenset({
@@ -2580,6 +3279,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "data", "filter", "filterFields", "name"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/graph-explorer/query/explorer"): (
@@ -2589,6 +3290,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "search"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "POST", "/xdr/graph-explorer/query/explorer/v2"): (
         frozenset({
@@ -2596,6 +3299,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "name", "search"
+        }),
+        frozenset({
         }),
     ),
     ("sentinelone", "POST", "/xdr/graph-explorer/query/management/query"): (
@@ -2605,6 +3310,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "name", "query", "queryDescription", "shared"
         }),
+        frozenset({
+        }),
     ),
     ("sentinelone", "PUT", "/xdr/graph-explorer/query/management/query/{query_id}"): (
         frozenset({
@@ -2612,6 +3319,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "name", "query", "queryDescription", "shared"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/admission-control-policies/entities/policy-precedence/v1"): (
@@ -2621,6 +3330,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "id", "precedence"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/admission-control-policies/entities/policy-rule-groups/v1"): (
         frozenset({
@@ -2628,6 +3339,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "rule_groups"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/agentic-studio/entities/knowledge_bases/v1"): (
@@ -2640,6 +3353,8 @@ DOCUMENTED_BODIES: dict[
             "embedding_model", "files_count", "id", "is_deleted",
             "name", "updated_at", "updated_by"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/alerts/entities/alerts/v2"): (
         frozenset({
@@ -2647,6 +3362,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action_parameters", "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/alerts/entities/alerts/v3"): (
@@ -2656,6 +3373,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "composite_ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/case-files/entities/file-details/v1"): (
         frozenset({
@@ -2663,6 +3382,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/casemgmt/entities/notification-groups/v1"): (
@@ -2672,6 +3393,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "channels", "description", "id", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/casemgmt/entities/notification-groups/v2"): (
         frozenset({
@@ -2679,6 +3402,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "channels", "description", "id", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/casemgmt/entities/templates/v1"): (
@@ -2689,6 +3414,8 @@ DOCUMENTED_BODIES: dict[
             "access_tags", "description", "fields", "id", "name",
             "sla_id", "sla_rules", "workflows"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/cases/entities/cases/v2"): (
         frozenset({
@@ -2698,6 +3425,8 @@ DOCUMENTED_BODIES: dict[
             "expected_consistency_version", "expected_version",
             "fields", "id"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/cloud-policies/entities/compliance/controls/v1"): (
         frozenset({
@@ -2705,6 +3434,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/cloud-policies/entities/compliance/frameworks/section/v1"): (
@@ -2714,6 +3445,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "section_name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/cloud-policies/entities/compliance/frameworks/v1"): (
         frozenset({
@@ -2722,6 +3455,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "active", "description", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/cloud-policies/entities/rule-overrides/v1"): (
         frozenset({
@@ -2729,6 +3464,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "overrides"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/cloud-policies/entities/rules/v1"): (
@@ -2739,6 +3476,8 @@ DOCUMENTED_BODIES: dict[
             "alert_info", "attack_types", "category", "controls",
             "description", "name", "rule_logic_list", "severity",
             "uuid"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/cloud-policies/entities/suppression-rules/v1"): (
@@ -2751,6 +3490,8 @@ DOCUMENTED_BODIES: dict[
             "suppression_comment", "suppression_expiration_date",
             "suppression_reason"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/cloud-security-registration-azure/entities/issue-suppressions/v1"): (
         frozenset({
@@ -2758,6 +3499,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/cloud-security-registration-azure/entities/registrations/v1"): (
@@ -2767,6 +3510,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resource"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/container-security/entities/image-assessment-policy-groups/v1"): (
         frozenset({
@@ -2774,6 +3519,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "name", "policy_group_data"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/container-security/entities/registries/v1"): (
@@ -2783,6 +3530,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "credential", "state", "user_defined_alias"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/correlation-rules/entities/rule-versions/publish/v1"): (
         frozenset({
@@ -2790,6 +3539,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/data-protection/entities/classifications/v2"): (
@@ -2799,6 +3550,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/data-protection/entities/local-application-groups/v1"): (
         frozenset({
@@ -2806,6 +3559,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "local_application_ids", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/data-protection/entities/local-applications/v1"): (
@@ -2820,6 +3575,8 @@ DOCUMENTED_BODIES: dict[
             "enable_rename_detection", "executable_name", "group_ids",
             "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/data-protection/entities/policies/v2"): (
         frozenset({
@@ -2827,6 +3584,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/data-protection/entities/web-locations/v2"): (
@@ -2838,6 +3597,8 @@ DOCUMENTED_BODIES: dict[
             "id", "location_type", "name", "provider_location_id",
             "provider_location_name", "type", "web_location_group_ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/devices/entities/devices/tags/v1"): (
         frozenset({
@@ -2845,6 +3606,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "device_ids", "tags"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/devices/entities/host-groups/v1"): (
@@ -2854,6 +3617,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/exclusions/entities/cert-based-exclusions/v1"): (
         frozenset({
@@ -2861,6 +3626,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "exclusions"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/exclusions/entities/exclusions/v2"): (
@@ -2872,6 +3639,8 @@ DOCUMENTED_BODIES: dict[
             "grandparent_value", "groups", "id",
             "is_descendant_process", "parent_value", "value"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/exclusions/entities/ss-ioa-exclusions/v2"): (
         frozenset({
@@ -2879,6 +3648,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "exclusions"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/fem/entities/external-assets/v1"): (
@@ -2888,6 +3659,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "assets"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/filevantage/entities/policies-precedence/v1"): (
         frozenset({
@@ -2896,6 +3669,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "precedence"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/filevantage/entities/policies/v1"): (
         frozenset({
@@ -2903,6 +3678,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "enabled", "id", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/filevantage/entities/policy-scheduled-exclusions/v1"): (
@@ -2913,6 +3690,8 @@ DOCUMENTED_BODIES: dict[
             "description", "id", "name", "policy_id", "processes",
             "repeated", "schedule_end", "schedule_start", "timezone",
             "users"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/filevantage/entities/rule-groups-rules/v1"): (
@@ -2942,6 +3721,8 @@ DOCUMENTED_BODIES: dict[
             "watch_rename_file_changes", "watch_rename_key_changes",
             "watch_set_value_changes", "watch_write_file_changes"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/filevantage/entities/rule-groups/v1"): (
         frozenset({
@@ -2949,6 +3730,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "id", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/fwmgr/entities/network-locations/v1"): (
@@ -2966,6 +3749,8 @@ DOCUMENTED_BODIES: dict[
             "icmp_request_targets", "id", "modified_by",
             "modified_on", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/fwmgr/entities/rule-groups/v1"): (
         frozenset({
@@ -2975,6 +3760,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "diff_operations", "diff_type", "id", "rule_ids",
             "rule_versions", "tracking"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/fwmgr/entities/rule-groups/validation/v1"): (
@@ -2986,6 +3773,8 @@ DOCUMENTED_BODIES: dict[
             "diff_operations", "diff_type", "id", "rule_ids",
             "rule_versions", "tracking"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/ioarules/entities/rule-groups/v1"): (
         frozenset({
@@ -2995,6 +3784,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "comment", "description", "enabled", "id", "name",
             "rulegroup_version"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/ioarules/entities/rules/v2"): (
@@ -3006,6 +3797,8 @@ DOCUMENTED_BODIES: dict[
             "comment", "rule_updates", "rulegroup_id",
             "rulegroup_version"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/iocs/entities/indicators/v1"): (
         frozenset({
@@ -3014,6 +3807,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "bulk_update", "comment", "indicators"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/mssp/entities/user-groups/v1"): (
         frozenset({
@@ -3021,6 +3816,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/netscan/entities/global-configs/v1"): (
@@ -3032,6 +3829,8 @@ DOCUMENTED_BODIES: dict[
             "network_scanning_enabled", "scan_exclusion", "scanners",
             "scanners_exclusion"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/netscan/entities/scanners/v1"): (
         frozenset({
@@ -3039,6 +3838,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "aids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem-content/entities/bulk-dashboards-template/v1"): (
@@ -3048,6 +3849,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "dashboard_items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem-content/entities/bulk-lookupfiles/v1"): (
         frozenset({
@@ -3055,6 +3858,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "lookup_files", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem-content/entities/bulk-savedqueries-template/v1"): (
@@ -3064,6 +3869,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "saved_query_items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem-content/entities/parsers-extensions/v1"): (
         frozenset({
@@ -3072,6 +3879,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "extension_id", "post_processing_script",
             "pre_processing_script", "test_cases"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem-content/entities/parsers/v1"): (
@@ -3083,6 +3892,8 @@ DOCUMENTED_BODIES: dict[
             "fields_to_be_removed_before_parsing", "fields_to_tag",
             "id", "repository", "script", "test_cases"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem/entities/connections/status/v1"): (
         frozenset({
@@ -3090,6 +3901,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "status"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem/entities/connectors/configs/v1"): (
@@ -3099,6 +3912,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "config", "connector_id"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/ngsiem/entities/federated-connections-config/v1"): (
         frozenset({
@@ -3106,6 +3921,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "cluster_url", "view_token"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/content-update/v1"): (
@@ -3115,6 +3932,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/device-control-classes/v1"): (
         frozenset({
@@ -3122,6 +3941,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "policies"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/device-control/v1"): (
@@ -3131,6 +3952,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/device-control/v2"): (
         frozenset({
@@ -3138,6 +3961,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "policies"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/firewall/v1"): (
@@ -3147,6 +3972,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/prevention/v1"): (
         frozenset({
@@ -3154,6 +3981,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/sensor-update/v1"): (
@@ -3163,6 +3992,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/sensor-update/v2"): (
         frozenset({
@@ -3170,6 +4001,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/policy/entities/sv-exclusions/v1"): (
@@ -3179,6 +4012,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "comment", "groups", "id", "is_descendant_process",
             "value"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PATCH", "/recon/entities/actions/v1"): (
@@ -3190,6 +4025,8 @@ DOCUMENTED_BODIES: dict[
             "content_format", "frequency", "id", "recipients",
             "status", "trigger_matchless"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PATCH", "/workflows/entities/human-inputs/v1"): (
         frozenset({
@@ -3197,6 +4034,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "input", "note"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/admission-control-policies/entities/policies/v1"): (
@@ -3206,6 +4045,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "description", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/admission-control-policies/entities/policy-host-groups/v1"): (
         frozenset({
@@ -3213,6 +4054,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "host_groups", "id"
+        }),
+        frozenset({
         }),
     ),
     (
@@ -3225,6 +4068,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "id", "rule_groups"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/admission-control-policies/entities/policy-rule-groups/v1"): (
         frozenset({
@@ -3232,6 +4077,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "rule_groups"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/agentic-studio/entities/agent-invocations/v1"): (
@@ -3241,6 +4088,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "credit_cents_limit", "deadline_seconds", "id", "messages"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/agentic-studio/entities/agent-version-invocations/v1"): (
         frozenset({
@@ -3249,6 +4098,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "credit_cents_limit", "deadline_seconds", "id",
             "messages", "version_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/agentic-studio/entities/knowledge_bases/v1"): (
@@ -3261,6 +4112,8 @@ DOCUMENTED_BODIES: dict[
             "embedding_model", "files_count", "id", "is_deleted",
             "name", "updated_at", "updated_by"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/agentless-scanning/entities/scan-by-schedule/v1"): (
         frozenset({
@@ -3268,6 +4121,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/alerts/entities/alerts/v1"): (
@@ -3277,6 +4132,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/alerts/entities/alerts/v2"): (
         frozenset({
@@ -3284,6 +4141,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "composite_ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/api-clients/entities/api-clients/v1"): (
@@ -3293,6 +4152,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "description", "name", "scopes"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/aspm-api-gateway/api/v1/cloud_security_config"): (
         frozenset({
@@ -3300,6 +4161,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "isEnabled"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/aspm-api-gateway/api/v1/query"): (
@@ -3310,6 +4173,8 @@ DOCUMENTED_BODIES: dict[
             "paginate", "query", "revisionId", "selectFields",
             "timestamp"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/aspm-api-gateway/api/v1/tags"): (
         frozenset({
@@ -3317,6 +4182,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "entries", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/case-files/entities/files/bulk-download/v1"): (
@@ -3326,6 +4193,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/case-files/entities/files/download/v1"): (
         frozenset({
@@ -3333,6 +4202,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/casemgmt/entities/notification-groups/v1"): (
@@ -3342,6 +4213,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "channels", "description", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/casemgmt/entities/notification-groups/v2"): (
         frozenset({
@@ -3349,6 +4222,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "channels", "description", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/casemgmt/entities/templates/v1"): (
@@ -3359,6 +4234,8 @@ DOCUMENTED_BODIES: dict[
             "access_tags", "description", "fields", "name", "sla_id",
             "sla_rules", "workflows"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cases/entities/alert-evidence/v1"): (
         frozenset({
@@ -3366,6 +4243,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "alerts", "id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cases/entities/case-tags/v1"): (
@@ -3375,6 +4254,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "id", "tags"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cases/entities/cases/v2"): (
         frozenset({
@@ -3382,6 +4263,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cases/entities/event-evidence/v1"): (
@@ -3391,6 +4274,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "events", "id"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cases/entities/merge/v1"): (
         frozenset({
@@ -3398,6 +4283,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "destination_id", "source_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cloud-connect-azure/entities/account/v1"): (
@@ -3407,6 +4294,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cloud-policies/entities/compliance/controls/v1"): (
         frozenset({
@@ -3414,6 +4303,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "framework_id", "name", "section_name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cloud-policies/entities/compliance/frameworks/v1"): (
@@ -3423,6 +4314,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "active", "description", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cloud-policies/entities/evaluation/v1"): (
         frozenset({
@@ -3431,6 +4324,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "domain", "logic", "subdomain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cloud-policies/entities/rule-overrides/v1"): (
         frozenset({
@@ -3438,6 +4333,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "overrides"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cloud-policies/entities/rules/v1"): (
@@ -3453,6 +4350,8 @@ DOCUMENTED_BODIES: dict[
             "remediation_info", "remediation_url", "resource_type",
             "severity", "subdomain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cloud-policies/entities/suppression-rules/v1"): (
         frozenset({
@@ -3465,6 +4364,8 @@ DOCUMENTED_BODIES: dict[
             "subdomain", "suppression_comment",
             "suppression_expiration_date", "suppression_reason"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cloud-security-assets/entities/resources/v1"): (
         frozenset({
@@ -3472,6 +4373,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cloud-security-registration-azure/entities/issue-suppressions/v1"): (
@@ -3481,6 +4384,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/cloud-security-registration-azure/entities/registrations/v1"): (
         frozenset({
@@ -3488,6 +4393,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resource"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/cloud-security-registration-azure/entities/scripts/v1"): (
@@ -3497,6 +4404,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/container-security/entities/base-images/v1"): (
         frozenset({
@@ -3504,6 +4413,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "base_images"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/container-security/entities/exports/v1"): (
@@ -3514,6 +4425,8 @@ DOCUMENTED_BODIES: dict[
             "expand_vulnerabilities", "format", "fql", "resource",
             "sort"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/container-security/entities/image-assessment-policy-exclusions/v1"): (
         frozenset({
@@ -3522,6 +4435,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "conditions"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/container-security/entities/image-assessment-policy-groups/v1"): (
         frozenset({
@@ -3529,6 +4444,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "name", "policy_group_data", "policy_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/container-security/entities/registries/v1"): (
@@ -3539,6 +4456,8 @@ DOCUMENTED_BODIES: dict[
             "credential", "type", "url", "url_uniqueness_key",
             "user_defined_alias"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/correlation-rules/entities/rule-versions/export/v1"): (
         frozenset({
@@ -3546,6 +4465,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "get_latest", "report_format", "search"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/correlation-rules/entities/rules/v1"): (
@@ -3560,6 +4481,8 @@ DOCUMENTED_BODIES: dict[
             "status", "tactic", "technique", "template_id",
             "trigger_on_create"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/classifications/v2"): (
         frozenset({
@@ -3568,6 +4491,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/cloud-applications/v1"): (
         frozenset({
@@ -3575,6 +4500,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "name", "urls"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/content-patterns/v1"): (
@@ -3586,6 +4513,8 @@ DOCUMENTED_BODIES: dict[
             "category", "description", "example",
             "min_match_threshold", "name", "regexes", "region"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/data-protection-precedence/v1"): (
         frozenset({
@@ -3593,6 +4522,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/enterprise-accounts/v1"): (
@@ -3603,6 +4534,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "application_group_id", "domains", "name",
             "plugin_config_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/labels/v2"): (
@@ -3616,6 +4549,8 @@ DOCUMENTED_BODIES: dict[
             "label_provider", "name", "plugins_configuration_id",
             "synced"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/local-application-groups/v1"): (
         frozenset({
@@ -3623,6 +4558,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "local_application_ids", "name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/local-applications/v1"): (
@@ -3638,6 +4575,8 @@ DOCUMENTED_BODIES: dict[
             "enable_rename_detection", "executable_name", "group_ids",
             "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/policies/v2"): (
         frozenset({
@@ -3645,6 +4584,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/web-location-groups/v2"): (
@@ -3654,6 +4595,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "description", "name", "web_location_ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/data-protection/entities/web-locations/v2"): (
         frozenset({
@@ -3661,6 +4604,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "web_locations"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/delivery-settings/entities/delivery-settings/v1"): (
@@ -3670,6 +4615,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "delivery_settings"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/detects/entities/summaries/GET/v1"): (
         frozenset({
@@ -3677,6 +4624,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/devices/combined/devices/login-history/v1"): (
@@ -3686,6 +4635,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/devices/combined/devices/login-history/v2"): (
         frozenset({
@@ -3693,6 +4644,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/devices/combined/devices/network-address-history/v1"): (
@@ -3702,6 +4655,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/devices/entities/devices-actions-delete/v1"): (
         frozenset({
@@ -3709,6 +4664,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action_parameters", "filter", "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/devices/entities/devices-actions/v2"): (
@@ -3718,6 +4675,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/devices/entities/devices/v2"): (
         frozenset({
@@ -3725,6 +4684,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/devices/entities/host-group-actions/v1"): (
@@ -3734,6 +4695,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/devices/entities/host-groups/v1"): (
         frozenset({
@@ -3741,6 +4704,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/enrollments/entities/details/v3"): (
@@ -3750,6 +4715,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "email_addresses", "expires_at"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/enrollments/entities/details/v4"): (
         frozenset({
@@ -3758,6 +4725,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "email_addresses", "enrollment_type", "expires_at",
             "use_network_extension"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/exclusions/aggregates/exclusions/GET/v2"): (
@@ -3774,6 +4743,8 @@ DOCUMENTED_BODIES: dict[
             "percents", "q", "ranges", "size", "sort",
             "sub_aggregates", "time_zone", "type"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/aggregates/ss-ioa-exclusions/GET/v2"): (
         frozenset({
@@ -3789,6 +4760,8 @@ DOCUMENTED_BODIES: dict[
             "percents", "q", "ranges", "size", "sort",
             "sub_aggregates", "time_zone", "type"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/cert-based-exclusions/v1"): (
         frozenset({
@@ -3796,6 +4769,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "exclusions"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/exclusion-actions/v2"): (
@@ -3806,6 +4781,8 @@ DOCUMENTED_BODIES: dict[
             "action_parameters", "available", "description", "group",
             "label", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/exclusions/reports/v2"): (
         frozenset({
@@ -3813,6 +4790,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "report_format", "search"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/exclusions/v2"): (
@@ -3822,6 +4801,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "exclusions"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/ss-ioa-exclusions/reports/v2"): (
         frozenset({
@@ -3830,6 +4811,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "report_format", "search"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/ss-ioa-exclusions/v2"): (
         frozenset({
@@ -3837,6 +4820,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "exclusions"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/ss-ioa-matched-rules/v2"): (
@@ -3852,6 +4837,8 @@ DOCUMENTED_BODIES: dict[
             "parent_command_line", "parent_image_file_name",
             "pattern_ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/entities/ss-ioa-new-rules/v2"): (
         frozenset({
@@ -3864,6 +4851,8 @@ DOCUMENTED_BODIES: dict[
             "grandparent_image_file_name", "image_file_name",
             "parent_command_line", "parent_image_file_name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/exclusions/sdmf/query/v1"): (
         frozenset({
@@ -3871,6 +4860,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "control_info", "id", "nodes", "res_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/fem/entities/external-asset-inventory/v1"): (
@@ -3880,6 +4871,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "data"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/filevantage/entities/actions/v1"): (
         frozenset({
@@ -3888,6 +4881,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "change_ids", "comment", "operation"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/filevantage/entities/policies/v1"): (
         frozenset({
@@ -3895,6 +4890,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "name", "platform"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/filevantage/entities/policy-scheduled-exclusions/v1"): (
@@ -3905,6 +4902,8 @@ DOCUMENTED_BODIES: dict[
             "description", "name", "policy_id", "processes",
             "repeated", "schedule_end", "schedule_start", "timezone",
             "users"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/filevantage/entities/rule-groups-rules/v1"): (
@@ -3934,6 +4933,8 @@ DOCUMENTED_BODIES: dict[
             "watch_rename_file_changes", "watch_rename_key_changes",
             "watch_set_value_changes", "watch_write_file_changes"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/filevantage/entities/rule-groups/v1"): (
         frozenset({
@@ -3941,6 +4942,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "name", "type"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/filevantage/entities/workflow/v1"): (
@@ -3950,6 +4953,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/forensics/entities/collections-validate/v1"): (
         frozenset({
@@ -3957,6 +4962,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "collection", "platform"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/forensics/entities/collections/v1"): (
@@ -3968,6 +4975,8 @@ DOCUMENTED_BODIES: dict[
             "aids", "collection_tag", "config_id", "deadline",
             "ffcids", "id", "platform", "priority", "self_destruct"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/forensics/entities/collectors-deploy/v1"): (
         frozenset({
@@ -3976,6 +4985,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "aids", "no_proxy", "proxy_host", "proxy_port"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/forensics/entities/collectors-shutdown/v1"): (
         frozenset({
@@ -3983,6 +4994,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "aids", "ffcids", "force", "platform", "self_destruct"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/forensics/entities/configurations-validate/v1"): (
@@ -3994,6 +5007,8 @@ DOCUMENTED_BODIES: dict[
             "collections", "description", "id", "is_default", "name",
             "platform", "tag"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/forensics/entities/configurations/v1"): (
         frozenset({
@@ -4003,6 +5018,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "collections", "description", "id", "is_default", "name",
             "platform", "tag"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/fwmgr/entities/network-locations-metadata/v1"): (
@@ -4018,6 +5035,8 @@ DOCUMENTED_BODIES: dict[
             "icmp_request_targets_polling_interval",
             "location_precedence"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/fwmgr/entities/network-locations-precedence/v1"): (
         frozenset({
@@ -4025,6 +5044,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "cid", "location_precedence"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/fwmgr/entities/network-locations/v1"): (
@@ -4040,6 +5061,8 @@ DOCUMENTED_BODIES: dict[
             "enabled", "host_addresses", "https_reachable_hosts",
             "icmp_request_targets", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/fwmgr/entities/rule-groups/v1"): (
         frozenset({
@@ -4047,6 +5070,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "description", "enabled", "name", "platform", "rules"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/fwmgr/entities/rule-groups/validation/v1"): (
@@ -4056,6 +5081,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "description", "enabled", "name", "platform", "rules"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/fwmgr/entities/rules/validate-filepath/v1"): (
         frozenset({
@@ -4063,6 +5090,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "filepath_pattern", "filepath_test_string"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/host-migration/entities/host-migrations-actions/v1"): (
@@ -4072,6 +5101,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "filter", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/host-migration/entities/host-migrations/GET/v1"): (
         frozenset({
@@ -4079,6 +5110,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/host-migration/entities/migration-destinations/GET/v1"): (
@@ -4088,6 +5121,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "device_ids", "filter"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/host-migration/entities/migrations-actions/v1"): (
         frozenset({
@@ -4096,6 +5131,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "filter", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/host-migration/entities/migrations/v1"): (
         frozenset({
@@ -4103,6 +5140,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "device_ids", "filter", "name", "target_cid"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/humio/api/v1/repositories/{repository}/queryjobs"): (
@@ -4114,6 +5153,8 @@ DOCUMENTED_BODIES: dict[
             "ingestEnd", "ingestStart", "isLive", "queryString",
             "start", "timeZone", "timeZoneOffsetMinutes",
             "useIngestTime"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/identity-protection/aggregates/devices/GET/v1"): (
@@ -4130,6 +5171,8 @@ DOCUMENTED_BODIES: dict[
             "percents", "q", "ranges", "size", "sort",
             "sub_aggregates", "time_zone", "type"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/identity-protection/entities/devices/GET/v1"): (
         frozenset({
@@ -4137,6 +5180,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/identity-protection/entities/policy-rules/v1"): (
@@ -4148,6 +5193,8 @@ DOCUMENTED_BODIES: dict[
             "simulationMode", "sourceEndpoint", "sourceUser",
             "trigger"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/image-assessment/combined/vulnerability-lookups/v1"): (
         frozenset({
@@ -4155,6 +5202,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "applicationPackages", "osversion", "packages"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/image-assessment/entities/image-inventory/v1"): (
@@ -4172,6 +5221,8 @@ DOCUMENTED_BODIES: dict[
             "original_image_name", "pod_id", "pod_name",
             "pod_namespace", "runmode", "runtime_type", "scan_request"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/intel/entities/incidents/GET/v1"): (
         frozenset({
@@ -4179,6 +5230,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/intel/entities/indicators/GET/v1"): (
@@ -4188,6 +5241,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/intel/entities/mitre/v1"): (
         frozenset({
@@ -4195,6 +5250,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/intelligence/combined/indicators/v1"): (
@@ -4204,6 +5261,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filter", "sort"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/intelligence/combined/lookup-indicators/v1"): (
         frozenset({
@@ -4211,6 +5270,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "values"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ioarules/entities/rule-groups/v1"): (
@@ -4220,6 +5281,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "comment", "description", "name", "platform"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ioarules/entities/rules/GET/v1"): (
         frozenset({
@@ -4227,6 +5290,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ioarules/entities/rules/v1"): (
@@ -4240,6 +5305,8 @@ DOCUMENTED_BODIES: dict[
             "field_values", "name", "pattern_severity",
             "rulegroup_id", "ruletype_id"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ioarules/entities/rules/validate/v1"): (
         frozenset({
@@ -4247,6 +5314,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "fields"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/iocs/aggregates/indicators/v1"): (
@@ -4263,6 +5332,8 @@ DOCUMENTED_BODIES: dict[
             "percents", "q", "ranges", "size", "sort",
             "sub_aggregates", "time_zone", "type"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/iocs/entities/indicators-reports/v1"): (
         frozenset({
@@ -4270,6 +5341,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "from_parent", "report_format", "search"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/iocs/entities/indicators/v1"): (
@@ -4279,6 +5352,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "comment", "indicators"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/iocs/sdmf/query/v1"): (
         frozenset({
@@ -4287,6 +5362,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "control_info", "id", "nodes", "res_id"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/kubernetes-protection/entities/accounts/azure/v1"): (
         frozenset({
@@ -4294,6 +5371,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/lambdas/entities/exports/v1"): (
@@ -4304,6 +5383,8 @@ DOCUMENTED_BODIES: dict[
             "expand_vulnerabilities", "format", "fql", "resource",
             "sort"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/loggingapi/entities/saved-searches-dynamic-execute/v1"): (
         frozenset({
@@ -4311,6 +5392,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "end", "repo_or_view", "search_query", "start"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/loggingapi/entities/saved-searches/execute-dynamic/v1"): (
@@ -4320,6 +5403,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "end", "repo_or_view", "search_query", "start"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/malquery/combined/fuzzy-search/v1"): (
         frozenset({
@@ -4327,6 +5412,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "options", "patterns"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/malquery/entities/samples-multidownload/v1"): (
@@ -4336,6 +5423,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "samples"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/malquery/queries/exact-search/v1"): (
         frozenset({
@@ -4343,6 +5432,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "options", "patterns"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/malquery/queries/hunt/v1"): (
@@ -4352,6 +5443,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "options", "yara_rule"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/message-center/entities/case-activities/GET/v1"): (
         frozenset({
@@ -4360,6 +5453,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/message-center/entities/case-activity/v1"): (
         frozenset({
@@ -4367,6 +5462,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "body", "case_id", "type", "user_uuid"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/message-center/entities/case/v2"): (
@@ -4380,6 +5477,8 @@ DOCUMENTED_BODIES: dict[
             "malware_submission_id", "recon_rule_type", "title",
             "type", "user_uuid"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/message-center/entities/cases/GET/v1"): (
         frozenset({
@@ -4387,6 +5486,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/mssp/entities/children/GET/v2"): (
@@ -4396,6 +5497,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/mssp/entities/user-group-members/v1"): (
         frozenset({
@@ -4403,6 +5506,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/mssp/entities/user-groups/v1"): (
@@ -4412,6 +5517,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-dashboard-labels-add/v1"): (
         frozenset({
@@ -4419,6 +5526,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "items", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-dashboard-labels-remove/v1"): (
@@ -4428,6 +5537,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-dashboard-labels-replace/v1"): (
         frozenset({
@@ -4435,6 +5546,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "items", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-dashboards-template/v1"): (
@@ -4444,6 +5557,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "dashboard_items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-lookupfile-labels-add/v1"): (
         frozenset({
@@ -4451,6 +5566,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "items", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-lookupfile-labels-remove/v1"): (
@@ -4460,6 +5577,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-lookupfile-labels-replace/v1"): (
         frozenset({
@@ -4467,6 +5586,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "items", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-lookupfiles/v1"): (
@@ -4476,6 +5597,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "lookup_files", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-savedqueries-template/v1"): (
         frozenset({
@@ -4483,6 +5606,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "saved_query_items", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-savedquery-labels-add/v1"): (
@@ -4492,6 +5617,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-savedquery-labels-remove/v1"): (
         frozenset({
@@ -4499,6 +5626,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "items", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/bulk-savedquery-labels-replace/v1"): (
@@ -4508,6 +5637,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "items", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/dashboard-labels/v1"): (
         frozenset({
@@ -4515,6 +5646,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "labels", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/lookupfile-labels/v1"): (
@@ -4524,6 +5657,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filename", "labels", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/parsers-clone/v1"): (
         frozenset({
@@ -4531,6 +5666,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "new_name", "source_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/parsers-extensions/v1"): (
@@ -4542,6 +5679,8 @@ DOCUMENTED_BODIES: dict[
             "post_processing_script", "pre_processing_script",
             "test_cases"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/parsers/bulk-install/v1"): (
         frozenset({
@@ -4550,6 +5689,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "parsers"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/parsers/install/v1"): (
         frozenset({
@@ -4557,6 +5698,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "parser_id", "version"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/parsers/v1"): (
@@ -4568,6 +5711,8 @@ DOCUMENTED_BODIES: dict[
             "fields_to_be_removed_before_parsing", "fields_to_tag",
             "name", "repository", "script", "test_cases"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem-content/entities/savedquery-labels/v1"): (
         frozenset({
@@ -4575,6 +5720,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "labels", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem/entities/connections/v1"): (
@@ -4587,6 +5734,8 @@ DOCUMENTED_BODIES: dict[
             "enable_user_enrichment", "log_sources", "name", "parser",
             "vendor_name", "vendor_product_name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ngsiem/entities/connectors/configs/v1"): (
         frozenset({
@@ -4594,6 +5743,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "config", "connector_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ngsiem/entities/federated-connections-config/v1"): (
@@ -4603,6 +5754,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "cluster_url", "connection_id", "view_token"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/plugins/entities/execute-proxy/v1"): (
         frozenset({
@@ -4610,6 +5763,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/plugins/entities/execute/v1"): (
@@ -4619,6 +5774,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/pluginsonprem/entities/host-configs/v1"): (
         frozenset({
@@ -4626,6 +5783,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "host_group_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/combined/reveal-uninstall-token/v1"): (
@@ -4635,6 +5794,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "audit_message", "device_id"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/content-update-actions/v1"): (
         frozenset({
@@ -4642,6 +5803,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action_parameters", "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/content-update-precedence/v1"): (
@@ -4651,6 +5814,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/content-update/v1"): (
         frozenset({
@@ -4658,6 +5823,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/device-control-actions/v1"): (
@@ -4667,6 +5834,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/device-control-precedence/v1"): (
         frozenset({
@@ -4674,6 +5843,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids", "platform_name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/device-control/v1"): (
@@ -4683,6 +5854,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/device-control/v2"): (
         frozenset({
@@ -4690,6 +5863,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "policies"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/firewall-actions/v1"): (
@@ -4699,6 +5874,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/firewall-precedence/v1"): (
         frozenset({
@@ -4706,6 +5883,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids", "platform_name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/firewall/v1"): (
@@ -4715,6 +5894,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/prevention-actions/v1"): (
         frozenset({
@@ -4722,6 +5903,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action_parameters", "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/prevention-precedence/v1"): (
@@ -4731,6 +5914,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids", "platform_name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/prevention/v1"): (
         frozenset({
@@ -4738,6 +5923,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/sensor-update-actions/v1"): (
@@ -4747,6 +5934,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/sensor-update-precedence/v1"): (
         frozenset({
@@ -4754,6 +5943,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids", "platform_name"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/policy/entities/sensor-update/v1"): (
@@ -4763,6 +5954,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "resources"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/policy/entities/sensor-update/v2"): (
         frozenset({
@@ -4770,6 +5963,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/quarantine/aggregates/quarantined-files/GET/v1"): (
@@ -4786,6 +5981,8 @@ DOCUMENTED_BODIES: dict[
             "percents", "q", "ranges", "size", "sort",
             "sub_aggregates", "time_zone", "type"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/quarantine/entities/quarantined-files/GET/v1"): (
         frozenset({
@@ -4794,6 +5991,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/quickscanpro/entities/scans/v1"): (
         frozenset({
@@ -4801,6 +6000,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/real-time-response/combined/batch-active-responder-command/v1"): (
@@ -4812,6 +6013,8 @@ DOCUMENTED_BODIES: dict[
             "base_command", "batch_id", "command_string",
             "optional_hosts", "persist_all"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/real-time-response/combined/batch-admin-command/v1"): (
         frozenset({
@@ -4821,6 +6024,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "base_command", "batch_id", "command_string",
             "optional_hosts", "persist_all"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/real-time-response/combined/batch-command/v1"): (
@@ -4832,6 +6037,8 @@ DOCUMENTED_BODIES: dict[
             "base_command", "batch_id", "command_string",
             "optional_hosts", "persist_all"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/real-time-response/combined/batch-get-command/v1"): (
         frozenset({
@@ -4839,6 +6046,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "batch_id", "file_path", "optional_hosts"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/real-time-response/combined/batch-init-session/v1"): (
@@ -4848,6 +6057,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "existing_batch_id", "host_ids", "queue_offline"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/real-time-response/combined/batch-refresh-session/v1"): (
         frozenset({
@@ -4855,6 +6066,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "batch_id", "hosts_to_remove"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/recon/aggregates/rules-preview/GET/v1"): (
@@ -4864,6 +6077,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filter", "lookback_days", "topic"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/recon/entities/actions/v1"): (
         frozenset({
@@ -4871,6 +6086,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "actions", "rule_id"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/scanner/aggregates/scans/GET/v1"): (
@@ -4887,6 +6104,8 @@ DOCUMENTED_BODIES: dict[
             "percents", "q", "ranges", "size", "sort",
             "sub_aggregates", "time_zone", "type"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/scanner/entities/scans/v1"): (
         frozenset({
@@ -4894,6 +6113,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "samples"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/snapshots/entities/accounts/v1"): (
@@ -4903,6 +6124,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "aws_accounts"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/snapshots/entities/deployments/v1"): (
         frozenset({
@@ -4910,6 +6133,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "resources"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/ti/events/entities/events/GET/v2"): (
@@ -4919,6 +6144,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/ti/rules/entities/rules/GET/v2"): (
         frozenset({
@@ -4926,6 +6153,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/group-actions/v1"): (
@@ -4935,6 +6164,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "action_parameters", "filter", "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/group-users-actions/v1"): (
         frozenset({
@@ -4942,6 +6173,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action_parameters", "filter", "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/group-users/GET/v1"): (
@@ -4951,6 +6184,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/groups/GET/v1"): (
         frozenset({
@@ -4958,6 +6193,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/groups/v1"): (
@@ -4967,6 +6204,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "cid", "description", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/user-actions/v1"): (
         frozenset({
@@ -4974,6 +6213,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "action", "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/user-management/entities/user-groups/GET/v1"): (
@@ -4983,6 +6224,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/user-roles/entities/user-roles/v1"): (
         frozenset({
@@ -4990,6 +6233,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "roleIds"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/workflows/entities/definition-actions/v1"): (
@@ -4999,6 +6244,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "ids"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/workflows/entities/execution-actions/v1"): (
         frozenset({
@@ -5006,6 +6253,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/workflows/entities/mock-executions/v1"): (
@@ -5015,6 +6264,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "definition", "mocks", "on_demand_trigger"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/workflows/entities/single-node-executions/v1"): (
         frozenset({
@@ -5022,6 +6273,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "definition", "mocks"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "POST", "/workflows/system-definitions/deprovision/v1"): (
@@ -5033,6 +6286,8 @@ DOCUMENTED_BODIES: dict[
             "definition_id", "deprovision_all", "template_id",
             "template_name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/workflows/system-definitions/promote/v1"): (
         frozenset({
@@ -5043,6 +6298,8 @@ DOCUMENTED_BODIES: dict[
             "customer_definition_id", "name", "parameters",
             "template_id", "template_name", "template_version"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "POST", "/workflows/system-definitions/provision/v1"): (
         frozenset({
@@ -5052,6 +6309,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "name", "parameters", "template_id", "template_name",
             "template_version"
+        }),
+        frozenset({
         }),
     ),
     (
@@ -5064,6 +6323,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "id", "rule_groups"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/admission-control-policies/entities/policy-rule-group-selectors/v1"): (
         frozenset({
@@ -5071,6 +6332,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "rule_groups"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/aspm-api-gateway/api/v1/business_applications"): (
@@ -5080,6 +6343,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "name", "persistentSignatures"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/aspm-api-gateway/api/v1/tags"): (
         frozenset({
@@ -5087,6 +6352,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "entries"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/cases/entities/cases/v2"): (
@@ -5100,6 +6367,8 @@ DOCUMENTED_BODIES: dict[
             "evidence", "name", "severity", "severity_info", "status",
             "tags", "template"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/cloud-policies/entities/compliance/control-rule-assignments/v1"): (
         frozenset({
@@ -5107,6 +6376,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "rule_ids"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/correlation-rules/entities/rules/ownership/v1"): (
@@ -5116,6 +6387,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "api_client_id", "id", "user_id", "user_uuid"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/correlation-rules/entities/rules/ownership/v2"): (
         frozenset({
@@ -5123,6 +6396,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "api_client_id", "ids", "user_id", "user_uuid"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/forensics/entities/collections/v1"): (
@@ -5134,6 +6409,8 @@ DOCUMENTED_BODIES: dict[
             "aids", "collection_tag", "config_id", "deadline",
             "ffcids", "id", "platform", "priority", "self_destruct"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/forensics/entities/configurations/v1"): (
         frozenset({
@@ -5143,6 +6420,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "collections", "description", "id", "is_default", "name",
             "platform", "tag"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/fwmgr/entities/network-locations/v1"): (
@@ -5160,6 +6439,8 @@ DOCUMENTED_BODIES: dict[
             "icmp_request_targets", "id", "modified_by",
             "modified_on", "name"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/fwmgr/entities/policies/v1"): (
         frozenset({
@@ -5171,6 +6452,8 @@ DOCUMENTED_BODIES: dict[
             "default_inbound", "default_outbound", "enforce",
             "is_default_policy", "local_logging", "platform_id",
             "policy_id", "rule_group_ids", "test_mode", "tracking"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/fwmgr/entities/policies/v2"): (
@@ -5184,6 +6467,8 @@ DOCUMENTED_BODIES: dict[
             "is_default_policy", "local_logging", "platform_id",
             "policy_id", "rule_group_ids", "test_mode", "tracking"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/ngsiem-content/entities/dashboard-labels/v1"): (
         frozenset({
@@ -5191,6 +6476,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "labels", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/ngsiem-content/entities/lookupfile-labels/v1"): (
@@ -5200,6 +6487,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "filename", "labels", "search_domain"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/ngsiem-content/entities/parsers/autoupdate/v1"): (
         frozenset({
@@ -5208,6 +6497,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "autoupdate_policy", "reason"
         }),
+        frozenset({
+        }),
     ),
     ("crowdstrike", "PUT", "/ngsiem-content/entities/savedquery-labels/v1"): (
         frozenset({
@@ -5215,6 +6506,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "id", "labels", "search_domain"
+        }),
+        frozenset({
         }),
     ),
     ("crowdstrike", "PUT", "/workflows/entities/definitions/v1"): (
@@ -5225,6 +6518,8 @@ DOCUMENTED_BODIES: dict[
             "Definition", "change_log", "enabled", "flight_control",
             "id"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/api_keys/delete/"): (
         frozenset({
@@ -5232,6 +6527,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/api_keys/generate/"): (
@@ -5241,6 +6538,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/api_keys/get_api_keys/"): (
         frozenset({
@@ -5248,6 +6547,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/assets/get_external_service/"): (
@@ -5257,6 +6558,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/assets/get_external_services/"): (
         frozenset({
@@ -5264,6 +6567,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/assets/get_vulnerability_tests/"): (
@@ -5273,6 +6578,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/authentication-settings/create/"): (
         frozenset({
@@ -5280,6 +6587,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/authentication-settings/update/"): (
@@ -5289,6 +6598,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/bioc/delete/"): (
         frozenset({
@@ -5296,6 +6607,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/bioc/get/"): (
@@ -5305,6 +6618,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/bioc/insert/"): (
         frozenset({
@@ -5312,6 +6627,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/correlations/delete/"): (
@@ -5321,6 +6638,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/correlations/get/"): (
         frozenset({
@@ -5328,6 +6647,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/correlations/insert/"): (
@@ -5337,6 +6658,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/dashboards/delete/"): (
         frozenset({
@@ -5344,6 +6667,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/dashboards/get/"): (
@@ -5353,6 +6678,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/distributions/create/"): (
         frozenset({
@@ -5360,6 +6687,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/distributions/get_dist_url/"): (
@@ -5369,6 +6698,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/distributions/get_status/"): (
         frozenset({
@@ -5376,6 +6707,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/endpoints/abort_scan/"): (
@@ -5385,6 +6718,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/endpoints/file_retrieval/"): (
         frozenset({
@@ -5392,6 +6727,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/endpoints/get_policy/"): (
@@ -5401,6 +6738,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/endpoints/get_profiles/"): (
         frozenset({
@@ -5408,6 +6747,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/endpoints/isolate/"): (
@@ -5417,6 +6758,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/endpoints/quarantine/"): (
         frozenset({
@@ -5424,6 +6767,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/endpoints/restore/"): (
@@ -5433,6 +6778,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/endpoints/scan/"): (
         frozenset({
@@ -5440,6 +6787,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/endpoints/unisolate/"): (
@@ -5449,6 +6798,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/endpoints/upgrade/"): (
         frozenset({
@@ -5456,6 +6807,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/get_risk_score/"): (
@@ -5465,6 +6818,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/hash_exceptions/allowlist/"): (
         frozenset({
@@ -5472,6 +6827,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/hash_exceptions/blocklist/"): (
@@ -5481,6 +6838,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/indicators/delete/"): (
         frozenset({
@@ -5488,6 +6847,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/indicators/get/"): (
@@ -5497,6 +6858,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/indicators/insert/"): (
         frozenset({
@@ -5504,6 +6867,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/integrations/syslog/create/"): (
@@ -5513,6 +6878,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/integrations/syslog/get/"): (
         frozenset({
@@ -5520,6 +6887,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/integrations/syslog/update/"): (
@@ -5529,6 +6898,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/legacy_exceptions/add/"): (
         frozenset({
@@ -5536,6 +6907,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/legacy_exceptions/edit/"): (
@@ -5545,6 +6918,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/playbooks/delete/"): (
         frozenset({
@@ -5553,6 +6928,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/profiles/add_signer_cn_to_allowlist/"): (
         frozenset({
@@ -5560,6 +6937,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "profile_name", "signers"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/profiles/prevention/add/"): (
@@ -5570,6 +6949,8 @@ DOCUMENTED_BODIES: dict[
             "description", "modules", "name", "platform",
             "profile_type"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/profiles/prevention/edit/"): (
         frozenset({
@@ -5577,6 +6958,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "profile_id", "update_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/profiles/prevention/get_modules/"): (
@@ -5586,6 +6969,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "platform", "profile_type"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/quarantine/status/"): (
         frozenset({
@@ -5593,6 +6978,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/rbac/get_user_group/"): (
@@ -5602,6 +6989,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/scheduled_queries/delete/"): (
         frozenset({
@@ -5609,6 +6998,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/scheduled_queries/insert/"): (
@@ -5618,6 +7009,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/scheduled_queries/list/"): (
         frozenset({
@@ -5625,6 +7018,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/scripts/delete/"): (
@@ -5634,6 +7029,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/scripts/get_script_code/"): (
         frozenset({
@@ -5641,6 +7038,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/scripts/get_script_execution_results/"): (
@@ -5650,6 +7049,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/scripts/get_script_execution_results_files/"): (
         frozenset({
@@ -5657,6 +7058,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/scripts/get_script_execution_status/"): (
@@ -5666,6 +7069,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/scripts/get_script_metadata/"): (
         frozenset({
@@ -5673,6 +7078,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/scripts/get_scripts/"): (
@@ -5682,6 +7089,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/scripts/run_script/"): (
         frozenset({
@@ -5689,6 +7098,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/scripts/run_snippet_code_script/"): (
@@ -5698,6 +7109,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/tags/agents/delete_permanently/"): (
         frozenset({
@@ -5705,6 +7118,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/triage_endpoint/"): (
@@ -5714,6 +7129,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/widgets/delete/"): (
         frozenset({
@@ -5721,6 +7138,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/widgets/get/"): (
@@ -5730,6 +7149,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "/xql/get_query_results/"): (
         frozenset({
@@ -5737,6 +7158,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "/xql/start_xql_query/"): (
@@ -5746,6 +7169,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "l_library/delete/"): (
         frozenset({
@@ -5753,6 +7178,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
     ("xdr", "POST", "l_library/get/"): (
@@ -5762,6 +7189,8 @@ DOCUMENTED_BODIES: dict[
         frozenset({
             "request_data"
         }),
+        frozenset({
+        }),
     ),
     ("xdr", "POST", "l_library/insert/"): (
         frozenset({
@@ -5769,6 +7198,8 @@ DOCUMENTED_BODIES: dict[
         }),
         frozenset({
             "request_data"
+        }),
+        frozenset({
         }),
     ),
 }

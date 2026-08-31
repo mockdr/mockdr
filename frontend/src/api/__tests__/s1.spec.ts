@@ -116,9 +116,20 @@ describe('alertsApi', () => {
     expect(mockGet).toHaveBeenCalledWith('/cloud-detection/alerts', { params: { ids: 'alert-1' } })
   })
 
-  it('action returns promise', () => {
-    expect(isPromise(alertsApi.action('star', { filter: { ids: ['alert-1'] } }))).toBe(true)
-    expect(mockPost).toHaveBeenCalledWith('/alerts/star', expect.any(Object))
+  it('setVerdict posts where SentinelOne keeps its alert actions', () => {
+    expect(isPromise(alertsApi.setVerdict(['alert-1'], 'true_positive'))).toBe(true)
+    expect(mockPost).toHaveBeenCalledWith(
+      '/cloud-detection/alerts/analyst-verdict',
+      { data: { analystVerdict: 'true_positive' }, filter: { ids: ['alert-1'] } },
+    )
+  })
+
+  it('setIncident posts beside it', () => {
+    expect(isPromise(alertsApi.setIncident(['alert-1'], 'resolved'))).toBe(true)
+    expect(mockPost).toHaveBeenCalledWith(
+      '/cloud-detection/alerts/incident',
+      { data: { incidentStatus: 'resolved' }, filter: { ids: ['alert-1'] } },
+    )
   })
 })
 
@@ -152,10 +163,12 @@ describe('threatsApi', () => {
     expect(mockPost).toHaveBeenCalledWith('/threats/t1/notes', { text: 'test note' })
   })
 
-  it('setVerdict returns promise', () => {
+  it('setVerdict sends the member the swagger names', () => {
+    // `verdict` is not `analystVerdict`. Sent under the wrong name the
+    // route ignored it: 200, "affected: 1", and no verdict changed.
     expect(isPromise(threatsApi.setVerdict(['t1'], 'true_positive'))).toBe(true)
     expect(mockPost).toHaveBeenCalledWith('/threats/analyst-verdict', expect.objectContaining({
-      data: { verdict: 'true_positive' },
+      data: { analystVerdict: 'true_positive' },
       filter: { ids: ['t1'] },
     }))
   })
@@ -175,10 +188,6 @@ describe('threatsApi', () => {
     expect(mockPost).toHaveBeenCalledWith('/threats/add-to-blacklist', expect.any(Object))
   })
 
-  it('action returns promise', () => {
-    expect(isPromise(threatsApi.action('resolve', { filter: {} }))).toBe(true)
-    expect(mockPost).toHaveBeenCalledWith('/threats/actions/resolve', expect.any(Object))
-  })
 })
 
 // ── tagsApi ────────────────────────────────────────────────────────────────

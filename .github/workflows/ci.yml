@@ -253,6 +253,13 @@ jobs:
       - name: The frontend's captured fixtures still match the mock
         run: python scripts/frontend_fixture_drift.py
 
+      # The question underneath that one: does the call arrive anywhere at
+      # all? Four of the console's own buttons posted to `/threats/actions/
+      # <name>`, a path family SentinelOne does not have, and every one
+      # 404'd — while 2 144 unit tests passed, because they mock the client.
+      - name: Every route the console calls is one the mock serves
+        run: python scripts/frontend_route_drift.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.

@@ -35,10 +35,13 @@ def _first_site_id(client: TestClient, auth_headers: dict) -> str:
 class TestCreateGroup:
     def _create(self, client: TestClient, auth_headers: dict, **overrides) -> dict:
         site_id = _first_site_id(client, auth_headers)
+        # The swagger marks `inherits`, `name` and `siteId` required inside
+        # `data`; a create without all three is one the product refuses.
         payload = {
             "name": "Test Group Beta",
             "siteId": site_id,
             "type": "static",
+            "inherits": True,
         } | overrides
         return client.post(f"{BASE}/groups", headers=auth_headers, json={"data": payload})
 

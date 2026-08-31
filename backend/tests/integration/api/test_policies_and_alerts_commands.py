@@ -61,7 +61,8 @@ class TestAlertCommands:
         aid = self._first_alert_id(client, auth_headers)
         resp = client.post("/web/api/v2.1/cloud-detection/alerts/analyst-verdict",
                            headers=auth_headers,
-                           json={"filter": {"ids": [aid]}, "data": {"verdict": "TRUE_POSITIVE"}})
+                           json={"filter": {"ids": [aid]},
+                                 "data": {"analystVerdict": "TRUE_POSITIVE"}})
         assert resp.status_code == 200
         assert "affected" in resp.json()["data"]
 

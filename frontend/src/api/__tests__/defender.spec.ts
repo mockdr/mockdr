@@ -79,16 +79,8 @@ describe('defender API', () => {
     expect(mdeIndicatorsApi.list()).toBeInstanceOf(Promise)
   })
 
-  it('mdeIndicatorsApi.get returns promise', async () => {
-    expect(mdeIndicatorsApi.get('ind-id')).toBeInstanceOf(Promise)
-  })
-
   it('mdeIndicatorsApi.create returns promise', async () => {
     expect(mdeIndicatorsApi.create({ indicatorValue: 'test' })).toBeInstanceOf(Promise)
-  })
-
-  it('mdeIndicatorsApi.update returns promise', async () => {
-    expect(mdeIndicatorsApi.update('ind-id', { indicatorValue: 'test' })).toBeInstanceOf(Promise)
   })
 
   it('mdeIndicatorsApi.delete returns promise', async () => {

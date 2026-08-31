@@ -195,27 +195,32 @@ export const graphIntuneApi = {
     graphClient.get('/v1.0/deviceAppManagement/mobileApps', { params }) as Promise<ODataResponse<GraphMobileApp>>,
 }
 
+// `me` is Graph's shortcut for the signed-in user and is valid only with
+// delegated authentication. mockdr authenticates with client credentials
+// throughout, and the CSDL reference documents no `/me` operation at all —
+// so a caller must name the user rather than fall through to a path this
+// product cannot serve.
 // ── Mail API ────────────────────────────────────────────────────────────────
 
 export const graphMailApi = {
-  /** List messages for a user (defaults to 'me'). */
-  listMessages: (userId = 'me', params?: Record<string, unknown>): Promise<ODataResponse<GraphMailMessage>> =>
+  /** List messages for a user. */
+  listMessages: (userId: string, params?: Record<string, unknown>): Promise<ODataResponse<GraphMailMessage>> =>
     graphClient.get(`/v1.0/${userId}/messages`, { params }) as Promise<ODataResponse<GraphMailMessage>>,
 
-  /** List mail folders for a user (defaults to 'me'). */
-  listFolders: (userId = 'me', params?: Record<string, unknown>): Promise<ODataResponse<GraphMailFolder>> =>
+  /** List mail folders for a user. */
+  listFolders: (userId: string, params?: Record<string, unknown>): Promise<ODataResponse<GraphMailFolder>> =>
     graphClient.get(`/v1.0/${userId}/mailFolders`, { params }) as Promise<ODataResponse<GraphMailFolder>>,
 }
 
 // ── Files API ───────────────────────────────────────────────────────────────
 
 export const graphFilesApi = {
-  /** Get the default drive for a user (defaults to 'me'). */
-  getDrive: (userId = 'me'): Promise<GraphDrive> =>
+  /** Get the default drive for a user. */
+  getDrive: (userId: string): Promise<GraphDrive> =>
     graphClient.get(`/v1.0/${userId}/drive`) as Promise<GraphDrive>,
 
   /** List children in the root of a drive. */
-  listChildren: (userId = 'me', itemId = 'root', params?: Record<string, unknown>): Promise<ODataResponse<GraphDriveItem>> =>
+  listChildren: (userId: string, itemId = 'root', params?: Record<string, unknown>): Promise<ODataResponse<GraphDriveItem>> =>
     // `drive/root/children` for the root, which is the path the reference
     // records; `drive/items/root/children` is not one Graph serves, so the
     // file list asked for a route that answered 404 and rendered empty.

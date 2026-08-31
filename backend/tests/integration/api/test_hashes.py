@@ -17,7 +17,8 @@ class TestHashVerdict:
         client.post(
             "/web/api/v2.1/restrictions",
             headers=auth_headers,
-            json={"data": {"type": "black_hash", "value": sha256, "description": "test hash"}},
+            json={"data": {"type": "black_hash", "osType": "windows",
+                           "value": sha256, "description": "test hash"}},
         )
         resp = client.get(f"{BASE}/{sha256}/verdict", headers=auth_headers)
         assert resp.status_code == 200
@@ -35,7 +36,8 @@ class TestHashVerdict:
         client.post(
             "/web/api/v2.1/restrictions",
             headers=auth_headers,
-            json={"data": {"type": "black_hash", "value": sha256.upper(), "description": "test"}},
+            json={"data": {"type": "black_hash", "osType": "windows",
+                           "value": sha256.upper(), "description": "test"}},
         )
         resp = client.get(f"{BASE}/{sha256.lower()}/verdict", headers=auth_headers)
         assert resp.json()["data"]["verdict"] == "blacklisted"

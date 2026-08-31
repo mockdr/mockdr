@@ -32,7 +32,8 @@ class TestViewerReadOnly:
 
     def test_viewer_cannot_create_user(self, client: TestClient) -> None:
         resp = client.post("/web/api/v2.1/users", headers=_VIEWER,
-                           json={"data": {"email": "x@x.com", "fullName": "X"}})
+                           json={"data": {"email": "x@x.com", "fullName": "X",
+                                          "scope": "tenant"}})
         assert resp.status_code == 403
 
     def test_viewer_cannot_delete_group(self, client: TestClient) -> None:
@@ -135,7 +136,9 @@ class TestAdminFullAccess:
 
     def test_admin_can_create_user(self, client: TestClient) -> None:
         resp = client.post("/web/api/v2.1/users", headers=_ADMIN,
-                           json={"data": {"email": "rbac-test@acmecorp.com", "fullName": "RBAC User"}})
+                           json={"data": {"email": "rbac-test@acmecorp.com",
+                                          "fullName": "RBAC User",
+                                          "scope": "tenant"}})
         assert resp.status_code == 200
 
     def test_admin_can_access_dev_endpoints(self, client: TestClient) -> None:

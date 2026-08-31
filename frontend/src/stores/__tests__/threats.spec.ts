@@ -6,7 +6,9 @@ import type { ThreatRecord } from '@/types'
 vi.mock('../../api/threats', () => ({
   threatsApi: {
     list: vi.fn(),
-    action: vi.fn(),
+    setVerdict: vi.fn(),
+    setIncident: vi.fn(),
+    addToBlacklist: vi.fn(),
   },
 }))
 
@@ -147,23 +149,37 @@ describe('useThreatsStore', () => {
   })
 
   describe('performAction()', () => {
-    it('calls threatsApi.action with the selected threat ids', async () => {
-      vi.mocked(threatsApi.action).mockResolvedValueOnce({ data: { affected: 1 } } as never)
+    it.each([
+      ['mark-as-threat', 'setVerdict', 'true_positive'],
+      ['mark-as-benign', 'setVerdict', 'false_positive'],
+      ['resolve', 'setIncident', 'resolved'],
+    ] as const)(
+      'maps %s onto the route SentinelOne actually has',
+      async (action, method, argument) => {
+        vi.mocked(threatsApi[method]).mockResolvedValueOnce({ data: { affected: 1 } } as never)
+        vi.mocked(threatsApi.list).mockResolvedValueOnce(mockListPage1 as never)
+
+        const store = useThreatsStore()
+        store.toggleSelect(makeThreat('t99'))
+        await store.performAction(action)
+
+        expect(threatsApi[method]).toHaveBeenCalledWith(['t99'], argument)
+      },
+    )
+
+    it('maps add-to-blocklist onto add-to-blacklist, which is its name', async () => {
+      vi.mocked(threatsApi.addToBlacklist).mockResolvedValueOnce({ data: { affected: 1 } } as never)
       vi.mocked(threatsApi.list).mockResolvedValueOnce(mockListPage1 as never)
 
       const store = useThreatsStore()
-      const threat = makeThreat('t99')
-      store.toggleSelect(threat)
+      store.toggleSelect(makeThreat('t99'))
+      await store.performAction('add-to-blocklist')
 
-      await store.performAction('resolve')
-
-      expect(threatsApi.action).toHaveBeenCalledWith('resolve', {
-        filter: { ids: ['t99'] },
-      })
+      expect(threatsApi.addToBlacklist).toHaveBeenCalledWith(['t99'])
     })
 
     it('clears selection after action', async () => {
-      vi.mocked(threatsApi.action).mockResolvedValueOnce({ data: { affected: 1 } } as never)
+      vi.mocked(threatsApi.setVerdict).mockResolvedValueOnce({ data: { affected: 1 } } as never)
       vi.mocked(threatsApi.list).mockResolvedValueOnce(mockListPage1 as never)
 
       const store = useThreatsStore()
@@ -174,7 +190,7 @@ describe('useThreatsStore', () => {
     })
 
     it('refreshes list after action', async () => {
-      vi.mocked(threatsApi.action).mockResolvedValueOnce({ data: { affected: 1 } } as never)
+      vi.mocked(threatsApi.setVerdict).mockResolvedValueOnce({ data: { affected: 1 } } as never)
       vi.mocked(threatsApi.list).mockResolvedValueOnce(mockListPage1 as never)
 
       const store = useThreatsStore()

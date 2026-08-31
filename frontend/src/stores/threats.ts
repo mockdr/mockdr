@@ -66,12 +66,25 @@ export const useThreatsStore = defineStore('threats', () => {
   /**
    * Trigger a bulk threat action on selected threats (or a specific set).
    *
-   * @param actionPath - Action name (e.g. mark-as-threat, resolve).
-   * @param threatIds  - Optional explicit list of threat IDs; defaults to selected.
+   * SentinelOne spells these as four different routes with four different
+   * bodies — a verdict, an incident status, a mitigation and a blocklist
+   * entry — so this maps the console's four buttons onto them rather than
+   * building a path out of the button's name. It used to post to
+   * `/threats/actions/<name>`, a family the product does not have, and
+   * every one of the four 404'd.
+   *
+   * @param action    - One of the four the console offers.
+   * @param threatIds - Optional explicit list of threat IDs; defaults to selected.
    */
-  async function performAction(actionPath: string, threatIds: string[] | null = null): Promise<void> {
+  async function performAction(
+    action: 'mark-as-threat' | 'mark-as-benign' | 'resolve' | 'add-to-blocklist',
+    threatIds: string[] | null = null,
+  ): Promise<void> {
     const ids = threatIds ?? selected.value.map((t) => t.id)
-    await threatsApi.action(actionPath, { filter: { ids } })
+    if (action === 'mark-as-threat') await threatsApi.setVerdict(ids, 'true_positive')
+    else if (action === 'mark-as-benign') await threatsApi.setVerdict(ids, 'false_positive')
+    else if (action === 'resolve') await threatsApi.setIncident(ids, 'resolved')
+    else await threatsApi.addToBlacklist(ids)
     await fetchList()
     selected.value = []
   }

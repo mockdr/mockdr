@@ -95,7 +95,8 @@ class TestThreatCommands:
         tid = self._first_threat_id(client, auth_headers)
         resp = client.post("/web/api/v2.1/threats/add-to-blacklist",
                            headers=auth_headers,
-                           json={"filter": {"ids": [tid]}})
+                           json={"filter": {"ids": [tid]},
+                                 "data": {"targetScope": "site"}})
         assert resp.status_code == 200
         assert "affected" in resp.json()["data"]
 
@@ -103,7 +104,8 @@ class TestThreatCommands:
         tid = self._first_threat_id(client, auth_headers)
         resp = client.post("/web/api/v2.1/threats/analyst-verdict",
                            headers=auth_headers,
-                           json={"filter": {"ids": [tid]}, "data": {"verdict": "true_positive"}})
+                           json={"filter": {"ids": [tid]},
+                                 "data": {"analystVerdict": "true_positive"}})
         assert resp.status_code == 200
 
     def test_set_incident_status(self, client: TestClient, auth_headers: dict) -> None:
@@ -126,7 +128,8 @@ class TestThreatCommands:
         tid = self._first_threat_id(client, auth_headers)
         resp = client.post("/web/api/v2.1/threats/fetch-file",
                            headers=auth_headers,
-                           json={"filter": {"ids": [tid]}})
+                           json={"filter": {"ids": [tid]},
+                                 "data": {"password": "Probe-Passw0rd!"}})
         assert resp.status_code == 200
         assert resp.json()["data"]["affected"] == 1
 

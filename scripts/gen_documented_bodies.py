@@ -46,8 +46,9 @@ S1_PREFIX = "/web/api/v2.1"
 _MAX_DEPTH = 8
 
 #: One row: vendor, method, the path the router carries, what the body must
-#: carry, and what makes it recognisable as a body for this route.
-Row = tuple[str, str, str, list[str], list[str]]
+#: carry, what makes it recognisable as a body for this route, and the
+#: members the reference marks required *inside* `data`.
+Row = tuple[str, str, str, list[str], list[str], list[str]]
 
 
 def resolve(schema: dict, definitions: dict, depth: int = 0) -> dict:
@@ -78,6 +79,24 @@ def member_names(schema: dict, definitions: dict) -> set[str]:
     return names
 
 
+def payload_required(schema: dict, definitions: dict) -> list[str]:
+    """What the swagger marks required inside a SentinelOne `data` payload.
+
+    The top-level `required` is `["data", "filter"]` on almost every action,
+    which says nothing about what the payload holds — and the payload's own
+    `required` says exactly that: `analystVerdict` on the verdict route,
+    `incidentStatus` on the incident route, `email` and `fullName` on
+    `POST /users`. Fifty-one such members were documented and unenforced, so
+    a verdict with no verdict in it answered `affected: 1` and changed
+    nothing.
+    """
+    resolved = resolve(schema, definitions)
+    payload = resolve((resolved.get("properties") or {}).get("data", {}), definitions)
+    if payload.get("type") == "array":
+        payload = resolve(payload.get("items", {}), definitions)
+    return sorted(payload.get("required") or [])
+
+
 def sentinelone_rows() -> list[Row]:
     """What the 2.1 swagger says each SentinelOne write body must carry."""
     if not SWAGGER.exists():
@@ -106,7 +125,8 @@ def sentinelone_rows() -> list[Row]:
             # Keyed without the API prefix, the way the router sees it —
             # `documented_filters.py` keys the same way.
             rows.append(("sentinelone", verb.upper(), path[len(S1_PREFIX):] or "/",
-                         required, sorted(member_names(schema, definitions))))
+                         required, sorted(member_names(schema, definitions)),
+                         payload_required(schema, definitions)))
     return rows
 
 
@@ -131,7 +151,10 @@ def crowdstrike_rows() -> list[Row]:
             name.split(".")[0].split("[")[0]
             for name in entry.get("request_paths") or []
         })
-        rows.append(("crowdstrike", method, path, required, members or required))
+        # gofalcon's bodies are flat: there is no `data` payload to look
+        # inside, so nothing is recorded for one.
+        rows.append(("crowdstrike", method, path, required,
+                     members or required, []))
     return rows
 
 
@@ -162,7 +185,7 @@ def cortex_rows() -> list[Row]:
         # `/public_api/v1` the reference spells out, and the mock's own paths
         # end in the slash the transcription omits.
         rows.append(("xdr", method, path[len(CORTEX_PREFIX):] + "/",
-                     required, members or required))
+                     required, members or required, []))
     return rows
 
 
@@ -180,16 +203,23 @@ def render(rows: list[Row]) -> str:
         "every member that shows the client meant this route at all — for",
         "SentinelOne that includes the members of the `data` payload, because",
         "this mock takes the flat form of those documents as well.",
+        "",
+        "`payload_required` is what the swagger marks required *inside*",
+        "`data`. The top-level `required` is `data, filter` on almost every",
+        "SentinelOne action and says nothing about what the payload holds;",
+        "the payload's own `required` says exactly that.",
         '"""',
         "from __future__ import annotations",
         "",
-        "#: ``(vendor, method, route path)`` → ``(required, recognisable)``.",
+        "#: ``(vendor, method, route path)`` →",
+        "#: ``(required, recognisable, payload_required)``.",
         "#: The path is the one the router carries — no mount prefix.",
         "DOCUMENTED_BODIES: dict[",
-        "    tuple[str, str, str], tuple[frozenset[str], frozenset[str]],",
+        "    tuple[str, str, str],",
+        "    tuple[frozenset[str], frozenset[str], frozenset[str]],",
         "] = {",
     ]
-    for vendor, method, path, required, members in rows:
+    for vendor, method, path, required, members, payload in rows:
         key = f'    ("{vendor}", "{method}", "{path}"): ('
         if len(key) > 100:
             lines.append("    (")
@@ -198,7 +228,7 @@ def render(rows: list[Row]) -> str:
             lines.append("    ): (")
         else:
             lines.append(key)
-        for values in (required, members):
+        for values in (required, members, payload):
             joined = ", ".join(f'"{v}"' for v in values)
             lines.append("        frozenset({")
             lines += textwrap.wrap(joined, width=70, initial_indent=" " * 12,

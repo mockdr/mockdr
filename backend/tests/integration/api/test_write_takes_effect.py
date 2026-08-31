@@ -100,12 +100,16 @@ class TestACreateKeepsWhatItWasSent:
             ),
             (
                 "/groups",
-                {"name": "zzz-probe-group", "rank": 7, "isDefault": True},
+                # `inherits` and `siteId` are required beside `name`.
+                {"name": "zzz-probe-group", "rank": 7, "isDefault": True,
+                 "inherits": True, "siteId": "1"},
                 ("rank", "isDefault"),
             ),
             (
                 "/users",
+                # `scope` is required beside `email` and `fullName`.
                 {"fullName": "zzz Probe", "email": "zzz-probe@example.test",
+                 "scope": "tenant",
                  "allowRemoteShell": True, "siteRoles": [{"id": "1"}]},
                 ("allowRemoteShell", "siteRoles"),
             ),
@@ -154,7 +158,9 @@ class TestAnUpdateKeepsWhatItWasSent:
         user = self._one(client, auth_headers, "/users")
         response = client.put(
             f"{BASE}/users/{user['id']}", headers=auth_headers,
-            json={"data": {"allowRemoteShell": True}},
+            # The swagger marks `scope` required on this update body, so a
+            # partial change still names the scope it applies to.
+            json={"data": {"allowRemoteShell": True, "scope": "tenant"}},
         )
         assert response.status_code == 200, response.text
         assert response.json()["data"]["allowRemoteShell"] is True

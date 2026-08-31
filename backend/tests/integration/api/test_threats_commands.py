@@ -29,7 +29,8 @@ class TestAnalystVerdict:
         resp = client.post(
             f"{BASE}/threats/analyst-verdict",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {"verdict": "true_positive"}},
+            json={"filter": {"ids": [tid]},
+                  "data": {"analystVerdict": "true_positive"}},
         )
         assert resp.status_code == 200
 
@@ -38,7 +39,8 @@ class TestAnalystVerdict:
         body = client.post(
             f"{BASE}/threats/analyst-verdict",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {"verdict": "false_positive"}},
+            json={"filter": {"ids": [tid]},
+                  "data": {"analystVerdict": "false_positive"}},
         ).json()
         assert "data" in body
 
@@ -120,7 +122,7 @@ class TestAddToBlacklist:
         resp = client.post(
             f"{BASE}/threats/add-to-blacklist",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
+            json={"filter": {"ids": [tid]}, "data": {"targetScope": "site"}},
         )
         assert resp.status_code == 200
 
@@ -192,7 +194,8 @@ class TestFetchFile:
         resp = client.post(
             f"{BASE}/threats/fetch-file",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
+            json={"filter": {"ids": [tid]},
+                  "data": {"password": "Probe-Passw0rd!"}},
         )
         assert resp.status_code == 200
 
@@ -203,7 +206,8 @@ class TestFetchFile:
         client.post(
             f"{BASE}/threats/fetch-file",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
+            json={"filter": {"ids": [tid]},
+                  "data": {"password": "Probe-Passw0rd!"}},
         )
         resp = client.get(f"{BASE}/threats/{tid}/download-from-cloud", headers=auth_headers)
         assert resp.status_code == 200
@@ -224,7 +228,8 @@ class TestDvThreatActions:
         resp = client.post(
             f"{BASE}/threats/dv-add-to-blacklist",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
+            json={"filter": {"ids": [tid]},
+                  "data": {"targetScope": "site", "hashes": ["a" * 40]}},
         )
         assert resp.status_code == 200
 
@@ -235,7 +240,8 @@ class TestDvThreatActions:
         resp = client.post(
             f"{BASE}/threats/dv-mark-as-threat",
             headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
+            json={"filter": {"ids": [tid]},
+                  "data": {"status": "true_positive", "events": [{"id": tid}]}},
         )
         assert resp.status_code == 200
 
