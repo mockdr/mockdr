@@ -52,6 +52,23 @@ def _create_action(
     return action
 
 
+def _names_a_target(request_data: dict) -> bool:
+    """Whether a request names anything at all to act on.
+
+    `select_endpoints` answers with every endpoint when it is handed no
+    filters, which is right for a listing and catastrophic for a write:
+    `update_agent_name` with a body carrying only an alias renamed all sixty
+    endpoints and answered `{"reply": true}`. `endpoints_named_by` has this
+    guard; the two write paths below did not.
+    """
+    return bool(
+        request_data.get("filters")
+        or request_data.get("endpoint_id_list")
+        or request_data.get("endpoint_id")
+        or request_data.get("agent_id"),
+    )
+
+
 def endpoints_named_by(request_data: dict) -> list[str]:
     """Every endpoint a request names, by id or by filter.
 
@@ -180,6 +197,8 @@ def update_agent_name(request_data: dict, alias: str) -> dict | None:
     """
     from application.xdr_endpoints.queries import select_endpoints
 
+    if not _names_a_target(request_data):
+        return None
     matched = select_endpoints(request_data)
     if not matched:
         return None
@@ -306,8 +325,10 @@ def tag_endpoints(body: dict, *, assign: bool) -> dict:
     from application.xdr_endpoints.queries import select_endpoints
 
     request_data = body.get("request_data") or {}
-    matched = select_endpoints(request_data)
     lcaas = (body.get("context") or {}).get("lcaas_id")
+    if not _names_a_target(request_data) and not lcaas:
+        return build_xdr_reply({})
+    matched = select_endpoints(request_data)
     if lcaas:
         matched = [e for e in matched if e.endpoint_id in lcaas]
 
