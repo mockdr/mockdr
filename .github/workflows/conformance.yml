@@ -13,10 +13,18 @@ on:
     paths:
       - "conformance/**"
       - "backend/api/routers/splunk/**"
+      # The Elasticsearch and Kibana routers themselves, which were not
+      # listed: a change to `es_search.py` or `es_alerts.py` changes exactly
+      # what these probes measure and triggered no run at all.
+      - "backend/api/routers/es_*.py"
+      # Compression, the Elastic headers and content type, the Kibana
+      # api-version header — every probe sees all of them.
+      - "backend/api/middleware/**"
       - "backend/application/splunk/**"
       - "backend/application/es_**"
       - "backend/utils/splunk/**"
       - "backend/utils/es_*.py"
+      - "backend/utils/kibana_*.py"
       - "backend/infrastructure/fixtures/splunk/**"
       - ".github/workflows/conformance.yml"
 
