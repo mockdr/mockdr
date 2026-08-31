@@ -60,8 +60,20 @@ def action_quarantined_files_by_query(
     Body: `{"filter": "<FQL>", "action": "release|delete|unquarantine"}`,
     the shape the reference records (`action`, `comment`, `filter`, `q`).
     """
+    # A query that selects nothing acts on nothing. With no filter this
+    # selected *everything*, so an empty body released every quarantined
+    # file there was — 15 of 15, from a request that said nothing at all.
+    # Its by-ids sibling does nothing with an empty `ids`, and this now
+    # matches it. Falcon's own schema marks no member required, so an empty
+    # body is not refused here, only acted on the way it reads.
+    selected_filter = body.get("filter") or body.get("q")
+    if not isinstance(selected_filter, str) or not selected_filter.strip():
+        response = quarantine_commands.action_quarantined_files(
+            [], body.get("action", "release"))
+        response.pop("resources", None)
+        return response
     selected = quarantine_queries.query_quarantined_file_ids(
-        body.get("filter"), 0, _BY_QUERY_LIMIT, None,
+        selected_filter, 0, _BY_QUERY_LIMIT, None,
     )
     ids = [str(i) for i in selected.get("resources") or []]
     response = quarantine_commands.action_quarantined_files(

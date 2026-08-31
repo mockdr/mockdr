@@ -130,6 +130,12 @@ _ANY_DOCUMENT = re.compile(r"/_doc(/|$)|/_create/|/_source$")
 #: the other direction. When a reference for one of these arrives, the route
 #: leaves this list rather than the list growing to meet it.
 _NOTHING_SAYS_OTHERWISE = {
+    # `DomainQueriesPatchRequest` declares `action`, `comment`, `filter` and
+    # `q`, and marks none of them required — so an empty body is not a thing
+    # Falcon refuses. It selects nothing here rather than everything: with no
+    # filter this once released every quarantined file there was, from a
+    # request that said nothing at all.
+    "PATCH /cs/quarantine/queries/quarantined-files/v1",
     # The Cortex reference states a requirement for 68 of its routes and
     # none for these — `xql/get_quota` gives `{"request_data": null}` as its
     # own example.

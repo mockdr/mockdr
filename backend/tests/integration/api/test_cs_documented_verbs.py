@@ -101,8 +101,26 @@ class TestTheQuarantineActionByFilter:
         assert len(before) > 1, "all files already in one state; nothing to move"
 
         resp = client.patch(f"{CS}/quarantine/queries/quarantined-files/v1",
-                            headers=cs_headers, json={"filter": "", "action": "delete"})
+                            headers=cs_headers,
+                            json={"filter": "state:'quarantined'", "action": "delete"})
         assert resp.status_code == 200, resp.text
         # MsaReplyMetaOnly: meta and errors, no resources.
         assert "resources" not in resp.json()
-        assert self._states(client, cs_headers) == {"deleted"}
+        after = self._states(client, cs_headers)
+        assert "quarantined" not in after
+        assert "deleted" in after
+
+    def test_an_empty_query_acts_on_nothing(
+        self, client: TestClient, cs_headers: dict,
+    ) -> None:
+        """With no filter this once released every file there was.
+
+        A body that says nothing must not act on everything. Falcon's own
+        schema marks no member required, so the body is not refused — it
+        selects nothing, the way the by-ids route does with empty `ids`.
+        """
+        before = self._states(client, cs_headers)
+        resp = client.patch(f"{CS}/quarantine/queries/quarantined-files/v1",
+                            headers=cs_headers, json={})
+        assert resp.status_code == 200, resp.text
+        assert self._states(client, cs_headers) == before
