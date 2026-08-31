@@ -1920,6 +1920,27 @@ def apply_source_filter(hits: list[dict], spec: object) -> list[dict]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
+def filter_es_records(
+    records: list[dict],
+    query_body: dict,
+    ids: dict[int, str] | None = None,
+    lookup: Callable[[str, str, str], list[Any]] | None = None,
+) -> list[dict]:
+    """The records a body's `query` matches — no sorting, no page cut.
+
+    Separate from `apply_es_query` because two callers need the matches
+    themselves rather than one page of them: `hits.total.value` counts what
+    matched (measured on 8.15: a `term` query over four documents reports 3
+    and 1, not 4 and 4), and an update-by-query changes every match rather
+    than the first ten.
+    """
+    query_clause = query_body.get("query")
+    if not query_clause:
+        return records
+    predicate = build_predicate(query_clause, ids=ids, lookup=lookup)
+    return [r for r in records if predicate(r)]
+
+
 def apply_es_query(
     records: list[dict],
     query_body: dict,
@@ -1945,10 +1966,7 @@ def apply_es_query(
     positions = doc_positions(records)
 
     # Filter.
-    query_clause = query_body.get("query")
-    if query_clause:
-        predicate = build_predicate(query_clause, ids=ids, lookup=lookup)
-        records = [r for r in records if predicate(r)]
+    records = filter_es_records(records, query_body, ids=ids, lookup=lookup)
 
     # Sort.
     sort_spec = query_body.get("sort")

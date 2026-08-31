@@ -51,8 +51,14 @@ def update_alert_status(
         }
     """
     _refuse_bad_status_body(body)
+    status = str(body.get("status") or "")
+    query = body.get("query")
+    if isinstance(query, dict):
+        # The other arm the body's own validation accepts, and the one
+        # Kibana's UI uses. It was validated and then dropped.
+        return alert_commands.update_alert_status_by_query(query, status)
     return alert_commands.update_alert_status(
-        body.get("signal_ids") or [], str(body.get("status") or ""),
+        body.get("signal_ids") or [], status,
     )
 
 

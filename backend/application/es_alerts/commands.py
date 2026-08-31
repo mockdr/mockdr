@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from application import bridge
 from repository.es_alert_repo import es_alert_repo
+from utils.es_ecs import to_ecs_document
+from utils.es_query import filter_es_records
+from utils.serde import record_dict
 
 
 def update_alert_status(alert_ids: list[str], status: str) -> dict:
@@ -28,6 +31,29 @@ def update_alert_status(alert_ids: list[str], status: str) -> dict:
     # response; `{"updated": N}` alone left a client with nothing to check for
     # version conflicts or failures.
     return _update_by_query_response(updated)
+
+
+def update_alert_status_by_query(query: dict, status: str) -> dict:
+    """Set the status of every alert a query matches.
+
+    The route validated this arm of the body and then handed only
+    `signal_ids` to the command, so a client that selected alerts the way
+    Kibana's own UI selects them — by query — was told `updated: 0` for a
+    query matching 45 alerts, and nothing changed.  A bulk status change
+    that silently does nothing is the worst kind: the operator moves on.
+    """
+    index = ".siem-signals-default"
+    alerts = list(es_alert_repo.list_all())
+    documents = [to_ecs_document(record_dict(a), index) for a in alerts]
+    # `apply_es_query` returns the same dict objects it was given, so the
+    # surviving documents identify their alerts by identity rather than by
+    # a field the ECS mapping may have moved or renamed.
+    by_identity = {id(doc): alert.id for doc, alert in zip(documents, alerts, strict=True)}
+    # Every match, not the first page: update_by_query has no size.
+    matched = filter_es_records(documents, {"query": query})
+    return update_alert_status(
+        [by_identity[id(doc)] for doc in matched if id(doc) in by_identity], status,
+    )
 
 
 def _update_by_query_response(updated: int, *, took: int = 5) -> dict:
