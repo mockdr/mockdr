@@ -77,6 +77,22 @@ def get_detections(
     return response
 
 
+@router.patch("/alerts/entities/alerts/v2")
+def update_detections_v2(
+    body: dict = Body(...),
+    auth: dict = Depends(require_cs_write),
+) -> dict:
+    """The same update, under the version that names the ids `ids`.
+
+    Falcon documents both: v2 requires `ids`, v3 requires `composite_ids`,
+    and the `action_parameters` are identical. Only v3 was served, so a
+    client on the older API met a 405. `_id_list` already reads either
+    spelling, and no refusal is invented here for the wrong one — there is
+    no measurement of how Falcon words that.
+    """
+    return update_detections(body, auth)
+
+
 @router.patch("/alerts/entities/alerts/v3")
 def update_detections(
     body: dict = Body(...),

@@ -45,7 +45,7 @@ _PARAM = re.compile(r"\{[^}]+\}")
 #: document; the rest are reduced references whose keys read "GET /path".
 _REFERENCES = (
     ("SentinelOne", "data/swagger_2_1.json", "", "openapi"),
-    ("CrowdStrike", "data/vendor-specs/crowdstrike_gofalcon_reduced.json", "/crowdstrike", "keys"),
+    ("CrowdStrike", "data/vendor-specs/crowdstrike_gofalcon_reduced.json", "/cs", "keys"),
     ("Defender", "data/vendor-specs/mde_docs_reduced.json", "/mde", "keys"),
     ("Graph", "data/vendor-specs/graph_v1.0_reduced.json", "/graph", "keys"),
     ("Cortex XDR", "data/vendor-specs/xdr_openapi_reduced.json", "/xdr", "keys"),

@@ -78,6 +78,23 @@ def query_hidden_devices(
     return host_queries.query_hidden_host_ids(filter, offset, limit, sort)
 
 
+@router.get("/devices/entities/devices/v2")
+def get_hosts_by_query(
+    ids: str = Query(...),
+    _: dict = Depends(require_cs_auth),
+) -> dict:
+    """Return full host entities for the ids named in the query string.
+
+    Falcon documents this path under both verbs and gofalcon's own client
+    reads devices with the GET form; only POST was served, so the ordinary
+    ids-then-entities read met a 405 on its second half.  The two answer
+    the same entities from the same query — the ids just arrive by a
+    different door.
+    """
+    id_list: list[str] = [i.strip() for i in ids.split(",") if i.strip()]
+    return host_queries.get_host_entities(id_list)
+
+
 @router.post("/devices/entities/devices/v2")
 def get_hosts(
     body: dict = Body(...),

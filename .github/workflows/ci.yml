@@ -216,6 +216,15 @@ jobs:
           python scripts/paging_audit.py
           python scripts/roundtrip_audit.py
 
+      # data/ is gitignored, so without this the spec is absent and every
+      # check that reads it quietly checks less — the same reason the
+      # field-drift job fetches it. It sits here rather than further down
+      # because `method_drift.py` below reads it too: without it that check
+      # compared 151 documented operations instead of 247, printed a note
+      # among a hundred other lines, and exited 0.
+      - name: Fetch SentinelOne API spec
+        run: ./scripts/fetch_swagger.sh
+
       - name: Refusals a client can parse, and rights it must have
         run: |
           python scripts/error_envelope_audit.py
@@ -223,11 +232,6 @@ jobs:
           python scripts/method_drift.py
           python scripts/body_audit.py
           python scripts/http_contract_audit.py
-
-      # data/ is gitignored, so without this the spec is absent and the
-      # check does not run — the same reason the field-drift job fetches it.
-      - name: Fetch SentinelOne API spec
-        run: ./scripts/fetch_swagger.sh
 
       - name: Enum values the vendor declares
         run: python scripts/enum_drift.py
