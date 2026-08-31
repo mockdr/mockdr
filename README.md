@@ -308,6 +308,58 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | Intune Device Management | ❌ | ✅ | ✅ |
 | Attack Simulation | ❌ | ✅ | ❌ |
 
+## Behaviour that will surprise you
+
+Two things this mock does are faithful to the products and unlike most
+mocks. Both will look like bugs the first time you meet them, and both are
+there because a mock that is easier than the product lets a broken client
+pass.
+
+### A write to Elasticsearch is not searchable until a refresh
+
+```bash
+curl -u elastic:mock-elastic-password -XPOST localhost:5001/elastic/my-index/_doc/1 \
+     -H 'Content-Type: application/json' -d '{"a":1}'
+curl -u elastic:mock-elastic-password localhost:5001/elastic/my-index/_search
+# hits.total.value: 0
+
+curl -u elastic:mock-elastic-password -XPOST localhost:5001/elastic/my-index/_refresh
+curl -u elastic:mock-elastic-password localhost:5001/elastic/my-index/_search
+# hits.total.value: 1
+```
+
+Elasticsearch is near-real-time: an indexed document reaches the search
+index at the next refresh, not at the write. Clients that index and then
+immediately search are the single most common Elasticsearch integration bug,
+and a mock that answers straight away hides it. Pass `?refresh=true` (or
+`wait_for`) on the write, or call `_refresh`, exactly as you would against a
+real cluster. There is no switch to turn this off.
+
+### A parameter whose value its type cannot hold is refused
+
+A filter the vendor documents as `integer`, `boolean` or a timestamp is
+checked before it is applied:
+
+```bash
+# 400, in SentinelOne's own validation envelope
+curl -H "Authorization: ApiToken $TOKEN" \
+     'localhost:5001/web/api/v2.1/agents?coreCount__lt=abc'
+curl -H "Authorization: ApiToken $TOKEN" \
+     'localhost:5001/web/api/v2.1/threats?resolved=maybe'
+curl -H "Authorization: ApiToken $TOKEN" \
+     'localhost:5001/web/api/v2.1/agents?createdAt__gte=not-a-date'
+```
+
+Earlier releases answered `200` to all three and quietly ignored the filter,
+or compared the value as text — so `?resolved=maybe` came back with every
+unresolved threat and `?coreCount__lt=abc` with the whole estate. A client
+with a formatting bug was handed a filtered-looking result and never told.
+Every valid spelling still works, including every ISO-8601 form and the
+epoch milliseconds a dated `__between` documents.
+
+If you are upgrading from 2.3.x and a request that used to succeed now
+answers `400`, read the `detail`: it names the parameter and what it wanted.
+
 ## API Coverage
 
 ### SentinelOne (prefix: `/web/api/v2.1`)
