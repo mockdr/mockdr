@@ -31,10 +31,11 @@ class FqlClause:
     Attributes:
         field:       Field name the clause targets, e.g. ``"hostname"``.
         operator:    One of ``"eq"``, ``"neq"``, ``"gte"``, ``"lte"``,
-                     ``"gt"``, ``"lt"``, ``"in"``, ``"wildcard"``,
+                     ``"gt"``, ``"lt"``, ``"in"``, ``"nin"``, ``"wildcard"``,
                      ``"not_wildcard"``.
         values:      List of values for the clause (single-element for
-                     scalar operators, multi-element for ``"in"`` / ``"or"``).
+                     scalar operators, multi-element for ``"in"`` /
+                     ``"nin"`` / ``"or"``).
         conjunction: How this clause joins with the preceding clause —
                      ``"and"`` or ``"or"``.
     """
@@ -77,7 +78,10 @@ def _classify_operator(op_chars: str, value: str) -> str:
         Canonical operator string.
     """
     if _BRACKET_RE.match(value):
-        return "in"
+        # The negation is read before the brackets: `field:!['a','b']` was
+        # classified as `in`, so a query for the hosts *outside* a set
+        # answered with exactly the hosts inside it.
+        return "nin" if op_chars in ("!", "!=") else "in"
     if op_chars == "!" or op_chars == "!=":
         return "neq"
     if op_chars == ">=":
@@ -118,7 +122,7 @@ def _extract_values(value_portion: str, operator: str) -> list[str]:
     Returns:
         List of unquoted value strings.
     """
-    if operator == "in":
+    if operator in ("in", "nin"):
         m = _BRACKET_RE.match(value_portion)
         if m:
             return [item.group(1) for item in _BRACKET_ITEM_RE.finditer(m.group(1))]
@@ -331,6 +335,9 @@ def _match_clause(record: object, clause: FqlClause) -> bool:
 
     if clause.operator == "in":
         return any(c in clause.values for c in candidates)
+
+    if clause.operator == "nin":
+        return all(c not in clause.values for c in candidates)
 
     # Range operators — attempt numeric comparison first, fall back to string.
     if clause.operator in ("gte", "lte", "gt", "lt"):
