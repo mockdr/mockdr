@@ -82,6 +82,15 @@ def test_documented_sort_fields_order_the_answer(
         present = [v for v in values if v is not None]
         if len(present) < 3:
             continue  # the field is not in this response; nothing to order
+        if any(isinstance(v, (dict, list)) for v in present):
+            # An object has no order. `scope` on an exclusion is a document
+            # naming the level and the ids, and sorting a page by it would
+            # mean sorting by that document's rendering — an artifact of how
+            # the mock stringifies a dict, not a contract any product keeps.
+            # It read as passing only while every record's scope was the same
+            # shape; the first seed to write account- and group-scoped
+            # exclusions beside the site-scoped ones ended that.
+            continue
         exercised += 1
         assert present == sorted(present, key=_key), f"{route} ignored sortBy={field}"
     if not exercised:

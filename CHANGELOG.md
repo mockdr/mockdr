@@ -81,6 +81,33 @@ unit tests, from 2 103.
 
 ### Fixed
 
+**No documented filter points at an empty field any more — 0 of 344, from 59.**
+The rest of them, after the indicators, the device rules, the agents and the
+threats: an account carries the licence document and SKUs its answer
+declares and an expiry date; an exclusion is written at all four scopes
+rather than two, and names the application where it is written against one;
+a blocklist entry likewise; a firewall rule names the tags it is scoped by; a
+group has a rank; a STAR rule the id of the scope it belongs to; and an
+activity that reports a threat says which threat — types 25 to 27 are
+"Threat detected", "mitigated" and "resolved", and all three left it unset,
+so a client following an activity to what it reports found nothing to
+follow.
+
+The scopes are round-robin, not drawn: a scope that appears only on some
+seeds gives a filter that passes only on some runs, which is the flakiness
+this seed keeps being cleaned of.
+
+Two tests had been passing on the uniformity that has now gone. The schema
+test caught `skus[].type` written lowercase where the swagger's enum is
+`Core`, `Control`, `Complete`. And `test_documented_sorting` asserted a page
+was ordered by `scope` — an object, whose ordering is the mock's rendering
+of a dict rather than a contract any product keeps. It read as passing only
+while every record's scope was the same shape; object- and list-valued
+fields are skipped now, with the reason written down.
+
+**32 tests that used to skip themselves now run**: 4 796 pass where 4 764
+did, and 150 skips where there were 182.
+
 **59 documented filters sat over a field nothing ever filled.**
 17 % of the filters this mock derives from the swagger pointed at a member
 that was empty in every seeded record — so each one could only ever answer

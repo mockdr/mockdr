@@ -38,7 +38,7 @@ def seed_groups(
         site = site_repo.get(sid)
         assert site is not None
         gids: list[str] = []
-        for gname in random.sample(_GROUP_NAMES, 3):
+        for rank_counter, gname in enumerate(random.sample(_GROUP_NAMES, 3), start=1):
             gid = new_id()
             gids.append(gid)
             group_repo.save(Group(
@@ -49,7 +49,9 @@ def seed_groups(
                 createdAt=ago(days=290),
                 updatedAt=rand_ago(30),
                 totalAgents=0,
-                rank=None,
+                # Groups are ordered in the console, and this was None on
+                # every one of them.
+                rank=rank_counter,
                 isDefault=(gname == "Default group"),
                 inherits=True,
                 description=fake.sentence(nb_words=6),

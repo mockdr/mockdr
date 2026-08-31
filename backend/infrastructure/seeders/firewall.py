@@ -9,6 +9,19 @@ from infrastructure.seeders._shared import rand_after, rand_ago
 from repository.firewall_repo import firewall_repo
 from utils.id_gen import new_id
 
+#: Tags a firewall rule is scoped by, when it is scoped by one.
+_TAG_NAMES: list[str] = ["Servers", "Workstations", "Contractors", "Executives"]
+
+
+def _a_tag_id(index: int) -> str:
+    """A tag id for every other rule, so both states are always seeded."""
+    from repository.store import store  # noqa: PLC0415 - avoids a cycle
+
+    if index % 2:
+        return ""
+    tags = list(store.get_all("tags"))
+    return str(getattr(tags[index % len(tags)], "id", "")) if tags else ""
+
 
 def seed_firewall_rules(
     fake: Faker,
@@ -48,8 +61,10 @@ def seed_firewall_rules(
             scopeId=fw_site_id,
             editable=True,
             tag=fake.sentence(nb_words=4),
-            tagIds=[],
-            tagNames=[],
+            # A rule scoped by tag names the tags. Both were empty on every
+            # rule, so the two documented filters over them matched none.
+            tagIds=[tag_id] if (tag_id := _a_tag_id(i)) else [],
+            tagNames=[_TAG_NAMES[i % len(_TAG_NAMES)]] if tag_id else [],
             tags=[],
             creator="Admin User",
             creatorId=admin_user_id,

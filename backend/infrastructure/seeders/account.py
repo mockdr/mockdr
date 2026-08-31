@@ -37,5 +37,38 @@ def seed_account(fake: Faker) -> tuple[str, str]:
         billingMode="subscription",
         usageType="customer",
         totalLicenses=SITE_COUNT * SITE_TOTAL_LICENSES,
+        # An account expires, and a trial one demonstrably so.
+        expiration=ago(days=-180),
+        # The same document each site carries, summed to the account. It was
+        # absent entirely, so `?module=` and `?sku=` matched no account and
+        # a console reading the account's entitlements read nothing.
+        licenses={
+            "bundles": [{
+                "displayName": "Endpoint Security - Complete",
+                "majorVersion": 1,
+                "minorVersion": 33,
+                "name": "complete",
+                "surfaces": [{
+                    "count": SITE_COUNT * SITE_TOTAL_LICENSES,
+                    "name": "Total Agents",
+                }],
+                "totalSurfaces": SITE_COUNT * SITE_TOTAL_LICENSES,
+            }],
+            "modules": [
+                {"displayName": "Remote Script Orchestration", "majorVersion": 1,
+                 "name": "rso"},
+                {"displayName": "Deep Visibility", "majorVersion": 1, "name": "dv"},
+            ],
+            "settings": [{
+                "displayName": "90 Days",
+                "groupName": "dv_retention",
+                "setting": "90 Days",
+                "settingGroup": "dv_retention",
+                "settingGroupDisplayName": "Deep Visibility Data Retention",
+            }],
+        },
+        # The swagger's enum is capitalised: Core, Control, Complete.
+        skus=[{"type": "Complete",
+               "totalLicenses": SITE_COUNT * SITE_TOTAL_LICENSES}],
     ))
     return account_id, _ACCOUNT_NAME

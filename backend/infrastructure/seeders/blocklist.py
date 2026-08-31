@@ -5,6 +5,7 @@ from faker import Faker
 
 from infrastructure.seeders._shared import MALWARE_NAMES, rand_after, rand_ago
 from repository.blocklist_repo import blocklist_repo
+from repository.group_repo import group_repo
 from repository.site_repo import site_repo
 from repository.user_repo import user_repo
 from utils.id_gen import new_id
@@ -22,9 +23,12 @@ def seed_blocklist(
         site_ids: Pool of site IDs for scope assignment.
         user_ids: Pool of user IDs for creator attribution.
     """
-    for _ in range(10):
+    for i in range(10):
         bid = new_id()
         bl_site_id = random.choice(site_ids)
+        bl_group_ids = [
+            g.id for g in group_repo.list_all() if g.siteId == bl_site_id
+        ][:1]
         bl_site = site_repo.get(bl_site_id)
         bl_uid = random.choice(user_ids)
         bl_user = user_repo.get(bl_uid)
@@ -37,7 +41,15 @@ def seed_blocklist(
             "description": f"Blocked: {random.choice(MALWARE_NAMES)}",
             "source": random.choice(["user", "cloud", "action_from_threat"]),
             "osType": random.choice(["windows", "macos", "linux"]),
-            "scope": {"siteIds": [bl_site_id], "groupIds": [], "accountIds": [], "tenant": False},
+            # Every entry was site-scoped, so the documented `accountIds`
+            # and `groupIds` filters matched none of them.
+            "scope": (
+                {"siteIds": [], "groupIds": [], "accountIds": [bl_site.accountId],
+                 "tenant": False}
+                if bl_site and i % 4 == 0
+                else {"siteIds": [bl_site_id], "groupIds": bl_group_ids,
+                      "accountIds": [], "tenant": False}
+            ),
             "scopeName": bl_site.name if bl_site else "",
             "scopePath": (
                 f"Global / Acme Corp Security / {bl_site.name}"

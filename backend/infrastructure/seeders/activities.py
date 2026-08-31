@@ -8,7 +8,11 @@ from repository.activity_repo import activity_repo
 from repository.agent_repo import agent_repo
 from repository.group_repo import group_repo
 from repository.site_repo import site_repo
+from repository.threat_repo import threat_repo
 from utils.id_gen import new_uuid
+
+#: The activity types that report on a threat, from `ACTIVITY_CATALOG`.
+_THREAT_ACTIVITIES: frozenset[int] = frozenset({25, 26, 27})
 
 
 def seed_activities(
@@ -59,6 +63,17 @@ def seed_activities(
         activity.accountId = account_id
         activity.accountName = account_name
         activity.primaryDescription = act_desc
+        # An activity about a threat names it. Types 25-27 are "Threat
+        # detected", "mitigated" and "resolved", and every one of them left
+        # `threatId` unset — so the documented `threatIds` filter matched no
+        # activity, and a client following an activity to the threat it
+        # reports found nothing to follow.
+        if act_type in _THREAT_ACTIVITIES:
+            on_agent = [t for t in threat_repo.list_all()
+                        if getattr(t, "agentRealtimeInfo", {}).get("agentId") == act_agent_id]
+            chosen = on_agent or threat_repo.list_all()
+            if chosen:
+                activity.threatId = str(random.choice(chosen).id)
 
         scope_name = (
             act_group.name if act_group

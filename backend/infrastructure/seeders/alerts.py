@@ -142,6 +142,10 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
             "s1ql": rule_s1ql,
             "severity": severity,
             "scopeLevel": "site",
+            # The scope's own id, which the swagger declares beside
+            # `scopeLevel` and nothing set — so the documented `scopeId`
+            # filter matched no rule.
+            "scopeId": agent.siteId,
             "siteIds": [agent.siteId],
             "groupIds": [],
             "accountIds": [agent.accountId],

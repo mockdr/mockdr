@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -30,6 +30,12 @@ class Account:
     salesforceId: str = ""
     unlimitedExpiration: bool = False
     makeSocDefaultUi: bool = False
+    # The account's own licence document and the SKUs under it, both
+    # declared on its answer and set by nothing — so `?module=` and `?sku=`
+    # could match no account, and neither could `?expiration=`. The sites
+    # carry the same shape; this is theirs summarised.
+    licenses: dict = field(default_factory=dict)
+    skus: list = field(default_factory=list)
     billingMode: str = "subscription"
     usageType: str = "customer"
     totalLicenses: int = 0
