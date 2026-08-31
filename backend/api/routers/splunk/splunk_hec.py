@@ -206,6 +206,19 @@ _SIMPLE_SOURCE = "http-simple"
 #: verdict on the payload — too small to guess from.
 _SIMPLE_SOURCETYPE = "unknown-too_small"
 
+#: `default` is this receiver's name for "wherever you send things by
+#: default", not an index of its own.  Measured on 10.4.2: a body posted
+#: with `?index=default` comes back echoing `_index: default` and is then
+#: found by `search index=main`, while `search index=default` finds
+#: nothing.  mockdr stored the word itself, so an event ingested here and
+#: searched for where it actually lives was not there — the whole
+#: ingest-then-search round trip, quietly broken.
+#:
+#: The event collector next door does *not* share this: it holds `default`
+#: against the token's index list like any other name and answers
+#: `{"text": "Incorrect index", "code": 7}`, which mockdr already did.
+_SIMPLE_DEFAULT_INDEX = "main"
+
 
 @router.post("/services/receivers/simple", response_model=None)
 async def receivers_simple(
@@ -231,13 +244,16 @@ async def receivers_simple(
     stamped_host = host or (request.client.host if request.client else "127.0.0.1")
     stamped_source = source or _SIMPLE_SOURCE
     stamped_sourcetype = sourcetype or _SIMPLE_SOURCETYPE
+    stored_index = _SIMPLE_DEFAULT_INDEX if index == "default" else index
     submit_event(
-        {"event": text, "index": index, "sourcetype": stamped_sourcetype,
+        {"event": text, "index": stored_index, "sourcetype": stamped_sourcetype,
          "source": stamped_source, "host": stamped_host},
-        index,
+        stored_index,
         stamped_sourcetype,
     )
     return JSONResponse(status_code=200, content={
+        # The receipt echoes what was asked for, which is what splunkd
+        # echoes — only where it lands is resolved.
         "index": index,
         "bytes": len(body),
         "host": stamped_host,

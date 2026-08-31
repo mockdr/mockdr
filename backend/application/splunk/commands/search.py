@@ -296,7 +296,13 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
         # documents the search never touched.
         events = []
     elif parsed.is_notable or parsed.index == "notable":
-        events = _query_notables(parsed)
+        # The notable store *and* whatever was ingested into that index.
+        # Serving only the store meant an event accepted by the receiver
+        # with `?index=notable`, and reported under that index by
+        # `stats count by index`, was invisible to `search index=notable` —
+        # the mock disagreeing with itself about where it had just put
+        # something.
+        events = _query_notables(parsed) + _query_events(parsed)
     else:
         events = _query_events(parsed)
 
