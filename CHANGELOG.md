@@ -79,6 +79,22 @@ Frontend coverage is 91.2 % of statements, from 81.0 %: `stores` 70.3 % →
 98.5 % (the dead file was most of the gap), `views/graph` 0 % → 74.2 %. 2 144
 unit tests, from 2 103.
 
+### Changed
+
+**The ReDoS guard measures a ratio, not the clock.**
+It asserted that a 32KB hostile `$filter` is rejected inside one second,
+chosen as "well under the old cost (~2.8s) and far above the fixed one
+(~1ms)". It failed anyway, once, under twenty parallel workers — a
+wall-clock budget measures the machine as much as the code — and raising it
+is no answer either: the broken version took 2.8s, so any budget loose
+enough to survive load would let the regression through. It compares the
+hostile filter against an ordinary one measured in the same conditions
+instead. A hostile filter costs 1x an ordinary one today; the limit is 50x
+and the quadratic version was roughly 2 800x.
+
+It was the only test in this suite asserting on elapsed time. The other
+fourteen files that read the clock use it for timestamps.
+
 ### Fixed
 
 **No documented filter points at an empty field any more — 0 of 344, from 59.**

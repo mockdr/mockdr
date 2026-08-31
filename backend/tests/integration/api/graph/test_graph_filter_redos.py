@@ -10,9 +10,21 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-# Well under the old cost (~2.8s for this input) and far above the fixed one
-# (~1ms), so this fails on a regression without flaking on a slow machine.
-_BUDGET_SECONDS = 1.0
+# How much dearer a hostile filter may be than an ordinary one, measured in
+# the same conditions rather than against the clock.
+#
+# This was an absolute budget of one second, chosen as "well under the old
+# cost (~2.8s) and far above the fixed one (~1ms)". It failed anyway, once,
+# under twenty parallel workers — because a wall-clock budget measures the
+# machine as much as the code, and raising it is no answer either: the broken
+# version took 2.8s, so any budget loose enough to survive load would let the
+# regression through.
+#
+# A ratio does not care how loaded the machine is. Quadratic cost me a
+# factor of roughly 2 800 here; linear costs a small multiple of a normal
+# request, and the floor keeps timer noise on a fast reject from mattering.
+_HOSTILE_COST_LIMIT = 50
+_NOISE_FLOOR_SECONDS = 0.05
 
 
 class TestHostileFilterIsRejectedQuickly:
@@ -22,20 +34,27 @@ class TestHostileFilterIsRejectedQuickly:
     def test_long_lambda_prefix_returns_promptly(
         self, client: TestClient, graph_admin_headers: dict, size: int,
     ) -> None:
-        hostile = "assignedLicenses/any(" + "a" * size
+        def ask(expression: str) -> tuple[float, int]:
+            start = time.perf_counter()
+            answer = client.get(
+                "/graph/v1.0/users",
+                params={"$filter": expression},
+                headers=graph_admin_headers,
+            )
+            return time.perf_counter() - start, answer.status_code
 
-        start = time.perf_counter()
-        resp = client.get(
-            "/graph/v1.0/users",
-            params={"$filter": hostile},
-            headers=graph_admin_headers,
-        )
-        elapsed = time.perf_counter() - start
+        ordinary_filter = "assignedLicenses/any(l: l/skuId eq 'not-a-real-sku')"
+        ask(ordinary_filter)  # warm up; route setup is not this test's subject
+        ordinary, _ = ask(ordinary_filter)
+        elapsed, status = ask("assignedLicenses/any(" + "a" * size)
 
-        assert elapsed < _BUDGET_SECONDS, (
-            f"{size}-byte filter took {elapsed:.2f}s — backtracking has regressed"
+        allowed = ordinary * _HOSTILE_COST_LIMIT + _NOISE_FLOOR_SECONDS
+        assert elapsed < allowed, (
+            f"{size}-byte filter cost {elapsed:.3f}s against {ordinary:.3f}s for an "
+            f"ordinary one — {elapsed / max(ordinary, 1e-6):.0f}x, and backtracking "
+            f"has regressed"
         )
-        assert resp.status_code in (200, 400)
+        assert status in (200, 400)
 
     def test_cost_grows_linearly_not_quadratically(
         self, client: TestClient, graph_admin_headers: dict,
