@@ -337,3 +337,44 @@ class TestAnEmptyQueryValue:
         assert resp.status_code == 200
         body = resp.json()
         assert (body["page"], body["perPage"]) == (2, 5)
+
+
+class TestAnUnreadableNumber:
+    """`?page=abc` is refused in three wordings, one per validator.
+
+    Measured on 8.15 against the live product.  mockdr sent `abc` to
+    `float()` on the two zod/io-ts routes and answered 500 — the one status
+    code the product never answers for a bad query member.
+    """
+
+    def test_config_schema_names_the_key(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/alerting/rules/_find",
+                          headers=ES_AUTH, params={"page": "abc"})
+        assert resp.status_code == 400
+        assert resp.json()["message"] == (
+            "[request query.page]: expected value of type [number] "
+            "but got [string]")
+
+    def test_zod_received_nan(self, client: TestClient) -> None:
+        for member in ("page", "per_page"):
+            resp = client.get("/kibana/api/lists/_find",
+                              headers=ES_AUTH, params={member: "abc"})
+            assert resp.status_code == 400, member
+            assert resp.json()["message"] == (
+                f"[request query]: {member}: Expected number, received nan"
+            ), member
+
+    def test_io_ts_echoes_the_value(self, client: TestClient) -> None:
+        resp = client.get("/kibana/api/osquery/packs",
+                          headers=ES_AUTH, params={"page": "abc"})
+        assert resp.status_code == 400
+        assert resp.json()["message"] == (
+            '[request query]: Invalid value "abc" supplied to "page"')
+
+    def test_the_empty_value_is_not_unreadable_on_those_two(
+        self, client: TestClient,
+    ) -> None:
+        """Guarding the unreadable value must not refuse the empty one."""
+        for path in ("/kibana/api/lists/_find", "/kibana/api/osquery/packs"):
+            resp = client.get(path, headers=ES_AUTH, params={"per_page": ""})
+            assert resp.status_code == 200, path

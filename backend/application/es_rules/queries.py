@@ -85,9 +85,21 @@ def _sort_key(record: dict, sort_field: str) -> str | int | float | bool:
     value: object = record
     for part in sort_field.split("."):
         if not isinstance(value, dict):
-            return ""
-        value = value.get(part, "")
-    return value if isinstance(value, (str, int, float, bool)) else ""
+            value = None
+            break
+        value = value.get(part)
+
+    # A pair, not the value itself: a missing path used to fall back to `""`,
+    # so sorting by a numeric field mixed `int` with `str` and the sort
+    # raised. The first member keeps absent values together at one end, the
+    # second orders what is there.
+    if isinstance(value, bool):
+        return (1, float(value), "")
+    if isinstance(value, (int, float)):
+        return (1, float(value), "")
+    if isinstance(value, str):
+        return (1, 0.0, value)
+    return (0, 0.0, "")
 
 
 def _rule_to_dict(rule: EsRule, *, listed: bool = False) -> dict:

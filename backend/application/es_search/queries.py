@@ -951,8 +951,14 @@ def es_search(index: str, body: dict, *, ignore_unavailable: bool = False) -> di
     aggs = body.get("aggs") or body.get("aggregations")
     if aggs:
         if query_clause:
-            # Compiled once, not once per document.
-            matches = build_predicate(query_clause)
+            # Compiled once, not once per document — and with the same
+            # arguments as every other call site. Without `ids` the `ids`
+            # clause fell back to a content-derived id instead of the one the
+            # client indexed under, and without `lookup` a `terms` lookup saw
+            # nothing: aggregations were computed over a different set than
+            # the hits in the same answer, so a search returning one hit
+            # returned no buckets for it.
+            matches = build_predicate(query_clause, ids=written_ids, lookup=_terms_lookup)
             matched = [r for r in records if matches(r)]
         else:
             matched = records
@@ -1004,7 +1010,7 @@ def es_count(index: str, body: dict, *, ignore_unavailable: bool = False) -> dic
     records, _, written = _resolve_collection(index, ignore_unavailable=ignore_unavailable)
     query_clause = _count_query_clause(body or {})
     if query_clause:
-        predicate = build_predicate(query_clause, ids=written)
+        predicate = build_predicate(query_clause, ids=written, lookup=_terms_lookup)
         records = [r for r in records if predicate(r)]
     return {
         "count": len(records),

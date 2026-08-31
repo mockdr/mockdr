@@ -21,7 +21,12 @@ from api.es_auth import optional_es_auth, require_es_auth
 from application.es_endpoints import queries as endpoint_queries
 from config import APP_VERSION
 from utils.es_response import build_kbn_error_response
-from utils.kibana_query import EXCESS, INVALID_KEYS, refuses_unknown
+from utils.kibana_query import (
+    EXCESS,
+    INVALID_KEYS,
+    NUMBER_IO_TS,
+    refuses_unknown,
+)
 
 router = APIRouter(tags=["Kibana Platform"])
 
@@ -327,7 +332,14 @@ def case_configuration(_: dict = Depends(require_es_auth)) -> list[dict]:
     return []
 
 
-@router.get("/api/osquery/packs")
+@router.get(
+    "/api/osquery/packs",
+    # This one had no numeric guard at all, so `?page=abc` was a 500.
+    dependencies=[refuses_unknown(
+        "page", "per_page", "sort", "sortOrder",
+        numbers=("page", "per_page"), number_dialect=NUMBER_IO_TS,
+    )],
+)
 def osquery_packs(
     # Taken as text: an empty value is the number zero on 8.15 — `?per_page=`
     # answers 200 with an empty page beside the real total — and an `int`

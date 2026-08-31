@@ -29,8 +29,15 @@ class PainlessError(ValueError):
 
 
 #: `ctx._source.a.b`, `ctx._source['a']['b']`, `ctx.op`, `params.x`.
+#:
+#: A segment carries no dot of its own. Written `\.[A-Za-z_][\w.]*`, the
+#: inner class could swallow the separators the outer repetition also
+#: matches, so a target that fails to match backtracked over every way of
+#: partitioning the path: 22 segments took 0.5s and each further one doubled
+#: it, which one `_update` body could spend, and `_update_by_query` spends
+#: once per matched document.
 _TARGET = re.compile(
-    r"""^ctx(?P<source>\._source|)(?P<path>(?:\.[A-Za-z_][\w.]*|\['[^']*'\]|\["[^"]*"\])*)$""",
+    r"""^ctx(?P<source>\._source|)(?P<path>(?:\.[A-Za-z_]\w*|\['[^']*'\]|\["[^"]*"\])*)$""",
 )
 _STATEMENT = re.compile(
     r"""^\s*(?P<target>[^=+\-]+?)\s*(?P<op>=|\+=|-=)\s*(?P<value>.+?)\s*$""",

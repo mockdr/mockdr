@@ -39,6 +39,39 @@ PREFIXED_INVALID_KEYS = "prefixed_invalid_keys"
 #: The runtime-type routes (Timeline): the query echoed, then the excess.
 EXCESS = "excess"
 
+#: How a route's validator refuses a number it cannot read.  Measured on
+#: 8.15 with `?page=abc` and with the empty `?page=`:
+#:
+#:     config-schema  [request query.page]: expected value of type [number]
+#:                    but got [string]              — and the empty value too
+#:     zod            [request query]: page: Expected number, received nan
+#:                    — but the empty value is the number zero, answered 200
+#:     io-ts          [request query]: Invalid value "abc" supplied to "page"
+#:                    — the empty value is zero here as well
+#:
+#: So the empty value is not universally a zero and not universally a
+#: refusal: which it is follows from the validator the route speaks.
+NUMBER_KEY_MISSING = "number_key_missing"
+NUMBER_ZOD = "number_zod"
+NUMBER_IO_TS = "number_io_ts"
+#: The two that read an empty value as zero rather than refusing it.
+_EMPTY_IS_ZERO = frozenset({NUMBER_ZOD, NUMBER_IO_TS})
+
+
+def _number_message(dialect: str, name: str, value: str) -> str:
+    """Word an unreadable number the way `dialect`'s validator words it."""
+    if dialect == NUMBER_ZOD:
+        return f"[request query]: {name}: Expected number, received nan"
+    if dialect == NUMBER_IO_TS:
+        return (
+            "[request query]: Invalid value "
+            + json.dumps(value) + " supplied to " + json.dumps(name)
+        )
+    return (
+        f"[request query.{name}]: expected value of type [number] "
+        f"but got [string]"
+    )
+
 
 def _message(dialect: str, sent: dict[str, str], extra: list[str]) -> str:
     """Word the refusal the way `dialect`'s validator words it."""
@@ -56,7 +89,10 @@ def _message(dialect: str, sent: dict[str, str], extra: list[str]) -> str:
 
 
 def known_query_members(
-    *known: str, dialect: str = KEY_MISSING, numbers: tuple[str, ...] = (),
+    *known: str,
+    dialect: str = KEY_MISSING,
+    numbers: tuple[str, ...] = (),
+    number_dialect: str = NUMBER_KEY_MISSING,
 ) -> Callable[..., None]:
     """Refuse any query member outside `known` the way 8.15 refuses it.
 
@@ -73,21 +109,21 @@ def known_query_members(
         }
         # dict, not set: the wordings name the members in the order sent.
         sent = dict(request.query_params)
-        # A member config-schema declares as a number, given something that is
-        # not one — an empty value included — is refused in its own words
-        # before anything reads it.  `?page=` is `expected value of type
-        # [number] but got [string]`, where an absent one is simply absent.
+        # A member declared as a number, given something that is not one, is
+        # refused in the validator's own words before anything reads it —
+        # where an absent one is simply absent.  Whether the empty value
+        # counts as "not one" is the validator's to say: see NUMBER_ZOD.
         for name in numbers:
             value = sent.get(name)
             if value is None:
+                continue
+            if value == "" and number_dialect in _EMPTY_IS_ZERO:
                 continue
             try:
                 float(value)
             except ValueError:
                 raise HTTPException(status_code=400, detail=build_kbn_error_response(
-                    400,
-                    f"[request query.{name}]: expected value of type [number] "
-                    f"but got [string]",
+                    400, _number_message(number_dialect, name, value),
                 )) from None
 
         extra = [k for k in sent if k not in measured and k not in declared]
@@ -105,9 +141,12 @@ def known_query_members(
 
 
 def refuses_unknown(
-    *known: str, dialect: str = KEY_MISSING, numbers: tuple[str, ...] = (),
+    *known: str,
+    dialect: str = KEY_MISSING,
+    numbers: tuple[str, ...] = (),
+    number_dialect: str = NUMBER_KEY_MISSING,
 ) -> DependsMarker:
     """`known_query_members` as a route dependency."""
-    marker: DependsMarker = Depends(
-        known_query_members(*known, dialect=dialect, numbers=numbers))
+    marker: DependsMarker = Depends(known_query_members(
+        *known, dialect=dialect, numbers=numbers, number_dialect=number_dialect))
     return marker

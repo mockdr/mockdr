@@ -219,7 +219,12 @@ async def batch_save_records(
     enough to read as right and is not what a client indexes into.
     """
     records = await request.json()
-    if not isinstance(records, list):
+    # Each element too, not just the array. `batch_find` beside this guards
+    # its elements; this one handed a string to `record.get("_key")` and
+    # answered 500 where its sibling answers 400.
+    if not isinstance(records, list) or any(
+        not isinstance(record, dict) for record in records
+    ):
         raise HTTPException(status_code=400, detail={"messages": [
             {"type": "ERROR", "text": "Expected a JSON array of records"},
         ]})

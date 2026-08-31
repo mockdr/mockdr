@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, Query
 
 from api.es_auth import require_es_auth
 from config import APP_VERSION
-from utils.kibana_query import refuses_unknown
+from utils.kibana_query import NUMBER_ZOD, refuses_unknown
 
 router = APIRouter(tags=["Kibana Alerting"])
 
@@ -198,7 +198,15 @@ def _list_envelope(page: int, per_page: int, data: list[Any]) -> dict:
     }
 
 
-@router.get("/api/lists/_find")
+@router.get(
+    "/api/lists/_find",
+    # The only paged route here with no numeric guard, so `?page=abc` reached
+    # `float()` and answered 500 where Kibana answers 400.
+    dependencies=[refuses_unknown(
+        "page", "per_page", "sort_field", "sort_order", "filter", "cursor",
+        numbers=("page", "per_page"), number_dialect=NUMBER_ZOD,
+    )],
+)
 def find_lists(
     # Taken as text: an empty value is the number zero on 8.15 — `?per_page=`
     # answers 200 with an empty page beside the real total — and an `int`

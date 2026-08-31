@@ -456,7 +456,11 @@ def _build_match(body: dict) -> Callable[[dict], bool]:
         tokens = set(_analyze_value(val))
         hits = sum(1 for t in terms if t in tokens)
         if required is not None:
-            return hits >= required
+            # At least one clause must match. `minimum_should_match: "-1"` on
+            # a single-term match clamps to zero, and `hits >= 0` is true of
+            # any document that merely has the field — the query widened to
+            # "field exists" and returned documents the cluster excludes.
+            return hits >= max(1, required)
         if operator == "and":
             return hits == len(terms)
         return hits > 0
@@ -609,6 +613,11 @@ def _build_terms_set(
     Painless.
     """
     field, spec = next(iter(body.items()))
+    if not isinstance(spec, dict):
+        # `_term_spec` guards its own shape this way; this builder assumed a
+        # dict and answered `{"terms_set": {"tags": ["a"]}}` with a 500.
+        msg = f"[terms_set] query does not support [{field}]"
+        raise ESQueryError(msg)
     wanted = [str(v) for v in spec.get("terms", [])]
     count_field = spec.get("minimum_should_match_field")
     script = (spec.get("minimum_should_match_script") or {}).get("source")
@@ -884,7 +893,17 @@ def _build_fuzzy(body: dict) -> Callable[[dict], bool]:
     field, spec = _term_spec(body)
     term = str(spec.get("value", ""))
     raw = spec.get("fuzziness", "AUTO")
-    distance = _auto_fuzziness(term) if str(raw).upper().startswith("AUTO") else int(raw)
+    if str(raw).upper().startswith("AUTO"):
+        distance = _auto_fuzziness(term)
+    else:
+        try:
+            distance = int(raw)
+        except (TypeError, ValueError) as exc:
+            # The cluster answers a parse error here; a bare `int()` made it
+            # this mock's 500 instead, since `ValueError` is not an
+            # `ESQueryError` and nothing above catches it.
+            msg = f"failed to parse [fuzziness] as an integer: [{raw}]"
+            raise ESQueryError(msg) from exc
     lowered = term.lower()
 
     def predicate(rec: dict) -> bool:

@@ -167,6 +167,18 @@ def update_alert_assignees(
     """
     _refuse_bad_assignees(body)
     assignees = body.get("assignees") or {}
+    if not isinstance(assignees, dict):
+        # The guard above only judges a dict, so a list or a string reached
+        # `assignees.get("add")` and answered 500 where Kibana says
+        # `assignees: Expected object, received array`.
+        raise HTTPException(
+            status_code=400,
+            detail=build_kbn_error_response(
+                400,
+                f"assignees: Expected object, received "
+                f"{'array' if isinstance(assignees, list) else type(assignees).__name__}",
+            ),
+        )
     # Stored as `{"uid": …}`, which is the shape an alert carries; the wire
     # names them as plain strings.
     return alert_commands.update_alert_assignees(

@@ -297,6 +297,17 @@ def bulk_action(
     """
     action = body.get("action")
     ids = body.get("ids")
+    if ids is not None and not isinstance(ids, list):
+        # A scalar `ids` — a client that forgot the array — was passed
+        # through to a `set()` of its characters, so a bulk disable answered
+        # `{"success": true, "rules_count": 0}` and disabled nothing; an int
+        # raised instead. Kibana refuses both.
+        raise HTTPException(
+            status_code=400,
+            detail=build_kbn_error_response(
+                400, 'Invalid value "' + str(ids) + '" supplied to "ids"',
+            ),
+        )
     if action not in _BULK_ACTIONS or (isinstance(ids, list) and not ids):
         # zod tries every member of the action union and reports each
         # failure; Kibana shows the first five and counts the rest
