@@ -1,6 +1,7 @@
 """Sentinel Log Analytics KQL query handler."""
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 from domain.sentinel.alert import SentinelAlert
@@ -8,7 +9,7 @@ from domain.sentinel.incident import SentinelIncident
 from repository.sentinel.alert_repo import sentinel_alert_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
-from utils.sentinel.kql_parser import parse_kql
+from utils.sentinel.kql_parser import UnsupportedKqlError, parse_kql
 from utils.sentinel.response import build_log_analytics_response
 
 # Table name → (fetch_fn, column_mapping)
@@ -63,8 +64,15 @@ def query_logs(kql: str) -> dict:
     parsed = parse_kql(kql)
     rows: list[dict] = []
 
+    # The table is resolved before an unreadable clause is refused: a query
+    # naming a table this workspace does not have is wrong in a way the
+    # client can fix, and saying so first is more use than complaining about
+    # a pipeline that would never have run anyway.
     for table in parsed.tables:
         rows.extend(_get_table_data(table))
+
+    if parsed.unsupported:
+        raise UnsupportedKqlError(parsed.unsupported)
 
     # Apply where clauses
     for field_name, op, value in parsed.where_clauses:
@@ -73,10 +81,33 @@ def query_logs(kql: str) -> dict:
     # Apply where in clauses
     for field_name, values in parsed.where_in_clauses:
         rows = [r for r in rows if str(r.get(field_name, "")) in values]
+    for field_name, values in parsed.where_not_in_clauses:
+        rows = [r for r in rows if str(r.get(field_name, "")) not in values]
 
     # Apply ago filters
     for field_name, threshold in parsed.ago_filters:
         rows = [r for r in rows if _parse_time(r.get(field_name, "")) > threshold]
+
+    # `| count` is one row with the number that reached it.
+    if parsed.count_only:
+        return build_log_analytics_response(
+            [{"name": "Count", "type": "int"}], [[len(rows)]])
+
+    # `| distinct a, b` reduces to those columns and drops repeats, keeping
+    # the order they were first seen in — it answered the whole table before.
+    if parsed.distinct_fields:
+        seen: set[tuple[str, ...]] = set()
+        reduced: list[list[str]] = []
+        for row in rows:
+            key = tuple(str(row.get(f, "")) for f in parsed.distinct_fields)
+            if key not in seen:
+                seen.add(key)
+                reduced.append(list(key))
+        if parsed.take > 0:
+            reduced = reduced[:parsed.take]
+        return build_log_analytics_response(
+            [{"name": f, "type": "string"} for f in parsed.distinct_fields], reduced,
+        )
 
     # Apply summarize
     if parsed.summarize_func == "count" and parsed.summarize_by:
@@ -191,24 +222,74 @@ def _alert_to_row(alert: SentinelAlert) -> dict:
     }
 
 
+def _as_number(text: str) -> float | None:
+    """`text` as a number, or None if it is not one."""
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ordered(row_val: str, value: str, op: str) -> bool:
+    """`<`, `>`, `<=`, `>=` — numerically where both sides are numbers.
+
+    Compared as text, `event.Severity >= 3` kept "81" and dropped "100",
+    because "1" sorts before "3".  Every severity in these tables is a
+    number, so every threshold query was answering the wrong set.
+    """
+    left, right = _as_number(row_val), _as_number(value)
+    if left is not None and right is not None:
+        return _compare(left, right, op)
+    return _compare(row_val, value, op)
+
+
+def _compare(left: float | str, right: float | str, op: str) -> bool:
+    """`left <op> right`, both sides already the same kind."""
+    if op == ">":
+        return left > right  # type: ignore[operator]
+    if op == "<":
+        return left < right  # type: ignore[operator]
+    if op == ">=":
+        return left >= right  # type: ignore[operator]
+    return left <= right  # type: ignore[operator]
+
+
+def _matches(row_val: str, op: str, value: str) -> bool:
+    """One predicate against one row's value for the column it names."""
+    folded, wanted = row_val.casefold(), value.casefold()
+    if op == "==":
+        return row_val == value
+    if op == "!=":
+        return row_val != value
+    # `=~` and `!~` are KQL's case-insensitive equality.
+    if op == "=~":
+        return folded == wanted
+    if op == "!~":
+        return folded != wanted
+    # KQL's string operators are case-insensitive; the `!` forms negate.
+    if op == "contains":
+        return wanted in folded
+    if op == "!contains":
+        return wanted not in folded
+    if op == "startswith":
+        return folded.startswith(wanted)
+    if op == "!startswith":
+        return not folded.startswith(wanted)
+    if op == "endswith":
+        return folded.endswith(wanted)
+    if op == "!endswith":
+        return not folded.endswith(wanted)
+    # `has` matches a whole term, not a substring: "cmd" has-matches
+    # "cmd.exe run" but not "cmdline".
+    if op in ("has", "!has"):
+        found = wanted in re.split(r"[^\w]+", folded)
+        return found if op == "has" else not found
+    return _ordered(row_val, value, op)
+
+
 def _filter_rows(rows: list[dict], field: str, op: str, value: str) -> list[dict]:
     """Apply a comparison filter to rows."""
-    result = []
-    for r in rows:
-        row_val = str(r.get(field, ""))
-        if op == "==" and row_val == value:
-            result.append(r)
-        elif op == "!=" and row_val != value:
-            result.append(r)
-        elif op == ">" and row_val > value:
-            result.append(r)
-        elif op == "<" and row_val < value:
-            result.append(r)
-        elif op == ">=" and row_val >= value:
-            result.append(r)
-        elif op == "<=" and row_val <= value:
-            result.append(r)
-    return result
+    return [r for r in rows if _matches(str(r.get(field, "")), op, value)]
 
 
 def _summarize_count(rows: list[dict], by_field: str) -> dict:

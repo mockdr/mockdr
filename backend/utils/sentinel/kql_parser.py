@@ -10,13 +10,30 @@ Supports the subset of KQL that SOAR integrations actually send:
 - ``| where Severity in ("High", "Medium")``
 - ``union SecurityIncident, SecurityAlert``
 
-This is NOT a full KQL engine.
+This is NOT a full KQL engine — and what it cannot read, it refuses.
+
+Everything it did not recognise used to be dropped on the floor: an unknown
+pipeline operator, and any `where` predicate outside a handful of shapes.
+`| where SourceSystem contains 'zzzzz'` answered all 210 rows, every one of
+them looking to the client like a match, and `| distinct SourceSystem`
+answered the whole table. Log Analytics answers a query it cannot compile
+with 400, so an unreadable clause raises `UnsupportedKqlError` and the route
+says so, rather than returning rows that mean something else.
 """
 from __future__ import annotations
 
 import re
 import time
 from dataclasses import dataclass, field
+
+
+class UnsupportedKqlError(ValueError):
+    """A query this parser cannot evaluate, refused rather than half-read.
+
+    Half-reading is the dangerous option: a dropped predicate widens the
+    result instead of narrowing it, so the client is handed more rows than
+    it asked for with nothing to say they do not match.
+    """
 
 
 @dataclass
@@ -26,6 +43,16 @@ class KQLQuery:
     tables: list[str] = field(default_factory=list)
     where_clauses: list[tuple[str, str, str]] = field(default_factory=list)  # (field, op, value)
     where_in_clauses: list[tuple[str, list[str]]] = field(default_factory=list)
+    where_not_in_clauses: list[tuple[str, list[str]]] = field(default_factory=list)
+    #: `| distinct a, b` — the columns to reduce to, in the order named.
+    distinct_fields: list[str] = field(default_factory=list)
+    #: `| count` — one row, one column, the number of rows reaching it.
+    count_only: bool = False
+    #: The first thing in the query this parser could not read, if any.
+    #: Recorded rather than raised so the caller can resolve the table
+    #: first: "there is no such table" is the more fundamental answer, and
+    #: it is the one a client can act on.
+    unsupported: str = ""
     project_fields: list[str] = field(default_factory=list)
     sort_field: str = ""
     sort_descending: bool = True
@@ -104,46 +131,167 @@ def _parse_pipeline(pipeline: str, result: KQLQuery) -> None:
             _parse_summarize(cmd[10:], result)
         elif cmd_lower.startswith("extend "):
             _parse_extend(cmd[7:], result)
+        elif cmd_lower.startswith("distinct "):
+            try:
+                result.distinct_fields = [
+                    _column(f) for f in cmd[9:].split(",") if f.strip()
+                ]
+            except UnsupportedKqlError as exc:
+                if not result.unsupported:
+                    result.unsupported = str(exc)
+        elif cmd_lower == "count":
+            result.count_only = True
+        elif not result.unsupported:
+            result.unsupported = (
+                f"'{cmd.split(None, 1)[0]}' operator is not supported")
+
+
+#: A column name as KQL lets it be written: bare, or bracket-quoted when it
+#: carries a dot — `['event.Severity']` is how a client reaches into the
+#: CrowdStrike table, whose columns are all dotted.
+_COLUMN = r"(?:\[\s*['\"](?P<quoted>[^'\"]+)['\"]\s*\]|(?P<bare>\w+))"
+
+
+def _column(text: str) -> str:
+    """The column `text` names, with any bracket quoting removed."""
+    match = re.fullmatch(r"\s*" + _COLUMN + r"\s*", text)
+    if not match:
+        msg = f"cannot read the column name {text.strip()!r}"
+        raise UnsupportedKqlError(msg)
+    return match.group("quoted") or match.group("bare")
+
+
+#: The string operators, and how each is spelled negated.
+_STRING_OPS: tuple[str, ...] = (
+    "contains", "!contains", "startswith", "!startswith",
+    "endswith", "!endswith", "has", "!has",
+)
+
+
+#: Raised out of the splitter, which has no `result` to record onto; the
+#: caller turns it back into a recorded reason.
+_OR_UNSUPPORTED = "'or' in a where clause is not supported"
+
+
+def _split_top_level_and(clause: str) -> list[str]:
+    """`a == 1 and b == 2` as its two parts, ignoring quoted text.
+
+    `or` is deliberately absent: the executor applies clauses one after the
+    other, which is an `and`, and quietly treating an `or` as one would widen
+    or narrow the result with nothing to show for it.
+    """
+    parts: list[str] = []
+    depth = 0
+    quote = ""
+    current: list[str] = []
+    index = 0
+    while index < len(clause):
+        char = clause[index]
+        if quote:
+            if char == quote:
+                quote = ""
+            current.append(char)
+        elif char in "\"'":
+            quote = char
+            current.append(char)
+        elif char in "([":
+            depth += 1
+            current.append(char)
+        elif char in ")]":
+            depth -= 1
+            current.append(char)
+        elif depth == 0 and clause[index:index + 5].lower() == " and ":
+            parts.append("".join(current))
+            current = []
+            index += 5
+            continue
+        elif depth == 0 and clause[index:index + 4].lower() == " or ":
+            raise UnsupportedKqlError(_OR_UNSUPPORTED)
+        else:
+            current.append(char)
+        index += 1
+    parts.append("".join(current))
+    return [p.strip() for p in parts if p.strip()]
 
 
 def _parse_where(clause: str, result: KQLQuery) -> None:
-    """Parse a where clause."""
+    """Parse a where clause, recording what it cannot read."""
+    try:
+        parts = _split_top_level_and(clause)
+    except UnsupportedKqlError as exc:
+        if not result.unsupported:
+            result.unsupported = str(exc)
+        return
+    for part in parts:
+        _parse_one_predicate(part, result)
+
+
+def _parse_one_predicate(clause: str, result: KQLQuery) -> None:
+    """Parse a single comparison, with no `and` left in it."""
     clause = clause.strip()
 
-    # Handle: field in ("val1", "val2")
-    in_match = re.match(
-        r'(\w+)\s+in\s*\(\s*(.*?)\s*\)',
-        clause, re.IGNORECASE,
+    # Handle: field in ("val1", "val2"), and its negation
+    in_match = re.fullmatch(
+        _COLUMN + r"\s+(?P<negated>!?)in\s*~?\s*\(\s*(?P<values>.*?)\s*\)",
+        clause, re.IGNORECASE | re.DOTALL,
     )
     if in_match:
-        field_name = in_match.group(1)
-        values_str = in_match.group(2)
-        values = [v.strip().strip('"').strip("'") for v in values_str.split(",")]
-        result.where_in_clauses.append((field_name, values))
+        field_name = in_match.group("quoted") or in_match.group("bare")
+        values = [
+            v.strip().strip('"').strip("'")
+            for v in in_match.group("values").split(",") if v.strip()
+        ]
+        if in_match.group("negated"):
+            result.where_not_in_clauses.append((field_name, values))
+        else:
+            result.where_in_clauses.append((field_name, values))
         return
 
     # Handle: field > ago(24h)
-    ago_match = re.match(
-        r'(\w+)\s*>\s*ago\((\d+)([smhd])\)',
+    ago_match = re.fullmatch(
+        _COLUMN + r"\s*>\s*ago\((\d+)([smhd])\)",
         clause, re.IGNORECASE,
     )
     if ago_match:
-        field_name = ago_match.group(1)
-        amount = int(ago_match.group(2))
-        unit = ago_match.group(3)
+        field_name = ago_match.group("quoted") or ago_match.group("bare")
+        amount = int(ago_match.group(3))
+        unit = ago_match.group(4)
         multipliers = {"s": 1, "m": 60, "h": 3600, "d": 86400}
         threshold = time.time() - (amount * multipliers.get(unit, 1))
         result.ago_filters.append((field_name, threshold))
         return
 
+    # Handle the string operators: contains, startswith, endswith, has, and
+    # each one's `!` spelling.  Every one of these used to fall through and
+    # be dropped, so the predicate widened the result to the whole table.
+    ops = "|".join(re.escape(op) for op in sorted(_STRING_OPS, key=len, reverse=True))
+    text_match = re.fullmatch(
+        _COLUMN + rf"\s+(?P<op>{ops})\s*~?\s*(?P<value>.+)",
+        clause, re.IGNORECASE | re.DOTALL,
+    )
+    if text_match:
+        result.where_clauses.append((
+            text_match.group("quoted") or text_match.group("bare"),
+            text_match.group("op").lower(),
+            text_match.group("value").strip().strip('"').strip("'"),
+        ))
+        return
+
     # Handle: field == "value" or field == value or field != "value"
-    eq_match = re.match(r'(\w+)\s*(==|!=|>=|<=|>|<)\s*"?([^"]*)"?', clause)
+    eq_match = re.fullmatch(
+        _COLUMN + r'\s*(?P<op>==|!=|>=|<=|=~|!~|>|<)\s*(?P<value>.+)',
+        clause, re.IGNORECASE | re.DOTALL,
+    )
     if eq_match:
         result.where_clauses.append((
-            eq_match.group(1),
-            eq_match.group(2),
-            eq_match.group(3).strip(),
+            eq_match.group("quoted") or eq_match.group("bare"),
+            eq_match.group("op"),
+            eq_match.group("value").strip().strip('"').strip("'"),
         ))
+        return
+
+    if not result.unsupported:
+        result.unsupported = f"cannot read the where clause {clause!r}"
 
 
 def _parse_sort(cmd: str, result: KQLQuery) -> None:

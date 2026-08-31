@@ -43,7 +43,10 @@ def _seed_alert_rules() -> None:
             description="Correlate SentinelOne threats into Sentinel incidents",
             kind="Scheduled",
             severity="High",
-            query="SentinelOne_CL | where confidenceLevel_s == 'malicious'",
+            query=(
+                "SentinelOne_CL "
+                "| where ['threatInfo.confidenceLevel'] == 'malicious'"
+            ),
             tactics=["Execution", "Impact"],
             etag=new_hex()[:8],
         ),
@@ -53,7 +56,7 @@ def _seed_alert_rules() -> None:
             description="Correlate CrowdStrike Falcon detections into Sentinel incidents",
             kind="Scheduled",
             severity="High",
-            query="CrowdStrike_CL | where Severity_d >= 3",
+            query="CrowdStrikeFalcon_CL | where ['event.Severity'] >= 70",
             tactics=["Execution", "LateralMovement"],
             etag=new_hex()[:8],
         ),
@@ -72,7 +75,10 @@ def _seed_alert_rules() -> None:
             description="Correlate Elastic Security alerts into Sentinel incidents",
             kind="Scheduled",
             severity="Medium",
-            query="ElasticSecurity_CL | where severity_s in ('high', 'critical')",
+            query=(
+                "ElasticSecurity_CL "
+                "| where signal_rule_severity in ('high', 'critical')"
+            ),
             tactics=["Execution"],
             etag=new_hex()[:8],
         ),
@@ -82,7 +88,9 @@ def _seed_alert_rules() -> None:
             description="Correlate Cortex XDR incidents into Sentinel incidents",
             kind="Scheduled",
             severity="High",
-            query="CortexXDR_CL | where severity_s in ('high', 'critical')",
+            query=(
+                "PaloAltoCortexXDR_CL | where severity in ('high', 'critical')"
+            ),
             tactics=["Execution", "CommandAndControl"],
             etag=new_hex()[:8],
         ),
