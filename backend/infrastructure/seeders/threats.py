@@ -48,6 +48,14 @@ def _threat_timeline(threat_id: str) -> list[dict]:
     ]
 
 
+#: Signers a detected file carries. An empty string is the unsigned case,
+#: which is most of what a detection engine sees.
+_PUBLISHERS: list[str] = [
+    "", "", "Microsoft Corporation", "Oracle America, Inc.",
+    "Adobe Inc.", "VideoLAN", "Notepad++",
+]
+
+
 def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
     """Create ``SEED_COUNT_THREATS`` threat records and persist them.
 
@@ -148,7 +156,10 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
             "agentUuid": agent.uuid,
             "agentVersion": agent.agentVersion,
             "assetVersion": agent.agentVersion.split(".")[-1],
-            "cloudProviders": {},
+            # The agent's own, so a threat and the endpoint it was found on
+            # describe the same machine. It was `{}` on every threat, and the
+            # two documented `cloudProvider` filters over it matched nothing.
+            "cloudProviders": dict(agent.cloudProviders or {}),
             "externalIp": agent.externalIp,
             "groupId": agent.groupId, "groupName": agent.groupName,
             "siteId": agent.siteId, "siteName": agent.siteName,
@@ -190,8 +201,13 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
                 ],
                 "detectionType": random.choice(["static", "dynamic"]),
                 "engines": detection_engines,
-                "externalTicketExists": False,
-                "externalTicketId": None,
+                # A threat that has been raised with a ticketing system says
+                # which ticket. Both were fixed at "no ticket, ever", so the
+                # documented `externalTicketId` filters could match nothing.
+                "externalTicketExists": (has_ticket := random.random() > 0.7),
+                "externalTicketId": (
+                    f"SOC-{random.randint(10000, 99999)}" if has_ticket else None
+                ),
                 "failedActions": False,
                 "fileExtension": file_ext,
                 "fileExtensionType": random.choice(["Executable", "Document", "Script"]),
@@ -218,7 +234,9 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
                 ]),
                 "pendingActions": False,
                 "processUser": f"ACMECORP\\{fake.user_name().upper()}",
-                "publisherName": "",
+                # Who signed the file, which a signed binary carries and an
+                # unsigned one does not.
+                "publisherName": random.choice(_PUBLISHERS),
                 "reachedEventsLimit": False,
                 "rebootRequired": False,
                 "rootProcessUpn": None,

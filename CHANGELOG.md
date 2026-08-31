@@ -101,11 +101,20 @@ filter by" rather than exercise them. Three records were half-written:
   method, missing permissions or user actions. The last two come from the
   swagger's own enums, so `enum_drift.py` holds them to it.
 
-22 remain, over five routes. The schema test caught the first attempt at
+13 remain, over five routes — and four of the twenty-two this first
+reported were the probe's own doing, not the seeder's: it did not descend
+into a list, so `scopeRoles.roleId`, `locations.id` and two others read as
+empty where the value was there all along.
+
+A threat carries the rest: the cloud provider of the endpoint it was found
+on, so the two describe the same machine; a ticket id where it has been
+raised with a ticketing system, both members having been fixed at "no
+ticket, ever"; and the publisher that signed the file, most detections being
+unsigned. The schema test caught the first attempt at
 `cloudProviders`, which put the provider's name in a member of its own where
 the swagger keys the object by provider — a good catch, and the reason the
-shape is right now. 23 tests that used to skip themselves now run: 4 787
-pass where 4 764 did, from 182 skips down to 159.
+shape is right now. 27 tests that used to skip themselves now run: 4 791 pass where 4 764
+did, from 182 skips down to 155.
 
 **A test looked for a substring nothing had.**
 `test_filter_contains_function` asked Defender for machines whose name
