@@ -82,9 +82,19 @@ def main() -> int:
             return 2
         headers = {"Authorization": f"Bearer {token.json()['access_token']}"}
 
+        # Resolved from the mock as it stands, not from the file: ids come
+        # from `secrets.randbelow` and cannot be seeded, so every one of them
+        # changes on every restart. Reading them out of the capture made
+        # every `{id}` path report "the mock answers 404 now" after any
+        # reseed — a check that always fires is one nobody believes.
         ids: dict[str, str] = {}
-        for path, body in captured.items():
-            values = body.get("value") if isinstance(body, dict) else None
+        for path in captured:
+            if "{id}" in path:
+                continue
+            answer = client.get(f"/graph{path}", headers=headers)
+            if answer.status_code != 200:
+                continue
+            values = answer.json().get("value")
             if isinstance(values, list) and values and isinstance(values[0], dict):
                 ids[path] = str(values[0].get("id", ""))
 

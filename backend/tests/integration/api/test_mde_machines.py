@@ -88,16 +88,26 @@ class TestListMachines:
         as a 500 — on the exact syntax the XSOAR MDE integration sends.
         """
         headers = _mde_auth(client)
+        # The needle comes out of a name this install has, rather than being
+        # assumed: `'WS'` was hard-coded here and passed only because some
+        # generated name happened to contain it. `WKSTN` does not — the
+        # letters are not adjacent — so a seeder change that shifted the draw
+        # left the assertion looking for a substring nothing had.
+        every = client.get(
+            "/mde/api/machines", headers=headers, params={"$top": 100},
+        ).json()["value"]
+        assert every, "no machines to take a name from"
+        needle = every[0]["computerDnsName"][:4]
         resp = client.get(
             "/mde/api/machines",
             headers=headers,
-            params={"$filter": "contains(computerDnsName,'WS')", "$top": 100},
+            params={"$filter": f"contains(computerDnsName,'{needle}')", "$top": 100},
         )
         assert resp.status_code == 200
         machines = resp.json()["value"]
-        assert machines, "expected at least one machine whose name contains 'WS'"
+        assert machines, f"expected at least one machine whose name contains {needle!r}"
         for machine in machines:
-            assert "ws" in machine["computerDnsName"].lower()
+            assert needle.lower() in machine["computerDnsName"].lower()
 
     def test_filter_startswith_function(self, client: TestClient) -> None:
         """$filter=startswith(...) anchors at the start of the value."""

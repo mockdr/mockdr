@@ -81,6 +81,39 @@ unit tests, from 2 103.
 
 ### Fixed
 
+**59 documented filters sat over a field nothing ever filled.**
+17 % of the filters this mock derives from the swagger pointed at a member
+that was empty in every seeded record — so each one could only ever answer
+with nothing, and 91 tests skipped themselves with "no scalar value to
+filter by" rather than exercise them. Three records were half-written:
+
+* an **indicator** kept almost none of the intelligence it arrives with —
+  no severity, category, labels, campaign, malware or actor names, no
+  batch, creator or external id, and no upload time. All eleven are filled
+  now, the actor and its type drawn together so a record's two members
+  agree, and `uploadTime` derived from `creationTime` rather than drawn
+  beside it;
+* a **device-control rule** described its device by class alone. It carries
+  the vendor, product and device ids, the manufacturer, name, uid and
+  version now — and a Bluetooth rule its minor classes and services, since
+  which members a rule fills follows the interface it is written against;
+* an **agent** had no external id, cloud provider, storage type, proxy
+  method, missing permissions or user actions. The last two come from the
+  swagger's own enums, so `enum_drift.py` holds them to it.
+
+22 remain, over five routes. The schema test caught the first attempt at
+`cloudProviders`, which put the provider's name in a member of its own where
+the swagger keys the object by provider — a good catch, and the reason the
+shape is right now. 23 tests that used to skip themselves now run: 4 787
+pass where 4 764 did, from 182 skips down to 159.
+
+**A test looked for a substring nothing had.**
+`test_filter_contains_function` asked Defender for machines whose name
+contains `WS` and asserted at least one came back. `WKSTN` does not contain
+it — the letters are not adjacent — so it had been passing on whichever
+generated name happened to, and a seeder change that shifted the draw ended
+that. It takes its needle from a name the install actually has.
+
 **`date-time` is a format, not a type.** Advertising the declared kind of
 each documented filter — right in itself — wrote `"type": "date-time"` into
 85 parameter schemas of this mock's own `/openapi.json`, and JSON Schema

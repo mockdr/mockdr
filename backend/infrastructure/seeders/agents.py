@@ -23,6 +23,24 @@ from repository.site_repo import site_repo
 from repository.tag_repo import tag_repo
 from utils.id_gen import new_id, new_uuid
 
+#: The swagger's own enums for what an endpoint is missing and what it wants
+#: its user to do. `enum_drift.py` fails on a value that is not one of these.
+_MISSING_PERMISSIONS: list[str] = [
+    "user_action_needed_fda", "user_action_needed_fda_helper",
+    "user_action_needed_notifications", "user_action_needed_network",
+]
+_USER_ACTIONS: list[str] = [
+    "reboot_needed", "upgrade_needed", "user_action_needed", "unprotected",
+]
+
+#: Where a server-class endpoint runs, when it runs somewhere.
+_CLOUD_PROVIDERS: list[str] = ["AWS", "Azure", "GCP"]
+_CLOUD_REGIONS: dict[str, list[str]] = {
+    "AWS": ["us-east-1", "eu-central-1", "ap-southeast-2"],
+    "Azure": ["westeurope", "eastus", "uksouth"],
+    "GCP": ["europe-west3", "us-central1", "asia-east1"],
+}
+
 
 def seed_agents(
     fake: Faker,
@@ -182,7 +200,8 @@ def seed_agents(
             id=aid,
             uuid=str(new_uuid()),
             computerName=hostname,
-            externalId="",
+            # The id this endpoint carries in whatever inventory owns it.
+            externalId=f"CMDB-{new_id()[:10]}",
             serialNumber=str(new_uuid()).upper(),
             accountId=account_id,
             accountName=account_name,
@@ -229,7 +248,7 @@ def seed_agents(
             isUninstalled=False,
             isUpToDate=random.random() > 0.2,
             isAdConnector=False,
-            isHyperAutomate=None,
+            isHyperAutomate=random.random() > 0.85,
             externalIp=ext_ip,
             lastIpToMgmt=local_ip,
             domain=doc_domain(),
@@ -258,8 +277,18 @@ def seed_agents(
             encryptedApplications=False,
             appsVulnerabilityStatus=random.choice(["not_applicable"] * 3 + ["patch_required"]),
             showAlertIcon=False,
-            missingPermissions=[],
-            userActionsNeeded=[],
+            # Both enums are the swagger's own, and `enum_drift.py` holds
+            # them to it. They were empty lists on every agent, so the four
+            # documented filters over them matched nothing and a console
+            # never showed an endpoint asking its user for anything.
+            # A macOS agent is the one that asks for Full Disk Access.
+            missingPermissions=(
+                random.sample(_MISSING_PERMISSIONS, k=random.randint(1, 2))
+                if os_type == "macos" and random.random() > 0.6 else []
+            ),
+            userActionsNeeded=(
+                [random.choice(_USER_ACTIONS)] if random.random() > 0.75 else []
+            ),
             scanStatus=scan_outcome,
             scanFinishedAt=scan_finished,
             scanAbortedAt=scan_aborted,
@@ -281,9 +310,29 @@ def seed_agents(
                 "deepVisibility": False,
                 "deepVisibilityProxyAddress": "",
                 "pacFileUsage": False,
-                "proxyMethod": "",
+                # An agent behind a proxy says how it found it.
+                "proxyMethod": random.choice(["", "", "manual", "pac", "system"]),
             },
-            cloudProviders={},
+            # An agent on a cloud instance names the provider it runs on;
+            # a workstation on someone's desk names none. This was `{}`
+            # everywhere, so the documented `cloudProvider` filter could
+            # match nothing.
+            # Keyed by provider, with the instance under it — the swagger
+            # declares `additionalProperties` as an object, and the schema
+            # test caught a first attempt that put the provider's name in a
+            # member of its own.
+            cloudProviders=(
+                {
+                    (cloud := random.choice(_CLOUD_PROVIDERS)): {
+                        "cloudInstanceId": f"i-{new_id()[:17]}",
+                        "cloudLocation": random.choice(_CLOUD_REGIONS[cloud]),
+                        "cloudInstanceSize": random.choice(
+                            ["t3.medium", "m5.large", "Standard_D2s_v3"]),
+                        "cloudAccount": new_id()[:12],
+                    },
+                }
+                if machine_type == "server" and random.random() > 0.4 else {}
+            ),
             hasContainerizedWorkload=(
                 os_type == "linux" and random.random() > 0.5
             ),
@@ -292,7 +341,7 @@ def seed_agents(
             operationalState="na",
             operationalStateExpiration=None,
             storageName=None,
-            storageType=None,
+            storageType=random.choice(["SSD", "SSD", "HDD", "NVMe"]),
             tags={"sentinelone": s1_tags},
             activeDirectory=ad_info,
             passphrase=passphrase(),
