@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import secrets
 from collections.abc import Mapping
 from fnmatch import fnmatch
 
@@ -1637,6 +1638,66 @@ def get_doc(
         response.status_code = 404
         return {"_index": index, "_id": doc_id, "found": False}
     return result
+
+
+#: Elasticsearch's own auto-generated ids are 20 characters of the URL-safe
+#: base64 alphabet (measured on 8.15: `xLRiWKABVd5TUdV6C-zG`). A client that
+#: stores the id it gets back and reads it later cares that it round-trips,
+#: not how it was made.
+_AUTO_ID_LENGTH = 20
+
+
+@router.post("/{index:esindex}/_doc", operation_id="es_index_doc_auto_id")
+def index_doc_auto_id(
+    index: str,
+    body: dict = Body(...),
+    refresh: str | None = Query(default=None),
+    _: dict = Depends(require_es_write),
+) -> JSONResponse:
+    """Index a document under an id Elasticsearch picks.
+
+    The ordinary ingest call — most client libraries write this way when the
+    document has no natural key — and it answered
+    `no handler found for uri [/{index}/_doc] and method [POST]`, which is
+    what mockdr says about a path it does not serve at all.
+    """
+    doc_id = secrets.token_urlsafe(32)[:_AUTO_ID_LENGTH]
+    result = search_queries.es_index_doc(
+        index, doc_id, body, refresh=_makes_visible(refresh))
+    if _forced_refresh(refresh):
+        result["forced_refresh"] = True
+    # Always 201: the id is new by construction.
+    return JSONResponse(status_code=201, content=result)
+
+
+@router.post("/{index:esindex}/_create/{doc_id}", operation_id="es_create_doc_post")
+@router.put("/{index:esindex}/_create/{doc_id}", operation_id="es_create_doc_put")
+def create_doc(
+    index: str,
+    doc_id: str,
+    body: dict = Body(...),
+    refresh: str | None = Query(default=None),
+    _: dict = Depends(require_es_write),
+) -> JSONResponse:
+    """Index a document only if that id is free.
+
+    `_doc` replaces; this refuses. Measured on 8.15, writing the same id
+    twice: 201, then 409 `version_conflict_engine_exception` reading
+    `[k]: version conflict, document already exists (current version [1])`.
+    """
+    existing = search_queries.es_get_doc(index, doc_id)
+    if existing is not None:
+        version = existing.get("_version", 1)
+        raise HTTPException(status_code=409, detail=build_es_error_response(
+            409, "version_conflict_engine_exception",
+            f"[{doc_id}]: version conflict, document already exists "
+            f"(current version [{version}])",
+        ))
+    result = search_queries.es_index_doc(
+        index, doc_id, body, refresh=_makes_visible(refresh))
+    if _forced_refresh(refresh):
+        result["forced_refresh"] = True
+    return JSONResponse(status_code=201, content=result)
 
 
 @router.post("/{index:esindex}/_doc/{doc_id}", operation_id="es_index_doc_post")

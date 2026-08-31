@@ -365,7 +365,13 @@ def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
         if name in by_fields:
             entry["groupby_rank"] = str(by_fields.index(name))
             if name in created:
-                entry["type"] = "str" if isinstance(results[0][name], str) else "num"
+                # From a row that carries it, not from the first row: `names`
+                # is the union across every row, and indexing the first with
+                # a name only a later row has raised KeyError out of a
+                # function every search runs.
+                sample = next(
+                    (r[name] for r in results if name in r), "")
+                entry["type"] = "str" if isinstance(sample, str) else "num"
         if last in ("top", "rare") and name in _TOP_SPECIALS:
             entry["type_special"] = _TOP_SPECIALS[name]
         described.append(entry)

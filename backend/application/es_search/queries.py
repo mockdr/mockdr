@@ -1377,6 +1377,32 @@ def es_delete_by_query(index: str, body: dict) -> dict:
     return _by_query(index, body, delete=True)
 
 
+def _concrete_indices(pattern: str) -> list[str]:
+    """The concrete indices `pattern` names, with any alias expanded.
+
+    A write goes to an index, never to the alias standing in front of it.
+    `_resolve_collection` returns the pattern it was given, so
+    `_delete_by_query` through an alias built the store key `alias:id` —
+    which nothing is filed under — deleted nothing, and reported one
+    document deleted. Elasticsearch deletes through the alias (measured on
+    8.15: three documents, delete one through the alias, two remain).
+    """
+    names = [n.strip().lower() for n in pattern.split(",") if n.strip()]
+    return [n for name in names for n in (indices_for_alias(name) or [name])]
+
+
+def _home_index(pattern: str, doc_id: str) -> str:
+    """Which of `pattern`'s indices holds `doc_id`.
+
+    The pattern itself when none of them does, so a caller that was already
+    given a concrete name keeps it.
+    """
+    for name in _concrete_indices(pattern):
+        if store.get("es_documents", f"{name}:{doc_id}") is not None:
+            return name
+    return pattern
+
+
 def _by_query(index: str, body: dict, *, delete: bool) -> dict:
     """The shared walk behind ``_update_by_query`` and ``_delete_by_query``.
 
@@ -1420,12 +1446,15 @@ def _by_query(index: str, body: dict, *, delete: bool) -> dict:
             changed += outcome
             noops += 1 - outcome
             continue
+        # The index the document actually lives in, which is not the alias
+        # or pattern the request named it through.
+        home = _home_index(canonical, doc_id)
         if delete:
-            store.delete("es_documents", f"{canonical}:{doc_id}")
-            _count_document(canonical, -1)
+            store.delete("es_documents", f"{home}:{doc_id}")
+            _count_document(home, -1)
             changed += 1
             continue
-        result = es_update_doc(canonical, doc_id, {"script": script} if source_text else {})
+        result = es_update_doc(home, doc_id, {"script": script} if source_text else {})
         changed += result["result"] == "updated"
         noops += result["result"] == "noop"
 
