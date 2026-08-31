@@ -236,6 +236,14 @@ jobs:
       - name: Enum values the vendor declares
         run: python scripts/enum_drift.py
 
+      # "No evidence, no route": a route this mock serves that the vendor
+      # does not publish. `param_drift.py` had been listing them since it
+      # was written — nine of them — and nothing in CI ever ran it. The
+      # seven that remain are named in the script with what to use instead,
+      # and an eighth fails here.
+      - name: No route the vendor does not publish
+        run: python scripts/param_drift.py
+
       # `body_audit.py` above asks whether a write route reads its body at
       # all. This asks whether the members it accepts are applied, which is a
       # different question: `PUT /tenant/policy` refused an empty body and an

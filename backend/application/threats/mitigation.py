@@ -174,8 +174,14 @@ def disable_engines(ids: list[str], actor_user_id: str | None = None) -> dict:
 def dv_mark_as_threat(ids: list[str], actor_user_id: str | None = None) -> dict:
     """Mark threats as confirmed malicious (from Deep Visibility context).
 
-    Implements POST /threats/dv-mark-as-threat.
-    Delegates to verdict.mark_as_threat.
+    Implements POST /threats/dv-mark-as-threat, which the 2.1 swagger does
+    publish. It used to delegate to a `mark_as_threat` sitting behind
+    `POST /threats/mark-as-threat`, a route the swagger does not publish at
+    all; that route is gone and its body lives here, where its one remaining
+    caller is. A Deep Visibility marking is the engine's as well as the
+    analyst's, which is why it moves `confidenceLevel` and the plain
+    `/threats/analyst-verdict` does not.
     """
-    from application.threats.verdict import mark_as_threat
-    return mark_as_threat(ids, actor_user_id)
+    from application.threats.verdict import _mark_malicious
+
+    return _mark_malicious(ids, actor_user_id)

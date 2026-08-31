@@ -35,6 +35,32 @@ import sys
 import warnings
 from pathlib import Path
 
+#: The routes this mock serves that the 2.1 swagger does not publish, each
+#: with what the vendor documents instead. They are listed rather than
+#: tolerated: anything *not* here fails, so the set cannot grow quietly
+#: again — it had reached nine, printed on every run of a script nothing in
+#: CI called.
+#:
+#: `POST /threats/mark-as-threat` and `POST /threats/mark-as-resolved` were
+#: two of the nine and are gone: `/threats/analyst-verdict` and
+#: `/threats/incident` do the same work and are published.
+_KNOWN_UNPUBLISHED: dict[str, str] = {
+    "DELETE /web/api/v2.1/exclusions/{}":
+        "the vendor deletes by body: DELETE /exclusions",
+    "PUT /web/api/v2.1/exclusions/{}":
+        "the vendor updates by body: PUT /exclusions",
+    "DELETE /web/api/v2.1/restrictions/{}":
+        "the vendor deletes by body: DELETE /restrictions",
+    "DELETE /web/api/v2.1/tag-manager/{}":
+        "the vendor deletes by body: DELETE /tag-manager",
+    "POST /web/api/v2.1/threat-intelligence/iocs/bulk":
+        "the vendor creates several at once through POST /threat-intelligence/iocs",
+    "POST /web/api/v2.1/threats/{}/notes":
+        "the vendor adds notes in bulk: POST /threats/notes with a filter",
+    "PUT /web/api/v2.1/firewall-control":
+        "the vendor takes PUT on /firewall-control/{category}, not the bare path",
+}
+
 ROOT = Path(__file__).resolve().parents[1]
 SWAGGER = ROOT / "data" / "swagger_2_1.json"
 PREFIX = "/web/api/v2.1"
@@ -209,6 +235,21 @@ def main() -> int:
     if args.max_mock_only is not None and mock_only_total > args.max_mock_only:
         print(f"  FAIL: more than {args.max_mock_only} undocumented parameters")
         return 1
+
+    # The parameter counts are reported, not judged: no mock implements a
+    # thousand filters. A *route* the vendor does not publish is judged,
+    # because "no evidence, no route" is a rule rather than a number — and
+    # the ones already here are named above with what to use instead.
+    new = [r for r in undocumented if r not in _KNOWN_UNPUBLISHED]
+    if new:
+        print(f"\n  FAIL: {len(new)} route(s) with no evidence in the swagger")
+        for route in new:
+            print(f"      {route}")
+        return 1
+    if _KNOWN_UNPUBLISHED:
+        print(f"\n  {len(_KNOWN_UNPUBLISHED)} unpublished route(s) known and listed:")
+        for route, instead in sorted(_KNOWN_UNPUBLISHED.items()):
+            print(f"      {route}\n          {instead}")
     return 0
 
 

@@ -44,6 +44,32 @@ def set_analyst_verdict(verdict: str, ids: list[str], actor_user_id: str | None 
     return {"data": {"affected": affected}}
 
 
+def _mark_malicious(ids: list[str], actor_user_id: str | None = None) -> dict:
+    """Set the engine's confidence and the analyst's verdict together.
+
+    Only `dv-mark-as-threat` reaches this: a Deep Visibility marking says
+    both, where `/threats/analyst-verdict` says only the second.
+    """
+    affected = 0
+    for threat_id in ids:
+        threat = threat_repo.get(threat_id)
+        if not threat:
+            continue
+        threat.threatInfo["confidenceLevel"] = "malicious"
+        threat.threatInfo["analystVerdict"] = "true_positive"
+        threat.threatInfo["updatedAt"] = utc_now()
+        threat_repo.save(threat)
+        bridge.threat_changed(threat)
+        site_id = threat.agentDetectionInfo.get("agentSiteId")
+        activity_repo.create(
+            3784, "Threat marked as malicious",
+            threat_id=threat_id, user_id=actor_user_id, site_id=site_id,
+        )
+        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
+        affected += 1
+    return {"data": {"affected": affected}}
+
+
 def set_incident_status(status: str, ids: list[str], actor_user_id: str | None = None) -> dict:
     """Set the incident status on a list of threats.
 
@@ -80,53 +106,5 @@ def set_incident_status(status: str, ids: list[str], actor_user_id: str | None =
     return {"data": {"affected": affected}}
 
 
-def mark_as_threat(ids: list[str], actor_user_id: str | None = None) -> dict:
-    """Mark threats as confirmed malicious.
-
-    Implements POST /threats/mark-as-threat.
-    Sets confidenceLevel=malicious, analystVerdict=true_positive.
-    """
-    affected = 0
-    for threat_id in ids:
-        threat = threat_repo.get(threat_id)
-        if not threat:
-            continue
-        threat.threatInfo["confidenceLevel"] = "malicious"
-        threat.threatInfo["analystVerdict"] = "true_positive"
-        threat.threatInfo["updatedAt"] = utc_now()
-        threat_repo.save(threat)
-        bridge.threat_changed(threat)
-        site_id = threat.agentDetectionInfo.get("agentSiteId")
-        activity_repo.create(
-            3784, "Threat marked as malicious",
-            threat_id=threat_id, user_id=actor_user_id, site_id=site_id,
-        )
-        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
-        affected += 1
-    return {"data": {"affected": affected}}
 
 
-def mark_as_resolved(ids: list[str], actor_user_id: str | None = None) -> dict:
-    """Mark threats as resolved.
-
-    Implements POST /threats/mark-as-resolved.
-    Sets incidentStatus=resolved, resolved=True.
-    """
-    affected = 0
-    for threat_id in ids:
-        threat = threat_repo.get(threat_id)
-        if not threat:
-            continue
-        threat.threatInfo["incidentStatus"] = "resolved"
-        threat.threatInfo["resolved"] = True
-        threat.threatInfo["updatedAt"] = utc_now()
-        threat_repo.save(threat)
-        bridge.threat_changed(threat)
-        site_id = threat.agentDetectionInfo.get("agentSiteId")
-        activity_repo.create(
-            27, "Threat marked as resolved",
-            threat_id=threat_id, user_id=actor_user_id, site_id=site_id,
-        )
-        webhook_commands.fire_event(THREAT_UPDATED, record_dict(threat))
-        affected += 1
-    return {"data": {"affected": affected}}

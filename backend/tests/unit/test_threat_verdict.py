@@ -1,9 +1,8 @@
 """Unit tests for application.threats.verdict — verdict and incident status commands."""
 import pytest
 
+from application.threats.mitigation import dv_mark_as_threat
 from application.threats.verdict import (
-    mark_as_resolved,
-    mark_as_threat,
     set_analyst_verdict,
     set_incident_status,
 )
@@ -112,15 +111,20 @@ class TestSetIncidentStatus:
         assert result["data"]["affected"] == 0
 
 
-# ── mark_as_threat ───────────────────────────────────────────────────────────
+# ── the malicious marking, now reached only through Deep Visibility ──────────
 
 
-class TestMarkAsThreat:
-    """Tests for the mark_as_threat command."""
+class TestDvMarkAsThreat:
+    """`dv-mark-as-threat` is published; `mark-as-threat` never was.
+
+    The plain route is gone — `param_drift.py` had it among the routes the
+    swagger does not publish — and its body moved behind the one the vendor
+    does document, which is the only caller that was left.
+    """
 
     def test_sets_malicious_confidence(self) -> None:
         tid = _first_threat_id()
-        result = mark_as_threat([tid])
+        result = dv_mark_as_threat([tid])
         assert result["data"]["affected"] == 1
         threat = threat_repo.get(tid)
         assert threat.threatInfo["confidenceLevel"] == "malicious"
@@ -129,44 +133,16 @@ class TestMarkAsThreat:
     def test_updates_timestamp(self) -> None:
         tid = _first_threat_id()
         old = threat_repo.get(tid).threatInfo.get("updatedAt", "")
-        mark_as_threat([tid])
+        dv_mark_as_threat([tid])
         assert threat_repo.get(tid).threatInfo["updatedAt"] >= old
 
     def test_creates_activity(self) -> None:
         before = len(activity_repo.list_all())
-        mark_as_threat([_first_threat_id()])
+        dv_mark_as_threat([_first_threat_id()])
         assert len(activity_repo.list_all()) > before
 
     def test_unknown_id_skipped(self) -> None:
-        result = mark_as_threat(["nonexistent"])
+        result = dv_mark_as_threat(["nonexistent"])
         assert result["data"]["affected"] == 0
 
 
-# ── mark_as_resolved ─────────────────────────────────────────────────────────
-
-
-class TestMarkAsResolved:
-    """Tests for the mark_as_resolved command."""
-
-    def test_sets_resolved_status(self) -> None:
-        tid = _first_threat_id()
-        result = mark_as_resolved([tid])
-        assert result["data"]["affected"] == 1
-        threat = threat_repo.get(tid)
-        assert threat.threatInfo["incidentStatus"] == "resolved"
-        assert threat.threatInfo["resolved"] is True
-
-    def test_updates_timestamp(self) -> None:
-        tid = _first_threat_id()
-        old = threat_repo.get(tid).threatInfo.get("updatedAt", "")
-        mark_as_resolved([tid])
-        assert threat_repo.get(tid).threatInfo["updatedAt"] >= old
-
-    def test_creates_activity(self) -> None:
-        before = len(activity_repo.list_all())
-        mark_as_resolved([_first_threat_id()])
-        assert len(activity_repo.list_all()) > before
-
-    def test_unknown_id_skipped(self) -> None:
-        result = mark_as_resolved(["nonexistent"])
-        assert result["data"]["affected"] == 0

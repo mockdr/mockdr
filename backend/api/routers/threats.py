@@ -133,18 +133,13 @@ def add_to_blacklist(body: FilterBody, current_user: dict = Depends(require_writ
     return threat_commands.add_to_blacklist(ids, body.data, current_user.get("userId"))
 
 
-@router.post("/threats/mark-as-threat")
-def mark_as_threat(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Mark the specified threats as confirmed malicious."""
-    ids = body.filter.get("ids", [])
-    return threat_commands.mark_as_threat(ids, current_user.get("userId"))
-
-
-@router.post("/threats/mark-as-resolved")
-def mark_as_resolved(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Mark the specified threats as resolved."""
-    ids = body.filter.get("ids", [])
-    return threat_commands.mark_as_resolved(ids, current_user.get("userId"))
+# There were `POST /threats/mark-as-threat` and `POST
+# /threats/mark-as-resolved` here. Neither is in the 2.1 swagger — the only
+# `mark-as-threat` it publishes is `dv-mark-as-threat`, and
+# `mark-as-resolved` appears nowhere at all. SentinelOne records both
+# through `/threats/analyst-verdict` and `/threats/incident`, which this
+# mock serves and which do the same work: `param_drift.py` had been listing
+# these two among the routes the vendor does not publish, and nothing ran it.
 
 
 @router.post("/threats/notes")

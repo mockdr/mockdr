@@ -13,8 +13,6 @@ from application.threats.mitigation import (
 )
 from application.threats.notes import add_note, bulk_add_notes
 from application.threats.verdict import (
-    mark_as_resolved,
-    mark_as_threat,
     set_analyst_verdict,
     set_incident_status,
 )
@@ -27,8 +25,6 @@ __all__ = [
     "dv_add_to_blacklist",
     "dv_mark_as_threat",
     "fetch_file",
-    "mark_as_resolved",
-    "mark_as_threat",
     "mitigate",
     "set_analyst_verdict",
     "set_incident_status",

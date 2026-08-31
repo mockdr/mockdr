@@ -4,8 +4,6 @@ POST /threats/analyst-verdict
 POST /threats/incident
 POST /threats/mitigate/{action}
 POST /threats/add-to-blacklist
-POST /threats/mark-as-threat
-POST /threats/mark-as-resolved
 POST /threats/{id}/notes
 GET  /threats/{id}/notes
 GET  /threats/{id}/download-from-cloud
@@ -127,26 +125,6 @@ class TestAddToBlacklist:
         assert resp.status_code == 200
 
 
-class TestMarkAsThreat:
-    def test_mark_as_threat_returns_200(self, client: TestClient, auth_headers: dict) -> None:
-        tid = _first_threat(client, auth_headers)["id"]
-        resp = client.post(
-            f"{BASE}/threats/mark-as-threat",
-            headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
-        )
-        assert resp.status_code == 200
-
-
-class TestMarkAsResolved:
-    def test_mark_as_resolved_returns_200(self, client: TestClient, auth_headers: dict) -> None:
-        tid = _first_threat(client, auth_headers)["id"]
-        resp = client.post(
-            f"{BASE}/threats/mark-as-resolved",
-            headers=auth_headers,
-            json={"filter": {"ids": [tid]}, "data": {}},
-        )
-        assert resp.status_code == 200
 
 
 class TestThreatNotes:
