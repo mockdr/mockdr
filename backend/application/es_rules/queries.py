@@ -74,7 +74,7 @@ def get_rule_by_rule_id(rule_id: str) -> dict | None:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _sort_key(record: dict, sort_field: str) -> str | int | float | bool:
+def _sort_key(record: dict, sort_field: str) -> tuple[int, float, str]:
     """Resolve a sort field that may name a nested member.
 
     ``execution_summary.last_execution.date`` is one of the fields this
