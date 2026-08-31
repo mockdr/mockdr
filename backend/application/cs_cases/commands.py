@@ -1,66 +1,12 @@
 """CrowdStrike Falcon Cases (Messaging Center) command handlers (mutations)."""
 from __future__ import annotations
 
-import uuid as _uuid
-
-from domain.cs_case import CsCase
-from infrastructure.seeders.cs_shared import CS_CID
 from repository.cs_case_repo import cs_case_repo
 from utils.cs_response import (
     build_cs_action_response,
-    build_cs_entity_response,
     build_cs_error_response,
 )
 from utils.dt import utc_now
-from utils.serde import record_dict
-
-
-def create_case(body: dict) -> dict:
-    """Create a new support case.
-
-    Args:
-        body: Request body with ``title``, ``body``, ``type``, ``detections``, ``incidents``.
-
-    Returns:
-        CS entity response with the newly created case.
-    """
-    now = utc_now()
-    case = CsCase(
-        id=str(_uuid.uuid4()),
-        cid=CS_CID,
-        title=body.get("title", "Untitled Case"),
-        body=body.get("body", ""),
-        type=body.get("type", "standard"),
-        detections=body.get("detections", []),
-        incidents=body.get("incidents", []),
-        status="open",
-        created_time=now,
-        last_modified_time=now,
-    )
-    cs_case_repo.save(case)
-    return build_cs_entity_response([record_dict(case)])
-
-
-def update_case(case_id: str, body: dict) -> dict:
-    """Update an existing case.
-
-    Args:
-        case_id: ID of the case to update.
-        body: Fields to update (title, body, status).
-
-    Returns:
-        CS entity response with the updated case.
-    """
-    case = cs_case_repo.get(case_id)
-    if not case:
-        return build_cs_error_response(404, f"Case {case_id} not found")
-
-    for field in ("title", "body", "status"):
-        if field in body:
-            setattr(case, field, body[field])
-    case.last_modified_time = utc_now()
-    cs_case_repo.save(case)
-    return build_cs_entity_response([record_dict(case)])
 
 
 def add_case_tags(case_id: str, tags: list[str]) -> dict:

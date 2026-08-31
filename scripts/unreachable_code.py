@@ -34,7 +34,6 @@ Exit status 1 when anything is flagged.
 from __future__ import annotations
 
 import ast
-import collections
 import re
 import sys
 from pathlib import Path
@@ -70,27 +69,99 @@ def public_defs(paths):
     return found
 
 
+def module_of(path):
+    """The dotted module a file under `backend/` is imported as."""
+    parts = path.relative_to(ROOT).with_suffix("").parts
+    return ".".join(parts)
+
+
 def mentions(paths):
-    """How often each identifier occurs, `def` lines excluded."""
-    counted: collections.Counter = collections.Counter()
+    """Which identifiers each file names, `def` lines excluded.
+
+    Counted per file rather than in one bag. Counting by name alone said
+    every one of 720 functions was reached, because two modules may define
+    the same name: `application/cs_cases/commands.py` has a `create_case`
+    that no route calls, and it read as reached the whole time because
+    `application/es_cases/commands.py` has one that a route does.
+    """
+    named: dict[pathlib.Path, set] = {}
     for path in paths:
+        seen = set()
         for line in path.read_text().splitlines():
             if line.lstrip().startswith(("def ", "async def ")):
                 continue
-            counted.update(_IDENTIFIER.findall(line))
-    return counted
+            seen.update(_IDENTIFIER.findall(line))
+        named[path] = seen
+    return named
+
+
+#: `from a.b import c` and `import a.b`, capturing the dotted path.
+_IMPORT = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import\s+(.+)|import\s+([\w.]+))")
+
+
+def importers(paths):
+    """The dotted modules each file imports.
+
+    Whole paths, not their parts: matching on parts made every file that
+    imports *any* `commands` module look like an importer of every other,
+    which is how a dead function in `application/cs_cases/commands.py` was
+    vouched for by a router importing `application/es_cases/commands.py`.
+    """
+    imported: dict[pathlib.Path, set] = {}
+    for path in paths:
+        modules: set = set()
+        for line in path.read_text().splitlines():
+            match = _IMPORT.match(line)
+            if not match:
+                continue
+            package, names, plain = match.groups()
+            if plain:
+                modules.add(plain)
+            elif package:
+                modules.add(package)
+                for name in names.replace("(", "").replace(")", "").split(","):
+                    bare = name.split(" as ")[0].strip()
+                    if bare and bare != "*":
+                        modules.add(f"{package}.{bare}")
+        imported[path] = modules
+    return imported
 
 
 def main():
     """Report every public function in the read layers that nothing names."""
     paths = sources()
     defs = public_defs(paths)
-    reached = mentions(paths)
+    named = mentions(paths)
+    imports = importers(paths)
+
+    def reached(home, name):
+        """Whether anything that can see this definition names it.
+
+        A file counts only if it is the defining module itself or imports
+        it. Counting every file made a same-named function in an unrelated
+        module vouch for this one, which is how a dead `create_case` in
+        `cs_cases` survived every run: `es_cases` has one that a route
+        calls. Requiring the mention to come from *outside* was the other
+        extreme, and flagged every helper a module calls itself.
+        """
+        parts = home.relative_to(ROOT).with_suffix("").parts
+        # `application.cs_cases.commands`, and the same without the leading
+        # `backend` since that is not part of the import path.
+        dotted = ".".join(parts)
+        own = {dotted, dotted.removeprefix("backend.")}
+        for path, seen in named.items():
+            if name not in seen:
+                continue
+            if path == home:
+                return True  # a helper its own module calls is reached
+            if own & imports.get(path, set()):
+                return True
+        return False
 
     flags = [
         (path.relative_to(ROOT), lineno, name)
         for (path, name), lineno in sorted(defs.items())
-        if not reached[name]
+        if not reached(path, name)
     ]
 
     print(f"=== UNREACHABLE CODE === {len(defs)} public function(s) read")

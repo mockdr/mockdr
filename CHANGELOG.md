@@ -28,6 +28,30 @@ CrowdStrike and Cortex references name their members and not their types, so
 a generated body would be a guess, and a guess that answers 400 measures the
 guess.
 
+### Removed
+
+**Seven functions nothing could reach, and the blind spot that hid them.**
+`unreachable_code.py` counted identifiers in one bag, by name, across every
+file — so a function was "reached" if *any* module anywhere named something
+spelled the same. `application/cs_cases/commands.py` has a `create_case`
+that no route calls and it read as reached on every run, because
+`application/es_cases/commands.py` has one that a route does. Six more sat
+behind the same collision.
+
+It attributes a mention now: a file counts only if it is the defining module
+or imports it by its whole dotted path. Matching on path *parts* was the
+first attempt and no better — every file importing any `commands` module
+vouched for every other. And a helper its own module calls is reached, which
+the attempt before that got wrong, flagging four `deep_complete`s.
+
+Gone with it: `create_case` and `update_case` on CrowdStrike cases, whose
+routes are read-only and tag-only; a `get_alert` in `alerts` and another in
+`es_alerts`; `scan_endpoint` in `es_endpoints`; `get_tags` in `es_rules`,
+where the route that serves tags computes them inline; and `get_indicator`
+in `mde_indicators`. 100 lines, and every one of them verified by hand
+before deletion — each caller named a same-spelled function of another
+module.
+
 ### Changed
 
 **Coverage runs through `sys.monitoring`, and CI gets nine minutes back.**

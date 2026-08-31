@@ -47,18 +47,3 @@ def list_indicators(
             f"https://api.securitycenter.microsoft.com/api/indicators?$top={top}&$skip={skip + top}"
         )
     return build_mde_list_response(page, next_link=next_link)
-
-
-def get_indicator(indicator_id: str) -> dict | None:
-    """Get a single indicator by its indicator ID.
-
-    Args:
-        indicator_id: The GUID of the indicator to retrieve.
-
-    Returns:
-        Indicator dict, or None if not found.
-    """
-    indicator = mde_indicator_repo.get(indicator_id)
-    if not indicator:
-        return None
-    return _resource(record_dict(indicator))

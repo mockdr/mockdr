@@ -3,7 +3,7 @@ from application.documented_filters import DOCUMENTED_FILTERS
 from repository.alert_repo import alert_repo
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.nested import get_nested
-from utils.pagination import ALERT_CURSOR, build_list_response, build_single_response, paginate
+from utils.pagination import ALERT_CURSOR, build_list_response, paginate
 from utils.serde import record_dict
 
 FILTER_SPECS = [
@@ -52,14 +52,6 @@ def list_alerts(params: dict, cursor: str | None, limit: int) -> dict:
         definition="v2_1.alerts.schemas_AlertInformationSchema_many_200",
         strict=True,
     )
-
-
-def get_alert(alert_id: str) -> dict | None:
-    """Return a single alert by ID, or None if not found."""
-    alert = alert_repo.get(alert_id)
-    if not alert:
-        return None
-    return build_single_response(record_dict(alert))
 
 
 #: The swagger's own filters for GET /cloud-detection/rules. `status` and

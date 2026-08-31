@@ -124,22 +124,6 @@ def run_action(
     return _create_action(agent_id, command, comment, params)
 
 
-def scan_endpoint(agent_id: str, comment: str = "") -> dict | None:
-    """Trigger a scan on the endpoint.
-
-    Args:
-        agent_id: ID of the target endpoint.
-        comment:  Operator comment.
-
-    Returns:
-        Action response dict, or None if endpoint not found.
-    """
-    ep = es_endpoint_repo.get(agent_id)
-    if not ep:
-        return None
-    return _create_action(agent_id, "scan", comment)
-
-
 #: How long the endpoint takes to answer, so a client that polls twice sees
 #: the action move rather than finding it already done.
 _SETTLE_SECONDS = 1.0

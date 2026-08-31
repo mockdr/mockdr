@@ -74,18 +74,6 @@ def get_rule_by_rule_id(rule_id: str) -> dict | None:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def get_tags() -> list[str]:
-    """Return all unique tags across all detection rules.
-
-    Returns:
-        Sorted list of unique tag strings.
-    """
-    tags: set[str] = set()
-    for rule in es_rule_repo.list_all():
-        tags.update(rule.tags)
-    return sorted(tags)
-
-
 def _sort_key(record: dict, sort_field: str) -> str | int | float | bool:
     """Resolve a sort field that may name a nested member.
 

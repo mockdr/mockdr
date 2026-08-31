@@ -30,18 +30,3 @@ def search_alerts(body: dict) -> dict:
     )
 
     return build_es_search_response(hits, total=total)
-
-
-def get_alert(alert_id: str) -> dict | None:
-    """Get a single alert by its ID.
-
-    Args:
-        alert_id: The alert ID to look up.
-
-    Returns:
-        Alert dict, or None if not found.
-    """
-    alert = es_alert_repo.get(alert_id)
-    if not alert:
-        return None
-    return record_dict(alert)
