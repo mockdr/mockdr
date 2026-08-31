@@ -438,6 +438,13 @@ app.add_middleware(ODataPropertyMiddleware)    # a $select/$filter/$orderby nami
 app.add_middleware(ElasticShapingMiddleware)   # filter_path, pretty, X-Opaque-Id
 app.add_middleware(ElasticHeadersMiddleware)   # the header every Elasticsearch client checks for
 app.add_middleware(SplunkHeadersMiddleware)    # Server/Vary/caching, and 304 on a fresh read
+# Inside the namespace rewrite, so a `/servicesNS/...` job is seen by its
+# `/services/...` path; outside the routes, so a 404 or 405 carries it too —
+# which splunkd's does. `add_middleware` prepends, so "inside" means *added
+# before* the rewrite: added after it, this saw the original path, matched
+# nothing, and a job addressed through `/servicesNS/` carried no `Link` at
+# all where splunkd sends one (measured on 10.4.2, both path forms).
+app.add_middleware(SplunkJobLinkMiddleware)
 # Path rewriting must happen before routing, so this is added last (outermost).
 app.add_middleware(SplunkNamespaceMiddleware)  # /servicesNS/{owner}/{app} -> /services
 app.add_middleware(RecordingProxyMiddleware)  # innermost — added first, runs last
@@ -445,10 +452,6 @@ app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries
 app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-# Inside the namespace rewrite, so a `/servicesNS/...` job is seen by its
-# `/services/...` path; outside the routes, so a 404 or 405 carries it too —
-# which splunkd's does.
-app.add_middleware(SplunkJobLinkMiddleware)
 app.add_middleware(KibanaApiVersionMiddleware)
 # Before routing: the cluster refuses the header without looking at the body.
 app.add_middleware(ElasticContentTypeMiddleware)
