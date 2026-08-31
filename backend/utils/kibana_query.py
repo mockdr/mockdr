@@ -88,6 +88,47 @@ def _message(dialect: str, sent: dict[str, str], extra: list[str]) -> str:
     return f"[request query.{extra[0]}]: definition for this key is missing"
 
 
+def numeric_members(
+    *numbers: str, number_dialect: str = NUMBER_KEY_MISSING,
+) -> Callable[..., None]:
+    """Refuse an unreadable number, and say nothing about anything else.
+
+    Not every route that declares a number refuses a member it does not
+    declare: measured on 8.15, `/api/lists/_find?zzzUnknown=1` and
+    `/api/osquery/packs?zzzUnknown=1` both answer 200, where
+    `/api/alerting/rules/_find` and `/api/cases/_find` answer 400. Guarding
+    the first two with `refuses_unknown` fixed a 500 on `?page=abc` and
+    invented a 400 on the unknown member in the same move — which
+    `scripts/kbn_param_audit.py` then caught against the live product.
+    """
+
+    def refuse(request: Request) -> None:
+        sent = dict(request.query_params)
+        for name in numbers:
+            value = sent.get(name)
+            if value is None:
+                continue
+            if value == "" and number_dialect in _EMPTY_IS_ZERO:
+                continue
+            try:
+                float(value)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=build_kbn_error_response(
+                    400, _number_message(number_dialect, name, value),
+                )) from None
+
+    return refuse
+
+
+def refuses_bad_numbers(
+    *numbers: str, number_dialect: str = NUMBER_KEY_MISSING,
+) -> DependsMarker:
+    """`numeric_members` as a route dependency."""
+    marker: DependsMarker = Depends(
+        numeric_members(*numbers, number_dialect=number_dialect))
+    return marker
+
+
 def known_query_members(
     *known: str,
     dialect: str = KEY_MISSING,

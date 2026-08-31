@@ -378,3 +378,21 @@ class TestAnUnreadableNumber:
         for path in ("/kibana/api/lists/_find", "/kibana/api/osquery/packs"):
             resp = client.get(path, headers=ES_AUTH, params={"per_page": ""})
             assert resp.status_code == 200, path
+
+    def test_guarding_the_number_does_not_refuse_an_unknown_member(
+        self, client: TestClient,
+    ) -> None:
+        """Not every route that declares a number refuses what it does not.
+
+        Measured on 8.15: `?zzzUnknown=1` is 200 on these two and 400 on the
+        two below. Reaching for `refuses_unknown` to get the numeric check
+        fixed a 500 and invented a refusal in the same move, which
+        `scripts/kbn_param_audit.py` caught against the live product.
+        """
+        for path in ("/kibana/api/lists/_find", "/kibana/api/osquery/packs"):
+            resp = client.get(path, headers=ES_AUTH, params={"zzzUnknown": "1"})
+            assert resp.status_code == 200, path
+
+        for path in ("/kibana/api/alerting/rules/_find", "/kibana/api/cases/_find"):
+            resp = client.get(path, headers=ES_AUTH, params={"zzzUnknown": "1"})
+            assert resp.status_code == 400, path

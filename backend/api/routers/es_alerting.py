@@ -26,7 +26,7 @@ from fastapi import APIRouter, Depends, Query
 
 from api.es_auth import require_es_auth
 from config import APP_VERSION
-from utils.kibana_query import NUMBER_ZOD, refuses_unknown
+from utils.kibana_query import NUMBER_ZOD, refuses_bad_numbers, refuses_unknown
 
 router = APIRouter(tags=["Kibana Alerting"])
 
@@ -201,10 +201,12 @@ def _list_envelope(page: int, per_page: int, data: list[Any]) -> dict:
 @router.get(
     "/api/lists/_find",
     # The only paged route here with no numeric guard, so `?page=abc` reached
-    # `float()` and answered 500 where Kibana answers 400.
-    dependencies=[refuses_unknown(
-        "page", "per_page", "sort_field", "sort_order", "filter", "cursor",
-        numbers=("page", "per_page"), number_dialect=NUMBER_ZOD,
+    # `float()` and answered 500 where Kibana answers 400. Numbers only:
+    # measured on 8.15, this route answers `?zzzUnknown=1` with 200, so
+    # refusing an unknown member here would invent a refusal the product
+    # does not make.
+    dependencies=[refuses_bad_numbers(
+        "page", "per_page", number_dialect=NUMBER_ZOD,
     )],
 )
 def find_lists(

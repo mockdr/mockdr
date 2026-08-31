@@ -25,6 +25,7 @@ from utils.kibana_query import (
     EXCESS,
     INVALID_KEYS,
     NUMBER_IO_TS,
+    refuses_bad_numbers,
     refuses_unknown,
 )
 
@@ -335,9 +336,10 @@ def case_configuration(_: dict = Depends(require_es_auth)) -> list[dict]:
 @router.get(
     "/api/osquery/packs",
     # This one had no numeric guard at all, so `?page=abc` was a 500.
-    dependencies=[refuses_unknown(
-        "page", "per_page", "sort", "sortOrder",
-        numbers=("page", "per_page"), number_dialect=NUMBER_IO_TS,
+    # Numbers only: measured on 8.15, this route answers `?zzzUnknown=1`
+    # with 200, so refusing an unknown member here would invent a refusal.
+    dependencies=[refuses_bad_numbers(
+        "page", "per_page", number_dialect=NUMBER_IO_TS,
     )],
 )
 def osquery_packs(
