@@ -52,7 +52,10 @@ async function fetchCases(p = 1): Promise<void> {
     // `Invalid value "created_at" supplied to "sortField"`, so this list
     // answered 400 and rendered empty.
     const res = await esCasesApi.find({ page: p, perPage, sortField: 'createdAt', sortOrder: 'desc' })
-    cases.value = res.data ?? []
+    // `cases`, not `data`: the Cases API does not use the shape the
+    // detection-engine routes do. Reading `data` left the table empty
+    // while the count above it read `res.total` and said otherwise.
+    cases.value = res.cases ?? []
     total.value = res.total ?? cases.value.length
   } finally {
     loading.value = false

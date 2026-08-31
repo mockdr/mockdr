@@ -85,8 +85,11 @@ run_backend() {
     _run "BE: Type-check (mypy)" \
         .venv/bin/mypy --strict --allow-any-generics . --ignore-missing-imports --exclude tests/
 
+    # `env` rather than a bare assignment: `_run` invokes "$@", and bash reads
+    # an expanded first word as a command name, not an environment binding —
+    # written the other way this step exited 127 and the suite never ran.
     _run "BE: Test + coverage (85% gate)" \
-        COVERAGE_CORE=sysmon .venv/bin/pytest --cov --cov-fail-under=85
+        env COVERAGE_CORE=sysmon .venv/bin/pytest --cov --cov-fail-under=85
 
     _run "BE: Critical-path tests" \
         .venv/bin/pytest -m critical --no-cov -n auto

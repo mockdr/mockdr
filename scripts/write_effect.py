@@ -162,6 +162,7 @@ def main() -> int:
 
     headers = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
     dropped: list[tuple[str, str, str]] = []
+    refused: list[str] = []
     unechoed: list[tuple[str, str]] = []
     routes = 0
 
@@ -206,11 +207,20 @@ def main() -> int:
                 }
                 if not sent:
                     continue
-                routes += 1
                 answer = client.request(method.upper(), url, headers=headers,
                                         json={"data": sent})
                 if answer.status_code not in (200, 201):
+                    # Counted apart, not silently. `routes += 1` used to come
+                    # before the request, so six routes that refuse this
+                    # generated body — `PUT /exclusions` among them — were
+                    # inside "N routes sent every member they document" while
+                    # nothing about them was judged. A denominator that counts
+                    # what was never looked at is the shape of an audit that
+                    # has stopped looking.
+                    refused.append(f"{method.upper()} {path[len(BASE):]} "
+                                   f"-> {answer.status_code}")
                     continue
+                routes += 1
                 found_records = records(answer.json())
                 if not found_records:
                     continue
@@ -234,6 +244,9 @@ def main() -> int:
     for route, name, why in sorted(dropped):
         print(f"      {route:36} {name:24} {why}")
     print(f"  {len(unechoed)} member(s) the response schema does not declare, so not judged")
+    print(f"  {len(refused)} route(s) that refused the generated body, so were not judged")
+    for entry in sorted(refused):
+        print(f"      {entry}")
     if verbose:
         for route, name in sorted(unechoed):
             print(f"      {route:36} {name}")

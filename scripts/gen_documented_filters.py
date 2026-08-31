@@ -76,9 +76,15 @@ def _field_paths(value: object, prefix: str = "", depth: int = 0) -> dict[str, s
             path = f"{prefix}{key}"
             found.setdefault(key, path)
             found[path] = path
-            found.update(_field_paths(sub, f"{path}.", depth + 1))
+            # The shallower name wins. `update` let a nested key overwrite a
+            # bare one, and an agent carries `locations[].id` as well as its
+            # own `id` — so `idsNin` was generated against `locations.id` and
+            # excluded nothing, while the agent id it names went unread.
+            for name, deep in _field_paths(sub, f"{path}.", depth + 1).items():
+                found.setdefault(name, deep)
     elif isinstance(value, list) and value:
-        found.update(_field_paths(value[0], prefix, depth + 1))
+        for name, deep in _field_paths(value[0], prefix, depth + 1).items():
+            found.setdefault(name, deep)
     return found
 
 

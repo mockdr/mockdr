@@ -163,7 +163,35 @@ def _matches(field_value: object, wanted: object) -> bool:
     if isinstance(field_value, bool):
         spelling = str(wanted).strip().lower()
         return spelling in (("true", "1", "yes") if field_value else ("false", "0", "no"))
+    # A field that holds many values is matched by its members, not by the
+    # rendering of the container. `?userActionsNeeded=reboot_needed` compared
+    # the string "['reboot_needed']" against "reboot_needed" and matched
+    # nothing, and its `Nin` spelling excluded nothing, so every list-valued
+    # filter the swagger documents answered 200 with the wrong set.
+    if isinstance(field_value, (list, tuple, set)):
+        return any(_matches(member, wanted) for member in field_value)
+    # And a field keyed by the thing being asked for — `cloudProviders` is
+    # `{"AWS": {...}}` — is matched by its keys, which is what `?cloudProvider=AWS`
+    # names.
+    if isinstance(field_value, dict):
+        return any(_matches(key, wanted) for key in field_value)
     return _as_text(field_value) == str(wanted)
+
+
+
+def _enum_keys(field_value: object) -> set[str]:
+    """Every spelling a record's value offers an enum filter.
+
+    A many-valued field offers one per member — `userActionsNeeded` is a
+    list, and comparing `_enum_key` of the whole list against a member
+    matched nothing, so four documented enum filters over list fields
+    answered 200 with the wrong set.
+    """
+    if isinstance(field_value, (list, tuple, set)):
+        return {_enum_key(member) for member in field_value}
+    if isinstance(field_value, dict):
+        return {_enum_key(key) for key in field_value}
+    return {_enum_key(_as_text(field_value))}
 
 
 def _enum_key(value: object) -> str:
@@ -252,7 +280,8 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
             if spec.enum:
                 wanted = {_enum_key(v) for v in values}
                 result = [
-                    r for r in result if _enum_key(_as_text(_get_field(r, spec.field))) in wanted
+                    r for r in result
+                    if _enum_keys(_get_field(r, spec.field)) & wanted
                 ]
             else:
                 result = [
@@ -290,7 +319,7 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
                 unwanted = {_enum_key(v) for v in values}
                 result = [
                     r for r in result
-                    if _enum_key(_as_text(_get_field(r, spec.field))) not in unwanted
+                    if not (_enum_keys(_get_field(r, spec.field)) & unwanted)
                 ]
             else:
                 result = [

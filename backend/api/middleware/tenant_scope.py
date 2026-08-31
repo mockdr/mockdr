@@ -5,7 +5,7 @@ to their own account.  Admin users and ``/_dev/`` paths are exempt.
 """
 from __future__ import annotations
 
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -89,61 +89,51 @@ class TenantScopeMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Check if accountIds is already in query string
+        # Both axes, in one pass. They used to be two branches, and the
+        # account one returned before the site one could run — so a caller
+        # confined to one site escaped that confinement by naming their own
+        # account, which is the query string a console sends anyway.
         qs = scope.get("query_string", b"").decode("utf-8", errors="replace")
         parsed = parse_qs(qs, keep_blank_values=True)
 
-        if "accountIds" in parsed:
-            # Non-admin user provided explicit accountIds — validate it matches
-            # their own accountId to prevent cross-tenant access.
-            user_account_id = record.get("accountId", "")
-            provided_ids = parsed["accountIds"]
-            if user_account_id and any(aid != user_account_id for aid in provided_ids):
-                # Override with the user's own accountId
-                qs_without = "&".join(
-                    f"{k}={v}" for k, vals in parse_qs(qs, keep_blank_values=True).items()
-                    if k != "accountIds" for v in vals
-                )
-                if qs_without:
-                    new_qs = f"{qs_without}&accountIds={user_account_id}"
-                else:
-                    new_qs = f"accountIds={user_account_id}"
-                scope["query_string"] = new_qs.encode("utf-8")
-            await self.app(scope, receive, send)
-            return
+        def confine(key: str, allowed: list[str]) -> list[str] | None:
+            """What this caller may ask for on one axis, or None to leave it.
 
-        # Inject the user's accountId
-        account_id = record.get("accountId", "")
-        allowed = _confined_sites(record)
-        if allowed and "siteIds" in parsed:
-            # A caller may narrow within their own scope and no further. The
-            # account branch above guards its axis the same way: asking for
-            # someone else's site returned that site's records in full.
+            A caller may narrow within their own scope and no further. Asking
+            for something outside it leaves their own scope standing rather
+            than widening to what they asked for, and an empty intersection
+            keeps their scope too — an empty value would read as "no filter".
+            """
+            if not allowed:
+                return None
+            if key not in parsed:
+                return allowed
             wanted = {
                 value.strip()
-                for entry in parsed["siteIds"] for value in entry.split(",") if value.strip()
+                for entry in parsed[key] for value in entry.split(",") if value.strip()
             }
-            permitted = [s for s in allowed.split(",") if s in wanted]
-            qs = "&".join(
-                f"{key}={value}"
-                for key, values in parsed.items() if key != "siteIds"
-                for value in values
-            )
-            # Nothing in common means nothing this caller may see, and an
-            # empty `siteIds` would read as "no filter" — so their own scope
-            # stands and the answer is empty on its own terms.
-            allowed = ",".join(permitted) if permitted else allowed
-        sites = allowed
-        if not account_id and not sites:
+            permitted = [one for one in allowed if one in wanted]
+            return permitted or allowed
+
+        account_id = str(record.get("accountId", "") or "")
+        accounts = confine("accountIds", [account_id] if account_id else [])
+        confined = _confined_sites(record)
+        sites = confine("siteIds", confined.split(",") if confined else [])
+        if accounts is None and sites is None:
             await self.app(scope, receive, send)
             return
 
-        additions = []
-        if account_id:
-            additions.append(f"accountIds={account_id}")
-        if sites:
-            additions.append(f"siteIds={sites}")
-        new_qs = "&".join([qs, *additions]) if qs else "&".join(additions)
+        # Rebuilt with `urlencode`, not an f-string: the old spelling dropped
+        # every other parameter's percent-encoding, so a `%26` inside a value
+        # split into a parameter of its own and silently changed the request.
+        rebuilt = {
+            key: values for key, values in parsed.items()
+            if key not in ("accountIds", "siteIds")
+        }
+        if accounts is not None:
+            rebuilt["accountIds"] = [",".join(accounts)]
+        if sites is not None:
+            rebuilt["siteIds"] = [",".join(sites)]
 
-        scope["query_string"] = new_qs.encode("utf-8")
+        scope["query_string"] = urlencode(rebuilt, doseq=True).encode("utf-8")
         await self.app(scope, receive, send)

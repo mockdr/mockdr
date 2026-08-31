@@ -13,8 +13,11 @@ vi.mock('../../../api/elastic', () => ({
     find: vi.fn().mockResolvedValue({
       page: 1,
       per_page: 25,
+      count_open_cases: 0,
+      count_in_progress_cases: 0,
+      count_closed_cases: 0,
       total: 4,
-      data: [
+      cases: [
         {
           id: 'case-1',
           title: 'Suspicious login detected',
@@ -346,7 +349,7 @@ describe('EsCasesView', () => {
   })
 
   it('hasNext is true when there are more pages', async () => {
-    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 100, data: [{ id: 'c1', title: 'Case 1', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z', created_by: { username: 'analyst' }, description: '', connector: { id: 'none', name: 'None' } }] })
+    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 100, count_open_cases: 0, count_in_progress_cases: 0, count_closed_cases: 0, cases: [{ id: 'c1', title: 'Case 1', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z', created_by: { username: 'analyst' }, description: '', connector: { id: 'none', name: 'None' } }] })
     const wrapper = mount(EsCasesView, {
       global: { plugins: [router], stubs: STUBS },
     })
@@ -360,8 +363,11 @@ describe('EsCasesView', () => {
     vi.mocked(esCasesApi.find).mockResolvedValue({
       page: 1,
       per_page: 25,
+      count_open_cases: 0,
+      count_in_progress_cases: 0,
+      count_closed_cases: 0,
       total: 50,
-      data: Array.from({ length: 25 }, (_, i) => ({
+      cases: Array.from({ length: 25 }, (_, i) => ({
         id: `case-${i}`,
         title: `Case ${i}`,
         status: 'open',
@@ -435,7 +441,7 @@ describe('EsCasesView', () => {
 
   // Empty state
   it('shows empty state when no cases are returned', async () => {
-    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 0, data: [] })
+    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 0, count_open_cases: 0, count_in_progress_cases: 0, count_closed_cases: 0, cases: [] })
     const wrapper = mount(EsCasesView, {
       global: { plugins: [router], stubs: STUBS },
     })

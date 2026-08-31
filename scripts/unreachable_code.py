@@ -84,7 +84,7 @@ def mentions(paths):
     that no route calls, and it read as reached the whole time because
     `application/es_cases/commands.py` has one that a route does.
     """
-    named: dict[pathlib.Path, set] = {}
+    named: dict[Path, set] = {}
     for path in paths:
         seen = set()
         for line in path.read_text().splitlines():
@@ -107,7 +107,7 @@ def importers(paths):
     which is how a dead function in `application/cs_cases/commands.py` was
     vouched for by a router importing `application/es_cases/commands.py`.
     """
-    imported: dict[pathlib.Path, set] = {}
+    imported: dict[Path, set] = {}
     for path in paths:
         modules: set = set()
         for line in path.read_text().splitlines():

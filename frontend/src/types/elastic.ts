@@ -7,12 +7,33 @@ export interface EsSearchResponse<T> {
   }
 }
 
-/** Kibana paginated list response. */
+/**
+ * Kibana paginated list response — the detection-engine shape, `data` under
+ * `perPage`.
+ */
 export interface KibanaListResponse<T> {
   page: number
   per_page: number
   total: number
   data: T[]
+}
+
+/**
+ * The Cases API's list reply, which is not that shape: the records are under
+ * `cases`, the page size comes back as `per_page` where the request takes
+ * `perPage`, and three counts ride along. Declaring it as `KibanaListResponse`
+ * had the view read `res.data`, which is `undefined` here — so the table was
+ * empty over a store with cases in it, and neither the unit test (whose mock
+ * copied the wrong shape) nor tsc could see it.
+ */
+export interface KibanaCasesResponse<T> {
+  page: number
+  per_page: number
+  total: number
+  cases: T[]
+  count_open_cases: number
+  count_in_progress_cases: number
+  count_closed_cases: number
 }
 
 /** Elastic Security endpoint metadata. */

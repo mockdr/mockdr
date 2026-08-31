@@ -73,6 +73,38 @@ class TestASiteScopedCallerSeesOneSite:
         headers = _scoped_headers(client, auth_headers, [sites[0]["id"]], "narrow")
         assert _agent_sites(client, headers, siteIds=sites[1]["id"]) == [sites[0]["id"]]
 
+    def test_naming_their_own_account_does_not_lift_the_site_scope(
+        self, client: TestClient, auth_headers: dict, sites: list[dict],
+    ) -> None:
+        """The two axes were two branches, and the account one returned first.
+
+        A console sends `accountIds` as a matter of course, so this was not an
+        exotic bypass: it was the ordinary query string, and it took the site
+        confinement off entirely.
+        """
+        headers = _scoped_headers(client, auth_headers, [sites[0]["id"]], "acct")
+        account_id = client.get(
+            f"{BASE}/accounts", headers=auth_headers,
+        ).json()["data"][0]["id"]
+        assert _agent_sites(client, headers, accountIds=account_id) == [sites[0]["id"]]
+
+    def test_a_percent_encoded_value_survives_the_rewrite(
+        self, client: TestClient, auth_headers: dict, sites: list[dict],
+    ) -> None:
+        """The query was rebuilt with an f-string, which lost the escaping.
+
+        A `%26` inside a value became a parameter separator, so the filter was
+        truncated and whatever followed it — `limit`, here — was silently
+        applied instead.
+        """
+        headers = _scoped_headers(client, auth_headers, [sites[0]["id"]], "encode")
+        response = client.get(
+            f"{BASE}/agents", headers=headers,
+            params={"limit": "100", "computerName__contains": "A&limit=1"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["pagination"]["totalItems"] == 0
+
     def test_asking_for_their_own_site_still_works(
         self, client: TestClient, auth_headers: dict, sites: list[dict],
     ) -> None:

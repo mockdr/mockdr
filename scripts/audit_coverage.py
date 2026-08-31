@@ -185,7 +185,7 @@ def tested():
 
 
 #: The mounts that are mockdr's own — its UI's API and its health surface.
-_OWN = ("/web/", "/_mock/", "/metrics")
+_OWN = ("/web/api/v2.1/_dev/", "/_mock/", "/metrics")
 
 #: How many segments of a literal must line up with a route's tail before it
 #: counts as naming it. Two keeps `/query` from claiming every route that

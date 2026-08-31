@@ -3,6 +3,7 @@ import { reportFailure } from './report'
 import type {
   EsSearchResponse,
   KibanaListResponse,
+  KibanaCasesResponse,
   EsEndpoint,
   EsRule,
   EsAlert,
@@ -149,8 +150,8 @@ export const esAlertsApi = {
 
 export const esCasesApi = {
   /** Find cases. */
-  find: (params?: Record<string, unknown>): Promise<KibanaListResponse<EsCase>> =>
-    kbnClient.get('/api/cases/_find', { params }) as Promise<KibanaListResponse<EsCase>>,
+  find: (params?: Record<string, unknown>): Promise<KibanaCasesResponse<EsCase>> =>
+    kbnClient.get('/api/cases/_find', { params }) as Promise<KibanaCasesResponse<EsCase>>,
 
   /** Get a single case. */
   get: (id: string): Promise<EsCase> =>
