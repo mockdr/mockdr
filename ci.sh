@@ -86,7 +86,7 @@ run_backend() {
         .venv/bin/mypy --strict --allow-any-generics . --ignore-missing-imports --exclude tests/
 
     _run "BE: Test + coverage (85% gate)" \
-        .venv/bin/pytest --cov --cov-fail-under=85
+        COVERAGE_CORE=sysmon .venv/bin/pytest --cov --cov-fail-under=85
 
     _run "BE: Critical-path tests" \
         .venv/bin/pytest -m critical --no-cov -n auto

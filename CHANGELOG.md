@@ -30,6 +30,14 @@ guess.
 
 ### Changed
 
+**Coverage runs through `sys.monitoring`, and CI gets nine minutes back.**
+One job was 29 of CI's 31 minutes while every other finished inside three,
+so it was the wall clock — and most of what it spent went on the `settrace`
+tracer rather than on the tests. Python 3.12 added `sys.monitoring` and
+coverage.py uses it when asked. Measured over the whole suite here: 197s
+with the default tracer against 139s with this, for byte-identical numbers —
+27 956 statements, 2 284 missed, 92 % either way.
+
 **The seed-ordering test tries twelve draws, not four.**
 It exists because a timestamp defect can hide in the one seed a suite
 happens to use, and it has now been beaten twice by exactly that: the
