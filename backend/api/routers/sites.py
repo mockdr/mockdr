@@ -7,6 +7,7 @@ from application.sites import commands as site_commands
 from application.sites import queries as site_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from utils.documented_params import documented_openapi, documented_params
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sites"])
 
@@ -72,7 +73,13 @@ def create_site(body: SiteCreateBody, _: dict = Depends(require_admin)) -> dict:
 
     Body: ``{"data": {name, accountId, siteType, suite, sku, totalLicenses, ...}}``
     """
-    return site_commands.create_site(body.data)
+    try:
+        return site_commands.create_site(body.data)
+    except site_commands.InvalidSiteError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
 
 
 @router.put("/sites/{site_id}")

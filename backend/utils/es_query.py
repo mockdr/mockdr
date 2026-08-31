@@ -1833,6 +1833,20 @@ def hit_id(rec: dict) -> str:
     return str(uuid.UUID(digest.hexdigest()[:32]))
 
 
+#: Elasticsearch's bounds are Java ints.
+_INT32_MIN = -2147483648
+_INT32_MAX = 2147483647
+
+#: What 8.15 says about a number outside them, measured with `1e400`,
+#: `2147483648` and `100000000000`. Its own message carries a `[line:col]`
+#: prefix and echoes the raw request bytes after the sentence; neither
+#: survives JSON parsing, so only the sentence itself is reproduced.
+_OUT_OF_RANGE = (
+    "Numeric value ({value}) out of range of int "
+    "(-2147483648 - 2147483647)"
+)
+
+
 def _as_bound(value: Any, name: str) -> int | None:
     """Coerce a ``from``/``size`` bound, rejecting what Elasticsearch rejects."""
     if value is None:
@@ -1842,10 +1856,24 @@ def _as_bound(value: Any, name: str) -> int | None:
         raise ESQueryError(msg)
     try:
         bound = int(value)
+    except OverflowError as exc:
+        # Python's JSON parser accepts `Infinity` and `1e400`; `int()` of
+        # either raises here rather than ValueError, and the exception left
+        # the handler as a 500 where 8.15 answers 400.
+        raise ESQueryError(_OUT_OF_RANGE.format(value=value),
+                           es_type="x_content_parse_exception") from exc
     except (TypeError, ValueError) as exc:
         # Elasticsearch reports Java's NumberFormatException verbatim.
         msg = f'For input string: "{value}"'
         raise ESQueryError(msg, es_type="number_format_exception") from exc
+    if not _INT32_MIN <= bound <= _INT32_MAX:
+        # These are Java ints. `int(1e20)` is a fine Python number and no
+        # kind of Elasticsearch one, so a size above the int32 ceiling was
+        # accepted here and refused there. Measured on 8.15: 2147483647 gets
+        # past the parse and meets the result-window limit; 2147483648 does
+        # not get past the parse.
+        raise ESQueryError(_OUT_OF_RANGE.format(value=value),
+                           es_type="x_content_parse_exception")
     if bound < 0:
         # The two are worded differently and mockdr used one formula for
         # both: `size` says `, found [-1]`, `from` says ` but was [-1]`

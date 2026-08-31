@@ -18,6 +18,33 @@ from utils.serde import record_dict
 from utils.strip import strip_fields
 
 
+class InvalidSiteError(ValueError):
+    """A site body this route cannot make a site out of."""
+
+
+def _whole_licenses(value: object) -> int:
+    """`totalLicenses` as a whole number, or a refusal saying it is not one.
+
+    `int(data.get("totalLicenses", 0))` raised out of the handler for a
+    string that is not a number, and for a dict or a list. A 500 tells the
+    client the server is broken and to retry the same body; the request is
+    what is wrong, and a 400 says so.
+    """
+    if value is None or value == "":
+        return 0
+    if isinstance(value, bool):
+        msg = "data.totalLicenses must be a number"
+        raise InvalidSiteError(msg)
+    if not isinstance(value, (int, float, str)):
+        msg = "data.totalLicenses must be a number"
+        raise InvalidSiteError(msg)
+    try:
+        return int(value)
+    except (ValueError, OverflowError):
+        msg = "data.totalLicenses must be a number"
+        raise InvalidSiteError(msg) from None
+
+
 def create_site(data: dict) -> dict:
     """Create a new site and persist it to the store.
 
@@ -31,6 +58,7 @@ def create_site(data: dict) -> dict:
         Dict with ``data`` containing the created site record (internal fields stripped).
     """
     now = utc_now()
+    licenses = _whole_licenses(data.get("totalLicenses", 0))
     account_id: str = data.get("accountId", "")
     account = account_repo.get(account_id)
     account_name: str = account.name if account else ""
@@ -42,7 +70,7 @@ def create_site(data: dict) -> dict:
         accountName=account_name,
         state="active",
         activeLicenses=0,
-        totalLicenses=int(data.get("totalLicenses", 0)),
+        totalLicenses=licenses,
         createdAt=now,
         updatedAt=now,
         registrationToken=new_id(),

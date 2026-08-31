@@ -198,6 +198,33 @@ async def create_indicator(
     return result or {}
 
 
+def _whole(body: dict, member: str, default: int) -> int:
+    """One of this body's numeric members, or a 400 saying which is wrong.
+
+    `int(body.get(member) or default)` raised out of the handler for every
+    value that is not a number — `"abc"`, a dict, and `Infinity`, which
+    Python's JSON parser accepts and `int()` refuses with a third kind of
+    exception. A client that sent the wrong type for a confidence bound got
+    a 500: that tells it the server is broken and to retry, where a 400
+    tells it the request is, which is the true and useful answer.
+    """
+    value = body.get(member)
+    if value is None or value == "" or value == [] or value == {}:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError too: Python's JSON parser accepts `Infinity` and
+        # `1e400`, and `int()` of either raises a third kind of exception.
+        raise HTTPException(
+            status_code=400,
+            detail=build_arm_error(
+                "BadRequest",
+                f"The value of parameter '{member}' is invalid.",
+            ),
+        ) from None
+
+
 # ── Query / Metrics ──────────────────────────────────────────────────────
 
 
@@ -222,16 +249,17 @@ async def query_indicators(
     return ti_queries.query_indicators(
         # The spec spells keywords as a list; a client sending one string is
         # taken to mean that one keyword.
-        keywords=" ".join(keywords) if isinstance(keywords, list) else str(keywords),
+        keywords=(" ".join(str(k) for k in keywords)
+                  if isinstance(keywords, list) else str(keywords)),
         pattern_types=body.get("patternTypes"),
         threat_types=body.get("threatTypes"),
         sources=body.get("sources"),
         ids=body.get("ids"),
-        min_confidence=int(body.get("minConfidence") or 0),
-        max_confidence=int(body.get("maxConfidence") or 100),
+        min_confidence=_whole(body, "minConfidence", 0),
+        max_confidence=_whole(body, "maxConfidence", 100),
         include_disabled=bool(body.get("includeDisabled", True)),
         sort_by=body.get("sortBy"),
-        page_size=int(body.get("pageSize") or 50),
+        page_size=_whole(body, "pageSize", 50),
     )
 
 
