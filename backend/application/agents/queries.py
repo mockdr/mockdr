@@ -149,6 +149,7 @@ def list_applications_for_agents(
     limit: int,
     agent_is_decommissioned: str | None = None,
     documented: dict | None = None,
+    application_ids: list[str] | None = None,
 ) -> dict:
     """Return installed applications across multiple agents (global endpoint).
 
@@ -160,12 +161,21 @@ def list_applications_for_agents(
         limit: Page size.
         agent_is_decommissioned: Filter by agent decommission status (``"true"``/``"false"``).
         documented: The other filters the swagger declares for this route.
+        application_ids: `?ids=`, the applications' own ids.  A filter, so it
+            runs before the page is cut: applied to the page instead, asking
+            for one application by id answered `totalItems: 0` whenever it
+            happened to fall past the first page — the same request answering
+            1 at `limit=1000` and 0 at `limit=10`.
     """
     apps = store.get_all("installed_apps")
 
     if agent_ids:
         agent_id_set = set(agent_ids)
         apps = [r for r in apps if r.get("agentId") in agent_id_set]
+
+    if application_ids:
+        wanted = set(application_ids)
+        apps = [r for r in apps if str(r.get("id")) in wanted]
 
     # Filter by agent decommission status
     if agent_is_decommissioned is not None:

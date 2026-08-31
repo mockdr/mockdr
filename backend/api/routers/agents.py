@@ -114,6 +114,7 @@ def list_installed_applications(
         cursor,
         limit,
         agent_is_decommissioned=agentIsDecommissioned,
+        application_ids=[i.strip() for i in ids.split(",") if i.strip()] if ids else None,
         documented={
             **documented_params(request, "/installed-applications"),
             **{
@@ -126,12 +127,6 @@ def list_installed_applications(
     apps = answer.get("data", [])
     next_cursor = answer.get("nextCursor")
     total = answer.get("totalItems", len(apps))
-    if ids:
-        # The application-level ids. Declared on the route and matched
-        # against nothing, so asking for one application listed them all.
-        wanted = {i.strip() for i in ids.split(",") if i.strip()}
-        apps = [app for app in apps if str(app.get("id")) in wanted]
-        next_cursor, total = None, len(apps)
     # ApplicationViewSchema_many: the declared fields only, with a pagination
     # block carrying the cursor and the total the swagger declares.
     return build_list_response(
