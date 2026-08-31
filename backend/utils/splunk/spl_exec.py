@@ -32,6 +32,7 @@ from utils.splunk.spl_parser import (
     current_time,
     parse_sort_keys,
 )
+from utils.splunk.spl_regex import REGEX, REX, compile_client_regex
 
 __all__ = [
     "aggregation_aliases",
@@ -49,7 +50,12 @@ SPLUNK_SERVER = "mockdr-splunk"
 
 #: How splunkd names each command in an error. `eval` is the odd one: it
 #: reports as `EvalCommand`, where everything else is `'<name>' command`.
-_COMMAND_LABELS: dict[str, str] = {"eval": "EvalCommand"}
+_COMMAND_LABELS: dict[str, str] = {
+    "eval": "EvalCommand",
+    # splunkd names the operator, not the command, for both the
+    # usage line and a regex it cannot compile.  Measured on 10.4.2.
+    "regex": "SearchOperator:regex",
+}
 
 
 def _command_label(name: str) -> str:
@@ -159,10 +165,11 @@ def _cmd_where(rows: Rows, command: SPLCommand) -> Rows:
 def _cmd_regex(rows: Rows, command: SPLCommand) -> Rows:
     match = re.match(r'\s*(\w+)\s*(!?=)\s*"?(.*?)"?\s*$', command.arg)
     if not match:
-        pattern = re.compile(command.arg.strip().strip('"'))
+        bare = command.arg.strip().strip('"')
+        pattern = compile_client_regex(bare, frame=REGEX)
         return [r for r in rows if pattern.search(str(r.get("_raw", "")))]
     field, op, raw_pattern = match.groups()
-    pattern = re.compile(raw_pattern)
+    pattern = compile_client_regex(raw_pattern, frame=REGEX)
     negate = op == "!="
     return [
         r for r in rows
@@ -985,10 +992,10 @@ def _cmd_rex(rows: Rows, command: SPLCommand) -> Rows:
     if not pattern_match:
         msg = "rex requires a quoted regular expression"
         raise SPLExprError(msg)
-    expression = pattern_match.group(1).replace('\\"', '"')
+    written = pattern_match.group(1).replace('\\"', '"')
     # Splunk spells named groups (?<name>...); Python requires (?P<name>...).
-    expression = re.sub(r"\(\?<(?![=!])", "(?P<", expression)
-    pattern = re.compile(expression)
+    expression = re.sub(r"\(\?<(?![=!])", "(?P<", written)
+    pattern = compile_client_regex(expression, frame=REX, echo=written)
 
     out: Rows = []
     for row in rows:

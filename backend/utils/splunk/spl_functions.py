@@ -35,6 +35,8 @@ from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
+from utils.splunk.spl_regex import EVAL, compile_client_regex
+
 #: What splunkd renders for each ``typeof``.
 _TYPE_NAMES = {
     "str": "String", "num": "Number", "bool": "Bool",
@@ -499,10 +501,9 @@ FUNCTIONS: dict[str, Callable[[list[Any]], Any]] = {
     "lower": lambda args: _string("lower", args[0]).lower(),
     "len": lambda args: len(_string("len", args[0])),
     "trim": lambda args: _trim_side("trim", args, "both"),
-    "replace": lambda args: re.sub(
-        _string("replace", args[1]), _string("replace", args[2]),
-        _string("replace", args[0]),
-    ),
+    "replace": lambda args: compile_client_regex(
+        _string("replace", args[1]), frame=EVAL,
+    ).sub(_string("replace", args[2]), _string("replace", args[0])),
     # maths
     "tonumber": lambda args: _number("tonumber", args[0]),
     "abs": lambda args: abs(_number("abs", args[0])),
