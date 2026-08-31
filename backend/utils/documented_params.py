@@ -32,6 +32,17 @@ def documented_params(request: Request, route: str) -> dict[str, str]:
     }
 
 
+def _schema_for(kind: str) -> dict[str, Any]:
+    """The JSON Schema for a spec's declared kind.
+
+    JSON Schema knows seven types and `date-time` is not one of them: it is a
+    `format` over `string`.
+    """
+    if kind == "date-time":
+        return {"type": "string", "format": "date-time"}
+    return {"type": kind}
+
+
 def documented_openapi(route: str) -> dict[str, Any]:
     """An ``openapi_extra`` block declaring the filters derived for ``route``."""
     specs = DOCUMENTED_FILTERS.get(route, ())
@@ -47,7 +58,12 @@ def documented_openapi(route: str) -> dict[str, Any]:
                 # this block *is* what the mock advertises for these
                 # parameters, so declaring them all as text told every reader
                 # the opposite of what the filter layer now enforces.
-                "schema": {"type": spec.kind},
+                #
+                # `date-time` is a JSON Schema *format*, not a type — writing
+                # it as a type made 85 parameters of this mock's own
+                # `/openapi.json` invalid, which a client generating code
+                # from it would choke on.
+                "schema": _schema_for(spec.kind),
                 "description": f"Documented filter on {spec.field} ({spec.type}).",
             }
             for spec in specs

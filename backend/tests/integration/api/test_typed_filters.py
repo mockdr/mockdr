@@ -149,19 +149,51 @@ class TestTheClassStaysClosed:
         assert not silent, f"typed parameters that swallow garbage: {silent}"
 
     def test_the_mock_advertises_the_type_it_enforces(self) -> None:
-        """A blanket ``string`` told every reader the opposite of the rule."""
+        """A blanket ``string`` told every reader the opposite of the rule.
+
+        `date-time` is a JSON Schema *format* over `string`, not a type of its
+        own — writing it as a type made 85 of this mock's own parameter
+        schemas invalid, which a client generating code from `/openapi.json`
+        would choke on. The kind is spelled the way JSON Schema spells it.
+        """
         from application.documented_filters import DOCUMENTED_FILTERS
         from utils.documented_params import documented_openapi
 
+        expected = {
+            "date-time": {"type": "string", "format": "date-time"},
+            "integer": {"type": "integer"},
+            "boolean": {"type": "boolean"},
+            "string": {"type": "string"},
+        }
         wrong = []
         for route, specs in DOCUMENTED_FILTERS.items():
             declared = {
-                p["name"]: p["schema"]["type"]
+                p["name"]: p["schema"]
                 for p in documented_openapi(route).get("parameters", [])
             }
             wrong += [
-                f"{route}?{spec.param}: says {declared[spec.param]}, enforces {spec.kind}"
+                f"{route}?{spec.param}: says {declared[spec.param]}, "
+                f"enforces {spec.kind}"
                 for spec in specs
-                if declared.get(spec.param) != spec.kind
+                if declared.get(spec.param) != expected[spec.kind]
             ]
         assert not wrong, wrong
+
+    def test_no_parameter_schema_uses_a_type_json_schema_does_not_know(self) -> None:
+        """The seven JSON Schema types, and `date-time` is not one of them."""
+        from main import app
+
+        known = {"string", "number", "integer", "boolean", "object", "array", "null"}
+        bad = []
+        for path, operations in app.openapi()["paths"].items():
+            for verb, operation in operations.items():
+                if not isinstance(operation, dict):
+                    continue
+                for parameter in operation.get("parameters", []) or []:
+                    schema = parameter.get("schema", {})
+                    for node in [schema, *schema.get("anyOf", []),
+                                 *schema.get("oneOf", [])]:
+                        kind = node.get("type")
+                        if isinstance(kind, str) and kind not in known:
+                            bad.append(f"{verb.upper()} {path} {parameter['name']}: {kind}")
+        assert not bad, bad

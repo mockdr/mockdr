@@ -40,6 +40,14 @@ all forty are clean.
 
 ### Fixed
 
+**`date-time` is a format, not a type.** Advertising the declared kind of
+each documented filter — right in itself — wrote `"type": "date-time"` into
+85 parameter schemas of this mock's own `/openapi.json`, and JSON Schema
+knows seven types of which that is not one. A client generating code from
+the document would have choked on every dated filter. They read
+`{"type": "string", "format": "date-time"}` now, and a test walks every
+parameter schema in the document for a type JSON Schema does not know.
+
 **The console's route sweep proved a page had rendered, not that it worked.**
 75 of the 92 end-to-end cases visited a route and ran axe over it. axe
 reports what is wrong with the markup a page rendered and finds nothing
