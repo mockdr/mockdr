@@ -83,22 +83,20 @@ def create_rule(
             400, "[request body]: type: Invalid discriminator value. Expected " + _RULE_TYPE_LIST,
         ))
     missing = [f for f in _REQUIRED_RULE_FIELDS if not body.get(f)]
+    missing += [f for f in _REQUIRED_BY_TYPE.get(str(body.get("type")), ())
+                if not body.get(f)]
     if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=build_security_solution_error(
-                400, f"Invalid value \"undefined\" supplied to \"{missing[0]}\"",
-            ),
-        )
-    if body.get("type") in ("query", "saved_query", "eql", "esql") and not body.get(
-        "query",
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail=build_security_solution_error(
-                400, 'Invalid value "undefined" supplied to "query"',
-            ),
-        )
+        # zod names every missing member, comma-joined, in the order the
+        # schema declares them. Measured on 8.15: omitting two answers
+        # `[request body]: description: Required, severity: Required`, and
+        # a threshold rule with no query answers
+        # `[request body]: query: Required, threshold: Required`. The mock
+        # answered io-ts's `Invalid value "undefined" supplied to "x"` and
+        # named only the first.
+        raise HTTPException(status_code=400, detail=build_kbn_error_response(
+            400, "[request body]: "
+            + ", ".join(f"{name}: Required" for name in missing),
+        ))
     if body.get("rule_id") and rule_queries.get_rule_by_rule_id(body["rule_id"]):
         raise HTTPException(
             status_code=409,
@@ -109,8 +107,24 @@ def create_rule(
     return rule_commands.create_rule(body, _caller(caller))
 
 
-#: Fields RuleCreateProps declares as required.
+#: Fields RuleCreateProps declares as required, whatever the rule's type.
 _REQUIRED_RULE_FIELDS = ("name", "description", "type", "severity", "risk_score")
+
+#: What each type additionally requires, in the order zod reports it.
+#:
+#: A plain `query` rule needs none: 8.15 accepts one with no query at all
+#: and stores `query: ""` with `language: "kuery"`. The mock refused it,
+#: which is what the console's own Create Rule button was answered with
+#: every time it was pressed. `saved_query` wants the saved search rather
+#: than a query of its own, and `threshold` wants both. Each measured by
+#: sending the type with nothing else.
+_REQUIRED_BY_TYPE: dict[str, tuple[str, ...]] = {
+    "eql": ("query",),
+    "esql": ("query",),
+    "threshold": ("query", "threshold"),
+    "saved_query": ("saved_id",),
+    "new_terms": ("query", "new_terms_fields", "history_window_start"),
+}
 
 
 @router.put("/api/detection_engine/rules", dependencies=[Depends(require_kbn_xsrf)])

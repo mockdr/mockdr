@@ -75,6 +75,12 @@ async function createCase(): Promise<void> {
       tags: newCase.value.tags ? newCase.value.tags.split(',').map(t => t.trim()) : [],
       connector: { id: 'none', name: 'none', type: '.none', fields: null },
       settings: { syncAlerts: true },
+      // Kibana requires the solution a case belongs to and refuses the body
+      // without it — `Invalid value "undefined" supplied to "owner"`, which
+      // is what this button answered every time it was pressed. Measured on
+      // 8.15: securitySolution, observability and cases are accepted, and
+      // anything else is a 403.
+      owner: 'securitySolution',
     })
     showCreateDialog.value = false
     newCase.value = { title: '', description: '', severity: 'medium', tags: '' }
