@@ -128,6 +128,16 @@ export interface EsSignalSource {
 /** Elastic Security case. */
 export interface EsCase {
   id: string
+  /**
+   * The saved object's opaque version, which every update must carry back.
+   *
+   * Kibana uses it for optimistic concurrency: send a stale one and it
+   * answers 409 "This case has been updated. Please refresh before saving
+   * additional updates." It is a base64 string — `WzIwNCwxXQ==` on the live
+   * 8.15 — and the detail page used to send `updated_at` in its place,
+   * which is a timestamp, so both status buttons 409'd every time.
+   */
+  version: string
   title: string
   description: string
   status: string

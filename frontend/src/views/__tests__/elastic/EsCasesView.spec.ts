@@ -4,7 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { flushPromises } from '@vue/test-utils'
 
 const FULL_CASE_FIELDS = vi.hoisted(() => ({
-  updated_at: '2025-01-01T00:00:00Z',
+  version: 'Wz1sMV0=', updated_at: '2025-01-01T00:00:00Z',
   connector: { id: 'none', name: 'None' },
 }))
 
@@ -68,7 +68,7 @@ vi.mock('../../../api/elastic', () => ({
         },
       ],
     }),
-    create: vi.fn().mockResolvedValue({ id: 'case-new', title: 'New Case', description: '', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '', updated_at: '', created_by: { username: '' }, connector: { id: 'none', name: 'None' } }),
+    create: vi.fn().mockResolvedValue({ id: 'case-new', title: 'New Case', description: '', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '', version: 'Wz1sMV0=', updated_at: '', created_by: { username: '' }, connector: { id: 'none', name: 'None' } }),
   },
 }))
 
@@ -349,7 +349,7 @@ describe('EsCasesView', () => {
   })
 
   it('hasNext is true when there are more pages', async () => {
-    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 100, count_open_cases: 0, count_in_progress_cases: 0, count_closed_cases: 0, cases: [{ id: 'c1', title: 'Case 1', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z', created_by: { username: 'analyst' }, description: '', connector: { id: 'none', name: 'None' } }] })
+    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 100, count_open_cases: 0, count_in_progress_cases: 0, count_closed_cases: 0, cases: [{ id: 'c1', title: 'Case 1', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '2025-01-01T00:00:00Z', version: 'Wz1sMV0=', updated_at: '2025-01-01T00:00:00Z', created_by: { username: 'analyst' }, description: '', connector: { id: 'none', name: 'None' } }] })
     const wrapper = mount(EsCasesView, {
       global: { plugins: [router], stubs: STUBS },
     })
@@ -369,6 +369,7 @@ describe('EsCasesView', () => {
       total: 50,
       cases: Array.from({ length: 25 }, (_, i) => ({
         id: `case-${i}`,
+        version: `Wz${i}sMV0=`,
         title: `Case ${i}`,
         status: 'open',
         severity: 'low',

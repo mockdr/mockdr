@@ -111,6 +111,17 @@ onMounted(async () => {
             <button v-if="incident.status === 'new'" @click="updateStatus('under_investigation')"
               :disabled="actionLoading"
               class="btn-ghost text-xs text-yellow-400">Investigate</button>
+            <!--
+              A resolved incident had no way back: the three buttons above
+              all hide once the status starts with "resolved", leaving only
+              "Assign User". The console's own filter dropdown offers
+              `under_investigation` as something to look for, so it must be
+              something you can reach.
+            -->
+            <button v-if="incident.status?.startsWith('resolved')"
+              @click="updateStatus('under_investigation')"
+              :disabled="actionLoading"
+              class="btn-ghost text-xs text-yellow-400">Reopen</button>
             <button v-if="!incident.status?.startsWith('resolved')" @click="updateStatus('resolved_true_positive')"
               :disabled="actionLoading"
               class="btn-ghost text-xs text-green-400">Resolve (TP)</button>

@@ -61,10 +61,16 @@ async function addComment(): Promise<void> {
 async function updateStatus(newStatus: string): Promise<void> {
   if (!caseData.value) return
   try {
-    await esCasesApi.update({
-      cases: [{ id, version: caseData.value.updated_at, status: newStatus }],
+    const updated = await esCasesApi.update({
+      cases: [{ id, version: caseData.value.version, status: newStatus }],
     })
-    caseData.value.status = newStatus
+    // Take the new version back. Kibana answers a list of the cases it
+    // updated, each carrying the version the *next* update must send —
+    // keeping the old one means the second button press is a 409, which is
+    // exactly what happened here.
+    const fresh = updated?.find((c) => c.id === id)
+    caseData.value.status = fresh?.status ?? newStatus
+    if (fresh?.version) caseData.value.version = fresh.version
     error.value = ''
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to update case status'
