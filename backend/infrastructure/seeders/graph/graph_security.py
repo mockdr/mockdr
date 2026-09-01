@@ -9,7 +9,7 @@ from domain.graph.secure_score import GraphSecureScore
 from domain.graph.security_alert import GraphSecurityAlert
 from domain.graph.security_incident import GraphSecurityIncident
 from domain.mde_alert import MdeAlert
-from infrastructure.seeders._shared import ago, rand_ago
+from infrastructure.seeders._shared import ago, rand_after, rand_ago
 from infrastructure.seeders.graph.graph_shared import GRAPH_TENANT_ID, graph_uuid
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
@@ -150,7 +150,10 @@ def seed_graph_security(fake: Faker) -> None:
         severity = _MDE_SEVERITY_MAP.get(mde_alert.severity, "medium")
         status = _MDE_STATUS_MAP.get(mde_alert.status, "new")
         created_dt = mde_alert.alertCreationTime or rand_ago(max_days=30)
-        last_update_dt = mde_alert.lastUpdateTime or rand_ago(max_days=5)
+        # Derived from the creation above when the alert carries no update
+        # of its own: two independent fallbacks let an incident be updated
+        # before it was raised.
+        last_update_dt = mde_alert.lastUpdateTime or rand_after(created_dt, 30)
 
         # Graph's alert evidence is a typed object, not a pair of invented
         # keys. `microsoft.graph.security.deviceEvidence` names the device
@@ -249,8 +252,13 @@ def seed_graph_security(fake: Faker) -> None:
             classification=None,
             determination=None,
             assignedTo=None,
-            createdDateTime=rand_ago(max_days=30),
-            lastUpdateDateTime=rand_ago(max_days=5),
+            # An incident spans the alerts it groups: it began when the
+            # first of them did and was last touched when the last of them
+            # was. Two independent draws had one incident updated a day
+            # before it was raised, and none of them lined up with the
+            # alerts they are made of.
+            createdDateTime=min(a.createdDateTime for a in group),
+            lastUpdateDateTime=max(a.lastUpdateDateTime for a in group),
             alert_ids=alert_ids,
             comments=[],
             tenantId=GRAPH_TENANT_ID,

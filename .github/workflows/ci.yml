@@ -216,6 +216,14 @@ jobs:
           python scripts/paging_audit.py
           python scripts/roundtrip_audit.py
 
+      # And with the clock. Every other check asks whether a field is shaped
+      # right; this asks whether the story it tells is possible. Nine pairs
+      # were not — a threat updated five days before it was detected, an
+      # investigation that ended before it began — each from drawing the two
+      # moments independently in a seeder.
+      - name: Time runs forwards in every record
+        run: python scripts/causality_audit.py
+
       # data/ is gitignored, so without this the spec is absent and every
       # check that reads it quietly checks less — the same reason the
       # field-drift job fetches it. It sits here rather than further down

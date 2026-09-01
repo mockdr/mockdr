@@ -14,6 +14,7 @@ from infrastructure.seeders._shared import (
     MITIGATION_STATUSES,
     MITRE_TACTICS,
     MITRE_TECHNIQUES,
+    rand_after,
     rand_ago,
 )
 from repository.agent_repo import agent_repo
@@ -245,7 +246,10 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
                 "storyline": fake.lexify("????????????????").upper(),
                 "threatId": tid,
                 "threatName": fname,
-                "updatedAt": rand_ago(10),
+                # Derived from the detection, not drawn beside it: three
+                # threats in thirty were updated up to five days before
+                # they existed, so "time to triage" came out negative.
+                "updatedAt": rand_after(created_at, 10),
             },
             agentDetectionInfo=agent_detection_info,
             agentRealtimeInfo=agent_realtime_info,

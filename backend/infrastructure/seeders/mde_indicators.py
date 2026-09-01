@@ -6,7 +6,7 @@ import random
 from faker import Faker
 
 from domain.mde_indicator import MdeIndicator
-from infrastructure.seeders._shared import ago, rand_ago
+from infrastructure.seeders._shared import ago, rand_after, rand_ago
 from infrastructure.seeders.mde_shared import MDE_SEVERITY_LEVELS, mde_guid
 from repository.mde_indicator_repo import mde_indicator_repo
 
@@ -84,5 +84,6 @@ def seed_mde_indicators(fake: Faker) -> None:
             creationTimeDateTimeUtc=creation_time,
             expirationTime=ago(-random.randint(30, 180)),  # future date
             lastUpdatedBy=fake.email(),
-            lastUpdateTime=rand_ago(10),
+            # After the creation above, not drawn beside it.
+            lastUpdateTime=rand_after(creation_time, 10),
         ))

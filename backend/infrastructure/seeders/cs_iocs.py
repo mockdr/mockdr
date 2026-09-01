@@ -8,7 +8,7 @@ from faker import Faker
 
 from domain.cs_ioc import CsIoc
 from infrastructure.safe_net import doc_domain, doc_ipv4
-from infrastructure.seeders._shared import ago, rand_ago
+from infrastructure.seeders._shared import ago, rand_after, rand_ago
 from infrastructure.seeders.cs_shared import (
     CS_IOC_ACTIONS,
     CS_IOC_SEVERITIES,
@@ -91,7 +91,8 @@ def seed_cs_iocs(fake: Faker) -> list[str]:
         platforms = _PLATFORMS_BY_TYPE.get(ioc_type, ["windows"])
 
         created_ts = rand_ago(60)
-        modified_ts = rand_ago(10)
+        # After the indicator was created, not beside it.
+        modified_ts = rand_after(created_ts, 10)
 
         # Some IOCs have expiration (future date), most do not
         has_expiration = random.random() < 0.3

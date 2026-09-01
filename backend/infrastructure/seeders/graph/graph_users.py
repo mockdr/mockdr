@@ -176,6 +176,10 @@ def seed_graph_users(fake: Faker) -> list[str]:
             enabled = False
             stale = False
 
+        # The account's birthday comes first: nobody signs in before their
+        # account exists, and drawing the two independently let them.
+        created = rand_ago(max_days=365 * 2)
+
         if stale:
             days_ago = random.randint(90, 200)
             ts = datetime.now(UTC) - timedelta(days=days_ago, hours=random.randint(0, 23))
@@ -185,9 +189,12 @@ def seed_graph_users(fake: Faker) -> list[str]:
             }
         else:
             sign_in_activity = _build_sign_in_activity(enabled)
+        sign_in_activity = {
+            key: max(value, created) if value else value
+            for key, value in sign_in_activity.items()
+        }
 
         assigned_licenses = random.choice(_LICENSE_POOLS)
-        created = rand_ago(max_days=365 * 2)
 
         user = GraphUser(
             id=user_id,

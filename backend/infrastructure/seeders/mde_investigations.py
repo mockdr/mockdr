@@ -6,7 +6,7 @@ import random
 from faker import Faker
 
 from domain.mde_investigation import MdeInvestigation
-from infrastructure.seeders._shared import rand_ago
+from infrastructure.seeders._shared import rand_after, rand_ago
 from infrastructure.seeders.mde_shared import MDE_INVESTIGATION_STATES
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_investigation_repo import mde_investigation_repo
@@ -58,8 +58,10 @@ def seed_mde_investigations(
 
         state = random.choice(MDE_INVESTIGATION_STATES)
         start_time = rand_ago(20)
-        # Completed investigations have an end time
-        end_time = "" if state in ("Running", "Queued") else rand_ago(5)
+        # Completed investigations have an end time — after they started,
+        # which a second independent draw did not guarantee: two of them
+        # ended before they began.
+        end_time = "" if state in ("Running", "Queued") else rand_after(start_time, 20)
         machine_id = alert.machineId or random.choice(machine_ids)
         machine = mde_machine_repo.get(machine_id)
 

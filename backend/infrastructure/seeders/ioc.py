@@ -75,7 +75,8 @@ def seed_iocs(fake: Faker) -> None:
             # An indicator is uploaded when it is created or after it, never
             # before — the pair is drawn once rather than twice.
             uploadTime=rand_after(created, 5),
-            updatedAt=rand_ago(10),
+            # After the creation above, not drawn beside it.
+            updatedAt=rand_after(created, 10),
             method="EQUALS",
             severity=random.choice([25, 50, 75, 100]),
             category=[random.choice(_CATEGORIES)],

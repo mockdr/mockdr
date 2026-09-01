@@ -11,6 +11,7 @@ from infrastructure.seeders._shared import (
     ALERT_SEVERITIES,
     ALERT_VERDICTS,
     MITRE_TACTICS,
+    rand_after,
     rand_ago,
 )
 from repository.agent_repo import agent_repo
@@ -44,7 +45,9 @@ def seed_alerts(fake: Faker, agent_ids: list[str]) -> None:
         assert agent is not None
         proc_name, proc_path = random.choice(PROCESS_CATALOG)
         created = rand_ago(30)
-        updated = rand_ago(5)
+        # Not a second independent draw: an alert updated before it was
+        # created is one no console can put on a timeline.
+        updated = rand_after(created, 5)
         severity = random.choice(ALERT_SEVERITIES)
         category = random.choice(["Threat Intelligence", "Behavioral", "Network", "Endpoint"])
         tactic = random.choice(MITRE_TACTICS)

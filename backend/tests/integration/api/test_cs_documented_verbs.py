@@ -64,14 +64,17 @@ class TestTheAlertUpdateUnderBothVersions:
         cid = client.get(f"{CS}/alerts/queries/alerts/v2", headers=cs_headers,
                          params={"limit": 1}).json()["resources"][0]
         before = self._status(client, cs_headers, cid)
+        # A status the alert is not already in, so "it changed" means what it
+        # says whatever the seed happened to draw.
+        wanted = "closed" if before == "in_progress" else "in_progress"
 
         resp = client.patch(f"{CS}/alerts/entities/alerts/v2", headers=cs_headers, json={
             "ids": [cid],
-            "action_parameters": [{"name": "update_status", "value": "in_progress"}]})
+            "action_parameters": [{"name": "update_status", "value": wanted}]})
         assert resp.status_code == 200, resp.text
         # DetectsapiResponseFields: meta and errors, no resources.
         assert "resources" not in resp.json()
-        assert self._status(client, cs_headers, cid) == "in_progress" != before
+        assert self._status(client, cs_headers, cid) == wanted != before
 
     def test_v3_still_takes_composite_ids(
         self, client: TestClient, cs_headers: dict,

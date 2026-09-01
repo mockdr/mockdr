@@ -104,7 +104,9 @@ def seed_agents(
         scan_aborted: str | None
         scan_roll = random.random()
         if scan_roll > 0.3:
-            scan_started = rand_ago(7)
+            # After the agent registered, not merely within the last week:
+            # one agent in sixty had scanned before it existed.
+            scan_started = max(rand_ago(7), registered_at)
             scan_outcome = random.choice(["finished", "finished", "aborted"])
             # Derive finish/abort time relative to scan start so it is always later
             from datetime import UTC as _UTC
