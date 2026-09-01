@@ -4,13 +4,13 @@ import type {
   EsSearchResponse,
   KibanaListResponse,
   KibanaCasesResponse,
-  EsEndpoint,
   EsRule,
   EsAlert,
   EsCase,
   EsCaseComment,
   EsExceptionList,
   EsExceptionListItem,
+  EsEndpointMetadata,
 } from '../types/elastic'
 
 const esBasicAuth = 'Basic ' + btoa(`${import.meta.env.VITE_ES_USERNAME}:${import.meta.env.VITE_ES_PASSWORD}`)
@@ -81,13 +81,19 @@ export const esSearchApi = {
 // ── Endpoints API ───────────────────────────────────────────────────────────
 
 export const esEndpointsApi = {
+  // The route answers `EsEndpointMetadata`, with everything about the host
+  // nested under `metadata`. Declared as the flat `EsEndpoint` the table
+  // wants, TypeScript had no way to see that the view was reading fields
+  // nothing carried — which is how a page of twenty-five blank rows passed
+  // a type check, a lint and forty-five unit tests.
   /** List endpoint metadata. */
-  list: (params?: Record<string, unknown>): Promise<KibanaListResponse<EsEndpoint>> =>
-    kbnClient.get('/api/endpoint/metadata', { params }) as Promise<KibanaListResponse<EsEndpoint>>,
+  list: (params?: Record<string, unknown>): Promise<KibanaListResponse<EsEndpointMetadata>> =>
+    kbnClient.get('/api/endpoint/metadata', { params }) as
+      Promise<KibanaListResponse<EsEndpointMetadata>>,
 
   /** Get single endpoint metadata. */
-  get: (id: string): Promise<EsEndpoint> =>
-    kbnClient.get(`/api/endpoint/metadata/${id}`) as Promise<EsEndpoint>,
+  get: (id: string): Promise<EsEndpointMetadata> =>
+    kbnClient.get(`/api/endpoint/metadata/${id}`) as Promise<EsEndpointMetadata>,
 
   /** Isolate an endpoint. */
   isolate: (agentIds: string[], comment: string): Promise<unknown> =>

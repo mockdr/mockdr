@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { RefreshCw, Shield, ShieldOff } from 'lucide-vue-next'
 import { esEndpointsApi } from '../../api/elastic'
-import type { EsEndpoint } from '../../types/elastic'
+import type { EsEndpoint, EsEndpointMetadata } from '../../types/elastic'
 import LoadingSkeleton from '../../components/shared/LoadingSkeleton.vue'
 import EmptyState from '../../components/shared/EmptyState.vue'
 
@@ -58,7 +58,24 @@ async function fetchEndpoints(p = 1): Promise<void> {
   try {
     // Kibana spells the page size `pageSize` here and counts pages from 0.
     const res = await esEndpointsApi.list({ page: p - 1, pageSize: perPage })
-    endpoints.value = res.data ?? []
+    // Flattened here: the table reads `hostname`, `os`, `agent_status`
+    // and the rest at the top level, and the route answers everything
+    // nested under `metadata`. Assigned straight across, every cell was
+    // undefined and the page drew twenty-five rows of nothing.
+    endpoints.value = (res.data ?? []).map((record: EsEndpointMetadata) => {
+      const m = record.metadata ?? {}
+      return {
+        agent_id: m.agent?.id ?? '',
+        hostname: m.host?.hostname ?? m.host?.name ?? '',
+        ip_address: (m.host?.ip ?? [])[0] ?? '',
+        os: m.host?.os?.full ?? m.host?.os?.name ?? '',
+        agent_status: record.host_status ?? '',
+        isolation_status: m.Endpoint?.state?.isolation ? 'isolated' : 'not isolated',
+        agent_version: m.agent?.version ?? '',
+        last_checkin: m['@timestamp'] ?? '',
+        policy_name: m.Endpoint?.policy?.applied?.name ?? '',
+      }
+    })
     total.value = res.total ?? endpoints.value.length
   } finally {
     loading.value = false

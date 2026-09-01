@@ -5,28 +5,42 @@ import { createRouter, createWebHistory } from 'vue-router'
 vi.mock('../../../api/elastic', () => ({
   esEndpointsApi: {
     list: vi.fn().mockResolvedValue({
+      // The shape `/api/endpoint/metadata` really answers: everything about
+      // the host under `metadata`, the agent's health beside it as
+      // `host_status`. This fixture carried the flat shape the table wants,
+      // which is why forty-five tests passed over a page of blank rows.
       data: [
         {
-          agent_id: 'ep-1',
-          hostname: 'WKSTN-001',
-          os: 'Windows 10.0',
-          agent_status: 'online',
-          isolation_status: 'normal',
-          agent_version: '8.10.0',
-          last_checkin: '2025-01-01T00:00:00Z',
-          policy_name: 'Default Policy',
-          ip_address: '10.0.0.1',
+          host_status: 'healthy',
+          metadata: {
+            '@timestamp': '2025-01-01T00:00:00Z',
+            agent: { id: 'ep-1', version: '8.10.0' },
+            host: {
+              hostname: 'WKSTN-001', name: 'WKSTN-001', ip: ['10.0.0.1'],
+              os: { name: 'Windows', full: 'Windows 10.0' },
+            },
+            Endpoint: {
+              status: 'enrolled',
+              state: { isolation: false },
+              policy: { applied: { name: 'Default Policy', status: 'success' } },
+            },
+          },
         },
         {
-          agent_id: 'ep-2',
-          hostname: 'WKSTN-002',
-          os: 'macOS 13.0',
-          agent_status: 'offline',
-          isolation_status: 'isolated',
-          agent_version: '8.10.0',
-          last_checkin: '2025-01-02T00:00:00Z',
-          policy_name: 'Custom Policy',
-          ip_address: '10.0.0.2',
+          host_status: 'unhealthy',
+          metadata: {
+            '@timestamp': '2025-01-02T00:00:00Z',
+            agent: { id: 'ep-2', version: '8.10.0' },
+            host: {
+              hostname: 'WKSTN-002', name: 'WKSTN-002', ip: ['10.0.0.2'],
+              os: { name: 'macOS', full: 'macOS 13.0' },
+            },
+            Endpoint: {
+              status: 'enrolled',
+              state: { isolation: true },
+              policy: { applied: { name: 'Default Policy', status: 'success' } },
+            },
+          },
         },
       ],
       total: 2,
@@ -262,7 +276,17 @@ describe('EsEndpointsView', () => {
   it('hasNext is true when total exceeds per-page limit', async () => {
     vi.mocked(esEndpointsApi.list).mockResolvedValueOnce({
       page: 1, per_page: 25,
-      data: [{ agent_id: 'ep-1', hostname: 'WKSTN-001', os: 'Windows', agent_status: 'online', isolation_status: 'normal', agent_version: '8.10.0', policy_name: 'Default', ip_address: '10.0.0.1', last_checkin: '2025-01-01T00:00:00Z' }],
+      data: [{
+        host_status: 'healthy',
+        metadata: {
+          '@timestamp': '2025-01-01T00:00:00Z',
+          agent: { id: 'ep-1', version: '8.10.0' },
+          host: { hostname: 'WKSTN-001', name: 'WKSTN-001', ip: ['10.0.0.1'],
+                  os: { name: 'Windows', full: 'Windows 10.0' } },
+          Endpoint: { status: 'enrolled', state: { isolation: false },
+                      policy: { applied: { name: 'Default', status: 'success' } } },
+        },
+      }],
       total: 100,
     })
     const wrapper = mount(EsEndpointsView, { global: { plugins: [router], stubs: STUBS } })

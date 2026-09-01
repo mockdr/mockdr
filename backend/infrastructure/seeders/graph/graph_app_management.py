@@ -1,6 +1,8 @@
 """Seed Microsoft Graph Intune App Management data (app protection policies + mobile apps)."""
 from __future__ import annotations
 
+import random
+
 from faker import Faker
 
 from domain.graph.app_protection_policy import GraphAppProtectionPolicy
@@ -61,6 +63,12 @@ _APP_PROTECTION_POLICIES: list[dict] = [
 # Static data for mobile apps
 # ---------------------------------------------------------------------------
 
+#: Graph's publishing lifecycle, weighted the way a real tenant looks: most
+#: apps are through it, a few are still on the way. A console that only ever
+#: sees `published` never exercises the other two badges.
+_PUBLISHING_STATES = ("published", "published", "published", "processing",
+                      "notPublished")
+
 _MOBILE_APPS: list[dict] = [
     {"displayName": "Microsoft Teams", "publisher": "Microsoft Corporation", "odata_type": "#microsoft.graph.iosVppApp"},
     {"displayName": "Outlook", "publisher": "Microsoft Corporation", "odata_type": "#microsoft.graph.androidStoreApp"},
@@ -113,6 +121,10 @@ def seed_graph_app_management(fake: Faker) -> None:
             publisher=app_cfg["publisher"],
             odata_type=app_cfg["odata_type"],
             isFeatured=app_cfg["displayName"] in {"Microsoft Teams", "Outlook", "Company Portal"},
+            # A tenant has apps in every stage of publishing, not only the
+            # finished ones — a console that only ever sees `published`
+            # never exercises the other two badges.
+            publishingState=random.choice(_PUBLISHING_STATES),
             createdDateTime=created,
             lastModifiedDateTime=modified,
         ))

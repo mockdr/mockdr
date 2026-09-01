@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 
-const FULL_ES_ENDPOINT_FIELDS = vi.hoisted(() => ({ os: 'Windows', agent_version: '8.0', policy_name: 'Default', ip_address: '10.0.0.1', last_checkin: '2025-01-01T00:00:00Z' }))
 const FULL_ES_RULE_FIELDS = vi.hoisted(() => ({ rule_id: 'rule-x', description: '', type: 'query', tags: [], created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z', created_by: 'elastic', interval: '5m' }))
 
 vi.mock('../../../api/elastic', () => ({
@@ -11,10 +10,15 @@ vi.mock('../../../api/elastic', () => ({
       page: 1,
       per_page: 50,
       total: 3,
+      // The shape `/api/endpoint/metadata` answers: the agent's health is
+      // `host_status`, beside `metadata` rather than inside it. Read as
+      // `agent_status` every endpoint counted as "Unknown" and the chart
+      // was one grey wedge — which these tests could not see, because the
+      // fixture spoke the same wrong language as the view.
       data: [
-        { agent_id: 'ep-1', hostname: 'WKSTN-001', agent_status: 'online', isolation_status: 'normal', ...FULL_ES_ENDPOINT_FIELDS },
-        { agent_id: 'ep-2', hostname: 'WKSTN-002', agent_status: 'offline', isolation_status: 'isolated', ...FULL_ES_ENDPOINT_FIELDS },
-        { agent_id: 'ep-3', hostname: 'WKSTN-003', agent_status: 'online', isolation_status: 'normal', ...FULL_ES_ENDPOINT_FIELDS },
+        { host_status: 'healthy', metadata: { agent: { id: 'ep-1' }, host: { hostname: 'WKSTN-001' } } },
+        { host_status: 'unhealthy', metadata: { agent: { id: 'ep-2' }, host: { hostname: 'WKSTN-002' } } },
+        { host_status: 'healthy', metadata: { agent: { id: 'ep-3' }, host: { hostname: 'WKSTN-003' } } },
       ],
     }),
   },
@@ -39,12 +43,25 @@ vi.mock('../../../api/elastic', () => ({
           {
             _id: 'alert-1',
             _index: '.alerts-security',
-            _source: { id: 'alert-1', rule_name: 'Brute Force', severity: 'high', risk_score: 75, status: 'open', host_name: 'WKSTN-001', timestamp: '2025-01-01T00:00:00Z', rule_id: 'rule-1' },
+            // ECS, as `signals/search` answers — not the flat shape.
+            _source: {
+              '@timestamp': '2025-01-01T00:00:00Z',
+              signal: { status: 'open',
+                        rule: { id: 'rule-1', rule_id: 'rule-1', name: 'Brute Force',
+                                severity: 'high', risk_score: 75 } },
+              host: { name: 'WKSTN-001' },
+            },
           },
           {
             _id: 'alert-2',
             _index: '.alerts-security',
-            _source: { id: 'alert-2', rule_name: 'Malware Exec', severity: 'critical', risk_score: 95, status: 'closed', host_name: 'SERVER-001', timestamp: '2025-01-02T00:00:00Z', rule_id: 'rule-2' },
+            _source: {
+              '@timestamp': '2025-01-02T00:00:00Z',
+              signal: { status: 'closed',
+                        rule: { id: 'rule-2', rule_id: 'rule-2', name: 'Malware Exec',
+                                severity: 'critical', risk_score: 95 } },
+              host: { name: 'SERVER-001' },
+            },
           },
         ],
         total: { value: 2, relation: 'eq' },
@@ -234,14 +251,14 @@ describe('EsDashboardView', () => {
   })
 
   // statusChartData computed
-  it('statusChartData computed groups endpoints by agent_status', async () => {
+  it('statusChartData computed groups endpoints by host_status', async () => {
     const wrapper = mount(EsDashboardView, { global: { plugins: [router], stubs: STUBS } })
     await flushPromises()
     const chartData = (wrapper.vm as any).statusChartData
-    expect(chartData.labels).toContain('online')
-    expect(chartData.labels).toContain('offline')
-    const onlineIndex = chartData.labels.indexOf('online')
-    expect(chartData.datasets[0].data[onlineIndex]).toBe(2)
+    expect(chartData.labels).toContain('healthy')
+    expect(chartData.labels).toContain('unhealthy')
+    const healthyIndex = chartData.labels.indexOf('healthy')
+    expect(chartData.datasets[0].data[healthyIndex]).toBe(2)
   })
 
   // ruleSeverityChartData computed

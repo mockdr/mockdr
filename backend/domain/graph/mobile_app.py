@@ -16,6 +16,11 @@ class GraphMobileApp:
     publisher: str = ""
     odata_type: str = ""  # output as @odata.type
     isFeatured: bool = False  # noqa: N815
+    #: Graph's own publishing lifecycle for the app — `notPublished`,
+    #: `processing` or `published`. The reference lists it among the fields
+    #: this collection carries, the mock did not answer it, and the console
+    #: drew an empty badge in the column that shows it.
+    publishingState: str = "published"  # noqa: N815
     privacyInformationUrl: str | None = None  # noqa: N815
     installCommandLine: str | None = None  # noqa: N815
     createdDateTime: str = ""  # noqa: N815

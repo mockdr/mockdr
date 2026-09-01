@@ -43,6 +43,12 @@ async function fetchData(): Promise<void> {
 onMounted(() => fetchData())
 </script>
 
+<!--
+  The install counts that used to sit beside the publishing state came from
+  `installSummary`, which the v1.0 reference does not list among this
+  collection's fields — so both columns showed "—" on every row, for every
+  app, always. A column the product cannot fill is not a column.
+-->
 <template>
   <div class="space-y-4">
     <!-- Header -->
@@ -70,8 +76,6 @@ onMounted(() => fetchData())
             <th scope="col" class="table-header text-left">Name</th>
             <th scope="col" class="table-header text-left">Publisher</th>
             <th scope="col" class="table-header text-left">State</th>
-            <th scope="col" class="table-header text-left">Installed</th>
-            <th scope="col" class="table-header text-left">Failed</th>
           </tr>
         </thead>
         <tbody>
@@ -90,8 +94,6 @@ onMounted(() => fetchData())
                   {{ app.publishingState }}
                 </span>
               </td>
-              <td class="table-cell text-sm text-s1-subtle">{{ app.installSummary?.installedDeviceCount ?? '—' }}</td>
-              <td class="table-cell text-sm text-s1-subtle">{{ app.installSummary?.failedDeviceCount ?? '—' }}</td>
             </tr>
           </template>
         </tbody>

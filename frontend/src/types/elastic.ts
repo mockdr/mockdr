@@ -37,6 +37,33 @@ export interface KibanaCasesResponse<T> {
 }
 
 /** Elastic Security endpoint metadata. */
+/**
+ * An endpoint record as `/api/endpoint/metadata` returns it.
+ *
+ * Everything about the host lives under `metadata`, and the agent's health
+ * beside it as `host_status`. `EsEndpoint` below is the flat shape the
+ * table wants; assigning one to the other left every cell undefined and the
+ * page drew twenty-five rows of nothing.
+ */
+export interface EsEndpointMetadata {
+  host_status?: string
+  metadata?: {
+    '@timestamp'?: string
+    agent?: { id?: string; version?: string }
+    host?: {
+      hostname?: string
+      name?: string
+      ip?: string[]
+      os?: { name?: string; full?: string; version?: string }
+    }
+    Endpoint?: {
+      status?: string
+      state?: { isolation?: boolean }
+      policy?: { applied?: { name?: string; status?: string } }
+    }
+  }
+}
+
 export interface EsEndpoint {
   agent_id: string
   hostname: string

@@ -6,7 +6,7 @@ import {
   Chart as ChartJS, ArcElement, Tooltip, Legend,
 } from 'chart.js'
 import { esEndpointsApi, esRulesApi, esAlertsApi, esCasesApi } from '../../api/elastic'
-import type { EsEndpoint, EsRule, EsAlert } from '../../types/elastic'
+import type { EsEndpointMetadata, EsRule, EsAlert, EsSignalSource } from '../../types/elastic'
 import LoadingSkeleton from '../../components/shared/LoadingSkeleton.vue'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
@@ -19,7 +19,7 @@ const ruleCount = ref(0)
 const alertCount = ref(0)
 const caseCount = ref(0)
 
-const endpoints = ref<EsEndpoint[]>([])
+const endpoints = ref<EsEndpointMetadata[]>([])
 const rules = ref<EsRule[]>([])
 const alerts = ref<EsAlert[]>([])
 
@@ -35,7 +35,10 @@ const summaryCards = computed(() => [
 const statusChartData = computed(() => {
   const counts: Record<string, number> = {}
   for (const ep of endpoints.value) {
-    const key = ep.agent_status ?? 'Unknown'
+    // The agent's health is `host_status`, beside `metadata` rather than
+    // inside it. Read as `agent_status` every endpoint counted as
+    // "Unknown" and the chart was one grey wedge.
+    const key = ep.host_status ?? 'Unknown'
     counts[key] = (counts[key] ?? 0) + 1
   }
   return {
@@ -114,7 +117,22 @@ async function fetchAll(): Promise<void> {
     ruleCount.value = rulesRes.total ?? rules.value.length
 
     const hits = alertsRes.hits?.hits ?? []
-    alerts.value = hits.map(h => ({ ...h._source, id: h._id }))
+    // ECS, not flat: the recent-alerts list read `rule_name`, `severity`,
+    // `host_name` and `status` off a signal document that carries none of
+    // them, so five rows showed a blank name and no severity colour.
+    alerts.value = hits.map((h) => {
+      const s = (h._source ?? {}) as EsSignalSource
+      return {
+        id: h._id,
+        rule_id: s.signal?.rule?.rule_id ?? '',
+        rule_name: s.signal?.rule?.name ?? '',
+        severity: s.signal?.rule?.severity ?? '',
+        risk_score: s.signal?.rule?.risk_score ?? 0,
+        status: s.signal?.status ?? '',
+        host_name: s.host?.name ?? '',
+        timestamp: s['@timestamp'] ?? '',
+      }
+    })
     alertCount.value = alertsRes.hits?.total?.value ?? alerts.value.length
 
     caseCount.value = casesRes.total ?? 0
