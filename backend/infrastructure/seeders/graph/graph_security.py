@@ -94,6 +94,31 @@ _MDE_SEVERITY_MAP: dict[str, str] = {
     "High": "high",
 }
 
+#: Defender's detection sources under the names `microsoft.graph.security
+#: .detectionSource` declares. Every Graph alert here answered
+#: `customDetection` whatever raised it, so a console grouping alerts by
+#: where they came from drew one bar, and an alert Defender attributed to
+#: its antivirus arrived in Graph as a custom detection.
+_MDE_DETECTION_SOURCE_MAP: dict[str, str] = {
+    "CustomDetection": "customDetection",
+    "WindowsDefenderAv": "antivirus",
+    "AutomatedInvestigation": "automatedInvestigation",
+    "WindowsDefenderAtp": "microsoftDefenderForEndpoint",
+    # Defender's own third-party feed has no member of its own in Graph's
+    # vocabulary; `unknown` is the sentinel the enum declares for that.
+    "ThirdPartyApis": "unknown",
+}
+
+#: And the state of the investigation behind it. Defender leaves this empty
+#: on an alert nothing has investigated, which `unknown` is the enum's word
+#: for; the answer carried null, which is not a member at all.
+_MDE_INVESTIGATION_STATE_MAP: dict[str, str] = {
+    "SuccessfullyRemediated": "successfullyRemediated",
+    "Benign": "benign",
+    "": "unknown",
+}
+
+
 _SEVERITY_RANK: dict[str, int] = {
     "informational": 0,
     "low": 1,
@@ -135,6 +160,45 @@ _CONTROL_SCORE_NAMES: list[str] = [
 ]
 
 
+
+def _incident_state(group: list[GraphSecurityAlert]) -> tuple[str, str | None, str | None]:
+    """What an incident's own status, classification and determination are.
+
+    An incident is the alerts it groups, and in Microsoft 365 Defender its
+    state follows theirs: it is resolved once they all are, in progress once
+    somebody has started, and active otherwise; and where its alerts agree on
+    a classification, the incident carries it.
+
+    Every incident here was born `active` with neither field set, so 15 of 15
+    had the same status and none could be filtered by any other, while the
+    alerts underneath them were new, in progress and resolved. Two members of
+    `incidentStatus` stay unseeded on purpose -- `redirected` means merged
+    into another incident and `awaitingAction` means a pending approval, and
+    this mock models neither, so answering with them would be a claim about
+    a relationship nothing here has.
+
+    Args:
+        group: The alerts this incident groups.
+
+    Returns:
+        The incident's status, and its classification and determination
+        where its alerts agree on one.
+    """
+    statuses = {alert.status for alert in group}
+    if statuses == {"resolved"}:
+        status = "resolved"
+    elif statuses & {"inProgress", "resolved"}:
+        status = "inProgress"
+    else:
+        status = "active"
+
+    classifications = {a.classification for a in group if a.classification}
+    determinations = {a.determination for a in group if a.determination}
+    classification = classifications.pop() if len(classifications) == 1 else None
+    determination = determinations.pop() if len(determinations) == 1 else None
+    return status, classification, determination
+
+
 def seed_graph_security(fake: Faker) -> None:
     """Seed Graph Security alerts v2, incidents, secure scores, and TI indicators.
 
@@ -170,7 +234,7 @@ def seed_graph_security(fake: Faker) -> None:
             cls_map = {
                 "TruePositive": "truePositive",
                 "FalsePositive": "falsePositive",
-                "BenignPositive": "informationalExpectedActivity",
+                "Informational, expected activity": "informationalExpectedActivity",
             }
             classification = cls_map.get(mde_alert.classification)
         if mde_alert.determination:
@@ -192,7 +256,10 @@ def seed_graph_security(fake: Faker) -> None:
             classification=classification,
             determination=determination,
             serviceSource="microsoftDefenderForEndpoint",
-            detectionSource="customDetection",
+            detectionSource=_MDE_DETECTION_SOURCE_MAP.get(
+                mde_alert.detectionSource, "unknown"),
+            investigationState=_MDE_INVESTIGATION_STATE_MAP.get(
+                mde_alert.investigationState, "unknown"),
             title=mde_alert.title,
             description=mde_alert.description,
             category=mde_alert.category,
@@ -244,13 +311,14 @@ def seed_graph_security(fake: Faker) -> None:
         categories = {a.category for a in group if a.category}
         category_str = next(iter(categories)) if categories else "SuspiciousActivity"
 
+        status, classification, determination = _incident_state(group)
         incident = GraphSecurityIncident(
             id=incident_id,
             displayName=f"Multi-stage attack involving {category_str}",
             severity=max_sev,
-            status="active",
-            classification=None,
-            determination=None,
+            status=status,
+            classification=classification,
+            determination=determination,
             assignedTo=None,
             # An incident spans the alerts it groups: it began when the
             # first of them did and was last touched when the last of them

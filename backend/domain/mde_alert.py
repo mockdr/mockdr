@@ -17,7 +17,9 @@ class MdeAlert:
     description: str = ""
     severity: str = "Medium"  # Informational|Low|Medium|High
     status: str = "New"  # New|InProgress|Resolved
-    classification: str = ""  # TruePositive|FalsePositive|BenignPositive
+    #: The three the docs list: TruePositive, FalsePositive,
+    #: "Informational, expected activity".
+    classification: str = ""
     determination: str = ""  # Malware|NotMalware|Phishing|Other
 
     # ── Assignment ────────────────────────────────────────────────────────────

@@ -15,6 +15,10 @@ class GraphSecurityAlert:
     determination: str | None = None  # malware, phishing, unwantedSoftware, etc.
     serviceSource: str = "microsoftDefenderForEndpoint"  # noqa: N815
     detectionSource: str = "customDetection"  # noqa: N815
+    #: `microsoft.graph.security.alertInvestigationState` -- `unknown` where
+    #: nothing has investigated the alert, which is the member the enum
+    #: declares for exactly that.
+    investigationState: str = "unknown"  # noqa: N815
     title: str = ""
     description: str = ""
     category: str = ""

@@ -304,6 +304,15 @@ jobs:
       - name: Every parameter the console sends is one the route reads
         run: python scripts/frontend_param_drift.py
 
+      # Those three ask about names. This one asks about values: a comparison
+      # against a string the API never answers with is a branch that never
+      # runs -- a badge that never colours, a filter that matches nothing --
+      # and the field is real, the comparison well typed, the page fine. It
+      # found fifteen Graph incidents that were all `active` while the alerts
+      # under them were new, in progress and resolved.
+      - name: Every value the console tests for is one a vendor answers with
+        run: python scripts/frontend_value_drift.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.

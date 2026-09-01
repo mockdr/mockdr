@@ -42,6 +42,15 @@ _COMMENT_TEMPLATES: list[str] = [
 ]
 
 
+#: The three classifications Defender's docs list. `BenignPositive` is not
+#: among them -- that is Sentinel's word, borrowed by a seeder standing next
+#: to it, and a client mapping Defender's vocabulary met a fourth value it
+#: had no case for.
+_CLASSIFICATIONS: tuple[str, ...] = (
+    "TruePositive", "FalsePositive", "Informational, expected activity",
+)
+
+
 def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
     """Generate approximately 40 MDE alert records.
 
@@ -59,7 +68,7 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
     alert_ids: list[str] = []
     alert_count = 40
 
-    for _ in range(alert_count):
+    for index in range(alert_count):
         alert_id = mde_guid()
         alert_ids.append(alert_id)
 
@@ -128,9 +137,11 @@ def seed_mde_alerts(fake: Faker, machine_ids: list[str]) -> list[str]:
         if status in ("InProgress", "Resolved"):
             assigned_to = fake.email()
         if status == "Resolved":
-            classification = random.choice([
-                "TruePositive", "FalsePositive", "BenignPositive",
-            ])
+            # Taken in turn rather than drawn: eight alerts are resolved and
+            # three values are on offer, and a draw left `TruePositive`
+            # unseeded often enough that a client filtering for it saw an
+            # empty estate and could not tell that from a working filter.
+            classification = _CLASSIFICATIONS[index % len(_CLASSIFICATIONS)]
             determination = random.choice([
                 "Malware", "NotMalware", "Phishing", "Other",
             ])
