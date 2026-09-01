@@ -253,15 +253,28 @@ def find_rules(
     # After the schema, not before it: a `page` that is not a number is zod's
     # complaint, and reading it as one here answered a 500 instead.
     _refuse_past_the_result_window(int(float(page or 1)), int(float(per_page or 20)))
-    return rule_queries.find_rules(
-        # An empty value is the number zero: `?per_page=` answers 200 with
-        # `perPage: 0`, an empty page beside the real total.
-        page=int(float(page or 0)),
-        per_page=int(float(per_page or 0)),
-        sort_field=sort_field,
-        sort_order=sort_order or "asc",
-        filter_str=filter,
-    )
+    try:
+        return rule_queries.find_rules(
+            # An empty value is the number zero: `?per_page=` answers 200
+            # with `perPage: 0`, an empty page beside the real total.
+            page=int(float(page or 0)),
+            per_page=int(float(per_page or 0)),
+            sort_field=sort_field,
+            sort_order=sort_order or "asc",
+            filter_str=filter,
+        )
+    except rule_queries.UnwrappedFilterError as exc:
+        # Measured on 8.15: a filter with no saved-object type in front of
+        # the key is a 400, not an empty page.
+        raise HTTPException(status_code=400, detail=build_security_solution_error(
+            400, "The key is empty and needs to be wrapped by a saved object "
+                 "type like alert: Bad Request",
+        )) from exc
+    except rule_queries.UnknownFilterKeyError as exc:
+        raise HTTPException(status_code=400, detail=build_security_solution_error(
+            400, f"This key '{exc}' does NOT exist in alert saved object "
+                 f"index patterns: Bad Request",
+        )) from exc
 
 
 #: What Kibana relays when the search behind this route asks for more than

@@ -78,6 +78,26 @@ export interface EsAlert {
   rule_id: string
 }
 
+/**
+ * A signal document as `signals/search` returns it — ECS, not flat.
+ *
+ * `EsAlert` below is what the table wants; this is what the API gives, and
+ * the two are not the same. Mapping between them by spreading `_source`
+ * produced an alert whose every field was undefined, and a table of
+ * twenty-five rows with nothing in them.
+ */
+export interface EsSignalSource {
+  '@timestamp'?: string
+  signal?: {
+    status?: string
+    rule?: { id?: string; rule_id?: string; name?: string; severity?: string; risk_score?: number }
+  }
+  host?: { name?: string; ip?: string; os?: { name?: string } }
+  user?: { name?: string }
+  process?: { name?: string }
+  file?: { name?: string }
+}
+
 /** Elastic Security case. */
 export interface EsCase {
   id: string

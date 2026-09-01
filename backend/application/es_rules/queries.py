@@ -1,6 +1,8 @@
 """Elastic Security detection rule query handlers (read-only)."""
 from __future__ import annotations
 
+import re
+
 from application.es_rules.commands import _rule_to_dict as _to_response
 from domain.es_rule import EsRule
 from repository.es_rule_repo import es_rule_repo
@@ -112,24 +114,82 @@ def _rule_to_dict(rule: EsRule, *, listed: bool = False) -> dict:
     return _to_response(rule, listed=listed)
 
 
+class UnknownFilterKeyError(ValueError):
+    """A saved-object attribute the rules index does not have."""
+
+
+class UnwrappedFilterError(ValueError):
+    """A filter with no saved-object type in front of the key."""
+
+
+#: Where each saved-object attribute path lives on a rule document.
+#: `alert.attributes.params.<x>` is the rule's own body, `alert.attributes.<x>`
+#: is the alerting framework's wrapper around it. Measured on 8.15: the two
+#: that matter to a console are `params.severity` and `enabled`, and an
+#: attribute the index does not have is a 400 rather than an empty page.
+_FILTER_KEYS: dict[str, str] = {
+    "alert.attributes.enabled": "enabled",
+    "alert.attributes.name": "name",
+    "alert.attributes.tags": "tags",
+    "alert.attributes.params.severity": "severity",
+    "alert.attributes.params.risk_score": "risk_score",
+    "alert.attributes.params.type": "type",
+    "alert.attributes.params.index": "index",
+    "alert.attributes.params.rule_id": "rule_id",
+    "alert.attributes.params.description": "description",
+}
+
+#: `<key> <op> <value>` — KQL's comparison, with the operators 8.15 answers to.
+_CLAUSE = re.compile(
+    r"^\s*(?P<key>[\w.]+)\s*(?P<op>>=|<=|>|<|:)\s*(?P<value>.+?)\s*$")
+
+
+def _clause_matches(record: dict, key: str, op: str, value: str) -> bool:
+    """One `key: value` against one rule."""
+    field = _FILTER_KEYS[key]
+    held = record.get(field)
+    wanted = value.strip().strip('"').strip("'")
+    if wanted == "*":
+        return held not in (None, "", [])
+    if isinstance(held, list):
+        return any(str(item).lower() == wanted.lower() for item in held)
+    if op == ":":
+        if isinstance(held, bool):
+            return str(held).lower() == wanted.lower()
+        return str(held).lower() == wanted.lower()
+    try:
+        left, right = float(held), float(wanted)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return {">=" : left >= right, "<=": left <= right,
+            ">": left > right, "<": left < right}[op]
+
+
 def _apply_filter(records: list[dict], filter_str: str) -> list[dict]:
-    """Apply a simple text filter to rule records.
+    """Apply Kibana's saved-object filter to rule records.
 
-    Searches rule name and tags for the filter string (case-insensitive).
-    Also handles ``alert.attributes.enabled: true/false``.
+    This read `enabled` by looking for the word anywhere in the string and
+    turned everything else into a text search over name and tags — so
+    `alert.attributes.params.severity: critical`, which is what the console's
+    own severity dropdown sends, matched nothing and emptied the table for
+    every value. 8.15 answers that filter with the rules of that severity,
+    and refuses an attribute the index does not have rather than answering
+    an empty page.
+
+    Raises:
+        UnwrappedFilterError: A filter with no `<type>.attributes.` key.
+        UnknownFilterKeyError: A key the rules index does not carry.
     """
-    lower = filter_str.lower().strip()
-
-    # Handle enabled status filter.
-    if "enabled" in lower:
-        if "true" in lower:
-            return [r for r in records if r.get("enabled") is True]
-        if "false" in lower:
-            return [r for r in records if r.get("enabled") is False]
-
-    # Text search across name and tags.
-    return [
-        r for r in records
-        if lower in r.get("name", "").lower()
-        or any(lower in t.lower() for t in r.get("tags", []))
-    ]
+    kept = records
+    for part in re.split(r"\s+AND\s+", filter_str.strip(), flags=re.IGNORECASE):
+        clause = _CLAUSE.match(part)
+        if not clause or "." not in clause.group("key"):
+            raise UnwrappedFilterError(part.strip())
+        key = clause.group("key")
+        if key not in _FILTER_KEYS:
+            raise UnknownFilterKeyError(key)
+        kept = [
+            r for r in kept
+            if _clause_matches(r, key, clause.group("op"), clause.group("value"))
+        ]
+    return kept

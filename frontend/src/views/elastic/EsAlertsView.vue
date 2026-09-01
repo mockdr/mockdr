@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { esAlertsApi } from '../../api/elastic'
-import type { EsAlert } from '../../types/elastic'
+import type { EsAlert, EsSignalSource } from '../../types/elastic'
 import { relativeTime } from '../../utils/formatters'
 import LoadingSkeleton from '../../components/shared/LoadingSkeleton.vue'
 import EmptyState from '../../components/shared/EmptyState.vue'
@@ -51,20 +51,42 @@ async function fetchAlerts(direction: 'next' | 'prev' | 'reset' = 'reset'): Prom
       from.value = 0
     }
 
+    // The signal document is ECS, not flat: severity lives at
+    // `signal.rule.severity` and the workflow state at `signal.status`.
+    // Queried as `severity` and `status` these matched nothing, so every
+    // option in both dropdowns emptied the table.
     const musts: Record<string, unknown>[] = []
-    if (filterSeverity.value) musts.push({ match: { severity: filterSeverity.value } })
-    if (filterStatus.value) musts.push({ match: { status: filterStatus.value } })
+    if (filterSeverity.value) {
+      musts.push({ match: { 'signal.rule.severity': filterSeverity.value } })
+    }
+    if (filterStatus.value) musts.push({ match: { 'signal.status': filterStatus.value } })
 
     const body: Record<string, unknown> = {
       from: from.value,
       size,
       query: musts.length > 0 ? { bool: { must: musts } } : { match_all: {} },
-      sort: [{ timestamp: { order: 'desc' } }],
+      sort: [{ '@timestamp': { order: 'desc' } }],
     }
 
     const res = await esAlertsApi.search(body)
     const hits = res.hits?.hits ?? []
-    alerts.value = hits.map(h => ({ ...h._source, id: h._id }))
+    // Flattened here rather than in the template: the table read
+    // `alert.rule_name`, `alert.severity`, `alert.status`,
+    // `alert.host_name` and `alert.timestamp`, none of which a signal
+    // document has, so it drew twenty-five rows with every cell blank.
+    alerts.value = hits.map((h) => {
+      const s = (h._source ?? {}) as EsSignalSource
+      return {
+        id: h._id,
+        rule_id: s.signal?.rule?.rule_id ?? '',
+        rule_name: s.signal?.rule?.name ?? '',
+        severity: s.signal?.rule?.severity ?? '',
+        risk_score: s.signal?.rule?.risk_score ?? 0,
+        status: s.signal?.status ?? '',
+        host_name: s.host?.name ?? '',
+        timestamp: s['@timestamp'] ?? '',
+      }
+    })
     total.value = res.hits?.total?.value ?? alerts.value.length
   } finally {
     loading.value = false

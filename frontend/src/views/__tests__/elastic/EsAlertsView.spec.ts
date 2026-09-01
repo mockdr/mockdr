@@ -8,32 +8,39 @@ vi.mock('../../../api/elastic', () => ({
       took: 5,
       hits: {
         hits: [
+          // The shape `signals/search` really answers: ECS, not flat. This
+          // fixture used to carry `rule_name`, `severity` and `host_name`
+          // at the top level — names no signal document has — so the view
+          // read them, found nothing, and every assertion here passed over a
+          // table whose cells were all empty in the browser.
           {
             _id: 'alert-1',
             _index: '.alerts-security',
             _source: {
-              id: 'alert-1',
-              rule_name: 'Brute Force Detected',
-              severity: 'high',
-              risk_score: 70,
-              status: 'open',
-              host_name: 'WKSTN-001',
-              timestamp: '2025-01-01T00:00:00Z',
-              rule_id: 'rule-1',
+              '@timestamp': '2025-01-01T00:00:00Z',
+              signal: {
+                status: 'open',
+                rule: {
+                  id: 'rule-1', rule_id: 'rule-1',
+                  name: 'Brute Force Detected', severity: 'high', risk_score: 70,
+                },
+              },
+              host: { name: 'WKSTN-001' },
             },
           },
           {
             _id: 'alert-2',
             _index: '.alerts-security',
             _source: {
-              id: 'alert-2',
-              rule_name: 'Malware Execution',
-              severity: 'critical',
-              risk_score: 95,
-              status: 'acknowledged',
-              host_name: 'SERVER-001',
-              timestamp: '2025-01-02T00:00:00Z',
-              rule_id: 'rule-2',
+              '@timestamp': '2025-01-02T00:00:00Z',
+              signal: {
+                status: 'acknowledged',
+                rule: {
+                  id: 'rule-2', rule_id: 'rule-2',
+                  name: 'Malware Execution', severity: 'critical', risk_score: 95,
+                },
+              },
+              host: { name: 'SERVER-001' },
             },
           },
         ],
