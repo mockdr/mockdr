@@ -12,8 +12,7 @@ vi.mock('../../api/misc', () => ({
           accountType: 'Paid',
           numberOfSites: 3,
           activeAgents: 42,
-          numberOfAgents: 50,
-          numberOfUsers: 5,
+          totalLicenses: 50,
           isDefault: false,
           expiration: null,
           createdAt: '2025-01-15T10:00:00Z',
@@ -26,8 +25,7 @@ vi.mock('../../api/misc', () => ({
           accountType: 'Trial',
           numberOfSites: 1,
           activeAgents: 5,
-          numberOfAgents: 10,
-          numberOfUsers: 2,
+          totalLicenses: 10,
           isDefault: false,
           expiration: '2025-06-01T00:00:00Z',
           createdAt: '2025-02-20T08:00:00Z',
@@ -36,8 +34,8 @@ vi.mock('../../api/misc', () => ({
       ],
       pagination: { totalItems: 2, nextCursor: null },
     }),
-    create: vi.fn().mockResolvedValue({ data: { id: 'acc-new', name: '', state: '', accountType: '', numberOfSites: 0, numberOfAgents: 0, activeAgents: 0, numberOfUsers: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } }),
-    update: vi.fn().mockResolvedValue({ data: { id: 'acc-1', name: '', state: '', accountType: '', numberOfSites: 0, numberOfAgents: 0, activeAgents: 0, numberOfUsers: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } }),
+    create: vi.fn().mockResolvedValue({ data: { id: 'acc-new', name: '', state: '', accountType: '', numberOfSites: 0, totalLicenses: 0, activeAgents: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } }),
+    update: vi.fn().mockResolvedValue({ data: { id: 'acc-1', name: '', state: '', accountType: '', numberOfSites: 0, totalLicenses: 0, activeAgents: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } }),
   },
 }))
 
@@ -64,8 +62,7 @@ describe('AccountsView', () => {
           accountType: 'Paid',
           numberOfSites: 3,
           activeAgents: 42,
-          numberOfAgents: 50,
-          numberOfUsers: 5,
+          totalLicenses: 50,
           isDefault: false,
           expiration: null,
           createdAt: '2025-01-15T10:00:00Z',
@@ -78,8 +75,7 @@ describe('AccountsView', () => {
           accountType: 'Trial',
           numberOfSites: 1,
           activeAgents: 5,
-          numberOfAgents: 10,
-          numberOfUsers: 2,
+          totalLicenses: 10,
           isDefault: false,
           expiration: '2025-06-01T00:00:00Z',
           createdAt: '2025-02-20T08:00:00Z',
@@ -88,8 +84,8 @@ describe('AccountsView', () => {
       ],
       pagination: { totalItems: 2, nextCursor: null },
     })
-    vi.mocked(accountsApi.create).mockResolvedValue({ data: { id: 'acc-new', name: '', state: '', accountType: '', numberOfSites: 0, numberOfAgents: 0, activeAgents: 0, numberOfUsers: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } })
-    vi.mocked(accountsApi.update).mockResolvedValue({ data: { id: 'acc-1', name: '', state: '', accountType: '', numberOfSites: 0, numberOfAgents: 0, activeAgents: 0, numberOfUsers: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } })
+    vi.mocked(accountsApi.create).mockResolvedValue({ data: { id: 'acc-new', name: '', state: '', accountType: '', numberOfSites: 0, totalLicenses: 0, activeAgents: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } })
+    vi.mocked(accountsApi.update).mockResolvedValue({ data: { id: 'acc-1', name: '', state: '', accountType: '', numberOfSites: 0, totalLicenses: 0, activeAgents: 0, isDefault: false, createdAt: '', updatedAt: '', expiration: null } })
   })
 
   // ── Basic rendering ───────────────────────────────────────────────────────
@@ -165,8 +161,7 @@ describe('AccountsView', () => {
           accountType: 'Trial',
           numberOfSites: 1,
           activeAgents: 1,
-          numberOfAgents: 1,
-          numberOfUsers: 1,
+          totalLicenses: 1,
           isDefault: false,
           expiration: null,
           createdAt: '2025-01-01T00:00:00Z',

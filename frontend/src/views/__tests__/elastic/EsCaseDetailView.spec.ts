@@ -11,7 +11,7 @@ const MOCK_CASE = {
   tags: ['malware', 'endpoint'],
   created_at: '2025-01-01T00:00:00Z',
   version: 'Wz1sMV0=', updated_at: '2025-01-01T12:00:00Z',
-  total_comment: 2,
+  totalComment: 2,
   created_by: { username: 'analyst1' },
   connector: { id: 'none', name: 'None' },
 }
@@ -44,7 +44,7 @@ vi.mock('../../../api/elastic', () => ({
       tags: ['malware', 'endpoint'],
       created_at: '2025-01-01T00:00:00Z',
       version: 'Wz1sMV0=', updated_at: '2025-01-01T12:00:00Z',
-      total_comment: 2,
+      totalComment: 2,
       created_by: { username: 'analyst1' },
       connector: { id: 'none', name: 'None' },
     }),

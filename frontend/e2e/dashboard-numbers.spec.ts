@@ -52,7 +52,10 @@ async function signIn(page: Parameters<typeof test>[1]['page'], route: string): 
   await page.goto('/login')
   await page.evaluate((t) => localStorage.setItem('s1_token', t), ADMIN_TOKEN)
   await page.goto(route)
-  await page.waitForTimeout(1200)
+  // A fixed wait read a card mid-render often enough to cost a red run;
+  // the cards fill from several calls, so wait for the last one to land.
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(300)
 }
 
 test.describe('a dashboard card counts what it says it counts', () => {

@@ -116,8 +116,7 @@ const STATE_COLOR: Record<string, string> = {
             <th scope="col" class="px-5 py-3">State</th>
             <th scope="col" class="px-5 py-3">Type</th>
             <th scope="col" class="px-5 py-3">Sites</th>
-            <th scope="col" class="px-5 py-3">Agents</th>
-            <th scope="col" class="px-5 py-3">Users</th>
+            <th scope="col" class="px-5 py-3">Agents / Licenses</th>
             <th scope="col" class="px-5 py-3">Created</th>
             <th scope="col" class="px-5 py-3"></th>
           </tr>
@@ -138,8 +137,7 @@ const STATE_COLOR: Record<string, string> = {
             </td>
             <td class="px-5 py-3 text-s1-muted capitalize">{{ account.accountType }}</td>
             <td class="px-5 py-3 text-s1-text">{{ account.numberOfSites }}</td>
-            <td class="px-5 py-3 text-s1-text">{{ account.activeAgents }} / {{ account.numberOfAgents }}</td>
-            <td class="px-5 py-3 text-s1-text">{{ account.numberOfUsers }}</td>
+            <td class="px-5 py-3 text-s1-text">{{ account.activeAgents }} / {{ account.totalLicenses }}</td>
             <td class="px-5 py-3 text-s1-muted text-xs">{{ account.createdAt?.slice(0, 10) }}</td>
             <td class="px-5 py-3">
               <button

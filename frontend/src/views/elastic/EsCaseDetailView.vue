@@ -141,7 +141,7 @@ onMounted(async () => {
             ['Created by', caseData.created_by?.username],
             ['Created', formatTime(caseData.created_at)],
             ['Updated', formatTime(caseData.updated_at)],
-            ['Comments', caseData.total_comment],
+            ['Comments', caseData.totalComment],
           ]" :key="(k as string)" class="flex justify-between gap-2">
             <span class="text-s1-muted">{{ k }}</span>
             <span class="text-s1-text text-right truncate max-w-[60%] font-mono text-xs">{{ v ?? '--' }}</span>

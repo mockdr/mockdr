@@ -15,7 +15,12 @@ export interface SplunkEnvelope<T = Record<string, unknown>> {
   updated: string
   generator: { build: string; version: string }
   entry: SplunkEntry<T>[]
-  paging: { total: number; perPage: number; offset: number }
+  /**
+   * Splunk pages a collection and not a singleton: `/services/data/indexes`
+   * carries `paging`, `/services/server/status` does not -- checked against
+   * a real splunkd, which answers those two exactly this way.
+   */
+  paging?: { total: number; perPage: number; offset: number }
 }
 
 /** Splunk search results envelope. */

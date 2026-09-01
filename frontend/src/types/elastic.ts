@@ -143,7 +143,8 @@ export interface EsCase {
   status: string
   severity: string
   tags: string[]
-  total_comment: number
+  /** Kibana mixes cases: snake_case timestamps, camelCase totals. */
+  totalComment: number
   created_at: string
   updated_at: string
   created_by: { username: string }

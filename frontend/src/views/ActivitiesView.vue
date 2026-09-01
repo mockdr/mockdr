@@ -63,7 +63,7 @@ function typeColor(activityType: number): string {
           <div class="flex-1 min-w-0">
             <div class="text-s1-text text-sm">{{ act.description }}</div>
             <div class="flex items-center gap-3 mt-0.5">
-              <span v-if="act.agentComputerName" class="text-xs text-s1-muted">{{ act.agentComputerName }}</span>
+              <span v-if="act.data?.computerName" class="text-xs text-s1-muted">{{ act.data?.computerName }}</span>
               <span v-if="act.primaryDescription" class="text-xs text-s1-cyan">{{ act.primaryDescription }}</span>
             </div>
           </div>

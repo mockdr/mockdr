@@ -194,7 +194,7 @@ onMounted(() => fetchCases())
                   </span>
                 </div>
               </td>
-              <td class="table-cell text-sm text-s1-subtle">{{ c.total_comment }}</td>
+              <td class="table-cell text-sm text-s1-subtle">{{ c.totalComment }}</td>
               <td class="table-cell text-xs text-s1-muted">{{ relativeTime(c.created_at) }}</td>
             </tr>
           </template>

@@ -282,7 +282,8 @@ export interface Alert {
     accountId: string | null
     osName: string | null
   } | null
-  agentRealtimeInfo: null
+  /** Declared as a null schema, and the answer omits the key outright. */
+  agentRealtimeInfo?: null
   sourceProcessInfo: {
     storyline: string | null
   } | null
@@ -331,7 +332,8 @@ export interface Group {
   id: string
   name: string
   siteId: string
-  siteName: string
+  // The summarized group declares `siteId` and no site name; the console
+  // resolves the name from the sites it already holds.
   type: string
   totalAgents: number
   isDefault: boolean
@@ -349,9 +351,14 @@ export interface Account {
   state: string
   accountType: string
   numberOfSites: number
-  numberOfAgents: number
   activeAgents: number
-  numberOfUsers: number
+  /**
+   * What the agents are counted against. The account schema declares
+   * `totalLicenses` and neither a `numberOfAgents` nor a `numberOfUsers`,
+   * so the table's "60 / " and its empty Users column were reading names
+   * the product does not answer with.
+   */
+  totalLicenses: number
   isDefault: boolean
   createdAt: string
   updatedAt: string
@@ -364,13 +371,15 @@ export interface User {
   id: string
   fullName: string
   email: string
-  role: string
+  /**
+   * The user list declares `lowestRole` and `scope`, and neither a `role`
+   * nor an `isActive` nor a `createdAt`. The three were declared here and
+   * read nowhere, which is the only reason nothing rendered blank.
+   */
   lowestRole?: string
   scope?: string
-  isActive: boolean
   twoFaEnabled: boolean
   lastLogin: string | null
-  createdAt: string
 }
 
 // ── Activity types ────────────────────────────────────────────────────────────
@@ -381,9 +390,14 @@ export interface Activity {
   description: string
   primaryDescription: string | null
   agentId: string | null
-  agentComputerName: string | null
   createdAt: string
-  data: Record<string, unknown>
+  /**
+   * Where the activity's scope names live. The schema declares no
+   * `agentComputerName` -- the endpoint's name is `data.computerName`,
+   * beside the account, site and group names -- so the row that read the
+   * top-level name never showed one.
+   */
+  data: { computerName?: string } & Record<string, unknown>
 }
 
 // ── Exclusion types ───────────────────────────────────────────────────────────
@@ -628,10 +642,10 @@ export interface TagDefinition {
   scopePath: string
   createdAt: string
   updatedAt: string
+  // `createdById` and `updatedById` were declared here; the tag schema has
+  // neither, and no view asked for them.
   createdBy: string
   updatedBy: string
-  createdById: string
-  updatedById: string
   allowEdit: boolean
   endpointsInCurrentScope: number
   totalEndpoints: number

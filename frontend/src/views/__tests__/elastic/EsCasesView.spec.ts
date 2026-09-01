@@ -25,7 +25,7 @@ vi.mock('../../../api/elastic', () => ({
           status: 'open',
           severity: 'high',
           tags: ['auth', 'suspicious'],
-          total_comment: 3,
+          totalComment: 3,
           created_at: '2025-01-15T10:00:00Z',
           created_by: { username: 'analyst1' },
           ...FULL_CASE_FIELDS,
@@ -37,7 +37,7 @@ vi.mock('../../../api/elastic', () => ({
           status: 'in-progress',
           severity: 'critical',
           tags: ['malware', 'ransomware', 'endpoints'],
-          total_comment: 7,
+          totalComment: 7,
           created_at: '2025-01-14T08:30:00Z',
           created_by: { username: 'analyst2' },
           ...FULL_CASE_FIELDS,
@@ -49,7 +49,7 @@ vi.mock('../../../api/elastic', () => ({
           status: 'closed',
           severity: 'medium',
           tags: [],
-          total_comment: 1,
+          totalComment: 1,
           created_at: '2025-01-10T12:00:00Z',
           created_by: { username: 'analyst3' },
           ...FULL_CASE_FIELDS,
@@ -61,14 +61,14 @@ vi.mock('../../../api/elastic', () => ({
           status: 'open',
           severity: 'low',
           tags: ['low'],
-          total_comment: 0,
+          totalComment: 0,
           created_at: '2025-01-13T09:00:00Z',
           created_by: { username: 'unknown' },
           ...FULL_CASE_FIELDS,
         },
       ],
     }),
-    create: vi.fn().mockResolvedValue({ id: 'case-new', title: 'New Case', description: '', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '', version: 'Wz1sMV0=', updated_at: '', created_by: { username: '' }, connector: { id: 'none', name: 'None' } }),
+    create: vi.fn().mockResolvedValue({ id: 'case-new', title: 'New Case', description: '', status: 'open', severity: 'low', tags: [], totalComment: 0, created_at: '', version: 'Wz1sMV0=', updated_at: '', created_by: { username: '' }, connector: { id: 'none', name: 'None' } }),
   },
 }))
 
@@ -349,7 +349,7 @@ describe('EsCasesView', () => {
   })
 
   it('hasNext is true when there are more pages', async () => {
-    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 100, count_open_cases: 0, count_in_progress_cases: 0, count_closed_cases: 0, cases: [{ id: 'c1', title: 'Case 1', status: 'open', severity: 'low', tags: [], total_comment: 0, created_at: '2025-01-01T00:00:00Z', version: 'Wz1sMV0=', updated_at: '2025-01-01T00:00:00Z', created_by: { username: 'analyst' }, description: '', connector: { id: 'none', name: 'None' } }] })
+    vi.mocked(esCasesApi.find).mockResolvedValueOnce({ page: 1, per_page: 25, total: 100, count_open_cases: 0, count_in_progress_cases: 0, count_closed_cases: 0, cases: [{ id: 'c1', title: 'Case 1', status: 'open', severity: 'low', tags: [], totalComment: 0, created_at: '2025-01-01T00:00:00Z', version: 'Wz1sMV0=', updated_at: '2025-01-01T00:00:00Z', created_by: { username: 'analyst' }, description: '', connector: { id: 'none', name: 'None' } }] })
     const wrapper = mount(EsCasesView, {
       global: { plugins: [router], stubs: STUBS },
     })
@@ -374,7 +374,7 @@ describe('EsCasesView', () => {
         status: 'open',
         severity: 'low',
         tags: [],
-        total_comment: 0,
+        totalComment: 0,
         created_at: '2025-01-01T00:00:00Z',
         updated_at: '2025-01-01T00:00:00Z',
         created_by: { username: 'analyst' },
