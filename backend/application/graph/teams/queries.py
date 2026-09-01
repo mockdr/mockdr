@@ -7,7 +7,7 @@ from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.channel_message_repo import graph_channel_message_repo
 from repository.graph.channel_repo import graph_channel_repo
 from repository.graph.team_repo import graph_team_repo
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
@@ -22,16 +22,22 @@ def _strip_internal(record: dict) -> dict:
     return result
 
 
-def list_teams() -> dict:
+def list_teams(top: int = 100, skip: int = 0) -> dict:
     """Return all teams.
+
+    Args:
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response dict.
     """
     records = [record_dict(t) for t in graph_team_repo.list_all()]
+    page, next_link = graph_page(records, top, skip, resource="teams")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#teams",
+        next_link=next_link,
     )
 
 

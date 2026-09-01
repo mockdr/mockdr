@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from repository.graph.subscribed_sku_repo import graph_subscribed_sku_repo
 from repository.graph.user_repo import graph_user_repo
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
-def list_subscribed_skus() -> dict:
+def list_subscribed_skus(top: int = 100, skip: int = 0) -> dict:
     """Return all subscribed SKUs as an OData list.
 
     Subscribed SKUs are always a small set so no filtering/pagination is needed.
@@ -27,9 +27,11 @@ def list_subscribed_skus() -> dict:
         record["prepaidUnits"] = _prepaid_for(record)
         records.append(record)
 
+    page, next_link = graph_page(records, top, skip, resource="subscribedSkus")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#subscribedSkus",
+        next_link=next_link,
     )
 
 

@@ -1,7 +1,7 @@
 """Microsoft Graph Organization endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from api.graph_auth import require_graph_auth
 from application.graph.organization import queries as org_queries
@@ -11,6 +11,8 @@ router = APIRouter(tags=["Graph Organization"])
 
 @router.get("/v1.0/organization")
 async def list_organization(
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """Return the tenant organization record.
@@ -18,4 +20,4 @@ async def list_organization(
     Always returns a list with a single organization entry, matching
     the real Microsoft Graph API behaviour.
     """
-    return org_queries.list_organization()
+    return org_queries.list_organization(top, skip)

@@ -4,20 +4,26 @@ from __future__ import annotations
 from repository.graph.directory_role_repo import graph_directory_role_repo
 from repository.graph.user_repo import graph_user_repo
 from repository.store import store
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
-def list_directory_roles() -> dict:
+def list_directory_roles(top: int = 100, skip: int = 0) -> dict:
     """Return all directory roles.
+
+    Args:
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response containing directory role records.
     """
     records = [record_dict(r) for r in graph_directory_role_repo.list_all()]
+    page, next_link = graph_page(records, top, skip, resource="directoryRoles")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#directoryRoles",
+        next_link=next_link,
     )
 
 

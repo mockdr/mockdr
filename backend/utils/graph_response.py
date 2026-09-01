@@ -40,6 +40,32 @@ def build_graph_list_response(
     return resp
 
 
+def graph_page(
+    records: list[dict], top: int, skip: int, *, resource: str,
+) -> tuple[list[dict], str | None]:
+    """One page of a collection, and the ``@odata.nextLink`` that follows it.
+
+    Graph pages every collection, and this mock read ``$top``/``$skip`` on 22
+    of its collection routes and ignored them on nine more -- so a console
+    asking those nine for a page got the estate, and the parameter it sent
+    did nothing at all. The nine now page the same way as the 22, through
+    here rather than through nine copies of the same four lines.
+
+    Args:
+        records:  The whole collection, already filtered.
+        top:      ``$top`` -- how many to return.
+        skip:     ``$skip`` -- how many to pass over first.
+        resource: The path under ``/v1.0`` that the next link points back at.
+
+    Returns:
+        The page, and the next link, which is None on the last page.
+    """
+    page = records[skip : skip + top]
+    if skip + top >= len(records):
+        return page, None
+    return page, f"https://graph.microsoft.com/v1.0/{resource}?$skip={skip + top}"
+
+
 def build_graph_error_response(code: str, message: str) -> dict:
     """Build a Microsoft Graph-style error response.
 

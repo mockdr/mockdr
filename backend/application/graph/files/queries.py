@@ -4,7 +4,7 @@ from __future__ import annotations
 from repository.graph.drive_item_repo import graph_drive_item_repo
 from repository.graph.drive_repo import graph_drive_repo
 from repository.graph.sharepoint_site_repo import graph_sharepoint_site_repo
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
@@ -55,14 +55,20 @@ def list_drive_children(drive_id: str, item_id: str = "root") -> dict:
     )
 
 
-def list_sites() -> dict:
+def list_sites(top: int = 100, skip: int = 0) -> dict:
     """Return all SharePoint sites.
+
+    Args:
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response dict.
     """
     records = [record_dict(s) for s in graph_sharepoint_site_repo.list_all()]
+    page, next_link = graph_page(records, top, skip, resource="sites")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#sites",
+        next_link=next_link,
     )

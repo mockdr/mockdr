@@ -15,10 +15,13 @@ router = APIRouter(tags=["Graph Identity"])
 async def list_conditional_access_policies(
     filter_str: str = Query(None, alias="$filter"),
     select: str = Query(None, alias="$select"),
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List Conditional Access policies."""
-    return identity_queries.list_ca_policies(filter_str=filter_str, select=select)
+    return identity_queries.list_ca_policies(
+        filter_str=filter_str, select=select, top=top, skip=skip)
 
 
 @router.get("/v1.0/identity/conditionalAccess/policies/{policy_id}")
@@ -45,15 +48,19 @@ async def get_conditional_access_policy(
 
 @router.get("/v1.0/identity/conditionalAccess/namedLocations")
 async def list_named_locations(
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List named locations (IP and country-based)."""
-    return named_location_queries.list_named_locations()
+    return named_location_queries.list_named_locations(top, skip)
 
 
 @router.get("/v1.0/directory/administrativeUnits")
 async def list_administrative_units(
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List administrative units."""
-    return admin_unit_queries.list_admin_units()
+    return admin_unit_queries.list_admin_units(top, skip)

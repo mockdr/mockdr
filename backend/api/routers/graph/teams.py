@@ -13,10 +13,12 @@ router = APIRouter(tags=["Graph Teams"])
 
 @router.get("/v1.0/teams")
 async def list_teams(
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List all teams."""
-    return teams_queries.list_teams()
+    return teams_queries.list_teams(top, skip)
 
 
 @router.get("/v1.0/teams/{team_id}")

@@ -296,6 +296,14 @@ jobs:
       - name: Every member the console writes is one the vendor documents
         run: python scripts/frontend_body_drift.py
 
+      # And the third face of it: a parameter a route does not declare is
+      # dropped in silence, so the list answers 200 with rows -- just not the
+      # filtered, sorted or paged ones. Nine Graph collections ignored the
+      # `$top` that 22 of their siblings read, and the console asked four of
+      # them for a page and got the estate.
+      - name: Every parameter the console sends is one the route reads
+        run: python scripts/frontend_param_drift.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.

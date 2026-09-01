@@ -1,7 +1,7 @@
 """Microsoft Graph Files (OneDrive / SharePoint) endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from api.graph_auth import require_graph_auth
 from application.graph.files import queries as files_queries
@@ -53,7 +53,9 @@ async def list_drive_root_children(
 
 @router.get("/v1.0/sites")
 async def list_sites(
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List SharePoint sites."""
-    return files_queries.list_sites()
+    return files_queries.list_sites(top, skip)

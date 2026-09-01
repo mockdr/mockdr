@@ -3,18 +3,21 @@ from __future__ import annotations
 
 from repository.graph.conditional_access_policy_repo import graph_ca_policy_repo
 from utils.graph_odata import apply_graph_filter, apply_odata_select, select_fields
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
 def list_ca_policies(
     filter_str: str | None = None, select: str | None = None,
+    top: int = 100, skip: int = 0,
 ) -> dict:
     """Return all conditional access policies.
 
     Args:
         filter_str: OData ``$filter`` expression.
         select:     OData ``$select`` expression.
+        top:        ``$top`` -- how many to return.
+        skip:       ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response containing conditional access policy records.
@@ -23,9 +26,12 @@ def list_ca_policies(
     if filter_str:
         records = apply_graph_filter(records, filter_str)
     records = apply_odata_select(records, select)
+    page, next_link = graph_page(
+        records, top, skip, resource="identity/conditionalAccess/policies")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#identity/conditionalAccess/policies",
+        next_link=next_link,
     )
 
 
