@@ -287,6 +287,15 @@ jobs:
       - name: Every field the console declares is one the answer carries
         run: python scripts/frontend_type_drift.py
 
+      # The same question on the write side. A member the vendor does not
+      # document is not refused by anything -- the route reads what it knows
+      # and drops the rest -- so the console gets its 200 and the field it
+      # meant to set stays as it was. It found the console posting `ids` to
+      # two Falcon routes that require `composite_ids`: accepted here, a 400
+      # in production. 30 of 44 literals are comparable; the rest are named.
+      - name: Every member the console writes is one the vendor documents
+        run: python scripts/frontend_body_drift.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.

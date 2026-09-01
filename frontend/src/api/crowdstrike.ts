@@ -102,13 +102,23 @@ export const csDetectionsApi = {
   queryIds: (params?: Record<string, unknown>): Promise<CsResponse<string>> =>
     csClient.get('/alerts/queries/alerts/v2', { params }) as Promise<CsResponse<string>>,
 
-  /** Fetch full detection entities by IDs. */
+  /**
+   * Fetch full alert entities by composite id.
+   *
+   * gofalcon marks `composite_ids` required on the v2 entities route and on
+   * the v3 update; `ids` is the v1 and v2-PATCH spelling. This mock reads
+   * either -- it will not invent a refusal whose wording nobody has
+   * measured -- but Falcon requires the newer name on these two, so a
+   * console sending the older one works here and 400s in production.
+   */
   getEntities: (ids: string[]): Promise<CsResponse<CsDetection>> =>
-    csClient.post('/alerts/entities/alerts/v2', { ids }) as Promise<CsResponse<CsDetection>>,
+    csClient.post('/alerts/entities/alerts/v2',
+      { composite_ids: ids }) as Promise<CsResponse<CsDetection>>,
 
-  /** Update detection status. */
+  /** Update alert status, under the names the v3 route requires. */
   update: (ids: string[], updates: Record<string, unknown>): Promise<CsResponse<CsDetection>> =>
-    csClient.patch('/alerts/entities/alerts/v3', { ids, ...updates }) as Promise<CsResponse<CsDetection>>,
+    csClient.patch('/alerts/entities/alerts/v3',
+      { composite_ids: ids, ...updates }) as Promise<CsResponse<CsDetection>>,
 }
 
 // ── Incidents API ────────────────────────────────────────────────────────────
