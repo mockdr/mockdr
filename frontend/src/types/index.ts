@@ -173,6 +173,14 @@ export interface ThreatInfo {
 }
 
 /** Agent state captured at detection time. */
+/**
+ * The detection-time snapshot beside a threat.
+ *
+ * It carries no `agentComputerName` — only `agentRealtimeInfo` declares
+ * that, and the mock strips it here because the schema does not list it. The
+ * threats table and the detail page both read it off this block, so the
+ * ENDPOINT column was blank on every row.
+ */
 export interface AgentDetectionInfo {
   siteId: string
   siteName: string
@@ -189,7 +197,6 @@ export interface AgentDetectionInfo {
   agentDomain: string | null
   agentDetectionState: string
   agentLastLoggedInUserName: string | null
-  agentComputerName: string
   agentMitigationMode: string
   cloudProviders: Record<string, string>
 }

@@ -133,7 +133,7 @@ function formatDate(ts: string): string {
                 <div class="text-xs text-s1-muted font-mono">{{ threat.threatInfo.sha1?.slice(0, 12) }}...</div>
               </td>
               <td class="table-cell text-sm text-s1-subtle">{{ threat.threatInfo.classification }}</td>
-              <td class="table-cell text-sm text-s1-subtle">{{ threat.agentDetectionInfo.agentComputerName }}</td>
+              <td class="table-cell text-sm text-s1-subtle">{{ threat.agentRealtimeInfo.agentComputerName }}</td>
               <td class="table-cell"><StatusBadge :status="threat.threatInfo.mitigationStatus" type="threat" /></td>
               <td class="table-cell"><StatusBadge :status="threat.threatInfo.incidentStatus" type="incident" /></td>
               <td class="table-cell"><StatusBadge :status="threat.threatInfo.analystVerdict" type="verdict" /></td>

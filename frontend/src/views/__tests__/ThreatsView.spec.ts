@@ -26,7 +26,7 @@ vi.mock('../../stores/threats', () => ({
           analystVerdict: 'undefined',
           createdAt: '2025-01-15T10:00:00Z',
         },
-        agentDetectionInfo: { agentComputerName: 'WIN-WORKSTATION-01' },
+        agentDetectionInfo: { }, agentRealtimeInfo: { agentComputerName: 'WIN-WORKSTATION-01' },
       },
       {
         id: 'threat-2',
@@ -39,7 +39,7 @@ vi.mock('../../stores/threats', () => ({
           analystVerdict: 'true_positive',
           createdAt: '2025-02-20T14:30:00Z',
         },
-        agentDetectionInfo: { agentComputerName: 'MAC-LAPTOP-02' },
+        agentDetectionInfo: { }, agentRealtimeInfo: { agentComputerName: 'MAC-LAPTOP-02' },
       },
     ],
     total: 2,

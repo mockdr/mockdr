@@ -148,7 +148,7 @@ onUnmounted(() => clearInterval(timer))
              tabindex="0" role="link" @keydown.enter.prevent="router.push(`/threats/${threat.id}`)">
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[140px]">{{ threat.threatInfo.threatName }}</div>
-                <div class="text-xs text-s1-muted">{{ threat.agentDetectionInfo.agentComputerName }}</div>
+                <div class="text-xs text-s1-muted">{{ threat.agentRealtimeInfo.agentComputerName }}</div>
               </td>
               <td class="table-cell">
                 <StatusBadge :status="threat.threatInfo.mitigationStatus" type="threat" />

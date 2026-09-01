@@ -40,7 +40,7 @@ vi.mock('../../stores/dashboard', () => ({
       {
         id: 't1',
         threatInfo: { threatName: 'Ransomware.Win32', mitigationStatus: 'active', classification: 'Malware' },
-        agentDetectionInfo: { agentComputerName: 'WS-HR-03' },
+        agentDetectionInfo: { }, agentRealtimeInfo: { agentComputerName: 'WKSTN-001' },
       },
     ],
     recentActivities: [
