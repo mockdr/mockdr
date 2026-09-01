@@ -122,7 +122,7 @@ onMounted(() => fetchAlerts())
         <tbody>
           <LoadingSkeleton v-if="loading && !alerts.length" :rows="8" />
           <template v-else>
-            <tr v-for="alert in alerts" :key="alert.alertId" class="table-row">
+            <tr v-for="alert in alerts" :key="alert.id" class="table-row">
               <td class="table-cell">
                 <div class="font-medium text-s1-text text-sm truncate max-w-[200px]">{{ alert.title }}</div>
                 <div class="text-xs text-s1-muted">{{ alert.detectionSource }}</div>
@@ -143,7 +143,7 @@ onMounted(() => fetchAlerts())
               <td class="table-cell">
                 <span class="font-mono text-xs text-s1-muted">{{ alert.computerDnsName ?? alert.machineId }}</span>
               </td>
-              <td class="table-cell text-xs text-s1-muted">{{ relativeTime(alert.creationTime) }}</td>
+              <td class="table-cell text-xs text-s1-muted">{{ relativeTime(alert.alertCreationTime) }}</td>
             </tr>
           </template>
         </tbody>

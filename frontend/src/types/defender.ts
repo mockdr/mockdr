@@ -16,7 +16,6 @@ export interface MdeMachine {
   id: string
   computerDnsName: string
   osPlatform: string
-  osVersion: string
   healthStatus: string
   riskScore: string
   exposureLevel: string
@@ -24,7 +23,12 @@ export interface MdeMachine {
   lastIpAddress: string
   lastExternalIpAddress: string
   machineTags: string[]
-  agentVersion: string
+  /**
+   * The OS release. Defender documents `version` here and neither an
+   * `osVersion` nor an agent version, so the console's two old rows read
+   * names that never arrive.
+   */
+  version: string
   isAadJoined: boolean
   aadDeviceId: string
   rbacGroupId: number
@@ -34,7 +38,8 @@ export interface MdeMachine {
 
 /** MDE Alert record. */
 export interface MdeAlert {
-  alertId: string
+  /** Defender names an alert `id`; there is no `alertId` in its docs. */
+  id: string
   title: string
   severity: string
   status: string
@@ -45,7 +50,8 @@ export interface MdeAlert {
   detectionSource: string
   threatFamilyName: string
   assignedTo: string
-  creationTime: string
+  /** `alertCreationTime` in Defender's docs -- `creationTime` is ours. */
+  alertCreationTime: string
   lastUpdateTime: string
   resolvedTime: string
   classification: string
@@ -70,7 +76,8 @@ export interface MdeIndicator {
 
 /** MDE Software inventory record. */
 export interface MdeSoftware {
-  softwareId: string
+  /** "microsoft-_-edge" and the like. Defender names it `id`. */
+  id: string
   name: string
   vendor: string
   version: string
@@ -83,7 +90,8 @@ export interface MdeSoftware {
 
 /** MDE Vulnerability record. */
 export interface MdeVulnerability {
-  vulnerabilityId: string
+  /** The CVE, e.g. "CVE-2024-21412". Defender names it `id`. */
+  id: string
   name: string
   description: string
   severity: string

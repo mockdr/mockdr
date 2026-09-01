@@ -11,6 +11,24 @@ from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
 from utils.serde import record_dict
 
+#: Fields the store keeps that the docs' machine does not declare. The OS
+#: release is the interesting one: the docs give a machine `version` and no
+#: `osVersion`, and the one recorded example carries `version` empty. Sending
+#: our value under a name Defender never uses -- while the name it does use
+#: sits blank -- is how a client ends up reading nothing off a machine that
+#: plainly knows its own OS. So the value moves into the declared field.
+_UNDECLARED = ("groupName", "loggedOnUsers", "agentVersion")
+
+
+def _declared_only(record: dict) -> dict:
+    """Drop what the docs do not declare, and put the OS release in `version`."""
+    os_release = record.pop("osVersion", "")
+    for key in _UNDECLARED:
+        record.pop(key, None)
+    if os_release:
+        record["version"] = os_release
+    return record
+
 
 def _renamed(record: dict) -> dict:
     """The stored machine under its API key, without the fixture completion.
@@ -18,17 +36,13 @@ def _renamed(record: dict) -> dict:
     Completion is what a page costs; running it over the whole collection to
     return `$top` rows is work thrown away.
     """
-    for key in ("groupName", "loggedOnUsers", "agentVersion"):
-        record.pop(key, None)
-    return to_mde_resource(record, "machineId")
+    return to_mde_resource(_declared_only(record), "machineId")
 
 
 def resource(record: dict) -> dict:
     """Render a stored record as the API resource, keyed by ``id``."""
-    # The docs' machine has none of these; loggedOnUsers has its own route.
-    for key in ("groupName", "loggedOnUsers", "agentVersion"):
-        record.pop(key, None)
-    return complete_mde(to_mde_resource(record, "machineId"), "machine")
+    # loggedOnUsers has its own route.
+    return complete_mde(to_mde_resource(_declared_only(record), "machineId"), "machine")
 
 
 def list_machines(

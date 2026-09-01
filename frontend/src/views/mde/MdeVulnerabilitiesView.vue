@@ -105,9 +105,9 @@ onMounted(() => fetchData())
           <tbody>
             <LoadingSkeleton v-if="loading && !vulnerabilities.length" :rows="8" />
             <template v-else>
-              <tr v-for="vuln in vulnerabilities" :key="vuln.vulnerabilityId" class="table-row">
+              <tr v-for="vuln in vulnerabilities" :key="vuln.id" class="table-row">
                 <td class="table-cell">
-                  <span class="font-mono text-xs text-s1-text">{{ vuln.vulnerabilityId }}</span>
+                  <span class="font-mono text-xs text-s1-text">{{ vuln.id }}</span>
                 </td>
                 <td class="table-cell text-sm text-s1-subtle truncate max-w-[250px]">{{ vuln.name }}</td>
                 <td class="table-cell">
@@ -179,7 +179,7 @@ onMounted(() => fetchData())
           <tbody>
             <LoadingSkeleton v-if="loading && !software.length" :rows="8" />
             <template v-else>
-              <tr v-for="sw in software" :key="sw.softwareId" class="table-row">
+              <tr v-for="sw in software" :key="sw.id" class="table-row">
                 <td class="table-cell">
                   <div class="font-medium text-s1-text text-sm">{{ sw.name }}</div>
                   <div v-if="sw.version" class="text-[10px] text-s1-muted font-mono">v{{ sw.version }}</div>

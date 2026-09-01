@@ -8,21 +8,21 @@ vi.mock('../../../api/defender', () => ({
     list: vi.fn().mockResolvedValue({
       value: [
         {
-          id: 'machine-1',
+          machineId: 'machine-1',
           computerDnsName: 'WKSTN-001',
           healthStatus: 'Active',
           osPlatform: 'Windows10',
           riskScore: 'High',
         },
         {
-          id: 'machine-2',
+          machineId: 'machine-2',
           computerDnsName: 'SRV-002',
           healthStatus: 'Inactive',
           osPlatform: 'Windows10',
           riskScore: 'Medium',
         },
         {
-          id: 'machine-3',
+          machineId: 'machine-3',
           computerDnsName: 'LINUX-003',
           healthStatus: 'Active',
           osPlatform: 'Linux',
@@ -35,43 +35,43 @@ vi.mock('../../../api/defender', () => ({
     list: vi.fn().mockResolvedValue({
       value: [
         {
-          alertId: 'alert-1',
+          id: 'alert-1',
           title: 'Alert One',
           severity: 'High',
           status: 'New',
           category: 'Malware',
-          creationTime: '2025-01-10T00:00:00Z',
-          id: 'machine-1',
+          alertCreationTime: '2025-01-10T00:00:00Z',
+          machineId: 'machine-1',
           computerDnsName: 'WKSTN-001',
         },
         {
-          alertId: 'alert-2',
+          id: 'alert-2',
           title: 'Alert Two',
           severity: 'Medium',
           status: 'InProgress',
           category: 'CommandAndControl',
-          creationTime: '2025-01-11T00:00:00Z',
-          id: 'machine-2',
+          alertCreationTime: '2025-01-11T00:00:00Z',
+          machineId: 'machine-2',
           computerDnsName: 'SRV-002',
         },
         {
-          alertId: 'alert-3',
+          id: 'alert-3',
           title: 'Alert Three',
           severity: 'Low',
           status: 'Resolved',
           category: 'Execution',
-          creationTime: '2025-01-12T00:00:00Z',
-          id: 'machine-3',
+          alertCreationTime: '2025-01-12T00:00:00Z',
+          machineId: 'machine-3',
           computerDnsName: 'LINUX-003',
         },
         {
-          alertId: 'alert-4',
+          id: 'alert-4',
           title: 'Alert Four',
           severity: 'Informational',
           status: 'New',
           category: 'PolicyViolation',
-          creationTime: '2025-01-13T00:00:00Z',
-          id: 'machine-1',
+          alertCreationTime: '2025-01-13T00:00:00Z',
+          machineId: 'machine-1',
           computerDnsName: 'WKSTN-001',
         },
       ],
@@ -279,7 +279,7 @@ describe('MdeDashboardView', () => {
     vi.mocked(mdeMachinesApi.list).mockResolvedValueOnce({
       '@odata.context': '',
       value: [
-        { id: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: null as unknown as string, riskScore: 'None', osVersion: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], agentVersion: '', isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
+        { id: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: null as unknown as string, riskScore: 'None', version: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
       ],
     })
     const wrapper = mount(MdeDashboardView, {
@@ -322,7 +322,7 @@ describe('MdeDashboardView', () => {
     vi.mocked(mdeAlertsApi.list).mockResolvedValueOnce({
       '@odata.context': '',
       value: [
-        { alertId: 'a1', title: 'Only High', severity: 'High', status: 'New', category: 'Malware', creationTime: '2025-01-10T00:00:00Z', machineId: 'm1', computerDnsName: 'HOST-1', description: '', detectionSource: '', threatFamilyName: '', assignedTo: '', lastUpdateTime: '2025-01-10T00:00:00Z', resolvedTime: '', classification: '', determination: '' },
+        { id: 'a1', title: 'Only High', severity: 'High', status: 'New', category: 'Malware', alertCreationTime: '2025-01-10T00:00:00Z', machineId: 'm1', computerDnsName: 'HOST-1', description: '', detectionSource: '', threatFamilyName: '', assignedTo: '', lastUpdateTime: '2025-01-10T00:00:00Z', resolvedTime: '', classification: '', determination: '' },
       ],
     })
     const wrapper = mount(MdeDashboardView, {
@@ -340,7 +340,7 @@ describe('MdeDashboardView', () => {
     vi.mocked(mdeAlertsApi.list).mockResolvedValueOnce({
       '@odata.context': '',
       value: [
-        { alertId: 'a1', title: 'Unknown sev', severity: 'Unknown', status: 'New', category: 'Other', creationTime: '2025-01-10T00:00:00Z', machineId: 'm1', computerDnsName: 'HOST-1', description: '', detectionSource: '', threatFamilyName: '', assignedTo: '', lastUpdateTime: '2025-01-10T00:00:00Z', resolvedTime: '', classification: '', determination: '' },
+        { id: 'a1', title: 'Unknown sev', severity: 'Unknown', status: 'New', category: 'Other', alertCreationTime: '2025-01-10T00:00:00Z', machineId: 'm1', computerDnsName: 'HOST-1', description: '', detectionSource: '', threatFamilyName: '', assignedTo: '', lastUpdateTime: '2025-01-10T00:00:00Z', resolvedTime: '', classification: '', determination: '' },
       ],
     })
     const wrapper = mount(MdeDashboardView, {
@@ -378,7 +378,7 @@ describe('MdeDashboardView', () => {
     vi.mocked(mdeMachinesApi.list).mockResolvedValueOnce({
       '@odata.context': '',
       value: [
-        { id: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: 'Linux', riskScore: null as unknown as string, osVersion: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], agentVersion: '', isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
+        { id: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: 'Linux', riskScore: null as unknown as string, version: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
       ],
     })
     const wrapper = mount(MdeDashboardView, {

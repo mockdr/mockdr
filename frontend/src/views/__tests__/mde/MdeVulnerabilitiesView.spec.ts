@@ -9,7 +9,7 @@ vi.mock('../../../api/defender', () => ({
       '@odata.context': 'https://api.securitycenter.microsoft.com/api/$metadata#Vulnerabilities',
       value: [
         {
-          vulnerabilityId: 'CVE-2025-001',
+          id: 'CVE-2025-001',
           name: 'Remote Code Execution in Foo',
           severity: 'Critical',
           cvssV3: 9.8,
@@ -17,7 +17,7 @@ vi.mock('../../../api/defender', () => ({
           publicExploit: true,
         },
         {
-          vulnerabilityId: 'CVE-2025-002',
+          id: 'CVE-2025-002',
           name: 'Privilege Escalation in Bar',
           severity: 'High',
           cvssV3: 7.5,
@@ -25,7 +25,7 @@ vi.mock('../../../api/defender', () => ({
           publicExploit: false,
         },
         {
-          vulnerabilityId: 'CVE-2025-003',
+          id: 'CVE-2025-003',
           name: 'Information Disclosure in Baz',
           severity: 'Medium',
           cvssV3: 5.0,
@@ -33,7 +33,7 @@ vi.mock('../../../api/defender', () => ({
           publicExploit: false,
         },
         {
-          vulnerabilityId: 'CVE-2025-004',
+          id: 'CVE-2025-004',
           name: 'Denial of Service in Qux',
           severity: 'Low',
           cvssV3: 3.1,
@@ -48,7 +48,7 @@ vi.mock('../../../api/defender', () => ({
       '@odata.context': 'https://api.securitycenter.microsoft.com/api/$metadata#Software',
       value: [
         {
-          softwareId: 'sw-1',
+          id: 'sw-1',
           name: 'Adobe Flash Player',
           vendor: 'Adobe',
           weaknesses: 3,
@@ -59,7 +59,7 @@ vi.mock('../../../api/defender', () => ({
           version: '32.0',
         },
         {
-          softwareId: 'sw-2',
+          id: 'sw-2',
           name: 'qBittorrent',
           vendor: 'qBittorrent',
           weaknesses: 1,
@@ -70,7 +70,7 @@ vi.mock('../../../api/defender', () => ({
           version: '4.5.0',
         },
         {
-          softwareId: 'sw-3',
+          id: 'sw-3',
           name: 'Mimikatz',
           vendor: 'N/A',
           weaknesses: 0,
@@ -81,7 +81,7 @@ vi.mock('../../../api/defender', () => ({
           version: '2.2.0',
         },
         {
-          softwareId: 'sw-4',
+          id: 'sw-4',
           name: 'SentinelOne',
           vendor: 'SentinelOne',
           weaknesses: 0,
@@ -92,7 +92,7 @@ vi.mock('../../../api/defender', () => ({
           version: '22.1',
         },
         {
-          softwareId: 'sw-5',
+          id: 'sw-5',
           name: 'Chrome (outdated)',
           vendor: 'Google',
           weaknesses: 2,
@@ -103,7 +103,7 @@ vi.mock('../../../api/defender', () => ({
           version: '110.0',
         },
         {
-          softwareId: 'sw-6',
+          id: 'sw-6',
           name: 'Notepad++',
           vendor: 'Don Ho',
           weaknesses: 0,

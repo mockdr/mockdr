@@ -349,3 +349,35 @@ class TestMachineActions:
             json={"Comment": "Test", "IsolationType": "Full"},
         )
         assert resp.status_code == 404
+
+
+class TestMachineNamesItsOsTheWayDefenderDoes:
+    """The OS release belongs in the field the docs declare for it.
+
+    Defender's machine has `version` and no `osVersion`; the store had it the
+    other way round, so the answer carried the OS under a name no Defender
+    client reads and left the declared one blank. That is invisible from the
+    outside -- 200, a full record, one field quietly empty -- which is why it
+    survived until a type check compared the console's names to the answer.
+    """
+
+    def test_the_os_release_is_under_the_declared_name(self, client: TestClient) -> None:
+        headers = _mde_auth(client)
+        machines = client.get("/mde/api/machines", headers=headers,
+                              params={"$top": 25}).json()["value"]
+
+        assert machines
+        for machine in machines:
+            assert "osVersion" not in machine, "not a name Defender's machine declares"
+            assert machine["version"], "the declared field is the one that is filled"
+
+    def test_the_single_machine_agrees_with_the_listing(self, client: TestClient) -> None:
+        headers = _mde_auth(client)
+        listed = client.get("/mde/api/machines", headers=headers,
+                            params={"$top": 1}).json()["value"][0]
+
+        single = client.get(f"/mde/api/machines/{listed['id']}", headers=headers).json()
+
+        assert single["version"] == listed["version"]
+        assert "osVersion" not in single
+        assert "agentVersion" not in single

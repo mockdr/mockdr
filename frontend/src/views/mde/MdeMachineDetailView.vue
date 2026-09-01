@@ -123,11 +123,10 @@ onMounted(async () => {
           <div v-for="[k, v] in [
             ['Machine ID', machine.id],
             ['OS Platform', machine.osPlatform],
-            ['OS Version', machine.osVersion],
+            ['OS Version', machine.version],
             ['Health Status', machine.healthStatus],
             ['Risk Score', machine.riskScore],
             ['Exposure Level', machine.exposureLevel],
-            ['Agent Version', machine.agentVersion],
             ['Last IP', machine.lastIpAddress],
             ['External IP', machine.lastExternalIpAddress],
             ['AAD Joined', machine.isAadJoined ? 'Yes' : 'No'],
@@ -177,12 +176,11 @@ onMounted(async () => {
                   ['Computer Name', machine.computerDnsName],
                   ['Machine ID', machine.id],
                   ['OS Platform', machine.osPlatform],
-                  ['OS Version', machine.osVersion],
+                  ['OS Version', machine.version],
                   ['Health Status', machine.healthStatus],
                   ['Risk Score', machine.riskScore],
                   ['Exposure Level', machine.exposureLevel],
-                  ['Agent Version', machine.agentVersion],
-                  ['AAD Device ID', machine.aadDeviceId],
+                        ['AAD Device ID', machine.aadDeviceId],
                   ['RBAC Group', machine.rbacGroupName],
                   ['First Seen', machine.firstSeen],
                   ['Last Seen', machine.lastSeen],
@@ -209,7 +207,7 @@ onMounted(async () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="alert in alerts" :key="alert.alertId" class="table-row">
+                <tr v-for="alert in alerts" :key="alert.id" class="table-row">
                   <td class="table-cell">
                     <div class="font-medium text-s1-text text-sm truncate max-w-[200px]">{{ alert.title }}</div>
                   </td>
