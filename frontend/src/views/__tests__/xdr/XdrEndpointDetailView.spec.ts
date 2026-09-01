@@ -64,11 +64,11 @@ describe('XdrEndpointDetailView', () => {
     expect(wrapper.text()).toContain('WKSTN-001')
   })
 
-  it('calls xdrEndpointsApi.list on mount with endpoint id filter', async () => {
+  it('calls xdrEndpointsApi.list on mount with the filter Cortex takes', async () => {
     mount(XdrEndpointDetailView, { global: { plugins: [router], stubs } })
     await flushPromises()
     expect(mockEndpointsList).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ field: 'endpoint_id', value: ['ep-1'] })])
+      expect.arrayContaining([expect.objectContaining({ field: 'endpoint_id_list', value: ['ep-1'] })])
     )
   })
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { ensureGraphAuth, graphGroupsApi } from '../../api/graph'
@@ -71,7 +72,10 @@ onMounted(() => fetchGroups())
           <template v-else>
             <tr v-for="group in groups" :key="group.id" class="table-row">
               <td class="table-cell">
-                <div class="font-medium text-s1-text text-sm">{{ group.displayName }}</div>
+                <RouterLink :to="`/graph/groups/${group.id}`"
+                  class="font-medium text-s1-text text-sm hover:text-s1-primary hover:underline">
+                  {{ group.displayName }}
+                </RouterLink>
               </td>
               <td class="table-cell">
                 <span

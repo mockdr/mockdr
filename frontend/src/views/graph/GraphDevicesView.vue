@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { ensureGraphAuth, graphDevicesApi } from '../../api/graph'
@@ -74,7 +75,10 @@ onMounted(() => fetchDevices())
           <template v-else>
             <tr v-for="device in devices" :key="device.id" class="table-row">
               <td class="table-cell">
-                <div class="font-medium text-s1-text text-sm">{{ device.deviceName }}</div>
+                <RouterLink :to="`/graph/devices/${device.id}`"
+                  class="font-medium text-s1-text text-sm hover:text-s1-primary hover:underline">
+                  {{ device.deviceName }}
+                </RouterLink>
               </td>
               <td class="table-cell text-sm text-s1-subtle">
                 {{ device.operatingSystem }} {{ device.osVersion }}

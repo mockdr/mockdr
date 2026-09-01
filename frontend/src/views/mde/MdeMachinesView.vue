@@ -24,14 +24,14 @@ const filterRisk = ref('')
 const selected = ref<Set<string>>(new Set())
 
 const allSelected = computed(() =>
-  machines.value.length > 0 && machines.value.every(m => selected.value.has(m.machineId)),
+  machines.value.length > 0 && machines.value.every(m => selected.value.has(m.id)),
 )
 
 function toggleAll(): void {
   if (allSelected.value) {
     selected.value = new Set()
   } else {
-    selected.value = new Set(machines.value.map(m => m.machineId))
+    selected.value = new Set(machines.value.map(m => m.id))
   }
 }
 
@@ -203,14 +203,14 @@ onMounted(() => fetchMachines())
           <LoadingSkeleton v-if="loading && !machines.length" :rows="8" />
           <template v-else>
             <tr
-              v-for="machine in machines" :key="machine.machineId"
+              v-for="machine in machines" :key="machine.id"
               class="table-row"
-              :class="selected.has(machine.machineId) ? 'bg-green-500/5' : ''"
-              @click="router.push(`/defender/machines/${machine.machineId}`)"
-             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/defender/machines/${machine.machineId}`)">
+              :class="selected.has(machine.id) ? 'bg-green-500/5' : ''"
+              @click="router.push(`/defender/machines/${machine.id}`)"
+             tabindex="0" role="link" @keydown.enter.prevent="router.push(`/defender/machines/${machine.id}`)">
               <td class="table-cell" @click.stop>
-                <input type="checkbox" aria-label="Select row" :checked="selected.has(machine.machineId)"
-                  @change="toggleSelect(machine.machineId)"
+                <input type="checkbox" aria-label="Select row" :checked="selected.has(machine.id)"
+                  @change="toggleSelect(machine.id)"
                   class="rounded-sm border-s1-border bg-s1-bg accent-green-500" />
               </td>
               <td class="table-cell">

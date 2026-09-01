@@ -6,7 +6,7 @@ vi.mock('../../../api/defender', () => ({
   ensureMdeAuth: vi.fn().mockResolvedValue(undefined),
   mdeMachinesApi: {
     get: vi.fn().mockResolvedValue({
-      machineId: 'test-machine-id',
+      id: 'test-machine-id',
       computerDnsName: 'WKSTN-001',
       healthStatus: 'Active',
       osPlatform: 'Windows10',
@@ -38,7 +38,7 @@ vi.mock('../../../api/defender', () => ({
           severity: 'High',
           status: 'New',
           category: 'Malware',
-          machineId: 'test-machine-id',
+          id: 'test-machine-id',
           computerDnsName: 'WKSTN-001',
           description: '',
           detectionSource: '',
@@ -56,7 +56,7 @@ vi.mock('../../../api/defender', () => ({
           severity: 'Medium',
           status: 'InProgress',
           category: 'SuspiciousActivity',
-          machineId: 'test-machine-id',
+          id: 'test-machine-id',
           computerDnsName: 'WKSTN-001',
           description: '',
           detectionSource: '',
@@ -74,7 +74,7 @@ vi.mock('../../../api/defender', () => ({
           severity: 'Low',
           status: 'Resolved',
           category: 'UnwantedSoftware',
-          machineId: 'test-machine-id',
+          id: 'test-machine-id',
           computerDnsName: 'WKSTN-001',
           description: '',
           detectionSource: '',
@@ -303,7 +303,7 @@ describe('MdeMachineDetailView', () => {
   it('shows empty state when no alerts for machine', async () => {
     vi.mocked(mdeAlertsApi.list).mockResolvedValueOnce({ '@odata.context': '', value: [] })
     vi.mocked(mdeMachinesApi.get).mockResolvedValueOnce({
-      machineId: 'test-machine-id',
+      id: 'test-machine-id',
       computerDnsName: 'WKSTN-001',
       healthStatus: 'Active',
       osPlatform: 'Windows10',

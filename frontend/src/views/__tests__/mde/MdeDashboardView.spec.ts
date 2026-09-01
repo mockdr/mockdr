@@ -8,21 +8,21 @@ vi.mock('../../../api/defender', () => ({
     list: vi.fn().mockResolvedValue({
       value: [
         {
-          machineId: 'machine-1',
+          id: 'machine-1',
           computerDnsName: 'WKSTN-001',
           healthStatus: 'Active',
           osPlatform: 'Windows10',
           riskScore: 'High',
         },
         {
-          machineId: 'machine-2',
+          id: 'machine-2',
           computerDnsName: 'SRV-002',
           healthStatus: 'Inactive',
           osPlatform: 'Windows10',
           riskScore: 'Medium',
         },
         {
-          machineId: 'machine-3',
+          id: 'machine-3',
           computerDnsName: 'LINUX-003',
           healthStatus: 'Active',
           osPlatform: 'Linux',
@@ -41,7 +41,7 @@ vi.mock('../../../api/defender', () => ({
           status: 'New',
           category: 'Malware',
           creationTime: '2025-01-10T00:00:00Z',
-          machineId: 'machine-1',
+          id: 'machine-1',
           computerDnsName: 'WKSTN-001',
         },
         {
@@ -51,7 +51,7 @@ vi.mock('../../../api/defender', () => ({
           status: 'InProgress',
           category: 'CommandAndControl',
           creationTime: '2025-01-11T00:00:00Z',
-          machineId: 'machine-2',
+          id: 'machine-2',
           computerDnsName: 'SRV-002',
         },
         {
@@ -61,7 +61,7 @@ vi.mock('../../../api/defender', () => ({
           status: 'Resolved',
           category: 'Execution',
           creationTime: '2025-01-12T00:00:00Z',
-          machineId: 'machine-3',
+          id: 'machine-3',
           computerDnsName: 'LINUX-003',
         },
         {
@@ -71,7 +71,7 @@ vi.mock('../../../api/defender', () => ({
           status: 'New',
           category: 'PolicyViolation',
           creationTime: '2025-01-13T00:00:00Z',
-          machineId: 'machine-1',
+          id: 'machine-1',
           computerDnsName: 'WKSTN-001',
         },
       ],
@@ -279,7 +279,7 @@ describe('MdeDashboardView', () => {
     vi.mocked(mdeMachinesApi.list).mockResolvedValueOnce({
       '@odata.context': '',
       value: [
-        { machineId: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: null as unknown as string, riskScore: 'None', osVersion: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], agentVersion: '', isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
+        { id: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: null as unknown as string, riskScore: 'None', osVersion: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], agentVersion: '', isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
       ],
     })
     const wrapper = mount(MdeDashboardView, {
@@ -378,7 +378,7 @@ describe('MdeDashboardView', () => {
     vi.mocked(mdeMachinesApi.list).mockResolvedValueOnce({
       '@odata.context': '',
       value: [
-        { machineId: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: 'Linux', riskScore: null as unknown as string, osVersion: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], agentVersion: '', isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
+        { id: 'x1', computerDnsName: 'HOST-1', healthStatus: 'Active', osPlatform: 'Linux', riskScore: null as unknown as string, osVersion: '', exposureLevel: '', lastSeen: '', lastIpAddress: '', lastExternalIpAddress: '', machineTags: [], agentVersion: '', isAadJoined: false, aadDeviceId: '', rbacGroupId: 0, rbacGroupName: '', firstSeen: '' },
       ],
     })
     const wrapper = mount(MdeDashboardView, {

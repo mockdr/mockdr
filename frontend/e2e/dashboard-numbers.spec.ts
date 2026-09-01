@@ -20,7 +20,20 @@ import { test, expect } from '@playwright/test'
  *
  * Each expectation below is the API's own count, fetched in the test rather
  * than written down, so the seed can change without this going stale.
+ *
+ * The counts are read on both sides of the page load and the card must
+ * match one of them. Other files in this suite resolve threats and create
+ * users against the same backend, so a count taken once can be stale by the
+ * time the page renders — which is a race in the test, not a wrong card,
+ * and it cost one confusing red run to see that.
  */
+
+/** Read a count twice, around whatever happens in between. */
+async function around<T>(read: () => Promise<T>, act: () => Promise<void>): Promise<[T, T]> {
+  const before = await read()
+  await act()
+  return [before, await read()]
+}
 
 const ADMIN_TOKEN = 'admin-token-0000-0000-000000000001'
 const API = process.env['E2E_API_URL'] ?? 'http://localhost:8001'
@@ -44,26 +57,32 @@ async function signIn(page: Parameters<typeof test>[1]['page'], route: string): 
 
 test.describe('a dashboard card counts what it says it counts', () => {
   test('the SentinelOne dashboard', async ({ page, request }) => {
-    const agents = await (await request.get(`${API}/web/api/v2.1/agents`,
-      { params: { limit: 200 }, headers: S1 })).json()
-    const threats = await (await request.get(`${API}/web/api/v2.1/threats`,
-      { params: { limit: 200 }, headers: S1 })).json()
-    const unresolved = await (await request.get(`${API}/web/api/v2.1/cloud-detection/alerts`,
-      { params: { incidentStatuses: 'unresolved', limit: 1 }, headers: S1 })).json()
+    const read = async () => {
+      const agents = await (await request.get(`${API}/web/api/v2.1/agents`,
+        { params: { limit: 200 }, headers: S1 })).json()
+      const threats = await (await request.get(`${API}/web/api/v2.1/threats`,
+        { params: { limit: 200 }, headers: S1 })).json()
+      const unresolved = await (await request.get(`${API}/web/api/v2.1/cloud-detection/alerts`,
+        { params: { incidentStatuses: 'unresolved', limit: 1 }, headers: S1 })).json()
+      return {
+        endpoints: agents.pagination.totalItems as number,
+        offline: agents.data.filter(
+          (a: { networkStatus: string }) => a.networkStatus !== 'connected').length,
+        active: threats.data.filter(
+          (t: { threatInfo: { incidentStatus: string } }) =>
+            t.threatInfo.incidentStatus !== 'resolved').length,
+        threats: threats.pagination.totalItems as number,
+        unresolved: unresolved.pagination.totalItems as number,
+      }
+    }
+    const [before, after] = await around(read, () => signIn(page, '/dashboard'))
 
-    const offline = agents.data.filter(
-      (a: { networkStatus: string }) => a.networkStatus !== 'connected').length
-    const active = threats.data.filter(
-      (t: { threatInfo: { incidentStatus: string } }) =>
-        t.threatInfo.incidentStatus !== 'resolved').length
-
-    await signIn(page, '/dashboard')
-    expect(await card(page, 'Total Endpoints')).toBe(agents.pagination.totalItems)
-    expect(await card(page, 'Active Threats')).toBe(active)
-    expect(await card(page, 'Unresolved Alerts')).toBe(unresolved.pagination.totalItems)
-    expect(await card(page, 'Endpoints Offline')).toBe(offline)
+    expect([before.endpoints, after.endpoints]).toContain(await card(page, 'Total Endpoints'))
+    expect([before.active, after.active]).toContain(await card(page, 'Active Threats'))
+    expect([before.unresolved, after.unresolved]).toContain(await card(page, 'Unresolved Alerts'))
+    expect([before.offline, after.offline]).toContain(await card(page, 'Endpoints Offline'))
     // The one that hid the bug: every threat counted as active.
-    expect(active).toBeLessThan(threats.pagination.totalItems)
+    expect(after.active).toBeLessThan(after.threats)
   })
 
   test('the Sentinel dashboard reads the estate, not the first page', async ({ page, request }) => {
@@ -77,20 +96,27 @@ test.describe('a dashboard card counts what it says it counts', () => {
     const workspace = '/subscriptions/00000000-0000-0000-0000-000000000000'
       + '/resourceGroups/mockdr-rg/providers/Microsoft.OperationalInsights'
       + '/workspaces/mockdr-workspace/providers/Microsoft.SecurityInsights'
-    const incidents = await (await request.get(`${API}/sentinel${workspace}/incidents`, {
-      params: { 'api-version': '2024-03-01', $top: 1000 },
-      headers: { Authorization: `Bearer ${token.access_token}` },
-    })).json()
+    // Sentinel's incidents *are* moved by the rest of this suite: the
+    // bridge turns a write on another mount into an incident here, which is
+    // the mock being one world rather than eight. Five appeared while the
+    // create-form tests ran, so these counts are read on both sides too.
+    const read = async () => {
+      const incidents = await (await request.get(`${API}/sentinel${workspace}/incidents`, {
+        params: { 'api-version': '2024-03-01', $top: 1000 },
+        headers: { Authorization: `Bearer ${token.access_token}` },
+      })).json()
+      const by = (status: string) => incidents.value.filter(
+        (i: { properties: { status: string } }) => i.properties.status === status).length
+      return { total: incidents.value.length as number,
+               New: by('New'), Active: by('Active'), Closed: by('Closed') }
+    }
+    const [before, after] = await around(read, () => signIn(page, '/sentinel'))
 
-    const by = (status: string) => incidents.value.filter(
-      (i: { properties: { status: string } }) => i.properties.status === status).length
-
-    await signIn(page, '/sentinel')
-    expect(await card(page, 'Open Incidents')).toBe(by('New'))
-    expect(await card(page, 'Active Incidents')).toBe(by('Active'))
-    expect(await card(page, 'Closed Incidents')).toBe(by('Closed'))
+    expect([before.New, after.New]).toContain(await card(page, 'Open Incidents'))
+    expect([before.Active, after.Active]).toContain(await card(page, 'Active Incidents'))
+    expect([before.Closed, after.Closed]).toContain(await card(page, 'Closed Incidents'))
     // A page is 50; the estate is larger, which is the whole point.
-    expect(incidents.value.length).toBeGreaterThan(50)
+    expect(after.total).toBeGreaterThan(50)
   })
 
   test('the Defender dashboard counts past its first page', async ({ page, request }) => {

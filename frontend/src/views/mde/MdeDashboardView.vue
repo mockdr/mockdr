@@ -243,7 +243,7 @@ onUnmounted(() => clearInterval(timer))
         <LoadingSkeleton v-if="loading" :rows="5" />
         <div v-else class="divide-y divide-s1-border">
           <div
-            v-for="machine in machines.slice(0, 5)" :key="machine.machineId"
+            v-for="machine in machines.slice(0, 5)" :key="machine.id"
             class="px-5 py-3 hover:bg-s1-hover transition-colors cursor-pointer"
           >
             <div class="flex items-center justify-between">

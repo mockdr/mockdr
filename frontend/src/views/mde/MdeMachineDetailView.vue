@@ -121,7 +121,7 @@ onMounted(async () => {
 
         <div class="space-y-2 text-sm">
           <div v-for="[k, v] in [
-            ['Machine ID', machine.machineId],
+            ['Machine ID', machine.id],
             ['OS Platform', machine.osPlatform],
             ['OS Version', machine.osVersion],
             ['Health Status', machine.healthStatus],
@@ -175,7 +175,7 @@ onMounted(async () => {
               <div class="grid grid-cols-2 gap-x-6 gap-y-0 text-sm">
                 <div v-for="[k, v] in [
                   ['Computer Name', machine.computerDnsName],
-                  ['Machine ID', machine.machineId],
+                  ['Machine ID', machine.id],
                   ['OS Platform', machine.osPlatform],
                   ['OS Version', machine.osVersion],
                   ['Health Status', machine.healthStatus],

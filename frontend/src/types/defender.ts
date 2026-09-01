@@ -4,9 +4,16 @@ export interface MdeODataResponse<T> {
   value: T[]
 }
 
-/** MDE Machine (device/endpoint). */
+/**
+ * MDE Machine (device/endpoint).
+ *
+ * Defender's `machine` entity names its key `id` — `machineId` is what an
+ * *alert* calls the machine it happened on. Declared as `machineId` here,
+ * every row pushed `/defender/machines/undefined` and the detail page
+ * answered 404, while the type check was satisfied because the type said so.
+ */
 export interface MdeMachine {
-  machineId: string
+  id: string
   computerDnsName: string
   osPlatform: string
   osVersion: string

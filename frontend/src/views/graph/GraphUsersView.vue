@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { ensureGraphAuth, graphUsersApi } from '../../api/graph'
@@ -67,7 +68,10 @@ onMounted(() => fetchUsers())
           <template v-else>
             <tr v-for="user in users" :key="user.id" class="table-row">
               <td class="table-cell">
-                <div class="font-medium text-s1-text text-sm">{{ user.displayName }}</div>
+                <RouterLink :to="`/graph/users/${user.id}`"
+                  class="font-medium text-s1-text text-sm hover:text-s1-primary hover:underline">
+                  {{ user.displayName }}
+                </RouterLink>
               </td>
               <td class="table-cell">
                 <span class="font-mono text-xs text-s1-muted">{{ user.userPrincipalName }}</span>

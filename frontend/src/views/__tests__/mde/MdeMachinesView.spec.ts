@@ -9,7 +9,7 @@ vi.mock('../../../api/defender', () => ({
       '@odata.context': 'https://api.securitycenter.microsoft.com/api/$metadata#Machines',
       value: [
         {
-          machineId: 'machine-1',
+          id: 'machine-1',
           computerDnsName: 'WKSTN-001',
           healthStatus: 'Active',
           osPlatform: 'Windows10',
@@ -26,7 +26,7 @@ vi.mock('../../../api/defender', () => ({
           machineTags: ['tagged'],
         },
         {
-          machineId: 'machine-2',
+          id: 'machine-2',
           computerDnsName: 'SRV-002',
           healthStatus: 'Inactive',
           osPlatform: 'WindowsServer2019',
@@ -43,7 +43,7 @@ vi.mock('../../../api/defender', () => ({
           machineTags: [],
         },
         {
-          machineId: 'machine-3',
+          id: 'machine-3',
           computerDnsName: 'LINUX-003',
           healthStatus: 'ImpairedCommunication',
           osPlatform: 'Linux',
@@ -60,7 +60,7 @@ vi.mock('../../../api/defender', () => ({
           machineTags: [],
         },
         {
-          machineId: 'machine-4',
+          id: 'machine-4',
           computerDnsName: 'MAC-004',
           healthStatus: 'NoCommunication',
           osPlatform: 'macOS',

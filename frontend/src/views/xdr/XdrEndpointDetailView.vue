@@ -45,7 +45,13 @@ async function performAction(action: 'isolate' | 'unisolate' | 'scan'): Promise<
       await xdrEndpointsApi.scan(id)
     }
     // Refresh endpoint data
-    const res = await xdrEndpointsApi.list([{ field: 'endpoint_id', operator: 'in', value: [id] }])
+    // `endpoint_id_list`, not `endpoint_id`: Cortex names this filter
+
+    // after the list it takes, and refuses the singular outright — which is
+
+    // what this page was answered with every time it opened.
+
+    const res = await xdrEndpointsApi.list([{ field: 'endpoint_id_list', operator: 'in', value: [id] }])
     const eps = res.reply?.endpoints ?? []
     if (eps.length > 0) endpoint.value = eps[0]
   } finally {
@@ -55,7 +61,7 @@ async function performAction(action: 'isolate' | 'unisolate' | 'scan'): Promise<
 
 onMounted(async () => {
   try {
-    const res = await xdrEndpointsApi.list([{ field: 'endpoint_id', operator: 'in', value: [id] }])
+    const res = await xdrEndpointsApi.list([{ field: 'endpoint_id_list', operator: 'in', value: [id] }])
     const eps = res.reply?.endpoints ?? []
     endpoint.value = eps.length > 0 ? eps[0] : null
   } finally {
