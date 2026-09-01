@@ -86,14 +86,12 @@ class TestSetIncidentStatus:
         assert result["data"]["affected"] == 1
         threat = threat_repo.get(tid)
         assert threat.threatInfo["incidentStatus"] == "resolved"
-        assert threat.threatInfo["resolved"] is True
 
     def test_sets_in_progress(self) -> None:
         tid = _first_threat_id()
         set_incident_status("in_progress", [tid])
         threat = threat_repo.get(tid)
         assert threat.threatInfo["incidentStatus"] == "in_progress"
-        assert threat.threatInfo["resolved"] is False
 
     def test_updates_timestamp(self) -> None:
         tid = _first_threat_id()

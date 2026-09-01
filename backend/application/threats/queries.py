@@ -1,7 +1,12 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
 from repository.threat_repo import threat_repo
-from utils.filtering import FilterSpec, apply_filters, apply_query_options
+from utils.filtering import (
+    FilterSpec,
+    apply_filters,
+    apply_query_options,
+    reject_wrong_type,
+)
 from utils.nested import get_nested
 from utils.pagination import THREAT_CURSOR, build_list_response, paginate
 from utils.serde import record_dict
@@ -21,7 +26,6 @@ FILTER_SPECS = [
     FilterSpec("analystVerdicts", "threatInfo.analystVerdict", "in"),
     FilterSpec("incidentStatuses", "threatInfo.incidentStatus", "in"),
     FilterSpec("confidenceLevels", "threatInfo.confidenceLevel", "in"),
-    FilterSpec("resolved", "threatInfo.resolved", "bool", kind="boolean"),
     FilterSpec("contentHashes", "threatInfo.sha1", "in"),
     FilterSpec("threatName", "threatInfo.threatName", "contains"),
     FilterSpec(
@@ -50,8 +54,40 @@ def public_threat(record: dict) -> dict:
     return record
 
 
+#: The incident statuses `?resolved=false` stands for. The swagger calls
+#: `resolved` a spelling kept "for backward-compatibility with API 2.0" — it
+#: is the same state under an older name, not a field of its own, and the
+#: threat schema declares no `threatInfo.resolved` to read it off. Pointed at
+#: one, the documented filter answered `resolved=true` with nothing while six
+#: threats were resolved.
+_UNRESOLVED_STATUSES = ("unresolved", "in_progress")
+
+
+def _as_incident_status(params: dict) -> dict:
+    """`?resolved=` rewritten as the incident statuses it means.
+
+    The swagger types it `boolean`, and a value that type cannot hold is
+    refused here the way every other typed filter is refused — through the
+    same helper, so the envelope comes from the one handler measured against
+    the vendor. `?resolved=maybe` used to be read as false and answered 200
+    with every unresolved threat.
+    """
+    raw = params.get("resolved")
+    if raw is None or raw == "" or "incidentStatuses" in params:
+        # An empty value has always meant "unset" on this mount, and still
+        # does — it is not a boolean the type cannot hold.
+        return {k: v for k, v in params.items() if k != "resolved"}
+    reject_wrong_type("resolved", "boolean", raw)
+    wanted = str(raw).strip().lower() in ("true", "1", "yes")
+    rest = {k: v for k, v in params.items() if k != "resolved"}
+    rest["incidentStatuses"] = (
+        "resolved" if wanted else ",".join(_UNRESOLVED_STATUSES))
+    return rest
+
+
 def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of threats sorted by creation date."""
+    params = _as_incident_status(params)
     # Filtered and sorted on the stored records; only the page becomes dicts.
     filtered = apply_filters(
         threat_repo.list_all(),

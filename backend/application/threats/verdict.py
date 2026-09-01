@@ -89,7 +89,6 @@ def set_incident_status(status: str, ids: list[str], actor_user_id: str | None =
         if not threat:
             continue
         threat.threatInfo["incidentStatus"] = status
-        threat.threatInfo["resolved"] = status == "resolved"
         threat.threatInfo["updatedAt"] = utc_now()
         threat_repo.save(threat)
         bridge.threat_changed(threat)

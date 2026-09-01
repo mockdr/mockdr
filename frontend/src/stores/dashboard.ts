@@ -69,9 +69,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
       summary.value = {
         totalAgents: agentsRes.pagination.totalItems,
-        activeThreats: threats.filter((t) => !t.threatInfo.resolved).length,
+        // By the status the threat carries, not by a `resolved` flag: the
+        // 2.1 schema declares no such field and the answer does not carry
+        // one, so this counted all thirty threats as active while six were
+        // resolved. `?resolved=` is a *filter* the vendor keeps for 2.0
+        // compatibility, not a property of the record.
+        activeThreats: threats.filter(
+          (t) => t.threatInfo.incidentStatus !== 'resolved').length,
         unresolvedAlerts: alertsRes.pagination.totalItems,
-        offlineAgents: agents.filter((a) => a.networkStatus === 'disconnected').length,
+        // `networkStatus` has four values — connected, connecting,
+        // disconnecting, disconnected — and anything that is not connected
+        // is off the network. Counting only the last of them lost the
+        // agents mid-transition.
+        offlineAgents: agents.filter((a) => a.networkStatus !== 'connected').length,
         infectedAgents: agents.filter((a) => a.infected).length,
       }
 
@@ -83,7 +93,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
       agentsByStatus.value = {
         connected:    agents.filter((a) => a.networkStatus === 'connected').length,
-        disconnected: agents.filter((a) => a.networkStatus === 'disconnected').length,
+        // The two transitional states counted towards neither bar, so an
+        // agent in one of them simply vanished from the chart.
+        disconnected: agents.filter((a) => a.networkStatus !== 'connected').length,
         inactive:     agents.filter((a) => !a.isActive).length,
       }
 

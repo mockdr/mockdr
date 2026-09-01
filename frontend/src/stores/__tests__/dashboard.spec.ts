@@ -36,8 +36,12 @@ const MOCK_AGENTS = [
 ]
 
 const MOCK_THREATS = [
-  { id: 't1', threatInfo: { resolved: false }, agentDetectionInfo: {}, agentRealtimeInfo: {}, indicators: [], mitigationStatus: [], whiteningOptions: [] },
-  { id: 't2', threatInfo: { resolved: true  }, agentDetectionInfo: {}, agentRealtimeInfo: {}, indicators: [], mitigationStatus: [], whiteningOptions: [] },
+  // `incidentStatus`, which the schema declares and the answer carries —
+  // not `resolved`, which it does not. The fixture used to say `resolved`
+  // and so did the store, so the two agreed with each other and with
+  // nothing else.
+  { id: 't1', threatInfo: { incidentStatus: 'unresolved' }, agentDetectionInfo: {}, agentRealtimeInfo: {}, indicators: [], mitigationStatus: [], whiteningOptions: [] },
+  { id: 't2', threatInfo: { incidentStatus: 'resolved'   }, agentDetectionInfo: {}, agentRealtimeInfo: {}, indicators: [], mitigationStatus: [], whiteningOptions: [] },
 ]
 
 const MOCK_ACTIVITIES = [
@@ -74,10 +78,10 @@ describe('useDashboardStore', () => {
       expect(store.summary.totalAgents).toBe(4)
     })
 
-    it('counts active threats (resolved=false)', async () => {
+    it('counts active threats by incidentStatus', async () => {
       const store = useDashboardStore()
       await store.fetchAll()
-      expect(store.summary.activeThreats).toBe(1) // only t1 is not resolved
+      expect(store.summary.activeThreats).toBe(1) // only t1 is unresolved
     })
 
     it('populates unresolvedAlerts from alerts pagination.totalItems', async () => {

@@ -119,7 +119,12 @@ async function fetchAll(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const res = await sentinelIncidentApi.list()
+    // The whole estate, not the first page. The default is 50, and the
+    // cards and both charts below are drawn from these rows — so 50 of 165
+    // incidents were described as if they were all of them, while the
+    // answer's own `nextLink` said otherwise. `$top` is documented with
+    // `maximum: 1000` in the ARM specification.
+    const res = await sentinelIncidentApi.list(1000)
     incidents.value = res.value ?? []
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to fetch data'

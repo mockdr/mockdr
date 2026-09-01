@@ -197,3 +197,46 @@ class TestTheClassStaysClosed:
                         if isinstance(kind, str) and kind not in known:
                             bad.append(f"{verb.upper()} {path} {parameter['name']}: {kind}")
         assert not bad, bad
+
+
+class TestResolvedIsTheStatusUnderAnOlderName:
+    """`?resolved=` is the 2.0 spelling of `incidentStatuses`.
+
+    The swagger says so itself — "used for backward-compatibility with API
+    2.0" — and declares no `threatInfo.resolved` for it to read off. Pointed
+    at one anyway, the documented filter answered `resolved=true` with
+    nothing while six of thirty threats were resolved, and the console's
+    "Active Threats" card counted all thirty.
+    """
+
+    def test_the_two_spellings_agree(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        by_flag = client.get(f"{BASE}/threats", headers=auth_headers,
+                             params={"resolved": "true", "limit": 200})
+        by_status = client.get(f"{BASE}/threats", headers=auth_headers,
+                               params={"incidentStatuses": "resolved", "limit": 200})
+        assert by_flag.status_code == by_status.status_code == 200
+        assert (by_flag.json()["pagination"]["totalItems"]
+                == by_status.json()["pagination"]["totalItems"])
+        assert by_flag.json()["pagination"]["totalItems"] > 0
+
+    def test_the_two_halves_are_the_whole(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        def total(**params: object) -> int:
+            resp = client.get(f"{BASE}/threats", headers=auth_headers,
+                              params={"limit": 200, **params})
+            assert resp.status_code == 200, resp.text
+            return int(resp.json()["pagination"]["totalItems"])
+
+        assert total(resolved="true") + total(resolved="false") == total()
+
+    def test_the_answer_carries_no_such_field(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """A filter is not a property: the schema declares no `resolved`."""
+        threats = client.get(f"{BASE}/threats", headers=auth_headers,
+                             params={"limit": 5}).json()["data"]
+        assert threats
+        assert all("resolved" not in t["threatInfo"] for t in threats)

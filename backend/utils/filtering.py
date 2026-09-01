@@ -18,7 +18,7 @@ from utils.nested import get_nested as _get_field
 _DECLARED_TYPES: dict[str, Any] = {"integer": int, "boolean": bool}
 
 
-def _reject_wrong_type(param: str, kind: str, raw: object) -> None:
+def reject_wrong_type(param: str, kind: str, raw: object) -> None:
     """Refuse a value the type the vendor declares cannot hold.
 
     The swagger types forty-odd of these parameters ``integer`` or
@@ -264,7 +264,7 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
         if raw is None or raw == "":
             continue
         if spec.kind != "string":
-            _reject_wrong_type(spec.param, spec.kind, raw)
+            reject_wrong_type(spec.param, spec.kind, raw)
 
         if spec.type == "eq":
             result = [r for r in result if _matches(_get_field(r, spec.field), raw)]
@@ -304,7 +304,7 @@ def apply_filters(records: list, params: dict, specs: list[FilterSpec]) -> list:
             # A value this cannot read used to skip the filter, which answered
             # 200 with the whole collection — the client asked to narrow and
             # was told, with a success, that nothing narrowed it.
-            _reject_wrong_type(spec.param, "date-time", raw)
+            reject_wrong_type(spec.param, "date-time", raw)
             dt = _parse_dt(str(raw)) or _epoch_ms(str(raw))
             if dt:
                 op = "gte" if spec.type == "gte_dt" else "lte"
