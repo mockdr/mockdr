@@ -14,6 +14,7 @@ from infrastructure.seeders._shared import (
     MITIGATION_STATUSES,
     MITRE_TACTICS,
     MITRE_TECHNIQUES,
+    _seeding_admin,
     rand_after,
     rand_ago,
 )
@@ -21,31 +22,69 @@ from repository.agent_repo import agent_repo
 from repository.threat_repo import threat_repo
 from utils.id_gen import new_id
 
+#: What each timeline entry says, and the activity type splunkd's own
+#: `TimelineViewSchema` carries beside it. The numbers are SentinelOne's
+#: activity types for these events, the same ones `/activities` reports.
+#: (activity type, what happened, which kind of event it was). The third
+#: goes in `secondaryDescription`, which the schema declares and the console
+#: shows beside the line — the category the old shape called `type`.
+_TIMELINE_EVENTS: tuple[tuple[int, str, str], ...] = (
+    (4001, "Threat detected by Behavioral AI", "detection"),
+    (2001, "File quarantined", "mitigation"),
+    (2010, "Process terminated", "mitigation"),
+    (3050, "Network connection blocked", "mitigation"),
+    (1502, "Hash reputation checked", "system"),
+    (3784, "Analyst marked as true positive", "analyst action"),
+    (2004, "Remediation initiated", "mitigation"),
+    (2005, "File deleted", "mitigation"),
+    (2006, "Registry key removed", "mitigation"),
+)
 
-def _threat_timeline(threat_id: str) -> list[dict]:
-    """Build a synthetic timeline of events for a single threat.
 
-    Args:
-        threat_id: ID of the parent threat.
+def _threat_timeline(threat_id: str, agent: object, sha1: str,
+                     detected_at: str) -> list[dict]:
+    """Build a timeline for one threat, in the shape its schema declares.
 
-    Returns:
-        List of timeline event dicts.
+    `TimelineViewSchema` names sixteen members — `createdAt`,
+    `activityType`, `primaryDescription` and the scope ids among them — and
+    this built `{timestamp, type, event}` instead. The response is shaped
+    strictly against that schema, so every one of those keys was dropped and
+    the route answered eight records of empty strings dated 2018, which is
+    the fixture's own example. A client reading a threat's history saw eight
+    rows of nothing and no way to tell they were not the history.
+
+    The events are ordered from the detection onwards, because a timeline
+    that is not in order is not a timeline.
     """
-    descriptions = [
-        "Threat detected by Behavioral AI", "File quarantined",
-        "Process terminated", "Network connection blocked",
-        "Hash reputation checked", "Analyst marked as true positive",
-        "Remediation initiated", "File deleted", "Registry key removed",
-    ]
+    analyst = _seeding_admin()[0]
+    chosen = random.sample(_TIMELINE_EVENTS, k=random.randint(4, 8))
+    stamps = sorted(rand_after(detected_at, 3) for _ in chosen)
     return [
         {
             "id": new_id(),
+            "createdAt": when,
+            "updatedAt": when,
+            "activityType": activity_type,
+            "data": {"threatId": threat_id},
+            "primaryDescription": description,
+            "secondaryDescription": kind,
+            "osFamily": getattr(agent, "osType", None),
+            "hash": sha1,
+            "agentUpdatedVersion": getattr(agent, "agentVersion", ""),
+            # "The user who invoked the activity (If applicable)" — a string
+            # in the swagger, with no null allowed. The analyst-driven event
+            # names the admin this mock actually serves; the machine-driven
+            # ones stay blank, because attributing a Behavioral AI detection
+            # to a person is the kind of quiet wrongness we are hunting. The
+            # swagger's own example id names nobody at all.
+            "userId": analyst if kind == "analyst action" else "",
             "threatId": threat_id,
-            "timestamp": rand_ago(0),
-            "type": random.choice(["detection", "mitigation", "user_action", "system"]),
-            "event": random.choice(descriptions),
+            "agentId": getattr(agent, "id", ""),
+            "accountId": getattr(agent, "accountId", ""),
+            "siteId": getattr(agent, "siteId", ""),
+            "groupId": getattr(agent, "groupId", ""),
         }
-        for _ in range(random.randint(4, 8))
+        for when, (activity_type, description, kind) in zip(stamps, chosen, strict=True)
     ]
 
 
@@ -75,6 +114,10 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
         classification = random.choice(CLASSIFICATIONS)
         confidence = random.choice(CONFIDENCE_LEVELS)
         created_at = rand_ago(60)
+        # Drawn once: the timeline names the same file the
+        # threat does, and a hash that differs from its own
+        # threat is a hash nothing can be correlated by.
+        threat_info_sha1 = fake.sha1()
 
         detection_engines = random.sample(
             ["DBT - Behavioral AI", "Cloud", "Static AI", "Reputation",
@@ -241,7 +284,7 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
                 "reachedEventsLimit": False,
                 "rebootRequired": False,
                 "rootProcessUpn": None,
-                "sha1": fake.sha1(),
+                "sha1": threat_info_sha1,
                 "sha256": fake.sha256(),
                 "storyline": fake.lexify("????????????????").upper(),
                 "threatId": tid,
@@ -260,5 +303,6 @@ def seed_threats(fake: Faker, agent_ids: list[str]) -> None:
                 k=random.randint(1, 3),
             ),
             notes=[],
-            timeline=_threat_timeline(tid),
+            timeline=_threat_timeline(
+                tid, agent, threat_info_sha1, created_at),
         ))

@@ -6,11 +6,18 @@ import type {
 } from '../types'
 import client from './client'
 
+/**
+ * One row of `GET /threats/{id}/timeline`. The names are the ones
+ * `schemas_TimelineViewSchema` declares — the response is restricted to that
+ * schema, so a field it does not name never reaches us, whatever the store
+ * behind it holds.
+ */
 interface TimelineEvent {
   id: string
-  timestamp: string
-  event: string
-  type: string
+  createdAt: string
+  activityType: number
+  primaryDescription: string
+  secondaryDescription: string
 }
 
 interface ThreatNote {

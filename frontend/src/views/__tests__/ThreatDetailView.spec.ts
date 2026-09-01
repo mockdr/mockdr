@@ -48,7 +48,7 @@ const FAKE_THREAT = {
     storylineId: 'story-1',
   },
   agentDetectionInfo: {
-    agentComputerName: 'ACME-WIN-007',
+    
     agentOsName: 'Windows 10',
     agentVersion: '23.1.0',
     siteId: 's1',

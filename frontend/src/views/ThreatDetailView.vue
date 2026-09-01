@@ -7,7 +7,12 @@ import StatusBadge from '../components/shared/StatusBadge.vue'
 import LoadingSkeleton from '../components/shared/LoadingSkeleton.vue'
 import type { ThreatRecord } from '../types'
 
-interface TimelineEvent { id: string; timestamp: string; event: string; type: string }
+interface TimelineEvent {
+  id: string
+  createdAt: string
+  primaryDescription: string
+  secondaryDescription: string
+}
 interface ThreatNote { id: string; text: string; createdAt: string }
 interface MitigationAction { mitigate?: string; incident?: string; label: string }
 
@@ -199,9 +204,9 @@ const MITIGATION_ACTIONS = computed<MitigationAction[]>(() => {
               <div class="absolute left-3 top-0 bottom-0 w-px bg-s1-border"></div>
               <div v-for="event in timeline" :key="event.id" class="relative pl-8 pb-6">
                 <div class="absolute left-1.5 w-3 h-3 rounded-full bg-s1-primary border-2 border-s1-bg"></div>
-                <div class="text-xs text-s1-muted mb-1">{{ event.timestamp?.slice(0, 19).replace('T', ' ') }}</div>
-                <div class="text-sm text-s1-text">{{ event.event }}</div>
-                <div class="text-xs text-s1-muted capitalize">{{ event.type }}</div>
+                <div class="text-xs text-s1-muted mb-1">{{ event.createdAt?.slice(0, 19).replace('T', ' ') }}</div>
+                <div class="text-sm text-s1-text">{{ event.primaryDescription }}</div>
+                <div class="text-xs text-s1-muted capitalize">{{ event.secondaryDescription }}</div>
               </div>
             </div>
           </div>
@@ -240,7 +245,7 @@ const MITIGATION_ACTIONS = computed<MitigationAction[]>(() => {
           <!-- Agent -->
           <div v-else-if="activeTab === 'agent'" class="space-y-2 text-sm">
             <div v-for="[k, v] in [
-              ['Computer Name', threat.agentDetectionInfo.agentComputerName],
+              ['Computer Name', threat.agentRealtimeInfo.agentComputerName],
               ['Agent Version', threat.agentDetectionInfo.agentVersion],
               ['OS', threat.agentDetectionInfo.agentOsName],
               ['Local IP', threat.agentDetectionInfo.agentIpV4],
