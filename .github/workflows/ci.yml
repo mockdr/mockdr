@@ -276,6 +276,17 @@ jobs:
       - name: Every route the console calls is one the mock serves
         run: python scripts/frontend_route_drift.py
 
+      # And the question under *that* one: does the answer carry what the
+      # console says it carries? `vue-tsc` checks the views against the
+      # console's own interfaces, never the interfaces against the API, so an
+      # interface copied from a seeder rather than a vendor schema type-checks
+      # perfectly and renders nothing. That is how eight blank timeline events
+      # reached a tab, and how five Defender names the vendor does not use
+      # (`alertId`, `creationTime`, `softwareId`, `vulnerabilityId`,
+      # `agentVersion`) sat in four types with views reading every one.
+      - name: Every field the console declares is one the answer carries
+        run: python scripts/frontend_type_drift.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.
