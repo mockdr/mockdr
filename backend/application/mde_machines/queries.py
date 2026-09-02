@@ -299,7 +299,15 @@ def get_machine_vulnerabilities(machine_id: str) -> dict | None:
     associated = (
         [v for i, v in enumerate(all_vulns) if i % len(machines) == machine_idx] if machines else []
     )
-    return build_mde_list_response([complete_mde(dict(v), "vulnerability") for v in associated])
+    # The same renderer the collection itself uses. Rendering these by hand
+    # skipped the `vulnerabilityId` -> `id` rename, so every vulnerability a
+    # machine reported answered `id: ""` -- the identical defect that was
+    # fixed for `/api/vulnerabilities` and missed here, where nothing looked.
+    from application.mde_vulnerabilities.queries import (  # noqa: PLC0415
+        _with_exposed_count,
+    )
+
+    return build_mde_list_response([_with_exposed_count(dict(v)) for v in associated])
 
 
 def get_machine_recommendations(machine_id: str) -> dict | None:
