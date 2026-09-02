@@ -34,6 +34,25 @@ _MACROS = {
     "notable": "search index=notable",
 }
 
+#: What splunkd puts in a macro's content beyond the five every macro
+#: carries. Measured on 10.4.2 across the eight macros a stock install
+#: ships: `args` appears only on a macro that takes arguments,
+#: `errormsg` and `validation` only on one that validates them, and
+#: `iseval` only on an eval macro (`comment(1)`). The recorded fixture is
+#: a composite of three different macros, so completing from it gave
+#: `notable` an argument it does not take and `histperc`'s error message
+#: about `perc` and `hist_rate` -- three members splunkd would have
+#: omitted, one of them describing a different macro entirely.
+_MACRO_OPTIONAL = ("args", "errormsg", "iseval", "validation")
+
+
+def _macro_content(definition: str) -> dict:
+    """A macro's content: the five every macro carries, and nothing else."""
+    content = complete({"definition": definition, "disabled": False}, "macro")
+    for optional in _MACRO_OPTIONAL:
+        content.pop(optional, None)
+    return content
+
 #: A knowledge object — a macro, an event type, a lookup — carries four more
 #: acl members than a system entry does, because it can be shared.
 #: What each collection offers as a whole. A system collection offers
@@ -138,7 +157,7 @@ def macros(
     entries = [
         build_splunk_entry(
             name,
-            complete({"definition": definition, "disabled": False}, "macro"),
+            _macro_content(definition),
             collection="admin/macros",
             links=("_reload", "alternate", "disable", "edit", "list"),
             fields=False,
@@ -169,7 +188,7 @@ def macro(
         ]})
     entry = build_splunk_entry(
         name,
-        complete({"definition": _MACROS[name], "disabled": False}, "macro"),
+        _macro_content(_MACROS[name]),
         collection="admin/macros",
         links=("_reload", "alternate", "disable", "edit", "list"),
         # Measured on 10.4.2: the definition is required, the rest optional.

@@ -287,3 +287,47 @@ class TestGetActionStatus:
             headers=ES_AUTH,
         )
         assert resp.status_code == 404
+
+
+class TestTheOlderPathRedirects:
+    """Kibana's two legacy action paths are not symmetric, and this mock's were.
+
+    Measured against Kibana 8.15 in docker: `POST /api/endpoint/unisolate`
+    answers 308 with `location: /api/endpoint/action/unisolate` and no body,
+    while `POST /api/endpoint/isolate` beside it is served directly -- it
+    answers 403 for an unprivileged caller rather than redirecting. This mock
+    served both the same way, so a client that does not follow redirects saw
+    a 200 here where the product sends a 308.
+    """
+
+    def test_unisolate_redirects_permanently(self, client: TestClient) -> None:
+        resp = client.post(
+            "/kibana/api/endpoint/unisolate", headers={**ES_AUTH, "kbn-xsrf": "true"},
+            json={"endpoint_ids": ["zzz"]}, follow_redirects=False,
+        )
+
+        assert resp.status_code == 308
+        # Built from the request's own path: Kibana is the root of its
+        # deployment and answers `/api/...`, this mock is mounted elsewhere.
+        assert resp.headers["location"] == "/kibana/api/endpoint/action/unisolate"
+        assert not resp.content
+
+    def test_following_it_reaches_the_action(self, client: TestClient) -> None:
+        listed = client.get("/kibana/api/endpoint/metadata", headers=ES_AUTH).json()
+        agent_id = listed["data"][0]["metadata"]["agent"]["id"]
+
+        resp = client.post(
+            "/kibana/api/endpoint/unisolate", headers={**ES_AUTH, "kbn-xsrf": "true"},
+            json={"endpoint_ids": [agent_id]},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["agent_id"] == agent_id
+
+    def test_isolate_is_served_where_it_stands(self, client: TestClient) -> None:
+        resp = client.post(
+            "/kibana/api/endpoint/isolate", headers={**ES_AUTH, "kbn-xsrf": "true"},
+            json={"endpoint_ids": ["zzz"]}, follow_redirects=False,
+        )
+
+        assert resp.status_code != 308, "the product does not redirect this one"

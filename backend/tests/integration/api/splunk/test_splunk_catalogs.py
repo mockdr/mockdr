@@ -86,6 +86,48 @@ class TestKnowledgeObjects:
         macros = {e["name"]: e["content"]["definition"] for e in body["entry"]}
         assert macros["notable"] == "search index=notable"
 
+    def test_a_macro_carries_only_what_it_defines(self, client: TestClient) -> None:
+        """splunkd omits `args`, `errormsg`, `iseval` and `validation` unless set.
+
+        Measured on 10.4.2 across the eight macros a stock install ships:
+        five of them carry exactly `definition`, `disabled` and the three
+        `eai:` members; `args` appears on the two that take arguments,
+        `errormsg` and `validation` on the two that validate them, and
+        `iseval` on `comment(1)` alone.
+
+        The recorded fixture this mock completes from is a composite of
+        three different macros, so `notable` -- which takes no arguments --
+        came back with an `args` and with `histperc`'s error message about
+        `perc` and `hist_rate`, describing a macro that is not this one.
+        """
+        expected = {"definition", "disabled", "eai:acl", "eai:appName", "eai:userName"}
+
+        for url in ("/splunk/services/admin/macros/notable",
+                    "/splunk/servicesNS/nobody/search/admin/macros/notable",
+                    "/splunk/services/admin/macros"):
+            body = client.get(url, headers=AUTH, params=JSON).json()
+            entry = next(e for e in body["entry"] if e["name"] == "notable")
+
+            assert set(entry["content"]) == expected, url
+
+    def test_a_macro_still_declares_the_fields_it_could_carry(
+        self, client: TestClient
+    ) -> None:
+        """The `fields` block names them even where the content does not.
+
+        Dropping them from the content must not drop them from the block
+        that says what a macro may be written with -- splunkd sends both,
+        and they say different things.
+        """
+        body = client.get("/splunk/services/admin/macros/notable",
+                          headers=AUTH, params=JSON).json()
+
+        fields = body["entry"][0]["fields"]
+        assert fields["required"] == ["definition"]
+        assert fields["optional"] == [
+            "args", "disabled", "errormsg", "iseval", "validation",
+        ]
+
     def test_a_macro_can_be_shared(self, client: TestClient) -> None:
         # A knowledge object carries four more acl members than a system
         # entry, because it can be shared.

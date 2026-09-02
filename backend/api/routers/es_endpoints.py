@@ -6,7 +6,7 @@ detail, and response actions (isolate, unisolate, kill process, scan).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_endpoints import commands as endpoint_commands
@@ -115,7 +115,27 @@ def isolate_endpoint(
     return result
 
 
-@router.post("/api/endpoint/unisolate", dependencies=[Depends(require_kbn_xsrf)])
+@router.post("/api/endpoint/unisolate", dependencies=[Depends(require_kbn_xsrf)],
+             status_code=308)
+def unisolate_legacy_path(request: Request) -> Response:
+    """The older path, which Kibana answers with a permanent redirect.
+
+    Measured against Kibana 8.15: `POST /api/endpoint/unisolate` answers 308
+    with `location: /api/endpoint/action/unisolate` and no body, while
+    `/api/endpoint/isolate` beside it is served directly -- the pair is not
+    symmetric, and this mock served both the same way. A client that follows
+    redirects cannot tell; one that does not saw a 404 here and a 308 there.
+    """
+    # Kibana is the root of its own deployment and answers a root-relative
+    # location; this mock is mounted under `/kibana`, so the target is built
+    # from the path the request arrived on rather than written down -- a
+    # location of `/api/...` would send a client configured with the mount
+    # prefix to somewhere that does not exist.
+    target = request.url.path.replace(
+        "/api/endpoint/unisolate", "/api/endpoint/action/unisolate", 1)
+    return Response(status_code=308, headers={"location": target})
+
+
 @router.post("/api/endpoint/action/unisolate", dependencies=[Depends(require_kbn_xsrf)])
 def unisolate_endpoint(
     body: dict = Body(...),
