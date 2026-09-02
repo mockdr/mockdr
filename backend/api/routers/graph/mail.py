@@ -65,7 +65,9 @@ async def send_mail(
 @router.get("/v1.0/users/{user_id}/mailFolders")
 async def list_mail_folders(
     user_id: str,
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List mail folders for a user."""
-    return mail_queries.list_mail_folders(user_id=user_id)
+    return mail_queries.list_mail_folders(user_id=user_id, top=top, skip=skip)

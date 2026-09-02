@@ -176,19 +176,66 @@ def next_link(body):
     return str(link) if link else None
 
 
-def fill(path):
+#: An id borrowed from the parent collection, per path prefix. A made-up
+#: uuid 404s, and 62 sub-collections were skipped for that reason alone --
+#: never walked, never flagged, invisible to this audit since it was written.
+_REAL_IDS = {}
+
+
+def borrowed_id(path, headers):
+    """An id the parent collection actually holds, or None if it has none."""
+    stem = path.split("{")[0].rstrip("/")
+    if not stem:
+        return None
+    if stem in _REAL_IDS:
+        return _REAL_IDS[stem]
+    _REAL_IDS[stem] = None
+    response = client.get(stem, headers=headers)
+    if response.status_code != 200:
+        return None
+    try:
+        rows = collection(response.json())
+    except ValueError:
+        return None
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        for key in ("id", "uuid", "device_id", "endpoint_id", "sid", "name"):
+            value = row.get(key)
+            if isinstance(value, (str, int)) and str(value):
+                _REAL_IDS[stem] = str(value)
+                return _REAL_IDS[stem]
+    return None
+
+
+def fill(path, headers=None):
+    real = borrowed_id(path, headers) if headers is not None and "{" in path else None
+
     def sub(match):
         name = match.group(1).lower()
         if "uuid" in name or name.endswith("_id") or name == "id" or "sid" in name:
-            return str(uuid.uuid4())
+            return real or str(uuid.uuid4())
         if "index" in name or "name" in name or "collection" in name:
-            return "zzz-conformance"
-        return "x"
-    return re.sub(r"\{([^}:]+)(?::[^}]*)?\}", sub, path)
+            return real or "zzz-conformance"
+        return real or "x"
+    return re.sub(r"\{([^}:]+)(?::[^}]*)?\}", sub, path, count=1 if real else 0) \
+        if real else re.sub(r"\{([^}:]+)(?::[^}]*)?\}", sub, path)
 
 
 #: The page-size parameter each vendor takes, in the order to try them.
 _LIMITERS = ("limit", "$top", "count", "per_page", "perPage", "pageSize", "page_size")
+
+#: What each mount's clients send when the route declares nothing. A route
+#: can read a parameter without declaring it -- every Splunk collection is
+#: paged by middleware, and the OpenAPI says those routes take nothing at all
+#: -- and this audit used to skip whatever it could not see declared. That is
+#: how nine Graph collections went unwalked while they ignored the `$top`
+#: their 22 siblings read: not one of them declared it, so not one was asked.
+_MOUNT_LIMITERS = {
+    "web": ("limit",), "cs": ("limit",), "mde": ("$top",), "graph": ("$top",),
+    "sentinel": ("$top",), "splunk": ("count",), "kibana": ("per_page",),
+    "elastic": ("size",),
+}
 _OFFSETS = {"limit": "skip", "$top": "$skip", "count": "offset",
             "per_page": "page", "perPage": "page", "pageSize": "page",
             "page_size": "page"}
@@ -314,6 +361,10 @@ def main():
     flags = []
     unpageable = []
     walked = 0
+    #: Why a route was not walked. A sweep that reports only what it walked
+    #: cannot be told from one that walked nothing.
+    skipped = {"no limiter to try": 0, "did not answer": 0,
+               "fewer than three records": 0}
     for path, operations in app.openapi()["paths"].items():
         operation = operations.get("get")
         if not operation or "/_dev/" in path:
@@ -330,21 +381,43 @@ def main():
             p["name"] for p in operation.get("parameters", []) if p.get("in") == "query"
         }
         limiter = next((name for name in _LIMITERS if name in declared), None)
+        undeclared = False
         if limiter is None:
+            # Nothing declared: try the spelling this mount's clients send,
+            # and believe the answer rather than the schema.
+            limiter = next(iter(_MOUNT_LIMITERS.get(mount, ())), None)
+            undeclared = limiter is not None
+        if limiter is None:
+            skipped["no limiter to try"] += 1
             continue
-        url = fill(path)
+        url = fill(path, headers)
         base = client.get(url, headers=headers, params={limiter: 1000})
         if base.status_code != 200:
+            skipped["did not answer"] += 1
             continue
         try:
             base_body = base.json()
         except ValueError:
+            skipped["did not answer"] += 1
             continue
         whole = collection(base_body)
         if not whole or len(whole) < 3:
+            skipped["fewer than three records"] += 1
             continue
 
-        offsetter = _OFFSETS.get(limiter) if _OFFSETS.get(limiter) in declared else None
+        if undeclared:
+            # Does it act on it? One page of two against a collection of
+            # three or more says yes; anything else says the route cannot be
+            # paged at all, which is what `unpageable` is for.
+            probe = client.get(url, headers=headers, params={limiter: 2})
+            answered = collection(probe.json()) if probe.status_code == 200 else None
+            if not answered or len(answered) != 2:
+                unpageable.append((mount, path))
+                continue
+
+        offsetter = _OFFSETS.get(limiter)
+        if not undeclared and offsetter not in declared:
+            offsetter = None
         walked += 1
         order, total, complaint = walk(
             url, headers, limiter, offsetter, declared, expected=len(whole),
@@ -391,6 +464,11 @@ def main():
             flags.append((mount, path, f"sorted by {ordered}: {complaint}"))
 
     print(f"=== PAGING AUDIT === {walked} collection(s) walked")
+    total_routes = walked + len(unpageable) + sum(skipped.values())
+    print(f"  of {total_routes} GET route(s) on a mount this audit can reach:")
+    for reason, count in skipped.items():
+        if count:
+            print(f"    {count:>4} not walked — {reason}")
     if unpageable:
         print(f"  {len(unpageable)} collection(s) publish no way to page:")
         for mount, path in unpageable:

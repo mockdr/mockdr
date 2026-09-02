@@ -53,6 +53,33 @@ class TestServerInfo:
         assert sorted(by_name["fishbucket"]["links"]) == ["alternate", "list"]
         assert sorted(by_name["limits"]["links"]) == ["_reload", "alternate", "list"]
 
+    def test_server_status_does_not_page(self, client: TestClient) -> None:
+        """splunkd answers all seven whatever ``count`` asks for.
+
+        The paging middleware slices every ``/services`` answer, and this one
+        is not a paged collection: splunkd sends no ``paging`` block here and
+        ignores ``count`` outright -- measured on 10.4.2 at count 1, 2 and 5,
+        seven entries every time. The mock handed back two, so a client
+        asking both the same question got a different estate from each.
+        """
+        for count in (1, 2, 5):
+            resp = client.get(f"{SPLUNK_PREFIX}/services/server/status",
+                              headers=_auth(), params={"count": count})
+            body = resp.json()
+
+            assert len(body["entry"]) == 7, f"count={count} sliced a collection that pages not"
+            assert "paging" not in body or body["paging"] is None
+
+    def test_a_collection_beside_it_still_pages(self, client: TestClient) -> None:
+        """And the routes splunkd does page keep paging, by the same envelope."""
+        resp = client.get(f"{SPLUNK_PREFIX}/services/data/indexes",
+                          headers=_auth(), params={"count": 2})
+        body = resp.json()
+
+        assert len(body["entry"]) == 2
+        assert body["paging"]["perPage"] == 2
+        assert body["paging"]["total"] > 2
+
     def test_server_settings(self, client: TestClient) -> None:
         resp = client.get(f"{SPLUNK_PREFIX}/services/server/settings", headers=_auth())
         assert resp.status_code == 200

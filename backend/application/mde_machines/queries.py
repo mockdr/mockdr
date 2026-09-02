@@ -168,7 +168,9 @@ def _app_to_mde_software(app: dict) -> dict:
     }
 
 
-def get_machine_software(machine_id: str) -> dict | None:
+def get_machine_software(
+    machine_id: str, top: int = 50, skip: int = 0,
+) -> dict | None:
     """Get software installed on a specific machine.
 
     Uses the canonical ``installed_apps`` store via the ``edr_id_map``
@@ -177,6 +179,8 @@ def get_machine_software(machine_id: str) -> dict | None:
 
     Args:
         machine_id: The GUID of the machine.
+        top:        ``$top`` -- how many to return.
+        skip:       ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response with software records, or None if machine not found.
@@ -195,7 +199,11 @@ def get_machine_software(machine_id: str) -> dict | None:
     machine_apps = [a for a in all_apps if a.get("agentId") == agent_id]
 
     software = [_app_to_mde_software(app) for app in machine_apps]
-    return build_mde_list_response(software)
+    next_link = None
+    if skip + top < len(software):
+        next_link = (f"https://api.securitycenter.microsoft.com/api/machines/"
+                     f"{machine_id}/software?$top={top}&$skip={skip + top}")
+    return build_mde_list_response(software[skip : skip + top], next_link=next_link)
 
 
 def get_software_inventory_export() -> dict:

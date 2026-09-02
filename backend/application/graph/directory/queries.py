@@ -27,7 +27,7 @@ def list_directory_roles(top: int = 100, skip: int = 0) -> dict:
     )
 
 
-def get_role_members(role_id: str) -> dict:
+def get_role_members(role_id: str, top: int = 100, skip: int = 0) -> dict:
     """Return users who are members of a directory role.
 
     Reads from the ``graph_directory_role_members`` collection to get
@@ -35,6 +35,8 @@ def get_role_members(role_id: str) -> dict:
 
     Args:
         role_id: The directory role's ``id``.
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response containing user dicts for role members.
@@ -48,7 +50,10 @@ def get_role_members(role_id: str) -> dict:
                 # A directoryObject collection names each item's concrete type.
                 members.append({"@odata.type": "#microsoft.graph.user", **record_dict(user)})
 
+    page, next_link = graph_page(
+        members, top, skip, resource="directoryRoles/{role_id}/members")
     return build_graph_list_response(
-        value=members,
+        value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#directoryRoles('{role_id}')/members",
+        next_link=next_link,
     )

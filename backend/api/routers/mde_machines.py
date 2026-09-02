@@ -128,10 +128,12 @@ def get_machine_alerts(
 @router.get("/api/machines/{machine_id}/software")
 def get_machine_software(
     machine_id: str,
+    top: int = Query(50, alias="$top", ge=1, le=1000),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """Get software installed on a specific machine."""
-    result = machine_queries.get_machine_software(machine_id)
+    result = machine_queries.get_machine_software(machine_id, top, skip)
     if result is None:
         raise HTTPException(
             status_code=404,

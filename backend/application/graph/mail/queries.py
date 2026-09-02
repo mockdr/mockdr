@@ -6,7 +6,7 @@ from infrastructure.seeders._shared import rand_ago
 from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.mail_folder_repo import graph_mail_folder_repo
 from repository.graph.mail_message_repo import graph_mail_message_repo
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
@@ -73,11 +73,13 @@ def get_message(user_id: str, message_id: str) -> dict | None:
     return _strip_internal(d)
 
 
-def list_mail_folders(user_id: str) -> dict:
+def list_mail_folders(user_id: str, top: int = 100, skip: int = 0) -> dict:
     """Return mail folders for a user.
 
     Args:
         user_id: The user's ``id``.
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response dict.
@@ -90,9 +92,12 @@ def list_mail_folders(user_id: str) -> dict:
             continue
         records.append(_strip_internal(d))
 
+    page, next_link = graph_page(
+        records, top, skip, resource="users/{user_id}/mailFolders")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#users('{user_id}')/mailFolders",
+        next_link=next_link,
     )
 
 

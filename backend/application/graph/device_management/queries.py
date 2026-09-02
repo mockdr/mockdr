@@ -11,7 +11,7 @@ from utils.graph_odata import (
     apply_odata_select,
     select_fields,
 )
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
@@ -113,7 +113,7 @@ def list_detected_apps(
     )
 
 
-def get_detected_app_devices(app_id: str) -> dict:
+def get_detected_app_devices(app_id: str, top: int = 100, skip: int = 0) -> dict:
     """Return managed devices that have a specific detected app installed.
 
     Reads device IDs from the ``graph_detected_app_devices`` collection,
@@ -121,6 +121,8 @@ def get_detected_app_devices(app_id: str) -> dict:
 
     Args:
         app_id: The detected app's ``id``.
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response containing managed device dicts.
@@ -133,7 +135,10 @@ def get_detected_app_devices(app_id: str) -> dict:
             if device is not None:
                 devices.append(record_dict(device))
 
+    page, next_link = graph_page(
+        devices, top, skip, resource="deviceManagement/detectedApps/{app_id}/managedDevices")
     return build_graph_list_response(
-        value=devices,
+        value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#deviceManagement/detectedApps('{app_id}')/managedDevices",
+        next_link=next_link,
     )

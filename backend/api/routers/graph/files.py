@@ -33,6 +33,8 @@ async def get_user_drive(
 @router.get("/v1.0/users/{user_id}/drive/root/children")
 async def list_drive_root_children(
     user_id: str,
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List root-level items in a user's OneDrive."""
@@ -48,7 +50,8 @@ async def list_drive_root_children(
                 f"Drive not found for user '{user_id}'",
             ),
         )
-    return files_queries.list_drive_children(drive_id=drive["id"], item_id="root")
+    return files_queries.list_drive_children(
+        drive_id=drive["id"], item_id="root", top=top, skip=skip)
 
 
 @router.get("/v1.0/sites")

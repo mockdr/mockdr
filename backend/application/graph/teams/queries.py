@@ -56,11 +56,13 @@ def get_team(team_id: str) -> dict | None:
     return record_dict(team)
 
 
-def list_channels(team_id: str) -> dict:
+def list_channels(team_id: str, top: int = 100, skip: int = 0) -> dict:
     """Return channels for a team.
 
     Args:
         team_id: The team's ``id``.
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response dict.
@@ -73,9 +75,12 @@ def list_channels(team_id: str) -> dict:
             continue
         records.append(_strip_internal(d))
 
+    page, next_link = graph_page(
+        records, top, skip, resource="teams/{team_id}/channels")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#teams('{team_id}')/channels",
+        next_link=next_link,
     )
 
 

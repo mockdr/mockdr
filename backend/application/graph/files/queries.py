@@ -29,12 +29,16 @@ def get_user_drive(user_id: str) -> dict | None:
     return None
 
 
-def list_drive_children(drive_id: str, item_id: str = "root") -> dict:
+def list_drive_children(
+    drive_id: str, item_id: str = "root", top: int = 100, skip: int = 0,
+) -> dict:
     """Return children of a drive item.
 
     Args:
         drive_id: The drive's ``id``.
         item_id:  Parent item ``id`` (defaults to ``"root"``).
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response dict.
@@ -49,9 +53,12 @@ def list_drive_children(drive_id: str, item_id: str = "root") -> dict:
         if parent_ref.get("id") == item_id:
             records.append(_strip_internal(d))
 
+    page, next_link = graph_page(
+        records, top, skip, resource="drives/{drive_id}/items/{item_id}/children")
     return build_graph_list_response(
-        value=records,
+        value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#drives('{drive_id}')/root/children",
+        next_link=next_link,
     )
 
 

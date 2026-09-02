@@ -45,10 +45,12 @@ async def get_team(
 @router.get("/v1.0/teams/{team_id}/channels")
 async def list_channels(
     team_id: str,
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List channels for a team."""
-    return teams_queries.list_channels(team_id=team_id)
+    return teams_queries.list_channels(team_id=team_id, top=top, skip=skip)
 
 
 @router.get("/v1.0/teams/{team_id}/channels/{channel_id}/messages")

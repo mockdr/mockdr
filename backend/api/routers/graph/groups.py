@@ -48,7 +48,9 @@ async def get_group(
 @router.get("/v1.0/groups/{group_id}/members")
 async def list_group_members(
     group_id: str,
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List members of a group."""
-    return group_queries.get_group_members(group_id)
+    return group_queries.get_group_members(group_id, top, skip)

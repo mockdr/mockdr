@@ -66,10 +66,12 @@ async def list_detected_apps(
 @router.get("/v1.0/deviceManagement/detectedApps/{app_id}/managedDevices")
 async def list_detected_app_devices(
     app_id: str,
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_feature("deviceManagement")),
 ) -> dict:
     """List managed devices that have a specific detected app installed."""
-    return device_queries.get_detected_app_devices(app_id)
+    return device_queries.get_detected_app_devices(app_id, top, skip)
 
 
 # ---------------------------------------------------------------------------

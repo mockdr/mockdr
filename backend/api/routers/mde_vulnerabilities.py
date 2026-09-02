@@ -48,10 +48,12 @@ def get_vulnerability(
 @router.get("/api/vulnerabilities/{vuln_id}/machineReferences")
 def get_vulnerability_machine_references(
     vuln_id: str,
+    top: int = Query(50, alias="$top", ge=1, le=1000),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """Get machines affected by a specific vulnerability."""
-    result = vuln_queries.get_vulnerability_machine_references(vuln_id)
+    result = vuln_queries.get_vulnerability_machine_references(vuln_id, top, skip)
     if result is None:
         raise HTTPException(
             status_code=404,

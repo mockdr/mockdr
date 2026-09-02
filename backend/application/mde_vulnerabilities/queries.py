@@ -100,7 +100,9 @@ def get_vulnerability(vuln_id: str) -> dict | None:
     return _with_exposed_count(record_dict(vuln))
 
 
-def get_vulnerability_machine_references(vuln_id: str) -> dict | None:
+def get_vulnerability_machine_references(
+    vuln_id: str, top: int = 50, skip: int = 0,
+) -> dict | None:
     """Get machines affected by a specific vulnerability.
 
     Returns a list of machine references for machines associated with
@@ -108,6 +110,8 @@ def get_vulnerability_machine_references(vuln_id: str) -> dict | None:
 
     Args:
         vuln_id: The CVE ID to look up.
+        top:     ``$top`` -- how many to return.
+        skip:    ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response with machine reference records, or None if
@@ -116,4 +120,9 @@ def get_vulnerability_machine_references(vuln_id: str) -> dict | None:
     vuln = mde_vulnerability_repo.get(vuln_id)
     if not vuln:
         return None
-    return build_mde_list_response(_machine_refs_for(vuln_id))
+    refs = _machine_refs_for(vuln_id)
+    next_link = None
+    if skip + top < len(refs):
+        next_link = (f"https://api.securitycenter.microsoft.com/api/vulnerabilities/"
+                     f"{vuln_id}/machineReferences?$top={top}&$skip={skip + top}")
+    return build_mde_list_response(refs[skip : skip + top], next_link=next_link)

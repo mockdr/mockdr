@@ -22,7 +22,9 @@ async def list_directory_roles(
 @router.get("/v1.0/directoryRoles/{role_id}/members")
 async def list_directory_role_members(
     role_id: str,
+    top: int = Query(100, alias="$top", ge=1, le=999),
+    skip: int = Query(0, alias="$skip", ge=0),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List members of a directory role."""
-    return directory_queries.get_role_members(role_id)
+    return directory_queries.get_role_members(role_id, top, skip)

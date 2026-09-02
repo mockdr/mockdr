@@ -62,18 +62,34 @@ def list_threats(
 
 
 @router.get("/threats/{threat_id}/timeline")
-def get_timeline(threat_id: str) -> dict:
-    """Return the timeline events for the given threat."""
-    result = threat_queries.get_threat_timeline(threat_id)
+def get_timeline(
+    threat_id: str,
+    skip: int = Query(0, ge=0),
+    cursor: str = Query(None),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> dict:
+    """Return the timeline events for the given threat.
+
+    The swagger documents `limit`, `cursor`, `skip` and `skipCount` here, and
+    this route took none of them: a client asking for a page of ten got the
+    whole timeline with a `nextCursor` of null, which reads as "that was all
+    of it".
+    """
+    result = threat_queries.get_threat_timeline(threat_id, skip, cursor, limit)
     if not result:
         raise HTTPException(status_code=404)
     return result
 
 
 @router.get("/threats/{threat_id}/notes")
-def get_notes(threat_id: str) -> dict:
-    """Return analyst notes for the given threat."""
-    result = threat_queries.get_threat_notes(threat_id)
+def get_notes(
+    threat_id: str,
+    skip: int = Query(0, ge=0),
+    cursor: str = Query(None),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> dict:
+    """Return analyst notes for the given threat, a page at a time."""
+    result = threat_queries.get_threat_notes(threat_id, skip, cursor, limit)
     if not result:
         raise HTTPException(status_code=404)
     return result

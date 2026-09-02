@@ -8,7 +8,7 @@ from application.alerts import commands as alert_commands
 from application.alerts import queries as alert_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from utils.documented_params import documented_openapi, documented_params
-from utils.pagination import build_list_response
+from utils.pagination import build_list_response, paginate
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Alerts"])
@@ -87,19 +87,27 @@ def list_star_rules(
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
     skip: int = Query(None),
+    cursor: str = Query(None),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
-    """Return the STAR custom detection rules, filtered as the swagger declares."""
+    """Return the STAR custom detection rules, filtered as the swagger declares.
+
+    The swagger documents `limit` and `cursor` here as on every other list,
+    and this route answered the whole collection with a null `nextCursor`
+    whatever was asked -- which a client reads as "there is no more".
+    """
     params = {
         k: v for k, v in locals().items()
         if v is not None and k not in ("cursor", "limit", "request")
     }
     params.update(documented_params(request, "/cloud-detection/rules"))
     rules = alert_queries.filter_star_rules(params)
+    page, next_cursor, total = paginate(rules, cursor, limit)
     # RuleViewSchema_many: the declared fields only, with a pagination block.
     return build_list_response(
-        rules,
-        None,
-        len(rules),
+        page,
+        next_cursor,
+        total,
         definition="v2_1.rules.schemas_RuleViewSchema_many_200",
         strict=True,
     )

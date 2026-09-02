@@ -11,7 +11,7 @@ from utils.graph_odata import (
     apply_odata_select,
     select_fields,
 )
-from utils.graph_response import build_graph_list_response
+from utils.graph_response import build_graph_list_response, graph_page
 from utils.serde import record_dict
 
 
@@ -78,13 +78,15 @@ def get_group(group_id: str, select: str | None = None) -> dict | None:
     return select_fields(record_dict(group), select)
 
 
-def get_group_members(group_id: str) -> dict:
+def get_group_members(group_id: str, top: int = 100, skip: int = 0) -> dict:
     """Return members of a group.
 
     Reads from the ``graph_group_members`` collection.
 
     Args:
         group_id: The group's ``id``.
+        top:  ``$top`` -- how many to return.
+        skip: ``$skip`` -- how many to pass over first.
 
     Returns:
         OData list response containing member dicts.
@@ -103,7 +105,10 @@ def get_group_members(group_id: str) -> dict:
         else:
             members.append({"@odata.type": "#microsoft.graph.directoryObject", **member})
 
+    page, next_link = graph_page(
+        members, top, skip, resource="groups/{group_id}/members")
     return build_graph_list_response(
-        value=members,
+        value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#groups('{group_id}')/members",
+        next_link=next_link,
     )

@@ -1,5 +1,6 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
+from config import DEFAULT_PAGE_SIZE
 from repository.threat_repo import threat_repo
 from utils.filtering import (
     FilterSpec,
@@ -8,7 +9,11 @@ from utils.filtering import (
     reject_wrong_type,
 )
 from utils.nested import get_nested
-from utils.pagination import THREAT_CURSOR, build_list_response, paginate
+from utils.pagination import (
+    THREAT_CURSOR,
+    build_list_response,
+    paginate,
+)
 from utils.serde import record_dict
 from utils.strip import strip_fields
 
@@ -106,15 +111,30 @@ def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     )
 
 
-def get_threat_timeline(threat_id: str) -> dict | None:
-    """Return the timeline events for the given threat, or None if not found."""
+def get_threat_timeline(
+    threat_id: str, skip: int = 0, cursor: str | None = None,
+    limit: int = DEFAULT_PAGE_SIZE,
+) -> dict | None:
+    """Return a page of the timeline for the given threat, or None if not found.
+
+    Args:
+        threat_id: The threat whose timeline this is.
+        skip:      Documented offset, applied before the cursor.
+        cursor:    Opaque cursor from the previous answer.
+        limit:     Page size.
+
+    Returns:
+        The S1 list envelope, or None when no such threat exists.
+    """
     threat = threat_repo.get(threat_id)
     if not threat:
         return None
+    events = threat.timeline[skip:]
+    page, next_cursor, total = paginate(events, cursor, limit)
     return build_list_response(
-        threat.timeline,
-        None,
-        len(threat.timeline),
+        page,
+        next_cursor,
+        total,
         definition="threat_analysis.schemas_TimelineViewSchema_many_200",
         strict=True,
     )
@@ -133,14 +153,29 @@ def get_fetched_file(threat_id: str) -> tuple[bytes, str] | None:
     return threat._fetched_file, f"{file_name}.zip"
 
 
-def get_threat_notes(threat_id: str) -> dict | None:
-    """Return the analyst notes for the given threat, or None if not found."""
+def get_threat_notes(
+    threat_id: str, skip: int = 0, cursor: str | None = None,
+    limit: int = DEFAULT_PAGE_SIZE,
+) -> dict | None:
+    """Return a page of the analyst notes for a threat, or None if not found.
+
+    Args:
+        threat_id: The threat whose notes these are.
+        skip:      Documented offset, applied before the cursor.
+        cursor:    Opaque cursor from the previous answer.
+        limit:     Page size.
+
+    Returns:
+        The S1 list envelope, or None when no such threat exists.
+    """
     threat = threat_repo.get(threat_id)
     if not threat:
         return None
+    notes = threat.notes[skip:]
+    page, next_cursor, total = paginate(notes, cursor, limit)
     return build_list_response(
-        threat.notes,
-        None,
-        len(threat.notes),
+        page,
+        next_cursor,
+        total,
         definition="threats.schemas_ThreatNoteSchema_many_200",
     )

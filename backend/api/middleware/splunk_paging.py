@@ -85,7 +85,17 @@ def _as_int(value: str | None, default: int) -> int:
 
 
 def _apply_paging(payload: dict, offset: int, count: int) -> None:
-    """Slice ``entry`` in place and make ``paging`` describe the result."""
+    """Slice ``entry`` in place and make ``paging`` describe the result.
+
+    A payload with no ``paging`` block is not a paged collection and is left
+    alone. `/services/server/status` is the one this mock serves: splunkd
+    answers its seven sub-resources whatever ``count`` asks for, and sends no
+    ``paging`` at all — measured on 10.4.2 at count 1, 2 and 5. This sliced
+    it anyway, so a client asking splunkd and this mock the same question got
+    seven entries from one and two from the other.
+    """
+    if not isinstance(payload.get("paging"), dict):
+        return
     entries = payload["entry"]
     total = len(entries)
 
@@ -94,13 +104,12 @@ def _apply_paging(payload: dict, offset: int, count: int) -> None:
         windowed = windowed[:count]
 
     payload["entry"] = windowed
-    paging = payload.get("paging")
-    if isinstance(paging, dict):
-        paging["total"] = paging.get("total", total)
-        paging["offset"] = offset
-        if count > 0:
-            paging["perPage"] = count
-        else:
-            paging["perPage"] = (
-                _UNLIMITED_PER_PAGE if count == 0 else _NEGATIVE_PER_PAGE
-            )
+    paging = payload["paging"]
+    paging["total"] = paging.get("total", total)
+    paging["offset"] = offset
+    if count > 0:
+        paging["perPage"] = count
+    else:
+        paging["perPage"] = (
+            _UNLIMITED_PER_PAGE if count == 0 else _NEGATIVE_PER_PAGE
+        )
