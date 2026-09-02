@@ -83,6 +83,13 @@ def update_exclusion(exclusion_id: str, body: dict, user_id: str | None) -> dict
         "type", "value", "osType", "mode", "source", "description",
         "scopeName", "scopePath", "scope", "actions", "pathExclusionType",
         "applicationName", "includeChildren", "includeParents",
+        # The create was taught to read `inject` and this was not, so an
+        # exclusion could be created with path-exclusion monitoring on and
+        # never have it turned off again: the update answered 200 and the
+        # record kept the old value. `id` and `sha256Value` stay out --
+        # one is the record's own identity, and the read schema declares
+        # no `sha256Value`, so nothing could observe it either way.
+        "inject",
     )
     for key in updatable:
         if key in data:

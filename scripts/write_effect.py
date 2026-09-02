@@ -104,6 +104,14 @@ def value_for(name: str, decl: dict) -> object | None:
         return 87.65
     if kind == "boolean":
         return True
+    if kind == "array":
+        # An array member the generator could not value was left out, and a
+        # route whose reference marks that member required refused the whole
+        # body -- `data.hashes`, `data.events` and `data.value` among them,
+        # so five routes were never judged at all.
+        item = decl.get("items") or {}
+        inner = value_for(name, item)
+        return [inner] if inner is not None else None
     return None
 
 
@@ -117,6 +125,22 @@ def body_members(spec: dict, operation: dict) -> dict:
     schema = resolve(spec, parameter.get("schema", {}))
     payload = resolve(spec, schema.get("properties", {}).get("data", {}))
     return payload.get("properties", {})
+
+
+def wants_filter(spec: dict, operation: dict) -> bool:
+    """Whether the route's own reference marks `filter` required.
+
+    Almost every SentinelOne action takes `data` and `filter` together, and a
+    sweep that sends only `data` is refused before anything it wanted to
+    measure is reached.
+    """
+    parameter = next(
+        (p for p in operation.get("parameters", []) or [] if p.get("in") == "body"), None,
+    )
+    if parameter is None:
+        return False
+    schema = resolve(spec, parameter.get("schema", {}))
+    return "filter" in (schema.get("required") or [])
 
 
 def answered_members(spec: dict, operation: dict) -> set:
@@ -165,6 +189,15 @@ def main() -> int:
     refused: list[str] = []
     unechoed: list[tuple[str, str]] = []
     routes = 0
+    #: Why a documented write was not exercised. Without this the headline
+    #: says 25 and nothing says of how many -- and 25 of 286 is a sample,
+    #: not a sweep.
+    skipped = {
+        "two path parameters to fill": 0, "the mock does not serve it": 0,
+        "the swagger types no body member": 0, "no id to address it with": 0,
+        "no member could be given a value": 0,
+        "the answer carried no record to compare": 0,
+    }
 
     with TestClient(app) as client:
         mock = app.openapi()["paths"]
@@ -183,19 +216,27 @@ def main() -> int:
                 continue
             placeholders = re.findall(r"\{([^}]+)\}", path)
             if len(placeholders) > 1:
+                for method in ("post", "put", "patch"):
+                    if operations.get(method) and method in mock.get(path, {}):
+                        skipped["two path parameters to fill"] += 1
                 continue
             for method in ("post", "put", "patch"):
                 operation = operations.get(method)
-                if not operation or method not in mock.get(path, {}):
+                if not operation:
+                    continue
+                if method not in mock.get(path, {}):
+                    skipped["the mock does not serve it"] += 1
                     continue
                 members = body_members(spec, operation)
                 if not members:
+                    skipped["the swagger types no body member"] += 1
                     continue
                 url = path
                 if placeholders:
                     collection = path[: path.index("{") - 1]
                     found = an_id(collection)
                     if not found:
+                        skipped["no id to address it with"] += 1
                         continue
                     url = path.replace("{" + placeholders[0] + "}", found)
                 exclusive = EXCLUSIVE.get((method.upper(), path[len(BASE):]), frozenset())
@@ -205,10 +246,37 @@ def main() -> int:
                     if name not in exclusive
                     and (value := value_for(name, resolve(spec, declaration))) is not None
                 }
+                # An update names the record it updates. A made-up `id` is a
+                # 404 that says nothing about whether the route applies what
+                # it accepts: `PUT /exclusions` and `PUT /restrictions` were
+                # both refused for that reason and neither was ever judged.
+                if method == "put" and "id" in sent and not placeholders:
+                    existing = an_id(path)
+                    if not existing:
+                        skipped["no id to address it with"] += 1
+                        continue
+                    sent["id"] = existing
                 if not sent:
+                    skipped["no member could be given a value"] += 1
                     continue
-                answer = client.request(method.upper(), url, headers=headers,
-                                        json={"data": sent})
+                body: dict = {"data": sent}
+                if wants_filter(spec, operation):
+                    # The widest filter the vendor takes, so the write reaches
+                    # whatever the estate holds rather than nothing.
+                    body["filter"] = {"tenant": True}
+                answer = client.request(method.upper(), url, headers=headers, json=body)
+                # `POST /users/generate-api-token` rotates the caller's token,
+                # so this sweep used to revoke its own credential halfway
+                # through and read 401 for every route the swagger lists after
+                # it -- counted as "refused the generated body", which is not
+                # what happened. A real client keeps the token it is handed.
+                minted = ""
+                if answer.status_code in (200, 201):
+                    body = answer.json()
+                    if isinstance(body, dict) and isinstance(body.get("data"), dict):
+                        minted = str(body["data"].get("token") or "")
+                if minted:
+                    headers["Authorization"] = f"ApiToken {minted}"
                 if answer.status_code not in (200, 201):
                     # Counted apart, not silently. `routes += 1` used to come
                     # before the request, so six routes that refuse this
@@ -223,6 +291,7 @@ def main() -> int:
                 routes += 1
                 found_records = records(answer.json())
                 if not found_records:
+                    skipped["the answer carried no record to compare"] += 1
                     continue
                 record = found_records[0]
                 declared = answered_members(spec, operation)
@@ -244,6 +313,11 @@ def main() -> int:
     for route, name, why in sorted(dropped):
         print(f"      {route:36} {name:24} {why}")
     print(f"  {len(unechoed)} member(s) the response schema does not declare, so not judged")
+    total = routes + len(refused) + sum(skipped.values())
+    print(f"  of {total} documented write(s) this mock serves:")
+    for reason, count in skipped.items():
+        if count:
+            print(f"    {count:>4} not exercised — {reason}")
     print(f"  {len(refused)} route(s) that refused the generated body, so were not judged")
     for entry in sorted(refused):
         print(f"      {entry}")

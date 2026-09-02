@@ -28,6 +28,11 @@ def create_rule(data: dict) -> dict:
         scopeId=data.get("scopeId"),
         editable=True,
         tag=data.get("tag", ""),
+        # Documented on the body and on the answer, and the record already
+        # had a place for it: a rule scoped to a set of tags was created
+        # with none, and the 200 echoed the empty list back as if that were
+        # what had been asked for.
+        tagIds=data.get("tagIds", []),
         creator=data.get("creator"),
         creatorId=data.get("creatorId"),
         localPort=data.get("localPort", {"type": "any", "values": []}),
@@ -60,7 +65,7 @@ def update_rule(rule_id: str, data: dict) -> dict | None:
         "name", "description", "status", "action", "direction", "order",
         "osType", "osTypes", "protocol", "scope", "scopeId", "tag",
         "localPort", "remotePort", "localHost", "remoteHost", "remoteHosts",
-        "application", "location",
+        "application", "location", "tagIds",
     }
     for key, value in data.items():
         if key in updatable:

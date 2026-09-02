@@ -115,3 +115,38 @@ class TestBlocklist:
     ) -> None:
         resp = client.delete(f"{BASE}/restrictions/does-not-exist", headers=auth_headers)
         assert resp.status_code == 404
+
+
+class TestUpdateAppliesWhatTheCreateDoes:
+    """An update that silently drops a member the create reads is invisible.
+
+    `inject` is documented on the PUT body and on the read schema, and the
+    update's `updatable` tuple did not name it: an exclusion created with
+    path-exclusion monitoring on could never have it turned off, because the
+    answer was a 200 carrying the value the record already had.
+    """
+
+    def test_inject_can_be_turned_off_again(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        created = client.post(f"{BASE}/exclusions", headers=auth_headers, json={"data": {
+            "type": "path", "value": "/tmp/zzz-inject", "osType": "linux",
+            "mode": "suppress", "inject": True,
+        }})
+        assert created.status_code in (200, 201), created.text
+        record = created.json()["data"][0]
+        assert record["inject"] is True, "the create reads it"
+
+        updated = client.put(f"{BASE}/exclusions", headers=auth_headers, json={"data": {
+            "id": record["id"], "osType": "linux", "type": "path",
+            "value": "/tmp/zzz-inject", "inject": False,
+        }})
+
+        assert updated.status_code == 200, updated.text
+        # The swagger's PUT answers the `_many_` schema, so `data` is a list.
+        answered = updated.json()["data"]
+        assert (answered[0] if isinstance(answered, list) else answered)["inject"] is False
+
+        after = client.get(f"{BASE}/exclusions", headers=auth_headers,
+                           params={"ids": record["id"]}).json()["data"][0]
+        assert after["inject"] is False, "and it stayed off"

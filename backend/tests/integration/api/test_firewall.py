@@ -182,3 +182,44 @@ class TestDeleteFirewallRules:
     def test_missing_filter_ids_returns_400(self, client: TestClient, auth_headers: dict) -> None:
         resp = _delete(client, auth_headers, {})
         assert resp.status_code == 400
+
+
+class TestARuleKeepsTheTagsItIsGiven:
+    """`tagIds` is documented on the body and on the answer, and was dropped.
+
+    The record had a place for it and neither the create nor the category
+    update read it, so a rule scoped to a set of tags was created with none
+    and the 200 echoed the empty list back as if that were what was asked.
+    """
+
+    def test_create_keeps_them(self, client: TestClient, auth_headers: dict) -> None:
+        response = client.post("/web/api/v2.1/firewall-control", headers=auth_headers,
+                               json={"data": {
+                                   "name": "zzz-tagged", "action": "Allow",
+                                   "direction": "any", "osType": "windows",
+                                   "status": "Enabled",
+                                   "tagIds": ["225494730938493804"],
+                               }})
+
+        assert response.status_code in (200, 201), response.text
+        assert response.json()["data"]["tagIds"] == ["225494730938493804"]
+
+    def test_update_can_change_them(self, client: TestClient, auth_headers: dict) -> None:
+        created = client.post("/web/api/v2.1/firewall-control", headers=auth_headers,
+                              json={"data": {
+                                  "name": "zzz-retagged", "action": "Allow",
+                                  "direction": "any", "osType": "windows",
+                                  "status": "Enabled",
+                                  "tagIds": ["225494730938493804"],
+                              }}).json()["data"]
+
+        updated = client.put(
+            "/web/api/v2.1/firewall-control", headers=auth_headers,
+            json={"data": {"tagIds": ["225494730938493915"]},
+                  "filter": {"ids": [created["id"]]}},
+        )
+        assert updated.status_code == 200, updated.text
+
+        after = client.get("/web/api/v2.1/firewall-control", headers=auth_headers,
+                           params={"ids": created["id"]}).json()["data"][0]
+        assert after["tagIds"] == ["225494730938493915"]
