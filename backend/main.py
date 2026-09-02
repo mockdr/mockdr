@@ -19,6 +19,7 @@ from api.documented_body import require_documented_body
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.compression import CompressionMiddleware
+from api.middleware.date_header import DateHeaderMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.es_content_type import ElasticContentTypeMiddleware
@@ -452,6 +453,8 @@ app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries
 app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+# RFC 9110 §6.6.1: every answer an origin server generates carries one.
+app.add_middleware(DateHeaderMiddleware)
 app.add_middleware(KibanaApiVersionMiddleware)
 # Before routing: the cluster refuses the header without looking at the body.
 app.add_middleware(ElasticContentTypeMiddleware)
