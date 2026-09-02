@@ -584,12 +584,24 @@ jobs:
     needs: [backend-quality]
     steps:
       - python scripts/field_drift.py --require-spec   # S1 responses vs the 2.1 swagger
+
+  audits:
+    needs: [backend-quality]
+    steps:
+      - python scripts/<each of them>.py       # 32 gates; the map is scripts/README.md
 ```
+
+The audits job is the one that grows. Listing a handful of its scripts here
+went stale the moment it did — it was five in this file and thirty-two in
+the workflow — so the count and the map live in `scripts/README.md`, which
+is checked against `ci.yml` rather than remembered.
 
 The remaining jobs (secret scanning, Docker build, Trivy, SBOM) gate the
 image. What runs before a release but not in CI — the conformance harness,
-`schema_drift.py`, `load_test.py` — is listed with the release checklist in
-`scripts/README.md`.
+`load_test.py`, the two `schema_drift.py` mounts that need a fetched
+reference — is listed with the release checklist in `scripts/README.md`.
+`mutation_probe.py` measures the gates themselves and is slow enough to
+belong in a quiet hour rather than on a push.
 
 **There is no `--allow-no-tests` flag. There is no `|| true` after any quality command.**
 

@@ -18,12 +18,39 @@ Every script prints what it is for at the top of its file; this is the map.
 | `unread_params.py` | Reads the *source*: a handler that declares a parameter and never mentions it again answers 200 with something plausible, and the parameter the client sent simply never happened. The one audit here that needs no running mock, and the only one that can see an effect invisible from outside — a `scope` the product requires, a body a route was built to read. Exit 1 on any. |
 | `body_audit.py` | Asks every route that *declares* a body whether it reads one: sends an empty object and one carrying a single member the route never declared, and flags the routes that answer 2xx to both. Needs no vendor reference — a route that accepts a body it cannot have meant is wrong whatever the product does. Routes that are right to answer anything are listed in the script with the reason, so exit 1 means something new. |
 | `authz_audit.py` | Asks every write route whether a credential without the right to it gets a 2xx — no credential at all, and the read-only one the vendor issues. The mistake in the other direction: a mock that permits what the product refuses. Exit 1 on any. |
+| `method_drift.py` | Find a documented method this mock answers 405 to — a verb the vendor publishes and no route takes. |
+| `shadowed_routes.py` | Find a route that a route registered before it already answers, so the second never runs. |
+| `unreachable_code.py` | Find an application function nothing can reach. |
+| `audit_coverage.py` | Say which routes nothing is watching — the one audit whose subject is the other audits. |
+| `enum_drift.py` | Find an answer whose value is outside the set the vendor declares. |
+| `type_stability_audit.py` | Ask whether a field means the same thing everywhere it appears — a `severity` that is a string here and a number there. |
+| `consistency_audit.py` | Fetch the same record two ways and check it is the same record. |
+| `causality_audit.py` | Time has to run forwards, in every record this mock serves: nothing is updated before it was created. |
+| `dangling_references.py` | Find a record that names a record this install does not have. |
+| `error_envelope_audit.py` | Check that every refusal is shaped the way its vendor shapes refusals — a client parses the error path too. |
+| `http_contract_audit.py` | Check the HTTP level itself, route by route, against what each runnable product does: content type, `Allow`, `HEAD`, the `WWW-Authenticate` challenge. |
+| `rfc_conformance.py` | Check the *protocol* rather than the vendor: 22 normative requirements of RFC 9110, 6749, 6750, 7617 and 8259 that bear on this origin server. Where a product breaks one, the simulation follows it and the deviation is listed with the measurement. |
+| `filter_spellings.py` | Ask whether two spellings of one filter select the same records. |
+| `write_effect.py` | Ask every write route whether the members it accepts do anything: a body applied in part answers 200 and reads back the old value. |
+| `frontend_route_drift.py` | Every route the console calls must be one the mock serves. |
+| `frontend_type_drift.py` | Ask whether the console's response types describe the answers it gets — an interface copied from a seeder type-checks perfectly and renders nothing. |
+| `frontend_body_drift.py` | Ask whether the members the console writes are members the vendor documents. |
+| `frontend_param_drift.py` | Ask whether the query parameters the console sends are ones a route reads. |
+| `frontend_value_drift.py` | Ask whether the values the console compares against ever actually occur — a branch on a string no answer carries never runs. |
+| `frontend_fixture_drift.py` | Do the frontend's captured fixtures still match what the mock answers? |
+| `schema_drift.py <vendor>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. CI runs it for CrowdStrike, Defender, Cortex and Sentinel; the other two are release-time, because they need the swagger fetched first. |
+
+## Run periodically, not per push
+
+| Script | Purpose |
+|---|---|
+| `mutation_probe.py` | Measures the gates above rather than the mock: injects one defect at a time — a comparison flipped, a sort reversed, a boundary loosened — and reports which ones nothing notices. The first run caught five of ten; whatever survives is a behaviour no gate is checking. Slow (a suite run per injection), so it belongs in a quiet hour rather than on a push. |
 
 ## Run before a release
 
 | Script | Purpose |
 |---|---|
-| `schema_drift.py <sentinel\|graph\|crowdstrike\|mde\|xdr\|sentinelone>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. |
+| `schema_drift.py sentinelone` and `schema_drift.py graph` | The two mounts CI does not judge, because they read a reference fetched at release time. |
 | `load_test.py` | Concurrent stress test; exit 0 iff p99 < 500 ms and errors < 1 %. Also a weekly CI job (`conformance.yml`). |
 | `../conformance/` | Splunk / Elasticsearch / Kibana against the real products; also a weekly/on-demand CI workflow (`conformance.yml`). |
 

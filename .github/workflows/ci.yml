@@ -313,6 +313,17 @@ jobs:
       - name: Every value the console tests for is one a vendor answers with
         run: python scripts/frontend_value_drift.py
 
+      # Those ask whether the mock matches a *vendor*. This asks whether it
+      # matches the *protocol*, which is a different and finite question: 22
+      # normative requirements from RFC 9110, 6749, 6750, 7617 and 8259 that
+      # bear on an HTTP origin server serving JSON over Basic, Bearer and
+      # client credentials. It found no answer carrying the `Date` §6.6.1
+      # obliges — uvicorn stopped adding one and nothing here made up the
+      # difference. Where a product breaks a requirement the simulation
+      # follows it, and those are listed by name with the measurement.
+      - name: Every requirement the protocols make of an origin server
+        run: python scripts/rfc_conformance.py
+
       # All six mounts it supports: five read specifications vendored under
       # data/vendor-specs, and SentinelOne reads the one fetched above — so
       # this needs nothing but the mock, which is the premise of this job.

@@ -8,6 +8,183 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+**`scripts/rfc_conformance.py` — the protocol, not just the products.**
+Every other check here asks whether an answer matches a vendor. This asks
+whether it matches the specification, which is a different and finite
+question: 22 normative requirements of RFC 9110, 6749, 6750, 7617 and 8259
+bear on an HTTP origin server serving JSON over Basic, Bearer and client
+credentials, and they can be listed and ticked off. Ranges, cookies and JWT
+are named as not in play, by measurement rather than omission — no mount
+serves a partial representation, nothing sets a cookie, every token issued
+is opaque.
+
+All 22 are met. Seven are recorded as met-with-an-exception, in two kinds an
+assessment tool has to keep apart. Six are requirements the *product* breaks
+and the simulation follows: Elasticsearch 8.15 sends no `Date` at all and
+gzips a 242-byte answer without a `Vary`; Kibana 8.15 answers 401 with no
+challenge; splunkd's Basic challenge names no charset; Falcon answers a bad
+secret in its own envelope rather than with an `error` and an
+`error_description`. A mock more conformant than the thing it stands in for
+tests clients against a world that does not exist. The seventh is
+unmeasurable: SentinelOne's 401 carries no challenge, and its swagger
+declares the credential `type: apiKey` rather than an HTTP authentication
+scheme — `ApiToken` is in no IANA registry and no SentinelOne runs here, so
+emitting an invented `ApiToken realm=...` would trade a known gap for an
+unknown fiction.
+
+**`scripts/mutation_probe.py` — measure the gates, do not trust them.** "32
+of 32 green" says nothing about the questions nobody asked. Ten defects were
+injected into a spread of old code and new — a comparison flipped, a sort
+reversed, a boundary loosened — and **five went through 4975 tests and 32
+audits without a murmur**: `/threats` came back oldest-first, a keyset cursor
+resumed at the wrong record, a machine reported a neighbour's
+vulnerabilities, the CrowdStrike branch of Sentinel's entity extraction
+stopped running, and the last page of a Graph collection announced another
+that is not there. Each is now pinned by the behaviour a client depends on
+rather than by the line that was mutated; re-running the same ten
+injections catches ten. Restoring the tree is guarded by `atexit` and by the
+three signals a timeout arrives as — the first run was killed at ten minutes
+and left a mutation on disk.
+
+**Four checks on the console, which nothing had ever compared with the API.**
+`vue-tsc` checks the views against the console's own interfaces and never
+the interfaces against the answers, so a type copied from a seeder rather
+than from a vendor schema type-checks perfectly and renders nothing.
+`frontend_type_drift.py` calls each documented GET and reports every
+declared field no record carries; `frontend_body_drift.py` compares the
+members the console writes with what each vendor's reference recognises;
+`frontend_param_drift.py` resolves every `<name>Api.<method>({...})` in a
+view or store to the route it calls and compares the literal's keys with the
+parameters that route reads; `frontend_value_drift.py` asks whether the
+string a comparison tests for ever actually occurs, because a branch on a
+value no answer carries never runs. Between them they found ten fields, two
+Falcon routes written in the older spelling, four calls asking for a page
+nobody read, and fifteen Graph incidents that were all `active`.
+
+### Fixed
+
+**No answer carried the `Date` every origin server owes.** RFC 9110 §6.6.1
+requires one on every response, in the IMF-fixdate form §5.6.7 fixes, and
+mockdr sent none on any mount: uvicorn 0.52.4 adds neither `Date` nor
+`Server` by default — checked against a bare four-line ASGI app on the same
+version — and nothing here made up the difference. It is a fidelity gap as
+well: splunkd 10.4.2 and Kibana 8.15 both answer with one every time, and
+Elasticsearch, measured, does not, so that mount stays silent. The stamp
+sits outermost in the stack, because the rate limiter and the body limit
+short-circuit above the app: a 429 and a 413 — the answers a client parses
+most carefully — carried none until it moved.
+
+**Eleven collections could not be paged.** `paging_audit.py` walked 42 and
+skipped everything that did not *declare* a page-size parameter, which is
+how nine Graph collections went unwalked while ignoring the `$top` their 22
+siblings read, and how every Splunk route stayed invisible — those are paged
+by middleware and the OpenAPI says they take nothing. It now tries the
+spelling each mount's clients send and believes the answer rather than the
+schema, borrows path ids from the collection that holds them instead of
+inventing uuids that 404, and prints its own denominator. Three SentinelOne
+collections that document `limit`, `cursor`, `skip` and `skipCount` took
+none of them; six Graph sub-collections and two Defender ones ignored
+`$top`; and `/services/server/status` was sliced by the Splunk paging
+middleware, which splunkd does not do — measured at count 1, 2 and 5, seven
+sub-resources every time.
+
+**A vocabulary borrowed from the product next door.** Defender's alerts
+answered `BenignPositive`, which is Sentinel's word, vendored under
+`sentinel-common/IncidentTypes`; Defender's own docs list three
+classifications and none of them is that. The three are taken in turn rather
+than drawn, because eight resolved alerts over three values left
+`TruePositive` unseeded and a client filtering for it cannot tell an empty
+estate from a broken filter. Every Graph security alert answered
+`detectionSource: customDetection` whatever raised it, while the Defender
+alert it derives from names five different sources; and all fifteen Graph
+incidents were born `active` with no classification while the alerts under
+them were new, in progress and resolved. An incident is the alerts it
+groups now. `redirected` and `awaitingAction` stay unseeded on purpose —
+they mean a merge and a pending approval, and this mock models neither.
+
+**One host was as many entities as things mentioned it.** Sentinel's entity
+store is what a client joins incidents on, and every bridged alert and every
+machine action created a *new* record: the seeded estate held 70 entities
+that were 41 distinct things, and isolating a machine three times left three
+more `Host` records behind it. Two incidents on the same machine named two
+different records, so the join gave the wrong answer before anybody had
+written anything. An entity is found before it is created now, on the
+property that names its kind, and a later mention merges what it knows.
+
+**An isolation the SIEM never heard about.** ADR-009 promises that after an
+EDR command returns, the corresponding Splunk event already exists — and
+nothing asked that of each mount in turn. Asking it: SentinelOne's and
+Defender's actions arrive, Cortex XDR's endpoint actions arrived nowhere.
+That one was half-built rather than missing — `pan:xdr:endpoint` was named
+as the sourcetype, `shapes.xdr_endpoint` written to fill it, and sixty such
+events sit in the seeded backlog. Isolate, unisolate and scan publish now.
+CrowdStrike containment and Elastic endpoint isolation still do not, and are
+named with the reason rather than guessed at: Falcon audits containment as a
+`UserActivityAuditEvent` whose field *names* are vendored and whose
+`OperationName` and `ServiceName` *values* are recorded nowhere in this
+repo, and Elastic writes its endpoint actions to `.logs-endpoint.actions`
+rather than into any Splunk stream.
+
+**Two writes accepted a member and dropped it.** `PUT /exclusions` ignored
+`inject`, which the create had been taught to read in an earlier round, so
+an exclusion created with path-exclusion monitoring on could never have it
+turned off. `POST /firewall-control` and its update ignored `tagIds`, which
+the swagger documents on the body *and* on the answer and for which the
+record already had a place. Both were found after `write_effect.py` stopped
+revoking its own credential half way through — `POST /users/generate-api-
+token` rotates the caller's token, so every route the swagger lists after it
+answered 401 and was counted as a refused body.
+
+**Two answers the real products do not give.** A Splunk macro carried three
+members splunkd omits: the recorded fixture is a composite of three
+different macros, so `notable` — which takes no arguments — came back with
+an `args`, an `iseval`, and `histperc`'s error message about `perc` and
+`hist_rate`. And Kibana's two legacy action paths are not symmetric while
+this mock's were: `POST /api/endpoint/unisolate` answers 308 with a
+`location`, while `/api/endpoint/isolate` beside it is served where it
+stands.
+
+**The threat timeline answered 200 with eight blank events.** The seeder
+stored `{id, threatId, timestamp, type, event}` and the response is
+restricted to `schemas_TimelineViewSchema`, which names none of those but
+`id`, so every stored key was dropped and the completion refilled the gaps
+from the fixture: eight empty events dated 2018-02-27, the same eight on
+every threat in the estate. The console's own interface had copied the
+seeder's names, so both sides agreed and neither noticed — which is what the
+four console checks above were written to find.
+
+**Fields the console read under names nobody answers with.** Five Defender
+names the product does not use (`alertId`, `creationTime`, `softwareId`,
+`vulnerabilityId`, `agentVersion`), the endpoint column reading a field
+`public_threat()` strips, an account's `numberOfAgents` and `numberOfUsers`
+where the schema declares `totalLicenses`, an activity's endpoint where the
+vendor puts it in `data.computerName`, and a Kibana case's comment count
+snake-cased to `total_comment` where the product says `totalComment`.
+`/api/machines/{id}/vulnerabilities` rendered its records by hand and so
+skipped the `vulnerabilityId` → `id` rename, answering `id: ""` for every
+one — the identical defect that had already been fixed for
+`/api/vulnerabilities`, in a sibling route where nothing looked.
+
+### Changed
+
+**`scripts/README.md` is the map, and it had drifted twenty entries behind
+the territory.** It named twelve checks while CI ran thirty-two, so two
+thirds of the verification this repository does was undiscoverable —
+including every check added in the week the drift happened. It lists all of
+them now, and `test_the_map_matches_the_territory.py` checks that against
+`ci.yml` rather than trusting anyone to remember. `TESTING.md` no longer
+repeats a handful of the same names, which is what went stale.
+
+**`frontend/e2e/_perf.spec.ts` became `perf-budget.spec.ts`.** It was
+committed by accident out of a chunking round: four tests that measured and
+logged and asserted nothing, running in the suite and inflating its count.
+What it measured is worth keeping, so it says it now — Chart.js stays off
+the login screen, and no view fetches more than thirty JavaScript files.
+Both bounds sit between two measured states rather than being chosen: 42-46
+files per navigation with one chunk per icon, 15-19 grouped.
+
+### Added
+
 **`scripts/write_effect.py` — the members a write route accepts must do
 something.** `body_audit.py` asks whether a route *reads* its body, by
 refusing `{}` and a member it does not declare. Whether the members it

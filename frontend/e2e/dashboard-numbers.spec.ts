@@ -115,9 +115,22 @@ test.describe('a dashboard card counts what it says it counts', () => {
     }
     const [before, after] = await around(read, () => signIn(page, '/sentinel'))
 
-    expect([before.New, after.New]).toContain(await card(page, 'Open Incidents'))
-    expect([before.Active, after.Active]).toContain(await card(page, 'Active Incidents'))
-    expect([before.Closed, after.Closed]).toContain(await card(page, 'Closed Incidents'))
+    // Bracketed rather than matched against two point reads: the collection
+    // grows *during* the page load as the rest of the suite writes, so the
+    // card can legitimately land between the two counts instead of on
+    // either. What is being asserted is that it counts the estate — a card
+    // reading the first page of 50 falls outside the bracket, which is the
+    // defect this test exists for.
+    const between = async (label: string, low: number, high: number) => {
+      const shown = await card(page, label)
+      expect(shown, `${label}: ${shown} outside [${low}, ${high}]`)
+        .toBeGreaterThanOrEqual(Math.min(low, high))
+      expect(shown).toBeLessThanOrEqual(Math.max(low, high))
+    }
+
+    await between('Open Incidents', before.New, after.New)
+    await between('Active Incidents', before.Active, after.Active)
+    await between('Closed Incidents', before.Closed, after.Closed)
     // A page is 50; the estate is larger, which is the whole point.
     expect(after.total).toBeGreaterThan(50)
   })
