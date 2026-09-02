@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from application import bridge
 from domain.xdr_action import XdrAction
 from repository.xdr_action_repo import xdr_action_repo
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
@@ -113,6 +114,7 @@ def isolate_endpoint(endpoint_ids: list[str]) -> dict | None:
         endpoint.is_isolated = "isolated"
         endpoint.isolated_date = _epoch_ms()
         xdr_endpoint_repo.save(endpoint)
+        bridge.xdr_endpoint_changed(endpoint)
 
     covered = [str(e.endpoint_id) for e in endpoints]
     action = _create_action(covered[0], "isolate", covered)
@@ -137,6 +139,7 @@ def unisolate_endpoint(endpoint_ids: list[str]) -> dict | None:
         endpoint.is_isolated = "unisolated"
         endpoint.isolated_date = None
         xdr_endpoint_repo.save(endpoint)
+        bridge.xdr_endpoint_changed(endpoint)
 
     covered = [str(e.endpoint_id) for e in endpoints]
     action = _create_action(covered[0], "unisolate", covered)
@@ -160,6 +163,7 @@ def scan_endpoint(endpoint_ids: list[str]) -> dict | None:
     for endpoint in endpoints:
         endpoint.scan_status = "in_progress"
         xdr_endpoint_repo.save(endpoint)
+        bridge.xdr_endpoint_changed(endpoint)
 
     covered = [str(e.endpoint_id) for e in endpoints]
     action = _create_action(covered[0], "scan", covered)

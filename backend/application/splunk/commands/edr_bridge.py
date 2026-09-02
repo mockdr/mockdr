@@ -33,6 +33,7 @@ def register_bridge() -> None:
     event_bus.subscribe("es_alert_created", _handle_es_alert)
     event_bus.subscribe("xdr_incident_created", _handle_xdr_incident)
     event_bus.subscribe("xdr_alert_created", _handle_xdr_alert)
+    event_bus.subscribe("xdr_endpoint_updated", _handle_xdr_endpoint)
     event_bus.subscribe("agent_updated", _handle_s1_agent_updated)
     event_bus.subscribe("activity_created", _handle_s1_activity)
 
@@ -264,6 +265,17 @@ def _handle_xdr_alert(event: DomainEvent) -> None:
         sourcetype=shapes.XDR_ALERTS,
         source=shapes.XDR_SOURCE,
         payload=shapes.xdr_alert(event.payload),
+        event_time=event.timestamp,
+    )
+
+
+def _handle_xdr_endpoint(event: DomainEvent) -> None:
+    """Bridge a Cortex XDR endpoint state change to Splunk."""
+    _create_splunk_event(
+        index=shapes.XDR_INDEX,
+        sourcetype=shapes.XDR_ENDPOINTS,
+        source=shapes.XDR_SOURCE,
+        payload=shapes.xdr_endpoint(event.payload),
         event_time=event.timestamp,
     )
 

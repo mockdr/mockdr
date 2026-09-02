@@ -24,6 +24,7 @@ from domain.event_bus import (
     MdeAlertCreated,
     ThreatCreated,
     XdrAlertCreated,
+    XdrEndpointUpdated,
     XdrIncidentCreated,
     event_bus,
 )
@@ -94,5 +95,14 @@ def xdr_alert_changed(alert: object) -> None:
     event_bus.publish(XdrAlertCreated(
         entity_id=str(getattr(alert, "id", "")),
         payload=_payload(alert),
+        timestamp=time.time(),
+    ))
+
+
+def xdr_endpoint_changed(endpoint: object) -> None:
+    """A Cortex XDR endpoint's own state changed."""
+    event_bus.publish(XdrEndpointUpdated(
+        entity_id=str(getattr(endpoint, "endpoint_id", "")),
+        payload=_payload(endpoint),
         timestamp=time.time(),
     ))

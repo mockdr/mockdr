@@ -119,6 +119,22 @@ class XdrAlertCreated(DomainEvent):
     entity_type: str = "alert"
 
 
+@dataclass
+class XdrEndpointUpdated(DomainEvent):
+    """Fired when a Cortex XDR endpoint's own state changes.
+
+    Isolating an endpoint is the action a SOAR playbook verifies through the
+    SIEM, and `pan:xdr:endpoint` was named as its sourcetype and
+    `shapes.xdr_endpoint` written to fill it -- and nothing ever published,
+    so the isolate returned 200 and the Splunk mount went on answering the
+    state the install was seeded with.
+    """
+
+    event_type: str = "xdr_endpoint_updated"
+    vendor: str = "cortex_xdr"
+    entity_type: str = "endpoint"
+
+
 # ── Event Bus ──────────────────────────────────────────────────────────────
 
 class EventBus:
