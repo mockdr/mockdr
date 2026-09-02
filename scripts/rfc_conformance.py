@@ -109,6 +109,18 @@ DEVIATIONS = {
     ("RFC 9110 §15.5.2", "kibana"):
         "Kibana 8.15 answers 401 with no WWW-Authenticate — measured on "
         "/api/features without credentials.",
+    ("RFC 9110 §12.5.5", "elastic"):
+        "Elasticsearch 8.15 gzips a 242-byte /_cluster/health and publishes "
+        "no Vary at all — measured with a raw request that sets "
+        "Accept-Encoding itself, because urllib overrides it and reports no "
+        "compression where there is some. Kibana in the same distribution "
+        "does send `Vary: accept-encoding`, and this mock sends it there.",
+    ("RFC 7617 §2.1", "splunk"):
+        "splunkd 10.4.2 challenges with `Basic realm=\"/splunk\"` and no "
+        "charset — measured without credentials on /services/data/indexes.",
+    ("RFC 6749 §5.2 (description)", "crowdstrike"):
+        "Falcon's envelope carries the reason in errors[].message rather "
+        "than in an `error_description` member.",
     ("RFC 6749 §5.2", "crowdstrike"):
         "Falcon answers a bad client_secret in its own {errors, meta, "
         "resources} envelope, which every one of its routes uses and "
@@ -295,6 +307,96 @@ def basic_realm():
         if challenge.startswith("Basic") and "realm=" not in challenge:
             wrong.append(f"{name}: {challenge}")
     return wrong
+
+
+@check("RFC 6749", "§5.1", "a token response says how long it lasts", "SHOULD")
+def token_expires_in():
+    return [name for name, (path, form) in TOKEN_ENDPOINTS.items()
+            if "expires_in" not in client.post(path, data=form).json()]
+
+
+@check("RFC 6749", "§5.2 (description)", "a refused token request explains itself",
+       "SHOULD")
+def token_error_description():
+    missing = []
+    for name, (path, form) in TOKEN_ENDPOINTS.items():
+        body = client.post(path, data={**form, "client_secret": "wrong"}).json()
+        if not body.get("error_description"):
+            missing.append(name)
+    return missing
+
+
+@check("RFC 6750", "§3.1", "an invalid token is answered error=\"invalid_token\"",
+       "SHOULD")
+def invalid_token_named():
+    wrong = []
+    for name, path, _ in MOUNTS:
+        response = client.get(path, headers={"Authorization": "Bearer not-a-real-token"})
+        challenge = response.headers.get("www-authenticate", "")
+        if challenge.startswith("Bearer") and 'error="invalid_token"' not in challenge:
+            wrong.append(f"{name}: {challenge}")
+    return wrong
+
+
+@check("RFC 7617", "§2.1", "a Basic challenge names charset=\"UTF-8\"", "SHOULD")
+def basic_charset():
+    wrong = []
+    for name, path, _ in MOUNTS:
+        challenge = client.get(path).headers.get("www-authenticate", "")
+        if challenge.startswith("Basic") and "charset=" not in challenge:
+            wrong.append(name)
+    return wrong
+
+
+@check("RFC 9110", "§12.5.5", "a negotiated answer names what it varies on", "SHOULD")
+def vary_on_negotiated():
+    wrong = []
+    for name, path, headers in MOUNTS:
+        response = client.get(path, headers={**headers, "Accept-Encoding": "gzip"})
+        if response.headers.get("content-encoding") and "accept-encoding" not in (
+                response.headers.get("vary", "").lower()):
+            wrong.append(name)
+    return wrong
+
+
+@check("RFC 9110", "§10.2.3", "a 429 says when to come back", "SHOULD")
+def retry_after_on_429():
+    """The limiter is off by default; turn it on, provoke one, put it back.
+
+    One request a minute, not three: at three this check refused to trip
+    about once in thirty runs, depending where in the window it started, and
+    a gate that flakes is worse than no gate at all.
+    """
+    client.post("/web/api/v2.1/_dev/rate-limit", headers=S1,
+                json={"enabled": True, "requestsPerMinute": 1})
+    try:
+        refused = None
+        for _ in range(40):
+            response = client.get("/web/api/v2.1/threats?limit=1", headers=S1)
+            if response.status_code == 429:
+                refused = response
+                break
+        if refused is None:
+            return ["the limiter never refused, so nothing was measured"]
+        problems = []
+        if not refused.headers.get("retry-after"):
+            problems.append("429 with no Retry-After")
+        if "date" not in {k.lower() for k in refused.headers}:
+            problems.append("429 with no Date")
+        return problems
+    finally:
+        client.post("/web/api/v2.1/_dev/rate-limit", headers=S1, json={"enabled": False})
+
+
+@check("RFC 9110", "§6.6.1 (short-circuit)",
+       "an answer a middleware makes is dated too")
+def date_on_short_circuits():
+    oversized = client.post("/web/api/v2.1/threats/notes", headers=S1,
+                            content=b"x" * (20 * 1024 * 1024))
+    if oversized.status_code != 413:
+        return []
+    return [] if "date" in {k.lower() for k in oversized.headers} else [
+        "413 from the body limit carried no Date"]
 
 
 # ── RFC 8259: JSON ─────────────────────────────────────────────────────────

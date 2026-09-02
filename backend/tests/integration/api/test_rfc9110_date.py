@@ -59,3 +59,39 @@ class TestEveryAnswerIsDated:
             resp = client.get(path, headers=ES_AUTH)
 
             assert "date" not in {k.lower() for k in resp.headers}, path
+
+
+class TestAMiddlewaresAnswerIsDatedToo:
+    """§6.6.1 binds every answer, including the ones the app never sees.
+
+    The rate limiter and the body limit sit outside most of the stack and
+    short-circuit: a 429 and a 413 never reach a route. A `Date` stamped
+    further in missed exactly those — the answers a client is most likely to
+    be parsing carefully, because something has gone wrong.
+    """
+
+    def test_a_429_is_dated(self, client: TestClient) -> None:
+        client.post("/web/api/v2.1/_dev/rate-limit", headers=S1_AUTH,
+                    json={"enabled": True, "requestsPerMinute": 3})
+        try:
+            refused = None
+            for _ in range(20):
+                response = client.get("/web/api/v2.1/threats", headers=S1_AUTH)
+                if response.status_code == 429:
+                    refused = response
+                    break
+
+            assert refused is not None, "the limiter never refused"
+            assert "date" in {k.lower() for k in refused.headers}
+            # RFC 9110 §10.2.3: and it says when to come back.
+            assert refused.headers.get("retry-after")
+        finally:
+            client.post("/web/api/v2.1/_dev/rate-limit", headers=S1_AUTH,
+                        json={"enabled": False})
+
+    def test_a_413_is_dated(self, client: TestClient) -> None:
+        oversized = client.post("/web/api/v2.1/threats/notes", headers=S1_AUTH,
+                                content=b"x" * (20 * 1024 * 1024))
+
+        assert oversized.status_code == 413
+        assert "date" in {k.lower() for k in oversized.headers}

@@ -453,8 +453,6 @@ app.add_middleware(FaultInjectionMiddleware)  # fault injection — delay/errors
 app.add_middleware(TenantScopeMiddleware)     # tenant isolation — scope non-admin queries
 app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-# RFC 9110 §6.6.1: every answer an origin server generates carries one.
-app.add_middleware(DateHeaderMiddleware)
 app.add_middleware(KibanaApiVersionMiddleware)
 # Before routing: the cluster refuses the header without looking at the body.
 app.add_middleware(ElasticContentTypeMiddleware)
@@ -468,7 +466,12 @@ app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
 # one of its encodings — which is what makes it stable across them.
 app.add_middleware(CompressionMiddleware)  # each product's own gzip policy
 app.add_middleware(BodyLimitMiddleware)    # outermost: 413 before any body is read
-app.add_middleware(MetricsMiddleware)         # outermost — runs first, captures all timings
+app.add_middleware(MetricsMiddleware)         # runs first, captures all timings
+# Outermost, and it has to be: RFC 9110 §6.6.1 binds *every* answer, and the
+# middlewares above short-circuit — a 429 from the rate limiter and a 413
+# from the body limit never reach the app, so a `Date` stamped further in
+# missed exactly the answers a client is most likely to be parsing carefully.
+app.add_middleware(DateHeaderMiddleware)
 
 
 @app.exception_handler(HTTPException)
