@@ -327,8 +327,34 @@ def _extract_entities_from_payload(payload: dict, vendor: str) -> list[str]:
     return entities
 
 
+#: What names each entity kind. A host is one host however many alerts
+#: mention it, and Sentinel's entity store holds it once.
+_ENTITY_KEY = {"Host": "hostName", "Account": "accountName", "Ip": "address"}
+
+
 def _create_entity(kind: str, properties: dict) -> str:
-    """Create and persist a Sentinel entity, return its ID."""
+    """The id of this entity, creating it only if the estate has none.
+
+    Every bridged alert and every machine action ran through here and made a
+    new record, so one host became five: isolating it three times added a
+    `Host` each time, and the seeded estate already carried 70 entities that
+    were 41 distinct things. A client listing entities saw the same host
+    repeatedly, and two incidents naming that host named two different
+    records -- so joining incidents on their entities, which is what the
+    entity store is for, gave the wrong answer.
+    """
+    naming = _ENTITY_KEY.get(kind)
+    if naming:
+        wanted = str(properties.get(naming, ""))
+        for existing in sentinel_entity_repo.list_all():
+            if (str(getattr(existing, "kind", "")) == kind
+                    and str(getattr(existing, "properties", {}).get(naming, "")) == wanted):
+                # Later mentions can know more about it than the first did.
+                merged = {**getattr(existing, "properties", {}), **properties}
+                existing.properties = merged
+                sentinel_entity_repo.save(existing)
+                return str(existing.entity_id)
+
     entity_id = f"ent-{uuid.uuid4().hex[:12]}"
     entity = SentinelEntity(
         entity_id=entity_id,

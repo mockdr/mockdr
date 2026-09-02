@@ -366,3 +366,62 @@ class TestAConditionalWriteIsConditional:
             params={"api-version": "2024-03-01"},
             json={"properties": {"message": "two"}},
         ).status_code == 200
+
+
+class TestOneHostIsOneEntity:
+    """The entity store holds a thing once, however many alerts mention it.
+
+    Every bridged alert and every machine action made a *new* entity record,
+    so the seeded estate held 70 entities that were 41 distinct things -- one
+    host four times -- and isolating a machine added another `Host` on every
+    call. Two incidents naming the same machine named two different records,
+    which is precisely the join the entity store exists for.
+    """
+
+    def _hosts(self, client: TestClient, headers: dict) -> list[dict]:
+        incidents = client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents", headers=headers,
+        ).json()["value"]
+        seen: dict[str, dict] = {}
+        for incident in incidents:
+            body = client.post(
+                f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}/entities",
+                headers=headers,
+            ).json()
+            for entity in body.get("entities", []):
+                if entity.get("kind") == "Host":
+                    seen[entity["name"]] = entity
+        return list(seen.values())
+
+    def test_no_host_is_named_by_two_records(self, client: TestClient) -> None:
+        headers = _auth(client)
+        hosts = self._hosts(client, headers)
+
+        by_name: dict[str, set[str]] = {}
+        for host in hosts:
+            hostname = str(host.get("properties", {}).get("hostName", ""))
+            by_name.setdefault(hostname, set()).add(host["name"])
+
+        doubled = {name: ids for name, ids in by_name.items() if len(ids) > 1}
+        assert not doubled, f"one host, more than one entity record: {doubled}"
+
+    def test_isolating_a_machine_twice_adds_no_entity(
+        self, client: TestClient
+    ) -> None:
+        mde = client.post("/mde/oauth2/v2.0/token", data={
+            "grant_type": "client_credentials", "client_id": "mde-mock-admin-client",
+            "client_secret": "mde-mock-admin-secret",
+            "scope": "https://api.securitycenter.microsoft.com/.default"})
+        mde_headers = {"Authorization": f"Bearer {mde.json()['access_token']}"}
+        machine = client.get("/mde/api/machines", headers=mde_headers,
+                             params={"$top": 1}).json()["value"][0]
+
+        from repository.sentinel.entity_repo import sentinel_entity_repo
+        before = len(sentinel_entity_repo.list_all())
+        for _ in range(3):
+            resp = client.post(f"/mde/api/machines/{machine['id']}/isolate",
+                               headers=mde_headers,
+                               json={"Comment": "entity", "IsolationType": "Full"})
+            assert resp.status_code in (200, 201), resp.text
+
+        assert len(sentinel_entity_repo.list_all()) == before

@@ -312,8 +312,29 @@ def _seed_comments() -> None:
         sentinel_incident_comment_repo.save(comment)
 
 
+#: What names each entity kind, the same three the live bridge uses.
+_ENTITY_KEY = {"Host": "hostName", "Account": "accountName", "Ip": "address"}
+
+
 def _save_entity(kind: str, properties: dict) -> str:
-    """Create and persist a Sentinel entity."""
+    """The id of this entity, creating it only if the estate has none.
+
+    A host mentioned by four alerts is one host. Saved once per mention, the
+    seeded estate held 70 entities that were 41 distinct things, and two
+    incidents naming the same machine named two different records -- so a
+    client joining incidents on their entities, which is what the entity
+    store is for, got the wrong answer before anybody had written anything.
+    """
+    naming = _ENTITY_KEY.get(kind)
+    if naming:
+        wanted = str(properties.get(naming, ""))
+        for existing in sentinel_entity_repo.list_all():
+            if (str(existing.kind) == kind
+                    and str(existing.properties.get(naming, "")) == wanted):
+                existing.properties = {**existing.properties, **properties}
+                sentinel_entity_repo.save(existing)
+                return str(existing.entity_id)
+
     eid = f"ent-{new_hex()[:12]}"
     entity = SentinelEntity(entity_id=eid, kind=kind, properties=properties)
     sentinel_entity_repo.save(entity)
