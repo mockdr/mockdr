@@ -178,6 +178,17 @@ probes:
       - $.data[*].timeline_id
       - $.data[*].timeline_title
       - $.data[*].execution_summary
+      # And the same for `index`. A query rule carries one when it was
+      # created with an index pattern and omits it when it relies on the
+      # space's defaults or a data view — measured on 8.15, where all nine
+      # rules this install holds are `immutable: false, rule_source:
+      # internal`, exactly like the mock's, and carry neither `index` nor
+      # `data_view_id`. The mock's own rules are seeded with one, so it
+      # answers truthfully for them. Which rules an install happens to hold
+      # is not what this endpoint is being measured on; the field's shape is
+      # pinned by the vendored spec in field drift instead.
+      - $.data[*].index
+      - $.data[*].index[*]
 
   - id: kbn-rules-patch-no-identifier
     endpoint: kibana
