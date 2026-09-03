@@ -287,12 +287,19 @@ AUDIT_COMMANDS=$(awk '
 if [ -z "$AUDIT_COMMANDS" ]; then
     fail "Audits — could not read the script list out of ci.yml"
 else
+    # One check measures the ASGI server's own headers (`Date`), which an
+    # in-process client cannot see at all. It needs a real instance.
+    if start_server 8001; then
+        export MOCKDR_HTTP_BASE="http://localhost:8001"
+    fi
     cd "$ROOT"
     while IFS= read -r audit_cmd; do
         [ -z "$audit_cmd" ] && continue
         # shellcheck disable=SC2086  # the argument (schema_drift.py <mount>) is meant to split
         run "${audit_cmd#python }" "$PYBIN" ${audit_cmd#python }
     done <<< "$AUDIT_COMMANDS"
+    cleanup_server
+    unset MOCKDR_HTTP_BASE
 fi
 
 # ── Secret Scanning ───────────────────────────────────────────────────────────

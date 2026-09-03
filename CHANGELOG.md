@@ -11,20 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 **`scripts/rfc_conformance.py` — the protocol, not just the products.**
 Every other check here asks whether an answer matches a vendor. This asks
 whether it matches the specification, which is a different and finite
-question: 22 normative requirements of RFC 9110, 6749, 6750, 7617 and 8259
+question: 20 normative requirements of RFC 9110, 6749, 6750, 7617 and 8259
 bear on an HTTP origin server serving JSON over Basic, Bearer and client
 credentials, and they can be listed and ticked off. Ranges, cookies and JWT
 are named as not in play, by measurement rather than omission — no mount
 serves a partial representation, nothing sets a cookie, every token issued
 is opaque.
 
-All 22 are met. Seven are recorded as met-with-an-exception, in two kinds an
+All 20 are met. Six are recorded as met-with-an-exception, in two kinds an
 assessment tool has to keep apart. Six are requirements the *product* breaks
-and the simulation follows: Elasticsearch 8.15 sends no `Date` at all and
-gzips a 242-byte answer without a `Vary`; Kibana 8.15 answers 401 with no
-challenge; splunkd's Basic challenge names no charset; Falcon answers a bad
-secret in its own envelope rather than with an `error` and an
-`error_description`. A mock more conformant than the thing it stands in for
+and the simulation follows: Elasticsearch 8.15 gzips a 242-byte answer
+without a `Vary`; Kibana 8.15 answers 401 with no challenge; splunkd's Basic
+challenge names no charset; Falcon answers a bad secret in its own envelope
+rather than with an `error` and an `error_description`. Elasticsearch also
+sends no `Date` at all, which this mock cannot follow — the header is the
+ASGI server's and its switch is process-wide. A mock more conformant than the thing it stands in for
 tests clients against a world that does not exist. The seventh is
 unmeasurable: SentinelOne's 401 carries no challenge, and its swagger
 declares the credential `type: apiKey` rather than an HTTP authentication
@@ -63,16 +64,24 @@ nobody read, and fifteen Graph incidents that were all `active`.
 
 ### Fixed
 
-**No answer carried the `Date` every origin server owes.** RFC 9110 §6.6.1
-requires one on every response, in the IMF-fixdate form §5.6.7 fixes, and
-mockdr sent none on any mount: uvicorn 0.52.4 adds neither `Date` nor
-`Server` by default — checked against a bare four-line ASGI app on the same
-version — and nothing here made up the difference. It is a fidelity gap as
-well: splunkd 10.4.2 and Kibana 8.15 both answer with one every time, and
-Elasticsearch, measured, does not, so that mount stays silent. The stamp
-sits outermost in the stack, because the rate limiter and the body limit
-short-circuit above the app: a 429 and a 413 — the answers a client parses
-most carefully — carried none until it moved.
+**A `Date` header that was never missing.** An earlier entry in this section
+claimed no answer carried one and added a middleware to supply it. Both were
+wrong, and the probe was why: it read `headers.get("Date")` out of a dict
+keyed in lower case, so it found nothing on every mount and reported that as
+the mock sending nothing. uvicorn has always added `Date` and `Server` after
+the app answers — which is exactly why it has a switch for each, and why the
+Dockerfile passes `--no-server-header`. The middleware is removed; it changed
+nothing a client could see.
+
+What survives is the lesson about *where* a requirement is measured.
+`rfc_conformance.py` checked §6.6.1 through an in-process client, which
+speaks to the application and never to the server, so it was reporting on a
+layer that cannot answer the question. It measures over HTTP now, against an
+instance `ci.sh` and the workflow both start, and reports *unmeasured*
+rather than met when there is none. Elasticsearch's own silence on `Date` is
+recorded as a departure this mock cannot follow rather than one it
+reproduces: uvicorn's switch is process-wide, so one mount cannot stay quiet
+while the others speak.
 
 **Eleven collections could not be paged.** `paging_audit.py` walked 42 and
 skipped everything that did not *declare* a page-size parameter, which is

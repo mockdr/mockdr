@@ -37,9 +37,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
+import urllib.error
+import urllib.request
 import warnings
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -100,12 +102,17 @@ UNVERIFIABLE = {
         "for an unknown fiction.",
 }
 
+#: One departure this mock *cannot* follow, recorded here rather than in the
+#: table below, because the table is for deviations the simulation
+#: reproduces: Elasticsearch 8.15 sends no `Date` on any answer — measured
+#: on /_cluster/health and /_cat/indices, 200 and 401 alike. `Date` is added
+#: by the ASGI server after the app has answered, and uvicorn's switch for
+#: it is process-wide, so one mount cannot stay silent while the others
+#: speak.
+
 #: Where a product's own behaviour departs from the RFC and the simulation
 #: follows it. Each entry names what was measured, on which version.
 DEVIATIONS = {
-    ("RFC 9110 §6.6.1", "elastic"):
-        "Elasticsearch 8.15 sends no Date on any answer — measured on "
-        "/_cluster/health and /_cat/indices, 200 and 401 alike.",
     ("RFC 9110 §15.5.2", "kibana"):
         "Kibana 8.15 answers 401 with no WWW-Authenticate — measured on "
         "/api/features without credentials.",
@@ -143,26 +150,39 @@ CHECKS: list[tuple[str, str, str, object]] = []
 
 @check("RFC 9110", "§6.6.1", "an origin server sends Date on every response")
 def date_on_every_answer():
-    missing = [name for name, path, headers in MOUNTS
-               if "date" not in {k.lower() for k in client.get(path, headers=headers).headers}]
-    return missing
+    """Measured over HTTP, because the app is not what supplies it.
 
+    `Date` and `Server` are added by the ASGI server after the application
+    has answered — which is why uvicorn has a flag to suppress each. An
+    in-process client speaks to the app directly and sees neither, so
+    checking this here would report a violation that no client can ever
+    observe. It cost a middleware and two commits to learn that: a probe
+    that read `headers.get("Date")` out of a dict keyed in lower case found
+    nothing, and nothing was what it was looking at.
 
-@check("RFC 9110", "§5.6.7", "Date is IMF-fixdate, ending in GMT")
-def date_is_imf_fixdate():
-    wrong = []
+    With no HTTP instance reachable, this reports unmeasured rather than
+    met: MOCKDR_HTTP_BASE names one (`ci.sh` and the conformance harness
+    both have one running).
+    """
+    base = os.environ.get("MOCKDR_HTTP_BASE")
+    if not base:
+        return ["unmeasured: set MOCKDR_HTTP_BASE to an http:// instance"]
+
+    missing = []
     for name, path, headers in MOUNTS:
-        raw = client.get(path, headers=headers).headers.get("date")
-        if raw is None:
-            continue
+        request = urllib.request.Request(base.rstrip("/") + path, headers=headers)
         try:
-            parsedate_to_datetime(raw)
-        except (TypeError, ValueError):
-            wrong.append(f"{name}: unparseable {raw!r}")
-            continue
-        if not raw.endswith(" GMT"):
-            wrong.append(f"{name}: {raw!r}")
-    return wrong
+            answered = urllib.request.urlopen(request, timeout=10).headers
+        except urllib.error.HTTPError as refused:
+            answered = refused.headers
+        except urllib.error.URLError:
+            return [f"unmeasured: {base} did not answer"]
+        if answered.get("date") is None:
+            missing.append(name)
+        elif not str(answered.get("date")).endswith(" GMT"):
+            # §5.6.7 admits one form, and it ends in GMT.
+            missing.append(f"{name}: {answered.get('date')!r} is not IMF-fixdate")
+    return missing
 
 
 @check("RFC 9110", "§15.5.2", "a 401 carries a WWW-Authenticate challenge")
@@ -378,25 +398,11 @@ def retry_after_on_429():
                 break
         if refused is None:
             return ["the limiter never refused, so nothing was measured"]
-        problems = []
-        if not refused.headers.get("retry-after"):
-            problems.append("429 with no Retry-After")
-        if "date" not in {k.lower() for k in refused.headers}:
-            problems.append("429 with no Date")
-        return problems
+        # `Date` is the ASGI server's, not the app's, and is checked over
+        # HTTP above rather than here where no server exists.
+        return [] if refused.headers.get("retry-after") else ["429 with no Retry-After"]
     finally:
         client.post("/web/api/v2.1/_dev/rate-limit", headers=S1, json={"enabled": False})
-
-
-@check("RFC 9110", "§6.6.1 (short-circuit)",
-       "an answer a middleware makes is dated too")
-def date_on_short_circuits():
-    oversized = client.post("/web/api/v2.1/threats/notes", headers=S1,
-                            content=b"x" * (20 * 1024 * 1024))
-    if oversized.status_code != 413:
-        return []
-    return [] if "date" in {k.lower() for k in oversized.headers} else [
-        "413 from the body limit carried no Date"]
 
 
 # ── RFC 8259: JSON ─────────────────────────────────────────────────────────

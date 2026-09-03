@@ -35,31 +35,40 @@ async function threat(request: Parameters<typeof test>[1]['request'], id: string
   return body.data[0].threatInfo as Record<string, string>
 }
 
-/** Tick the first row's checkbox and wait for the toolbar to appear. */
-async function selectFirstRow(page: Parameters<typeof test>[1]['page']): Promise<void> {
+/** Tick the *last* row's checkbox and wait for the toolbar to appear.
+ *
+ * The last, not the first, and that is the whole point: `detail-actions`
+ * opens the first row of this same list and presses "True Positive" on it,
+ * while this marks its row benign. Against one shared backend they were
+ * overwriting each other's verdict — a red run that says nothing about the
+ * console, seen once in five. Serial ordering inside this file cannot help,
+ * because the other file is a different file. Splitting the estate can:
+ * these two act on opposite ends of the same list.
+ */
+async function selectLastRow(page: Parameters<typeof test>[1]['page']): Promise<void> {
   await page.waitForSelector('tbody tr', { timeout: 15_000 })
   const rows = page.locator('tbody tr')
-  await expect(rows.first()).toBeVisible()
-  await rows.first().locator('input[type="checkbox"]').check()
+  await expect(rows.last()).toBeVisible()
+  await rows.last().locator('input[type="checkbox"]').check()
   await expect(page.getByText('1 selected')).toBeVisible()
 }
 
-// Serial: these press buttons that change the same first row, against one
-// shared backend. Run in parallel they overwrite each other's verdict and
-// fail for a reason that has nothing to do with the console.
+// Serial: these press buttons that change the same row, against one shared
+// backend. Run in parallel they overwrite each other's verdict and fail for
+// a reason that has nothing to do with the console.
 test.describe.serial('bulk actions on the threats view', () => {
   test('the toolbar appears only once something is selected', async ({ page }) => {
     await signIn(page, '/threats')
     await page.waitForSelector('tbody tr', { timeout: 15_000 })
     await expect(page.getByRole('button', { name: /Mark as Benign/i })).toHaveCount(0)
 
-    await page.locator('tbody tr').first().locator('input[type="checkbox"]').check()
+    await page.locator('tbody tr').last().locator('input[type="checkbox"]').check()
     await expect(page.getByRole('button', { name: /Mark as Benign/i })).toBeVisible()
   })
 
   test('Mark as Benign sets the analyst verdict on the record', async ({ page, request }) => {
     await signIn(page, '/threats')
-    await selectFirstRow(page)
+    await selectLastRow(page)
 
     const responded = page.waitForResponse(
       (r) => r.url().includes('/threats/analyst-verdict') && r.request().method() === 'POST',
@@ -80,7 +89,7 @@ test.describe.serial('bulk actions on the threats view', () => {
 
   test('Resolve sets the incident status on the record', async ({ page, request }) => {
     await signIn(page, '/threats')
-    await selectFirstRow(page)
+    await selectLastRow(page)
 
     const responded = page.waitForResponse(
       (r) => r.url().includes('/threats/incident') && r.request().method() === 'POST',
@@ -98,7 +107,7 @@ test.describe.serial('bulk actions on the threats view', () => {
 
   test('Add to Blocklist reaches the route the vendor spells "blacklist"', async ({ page }) => {
     await signIn(page, '/threats')
-    await selectFirstRow(page)
+    await selectLastRow(page)
 
     const responded = page.waitForResponse(
       (r) => r.url().includes('/threats/add-to-blacklist') && r.request().method() === 'POST',
@@ -115,10 +124,10 @@ test.describe.serial('bulk actions on the threats view', () => {
       }
     })
     await signIn(page, '/threats')
-    await selectFirstRow(page)
+    await selectLastRow(page)
 
     for (const name of [/Mark as Threat/i, /Mark as Benign/i, /^Resolve$/i, /Add to Blocklist/i]) {
-      await page.locator('tbody tr').first().locator('input[type="checkbox"]').check()
+      await page.locator('tbody tr').last().locator('input[type="checkbox"]').check()
       await page.getByRole('button', { name }).click()
       await page.waitForTimeout(250)
     }

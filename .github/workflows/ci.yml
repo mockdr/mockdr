@@ -321,7 +321,22 @@ jobs:
       # obliges — uvicorn stopped adding one and nothing here made up the
       # difference. Where a product breaks a requirement the simulation
       # follows it, and those are listed by name with the measurement.
+      # `Date` is added by the ASGI server after the app has answered, so an
+      # in-process client cannot see it at all. One instance, for that check.
+      - name: An instance for the checks that measure the server layer
+        run: |
+          (cd backend && python -m uvicorn main:app --port 8123 --log-level warning &)
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8123/web/api/v2.1/system/status >/dev/null && break
+            sleep 1
+          done
+
+      # The env goes in a block, not on the command: ci.sh reads this file to
+      # learn what to run, and an inline assignment travelled into the mirror
+      # as part of the command it was supposed to execute.
       - name: Every requirement the protocols make of an origin server
+        env:
+          MOCKDR_HTTP_BASE: http://localhost:8123
         run: python scripts/rfc_conformance.py
 
       # All six mounts it supports: five read specifications vendored under
