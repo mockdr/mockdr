@@ -91,5 +91,16 @@ Run them from the repository root with the backend's interpreter:
 3. The conformance harness: Splunk 0 findings, Elasticsearch + Kibana 0 findings (ignore the first run on a fresh stack — `store.size` is `null` on a just-created index and the KV store answers 503 while initialising).
 4. `load_test.py` passes.
 5. Version in `backend/config.py`, `backend/pyproject.toml`, `frontend/package.json`; a `## [x.y.z]` section in CHANGELOG.md (`tests/unit/test_version.py` checks all four).
-6. Push, wait for CI on the release commit, then tag `vX.Y.Z` — never before.
+6. Push, then tag `vX.Y.Z` — never before the checks above are green.
+
+   GitHub Actions is disabled on this repository, so there is no CI run to
+   wait for and this step does not pretend there is. `ci.sh` stands in its
+   place, and since it now reads its audit list out of `ci.yml` rather than
+   carrying a copy, it runs the same checks: both quality gates, the
+   browser suite, all thirty-four audit invocations, the Docker build and
+   its smoke test. What it does *not* cover, and what therefore does not run
+   for a release made this way: the Trivy container scan, the SBOM, and
+   gitleaks — the last only because it is not installed here. Turning the
+   workflow back on for a release commit (`gh workflow enable "CI"`) is the
+   way to get those; 2.4.0 shipped without them, deliberately.
 7. `gh release create vX.Y.Z --title "mockdr vX.Y.Z" --notes-file <the CHANGELOG section> --verify-tag` — a tag without a Release is invisible to anyone reading the repository page (2.1.0 shipped that way).
