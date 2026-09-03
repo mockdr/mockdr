@@ -26,6 +26,13 @@ export default defineConfig({
     },
     // Exclude Playwright E2E specs from vitest — they use @playwright/test not vitest
     exclude: ['node_modules/**', 'e2e/**'],
+    // A timeout should measure the test, not the machine. The default five
+    // seconds is generous for a mounted component and not for one mounted
+    // while `pytest -n auto` has every core: `ci.sh` runs the two quality
+    // gates concurrently, where CI gives them a runner each, and a Graph
+    // view that mounts in milliseconds alone timed out at 19s under that
+    // load. Fifteen still fails a component that genuinely hangs.
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
