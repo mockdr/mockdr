@@ -38,7 +38,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `frontend_param_drift.py` | Ask whether the query parameters the console sends are ones a route reads. |
 | `frontend_value_drift.py` | Ask whether the values the console compares against ever actually occur — a branch on a string no answer carries never runs. |
 | `frontend_fixture_drift.py` | Do the frontend's captured fixtures still match what the mock answers? |
-| `schema_drift.py <vendor>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. CI runs it for CrowdStrike, Defender, Cortex and Sentinel; the other two are release-time, because they need the swagger fetched first. |
+| `schema_drift.py <vendor>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. CI runs all six mounts: `crowdstrike`, `mde`, `xdr`, `sentinel`, `graph`, `sentinelone`. |
 
 ## Run periodically, not per push
 
@@ -50,7 +50,6 @@ Every script prints what it is for at the top of its file; this is the map.
 
 | Script | Purpose |
 |---|---|
-| `schema_drift.py sentinelone` and `schema_drift.py graph` | The two mounts CI does not judge, because they read a reference fetched at release time. |
 | `load_test.py` | Concurrent stress test; exit 0 iff p99 < 500 ms and errors < 1 %. Also a weekly CI job (`conformance.yml`). |
 | `../conformance/` | Splunk / Elasticsearch / Kibana against the real products; also a weekly/on-demand CI workflow (`conformance.yml`). |
 

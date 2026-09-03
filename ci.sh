@@ -11,6 +11,12 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND="$ROOT/backend"
+# The workflow says `python` because setup-python puts one on PATH. Locally
+# there is none: the interpreter lives in the backend's venv, so the two
+# hostile-input stages have been failing with "command not found" since they
+# were written, and the summary counted them as check failures rather than
+# as this.
+PYBIN="$ROOT/backend/.venv/bin/python"
 FRONTEND="$ROOT/frontend"
 
 # Prefer docker, fall back to podman
@@ -101,7 +107,7 @@ run_backend() {
         .venv/bin/pip-audit
 
     _run "BE: SAST (bandit)" \
-        bandit -r . -x ./tests,./.venv -ll
+        .venv/bin/bandit -r . -x ./tests,./.venv -ll
 
     # Exclude own package — BSL 1.1, not in deny-list scope
     _run "BE: License compliance (pip-licenses)" \
@@ -178,19 +184,53 @@ echo -e "\n${BOLD}Phase 2: Integration checks (sequential)${NC}"
 
 # ── Shared server helper ──────────────────────────────────────────────────────
 SERVER_PID=""
-cleanup_server() { [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true; SERVER_PID=""; }
+# Kill it, then *wait until the port is free*. Firing a signal and moving
+# on left the next stage refusing to start: uvicorn takes a moment to let
+# go, and the stage after this one asks for the same port. Escalates rather
+# than hanging, and never kills by port — that would take a stranger's
+# process with it.
+cleanup_server() {
+    [ -n "$SERVER_PID" ] || return 0
+    local port="${SERVER_PORT:-8001}"
+    kill "$SERVER_PID" 2>/dev/null || true
+    for _ in $(seq 1 10); do
+        curl -s "http://localhost:${port}/web/api/v2.1/system/status" >/dev/null 2>&1 || break
+        sleep 1
+    done
+    if curl -s "http://localhost:${port}/web/api/v2.1/system/status" >/dev/null 2>&1; then
+        kill -9 "$SERVER_PID" 2>/dev/null || true
+        sleep 2
+    fi
+    SERVER_PID=""
+}
 
 start_server() {
     local port="$1"
     cleanup_server
+
+    # Refuse a port something else already holds. The health check cannot
+    # tell whose server answered it: with a stray uvicorn on 8001 from an
+    # earlier session, the one started here failed to bind, died, and the
+    # probe hit the stray instead — so this returned success and the whole
+    # e2e stage ran against an unknown build. It looked like 75 test
+    # failures rather than like the setup error it was.
+    if curl -s "http://localhost:${port}/web/api/v2.1/system/status" >/dev/null 2>&1; then
+        echo "Port $port is already serving — stop it first (fuser -k $port/tcp)" >&2
+        return 1
+    fi
+
     cd "$BACKEND"
     .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port "$port" &>/dev/null &
     SERVER_PID=$!
+    SERVER_PORT="$port"
     for _ in $(seq 1 30); do
+        # And check the process we started is the one still standing.
+        kill -0 "$SERVER_PID" 2>/dev/null || break
         curl -s "http://localhost:${port}/web/api/v2.1/system/status" >/dev/null 2>&1 && return 0
         sleep 1
     done
     echo "Server failed to start on port $port" >&2
+    cleanup_server
     return 1
 }
 
@@ -215,7 +255,7 @@ step "Field drift — swagger spec vs mock responses"
 
 if start_server 8001; then
     run "Field drift check" \
-        python "$ROOT/scripts/field_drift.py" --base-url http://localhost:8001/web/api/v2.1
+        "$PYBIN" "$ROOT/scripts/field_drift.py" --base-url http://localhost:8001/web/api/v2.1
     cleanup_server
 else
     fail "Field drift — server failed to start"
@@ -224,8 +264,36 @@ fi
 # ── Hostile inputs ────────────────────────────────────────────────────────────
 step "Hostile inputs — parser fuzzing and hostile-body probing"
 
-run "Fuzz the hand-written parsers" python "$ROOT/scripts/fuzz_parsers.py"
-run "Hostile bodies on every route" python "$ROOT/scripts/hostile_probe.py"
+run "Fuzz the hand-written parsers" "$PYBIN" "$ROOT/scripts/fuzz_parsers.py"
+run "Hostile bodies on every route" "$PYBIN" "$ROOT/scripts/hostile_probe.py"
+
+# ── Audits ────────────────────────────────────────────────────────────────────
+# Read out of .github/workflows/ci.yml rather than listed here. This file
+# calls itself a mirror, and it had drifted to three of the thirty-two
+# scripts the audits job runs -- so "ci.sh green locally", which is step one
+# of the release checklist, was verifying under a tenth of what CI does. A
+# copied list drifts; a derived one cannot.
+step "Audits — the ones that need nothing but the mock"
+
+AUDIT_COMMANDS=$(awk '
+    /^  audits:/       { inside = 1 }
+    inside && /^  [a-z-]+:$/ && !/^  audits:$/ { inside = 0 }
+    inside && /python scripts\/[a-z_]+\.py/ {
+        sub(/^[[:space:]]*(run:[[:space:]]*)?/, "")
+        print
+    }
+' "$ROOT/.github/workflows/ci.yml")
+
+if [ -z "$AUDIT_COMMANDS" ]; then
+    fail "Audits — could not read the script list out of ci.yml"
+else
+    cd "$ROOT"
+    while IFS= read -r audit_cmd; do
+        [ -z "$audit_cmd" ] && continue
+        # shellcheck disable=SC2086  # the argument (schema_drift.py <mount>) is meant to split
+        run "${audit_cmd#python }" "$PYBIN" ${audit_cmd#python }
+    done <<< "$AUDIT_COMMANDS"
+fi
 
 # ── Secret Scanning ───────────────────────────────────────────────────────────
 step "Secret scanning — gitleaks"
