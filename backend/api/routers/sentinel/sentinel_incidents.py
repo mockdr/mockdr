@@ -9,6 +9,7 @@ from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import comments as comment_cmds
 from application.sentinel.commands import incidents as incident_cmds
 from application.sentinel.queries import incidents as incident_queries
+from domain.sentinel.incident_comment import comment_key
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
 from utils.sentinel.preconditions import check_if_match
@@ -230,7 +231,14 @@ async def create_or_update_comment(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
-    known = sentinel_incident_comment_repo.get(comment_id)
+    if sentinel_incident_repo.get(incident_id) is None:
+        # A comment is a child of its incident; there is nothing to attach
+        # it to. It used to be stored anyway, orphaned.
+        raise HTTPException(
+            status_code=404,
+            detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
+        )
+    known = sentinel_incident_comment_repo.get(comment_key(incident_id, comment_id))
     if known is not None:
         check_if_match(request.headers.get("if-match"), known.etag)
     message = body.get("properties", {}).get("message", "")
@@ -256,7 +264,7 @@ def delete_incident_comment(
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
     """Delete a comment."""
-    comment_cmds.delete_comment(comment_id)
+    comment_cmds.delete_comment(incident_id, comment_id)
     return {}
 
 

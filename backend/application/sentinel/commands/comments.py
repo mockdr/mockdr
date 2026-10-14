@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from domain.sentinel.incident_comment import SentinelIncidentComment
+from domain.sentinel.incident_comment import SentinelIncidentComment, comment_key
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from utils.dt import utc_now
 
@@ -27,7 +27,7 @@ def create_or_update_comment(
     Returns:
         The created/updated comment.
     """
-    existing = sentinel_incident_comment_repo.get(comment_id)
+    existing = sentinel_incident_comment_repo.get(comment_key(incident_id, comment_id))
     now = utc_now()
 
     if existing:
@@ -51,6 +51,6 @@ def create_or_update_comment(
     return comment
 
 
-def delete_comment(comment_id: str) -> bool:
-    """Delete an incident comment."""
-    return sentinel_incident_comment_repo.delete(comment_id)
+def delete_comment(incident_id: str, comment_id: str) -> bool:
+    """Delete one incident's comment."""
+    return sentinel_incident_comment_repo.delete(comment_key(incident_id, comment_id))

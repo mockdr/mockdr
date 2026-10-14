@@ -484,3 +484,50 @@ class TestPutReplacesTheIncident:
         assert props["incidentNumber"] == created["properties"]["incidentNumber"]
         assert props["createdTimeUtc"] == created["properties"]["createdTimeUtc"]
 
+
+class TestACommentBelongsToItsIncident:
+    """A comment is a child resource: `incidents/{incidentId}/comments/{commentId}`.
+
+    The store keyed comments by name alone, so a PUT of comment `x` under
+    incident B rewrote — and moved nothing of — incident A's comment `x`,
+    and a comment could be PUT under an incident that does not exist.
+    """
+
+    def _two_incidents(self, client: TestClient, headers: dict) -> tuple[str, str]:
+        listing = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents", headers=headers).json()
+        return listing["value"][0]["name"], listing["value"][1]["name"]
+
+    def test_the_same_name_under_two_incidents_is_two_comments(
+        self, client: TestClient,
+    ) -> None:
+        headers = _auth(client)
+        a, b = self._two_incidents(client, headers)
+        for incident, message in ((a, "on A"), (b, "on B")):
+            resp = client.put(
+                f"{SENTINEL_PREFIX}{_WS}/incidents/{incident}/comments/shared-name",
+                json={"properties": {"message": message}}, headers=headers,
+            )
+            assert resp.status_code in (200, 201), resp.text
+        for incident, message in ((a, "on A"), (b, "on B")):
+            got = client.get(
+                f"{SENTINEL_PREFIX}{_WS}/incidents/{incident}/comments/shared-name",
+                headers=headers,
+            )
+            assert got.status_code == 200
+            assert got.json()["properties"]["message"] == message
+
+        client.delete(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{b}/comments/shared-name", headers=headers,
+        )
+        still = client.get(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{a}/comments/shared-name", headers=headers,
+        )
+        assert still.status_code == 200, "deleting B's comment removed A's"
+
+    def test_a_comment_under_a_missing_incident_is_a_404(self, client: TestClient) -> None:
+        resp = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/no-such-incident/comments/orphan",
+            json={"properties": {"message": "nobody home"}}, headers=_auth(client),
+        )
+        assert resp.status_code == 404
+        assert resp.json()["error"]["code"] == "ResourceNotFound"
