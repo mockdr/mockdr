@@ -14,7 +14,9 @@ from infrastructure.seeders.xdr_shared import (
     xdr_id,
 )
 from repository.agent_repo import agent_repo
+from repository.store import store
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
+from utils.event_time import parse_epoch
 
 _OS_TYPE_MAP: dict[str, str] = {
     "windows": "windows",
@@ -44,6 +46,12 @@ XDR_INSTALL_PACKAGES: list[str] = [
 ]
 
 
+def _epoch_ms(iso: str | None) -> int | None:
+    """An S1 ISO timestamp as Cortex's epoch milliseconds."""
+    seconds = parse_epoch(iso)
+    return int(seconds * 1000) if seconds is not None else None
+
+
 def seed_xdr_endpoints(fake: Faker) -> list[str]:
     """Create XDR endpoint records from existing S1 agent fleet.
 
@@ -62,6 +70,12 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
     for index, agent in enumerate(s1_agents):
         eid = xdr_id("EP")
         endpoint_ids.append(eid)
+
+        # Joinable like the CrowdStrike, Defender and Intune copies already
+        # were: without it a cross-vendor view could not find this endpoint.
+        mapping = store.get("edr_id_map", agent.id) or {}
+        mapping["xdr_endpoint_id"] = eid
+        store.save("edr_id_map", agent.id, mapping)
 
         # Map OS type
         os_type = _OS_TYPE_MAP.get(agent.osType, "windows")
@@ -109,10 +123,26 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
                 index % len(XDR_INSTALL_PACKAGES)],
             public_ip=[fake.ipv4_public()],
         )
-        # `first_seen` and `last_seen` are independent draws, and two
-        # endpoints were first seen after they were last seen. Ordered after
-        # the record is built, so no draw moves.
-        endpoint.first_seen = min(endpoint.first_seen, endpoint.last_seen)
+        # This is the S1 agent's machine, and the facts S1 holds about it
+        # are the facts: who logs on, its domain, its public address, when
+        # it enrolled and last checked in, whether it is isolated. Each was
+        # drawn here on its own — users never the S1 user, `ACMECORP` for
+        # every domain, a *routable* public address (`ipv4_public()` names
+        # somebody's real host), first seen after last seen, every fourth
+        # endpoint isolated while S1 isolated none. The draws above stay so
+        # the stream every later seeder reads is unchanged; S1 decides the
+        # values.
+        if agent.lastLoggedInUserName:
+            endpoint.users = [agent.lastLoggedInUserName, *users[1:]]
+        endpoint.domain = agent.domain
+        endpoint.public_ip = [agent.externalIp] if agent.externalIp else []
+        endpoint.install_date = _epoch_ms(agent.installedAt) or endpoint.install_date
+        endpoint.first_seen = _epoch_ms(agent.createdAt) or endpoint.first_seen
+        endpoint.last_seen = _epoch_ms(agent.lastActiveDate) or endpoint.last_seen
+        endpoint.is_isolated = (
+            "isolated" if agent.networkQuarantineEnabled else "unisolated")
+        if agent.networkQuarantineEnabled:
+            endpoint.isolated_date = endpoint.last_seen
         xdr_endpoint_repo.save(endpoint)
 
     return endpoint_ids

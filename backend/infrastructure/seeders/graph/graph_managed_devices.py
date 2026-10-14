@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from faker import Faker
 
 from domain.graph.managed_device import GraphManagedDevice
+from infrastructure.seeders._shared import MACHINE_HARDWARE
 from infrastructure.seeders.graph.graph_shared import GRAPH_DOMAIN, graph_uuid
 from repository.agent_repo import agent_repo
 from repository.graph.managed_device_repo import graph_managed_device_repo
@@ -103,12 +104,15 @@ def seed_graph_managed_devices(fake: Faker) -> None:
         else:
             compliance_state = "unknown"
 
-        # Manufacturer / model based on OS
-        models = _MODEL_MAP.get(agent.osType, _WINDOWS_MODELS)
-        manufacturer, model = random.choice(models)
-
-        # Serial number
-        serial_number = fake.bothify("???-########").upper()
+        # The hardware S1 reports for this machine — the serial number and
+        # model CrowdStrike already copies. Both were drawn here on their
+        # own, so Intune and the EDRs named different hardware for one
+        # device and a join on serial number matched nothing. The draws stay
+        # so the Graph seeders after this one see the same stream.
+        manufacturer, model = random.choice(_MODEL_MAP.get(agent.osType, _WINDOWS_MODELS))
+        manufacturer, model = MACHINE_HARDWARE.get(agent.modelName or "", (manufacturer, model))
+        fake.bothify("???-########")
+        serial_number = agent.serialNumber
 
         # A device's primary user has to be a real directory user: deriving the
         # UPN from the S1 computer name produced addresses matching no Graph

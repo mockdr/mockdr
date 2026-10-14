@@ -9,6 +9,7 @@ from domain.es_endpoint import EsEndpoint
 from infrastructure.seeders.es_shared import ES_POLICY_NAMES, es_uuid
 from repository.agent_repo import agent_repo
 from repository.es_endpoint_repo import es_endpoint_repo
+from repository.store import store
 
 _OS_MAP: dict[str, str] = {
     "windows": "Windows",
@@ -59,8 +60,15 @@ def seed_es_endpoints(fake: Faker) -> list[str]:
         agent_id = es_uuid()
         agent_ids.append(agent_id)
 
+        mapping = store.get("edr_id_map", agent.id) or {}
+        mapping["es_agent_id"] = agent_id
+        store.save("edr_id_map", agent.id, mapping)
+
         os_name = _OS_MAP.get(agent.osType, "Windows")
-        os_full = _OS_FULL_MAP.get(agent.osType, "Windows 10 Pro 22H2")
+        # The host's own OS, as S1 reports it. One fixed string per family
+        # had a Windows Server 2019 and a CentOS 7 box reporting
+        # "Windows 10 Pro 22H2" and "Ubuntu 22.04 LTS".
+        os_full = agent.osName or _OS_FULL_MAP.get(agent.osType, "Windows 10 Pro 22H2")
         architecture = _ARCH_MAP.get(agent.osType, "x86_64")
 
         # Build network fields from interfaces
@@ -78,7 +86,9 @@ def seed_es_endpoints(fake: Faker) -> list[str]:
 
         policy_name = random.choice(ES_POLICY_NAMES)
         status = random.choice(_STATUS_WEIGHTS)
-        isolation = random.choice(_ISOLATION_WEIGHTS)
+        # Drawn so the stream stays aligned; S1's network quarantine decides.
+        random.choice(_ISOLATION_WEIGHTS)
+        isolation = "isolated" if agent.networkQuarantineEnabled else "normal"
 
         es_endpoint_repo.save(EsEndpoint(
             agent_id=agent_id,

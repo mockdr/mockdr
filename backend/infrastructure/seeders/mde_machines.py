@@ -96,6 +96,11 @@ def seed_mde_machines(fake: Faker) -> list[str]:
             # last seen. Ordered after drawing, so the stream is unchanged.
             entry["firstSeen"] = min(entry["firstSeen"], entry["lastSeen"])
             logged_on_users.append(entry)
+        # The user S1 saw last on this machine is one of those logged on to
+        # it; the list was all invented names, so a pivot from the S1 agent's
+        # user to Defender found nobody. The name draw stays in the stream.
+        if agent.lastLoggedInUserName:
+            logged_on_users[0]["accountName"] = agent.lastLoggedInUserName
 
         # Random machine tags
         tag_count = random.randint(0, 3)
