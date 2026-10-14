@@ -55,6 +55,33 @@ Every script prints what it is for at the top of its file; this is the map.
 | `soak_test.py` | A long day of client traffic in-process — token fetches, polls, searches, actions, HEC acks, scrolls across all eight mounts — with the clock moved forward per request (default 50,000 requests ≈ 42 simulated hours, about four minutes). Samples every store collection, the module-level caches and RSS; exit 1 if anything still grows linearly in the second half that is not bounded by a documented cap or lifetime. |
 | `run_collections.py --base-url <mock>` | Runs the Postman collection with newman and the Bruno one with `bru`, both fetched by `npx` (network the first time, nothing installed globally), from nothing but the base URLs, against a running mock. Exit 1 on any answer of 400 or above that is not listed in the script as expected. Needs a live server, so it is not in CI. |
 | `../conformance/` | Splunk / Elasticsearch / Kibana against the real products; also a weekly/on-demand CI workflow (`conformance.yml`). |
+| `sdk_smoke.py` | The vendors' **real client libraries** against a running mock: falconpy, msgraph-sdk + azure-identity + MSAL, elasticsearch-py, splunklib, azure-mgmt-securityinsight + azure-monitor-query, `requests` for Defender and Kibana, and the XSOAR SentinelOne v2 and Cortex XDR integrations through a `demistomock` shim. Each vendor authenticates, pages to the end with the SDK's own pager, fetches by id, runs an action and polls it, searches or hunts, and walks the error paths (bad credentials, unknown id, a 429 from the dev limiter), checking the SDK raises what it raises against the product. Prints PASS/FAIL/SKIP per vendor with the failing step; exit 1 on any FAIL. Needs its own venv (below) and mutates the mock, so it is not in `ci.sh` or the pytest run. Against v2.6.0 it fails six of nine vendors. |
+
+Setting up and running `sdk_smoke.py` (the SDKs never go into the backend's
+venv or requirements):
+
+```bash
+python3 -m venv /tmp/sdk-venv
+/tmp/sdk-venv/bin/pip install crowdstrike-falconpy msgraph-sdk azure-identity msal \
+    'elasticsearch>=8,<9' splunk-sdk azure-mgmt-securityinsight azure-monitor-query \
+    requests dateparser python-dateutil pytz setuptools
+
+# The Azure SDKs refuse plain http, so serve the mock over TLS.
+openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=127.0.0.1 \
+    -addext subjectAltName=IP:127.0.0.1 -keyout /tmp/mock.key -out /tmp/mock.crt
+(cd backend && .venv/bin/python -m uvicorn main:app --port 8101 --no-server-header \
+    --ssl-keyfile /tmp/mock.key --ssl-certfile /tmp/mock.crt) &
+
+/tmp/sdk-venv/bin/python scripts/sdk_smoke.py --base-url https://127.0.0.1:8101 \
+    --ca-file /tmp/mock.crt --xsoar-dir /tmp/xsoar --fetch-xsoar --reset
+```
+
+`--fetch-xsoar` downloads the XSOAR integration sources from
+`demisto/content` (`--xsoar-ref` pins a commit); later runs can reuse
+`--xsoar-dir` offline. Against an http base URL the Graph, Defender and
+Sentinel workflows are reported SKIP (`--strict` makes that a failure).
+`--vendor NAME` runs one; `-v` prints each step and the traceback of a
+failure.
 
 ## Run when a vendor reference changes
 
@@ -92,7 +119,7 @@ Run them from the repository root with the backend's interpreter:
 1. `ci.sh` green locally (the CI mirror).
 2. `schema_drift.py` for the six spec-judged platforms: 0 drift, unjudged routes listed and explained.
 3. The conformance harness: Splunk 0 findings, Elasticsearch + Kibana 0 findings (ignore the first run on a fresh stack — `store.size` is `null` on a just-created index and the KV store answers 503 while initialising).
-4. `load_test.py` passes.
+4. `load_test.py` passes, and `sdk_smoke.py` passes for all nine vendors (over TLS, so none is skipped).
 5. Version in `backend/config.py`, `backend/pyproject.toml`, `frontend/package.json`; a `## [x.y.z]` section in CHANGELOG.md (`tests/unit/test_version.py` checks all four).
 6. Push, then tag `vX.Y.Z` — never before the checks above are green.
 
