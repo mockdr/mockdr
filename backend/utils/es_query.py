@@ -30,6 +30,7 @@ import re
 import struct
 import uuid
 from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import datetime
 from fnmatch import fnmatch
 from typing import Any, NamedTuple
@@ -43,6 +44,28 @@ _DEFAULT_SIZE = 10
 
 #: Mirrors Elasticsearch's indices.query.bool.max_nested_depth default.
 _MAX_CLAUSE_DEPTH = 30
+
+#: The most clauses one query may hold, counted over the whole tree with
+#: every query_string term as one: Lucene's ``IndexSearcher.maxClauseCount``,
+#: which Elasticsearch 8 sizes from the heap and the search thread pool
+#: (4,096 was the fixed default before 8.0). Every clause is a scan of every
+#: document here, so 16 MB of `a OR a OR …` held a worker for minutes.
+MAX_CLAUSE_COUNT = 4096
+
+#: Clauses counted so far in the query being built.
+_CLAUSE_COUNT: ContextVar[int] = ContextVar("es_clause_count", default=0)
+
+
+def _count_clauses(n: int) -> None:
+    """Add *n* clauses to the query being built; refuse one that has too many."""
+    total = _CLAUSE_COUNT.get() + n
+    _CLAUSE_COUNT.set(total)
+    if total > MAX_CLAUSE_COUNT:
+        msg = (
+            "Query contains too many nested clauses; maxClauseCount is set to "
+            f"{MAX_CLAUSE_COUNT}"
+        )
+        raise ESQueryError(msg, es_type="too_many_nested_clauses")
 
 
 #: Every key a search body may carry. Elasticsearch refuses any other with
@@ -360,8 +383,26 @@ def build_predicate(
         A callable that accepts a record dict and returns ``True`` on match.
 
     Raises:
-        ESQueryError: If the clause is unsupported or nested too deeply.
+        ESQueryError: If the clause is unsupported, nested too deeply, or
+            the query holds more than ``MAX_CLAUSE_COUNT`` clauses.
     """
+    if _depth == 0:
+        counted = _CLAUSE_COUNT.set(0)
+        try:
+            return _build_predicate(clause, _depth, ids, lookup)
+        finally:
+            _CLAUSE_COUNT.reset(counted)
+    return _build_predicate(clause, _depth, ids, lookup)
+
+
+def _build_predicate(
+    clause: dict,
+    _depth: int,
+    ids: dict[int, str] | None,
+    lookup: Callable[[str, str, str], list[Any]] | None,
+) -> Callable[[dict], bool]:
+    """The body of ``build_predicate``, inside one query's clause count."""
+    _count_clauses(1)
     # Elasticsearch caps nesting at indices.query.bool.max_nested_depth for
     # exactly this reason: without a bound, a deeply nested bool exhausts the
     # stack and the RecursionError escapes as a 500.
@@ -1319,6 +1360,7 @@ def _build_query_string(body: dict) -> Callable[[dict], bool]:
     default_field = body.get("default_field", "_all")
 
     tokens = _qs_tokenise(query)
+    _count_clauses(sum(1 for kind, _, _ in tokens if kind == "term"))
     predicate = _qs_parse_expr(tokens, 0, default_field)[0]
     return predicate
 

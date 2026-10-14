@@ -8,8 +8,15 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from utils.cs_fql import parse_fql
-from utils.es_query import calculate_min_should_match
+from utils.es_query import (
+    MAX_CLAUSE_COUNT,
+    ESQueryError,
+    build_predicate,
+    calculate_min_should_match,
+)
 from utils.splunk.spl_exec import MAX_EXPANDED_ROWS, MAX_GENERATED_ROWS, execute_pipeline
 from utils.splunk.spl_parser import parse_spl
 
@@ -72,3 +79,16 @@ def test_a_float_overflow_is_a_failed_search_not_a_crash() -> None:
         rows, messages = _spl(f"| makeresults | eval x={expression}")
         assert rows == []
         assert messages[0]["type"] == "FATAL"
+
+
+def test_an_elasticsearch_query_holds_at_most_max_clause_count_clauses() -> None:
+    """Every clause scans every document: 16 MB of `a OR a` ran for minutes."""
+    words = " OR ".join(["zzzz"] * (MAX_CLAUSE_COUNT + 1))
+    with pytest.raises(ESQueryError, match="maxClauseCount"):
+        build_predicate({"query_string": {"query": words}})
+    many = {"bool": {"should": [{"term": {"a": "b"}}] * (MAX_CLAUSE_COUNT + 1)}}
+    with pytest.raises(ESQueryError, match="maxClauseCount"):
+        build_predicate(many)
+    # Within the ceiling, and counted afresh for each query.
+    for _ in range(3):
+        build_predicate({"query_string": {"query": " OR ".join(["zzzz"] * 1000)}})
