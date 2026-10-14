@@ -181,6 +181,31 @@ class TestCaseTags:
         assert resp.status_code == 200
 
 
+    def test_delete_tags_in_the_query_string_as_falcon_takes_them(
+        self, client: TestClient,
+    ) -> None:
+        """``id`` and repeated ``tag`` in the query, no body.
+
+        gofalcon ``entities_case_tags_delete_v1_parameters.go`` and falconpy's
+        ``entities_case_tags_delete_v1`` put both in the query string (``tag``
+        with ``collectionFormat: multi``) and send no body. The route required
+        a JSON body, so every SDK call met a 400 and no tag was removed.
+        """
+        headers = _cs_auth(client)
+        case_id = _first_case_id(client, headers)
+        client.post("/cs/cases/entities/case-tags/v1", headers=headers,
+                    json={"id": case_id, "tags": ["drop-a", "drop-b", "keep"]})
+        resp = client.delete("/cs/cases/entities/case-tags/v1", headers=headers,
+                             params=[("id", case_id), ("tag", "drop-a"), ("tag", "drop-b")])
+        assert resp.status_code == 200
+        # The message-center case document carries no tags; read the store.
+        from repository.cs_case_repo import cs_case_repo  # noqa: PLC0415
+        tags = cs_case_repo.get(case_id).tags
+        assert "keep" in tags
+        assert "drop-a" not in tags
+        assert "drop-b" not in tags
+
+
     def test_delete_tags_response_contains_case_id(self, client: TestClient) -> None:
         headers = _cs_auth(client)
         case_id = _first_case_id(client, headers)

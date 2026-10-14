@@ -54,13 +54,25 @@ def add_case_tags(
 
 @router.delete("/cases/entities/case-tags/v1")
 def delete_case_tags(
-    body: dict = Body(...),
+    id: str = Query(None),  # noqa: A002 - Falcon's own parameter name
+    tag: list[str] = Query(None),
+    body: dict | None = Body(None),
     _: dict = Depends(require_cs_write),
 ) -> dict:
     """Remove tags from a case.
 
-    Body: ``{"id": "...", "tags": [...]}``.
+    Falcon takes both in the query string — ``id`` (required) and ``tag``,
+    an array with ``collectionFormat: multi`` and also required
+    (gofalcon ``entities_case_tags_delete_v1_parameters.go``; falconpy's
+    ``entities_case_tags_delete_v1``) — and sends no body, as a DELETE
+    usually does not. The route required a JSON body, so every SDK call met
+    a 400 for a body it was never going to send. The body form
+    ``{"id": "...", "tags": [...]}`` the mock took before is still read
+    when the query names nothing.
     """
+    if id or tag:
+        return case_commands.delete_case_tags(id or "", list(tag or []))
+    body = body or {}
     case_id = body.get("id", "")
     tags = body.get("tags", [])
     return case_commands.delete_case_tags(case_id, tags)
