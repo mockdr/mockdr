@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import comments as comment_cmds
@@ -76,10 +76,11 @@ async def create_or_update_incident(
     workspace: str,
     incident_id: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
-    """Create or update an incident."""
+    """Create an incident, or replace the one there."""
     body = await request.json()
     if not isinstance(body, dict):
         # A JSON null or array reached `.get` on the wrong type and 500ed.
@@ -90,9 +91,26 @@ async def create_or_update_incident(
     existing = sentinel_incident_repo.get(incident_id)
     if existing is not None:
         check_if_match(request.headers.get("if-match"), existing.etag)
-    properties = body.get("properties", {})
-    incident_cmds.create_or_update_incident(incident_id, properties)
-    return incident_queries.get_incident(incident_id) or {}
+    properties = body.get("properties")
+    missing = incident_cmds.missing_required(properties)
+    if missing:
+        # The spec marks these Required; ARM refuses a body without them.
+        # The code is the repo's ARM 400 — Microsoft does not document the
+        # one Sentinel answers here.
+        raise HTTPException(
+            status_code=400,
+            detail=build_arm_error(
+                "BadRequest",
+                "Required properties are missing: "
+                + ", ".join(f"'properties.{name}'" for name in missing),
+            ),
+        )
+    incident, created = incident_cmds.create_or_update_incident(
+        incident_id, cast(dict[str, Any], properties),
+    )
+    # Create Or Update answers 201 for a new incident and 200 for a replaced one.
+    response.status_code = 201 if created else 200
+    return incident_queries.get_incident(incident.incident_id) or {}
 
 
 @router.delete(_WS + "/incidents/{incident_id}")

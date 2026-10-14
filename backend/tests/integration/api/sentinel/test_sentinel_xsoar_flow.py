@@ -78,10 +78,14 @@ class TestXsoarSentinelFlow:
         )
         assert comment_resp.status_code == 200
 
-        # Step 7: Update incident (close with classification)
+        # Step 7: Update incident (close with classification). PUT replaces,
+        # so XSOAR sends the incident it read with its changes applied —
+        # the required title and severity included.
         update_resp = client.put(
             f"{SENTINEL_PREFIX}{_WS}/incidents/{inc_id}",
             json={"properties": {
+                "title": props["title"],
+                "severity": props["severity"],
                 "status": "Closed",
                 "classification": "TruePositive",
                 "classificationComment": "Confirmed by XSOAR playbook",

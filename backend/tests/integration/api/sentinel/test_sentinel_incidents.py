@@ -88,7 +88,7 @@ class TestCRUDIncidents:
             }},
             headers=_auth(client),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # Create Or Update: 201 Created
         assert resp.json()["properties"]["title"] == "Test Incident"
 
     def test_get_incident(self, client: TestClient) -> None:
@@ -96,7 +96,7 @@ class TestCRUDIncidents:
         # Create
         client.put(
             f"{SENTINEL_PREFIX}{_WS}/incidents/test-get-001",
-            json={"properties": {"title": "Get Test", "severity": "Medium"}},
+            json={"properties": {"title": "Get Test", "severity": "Medium", "status": "New"}},
             headers=headers,
         )
         # Get
@@ -111,12 +111,16 @@ class TestCRUDIncidents:
         headers = _auth(client)
         client.put(
             f"{SENTINEL_PREFIX}{_WS}/incidents/test-update-001",
-            json={"properties": {"title": "Original", "severity": "Low"}},
+            json={"properties": {"title": "Original", "severity": "Low", "status": "New"}},
             headers=headers,
         )
         resp = client.put(
             f"{SENTINEL_PREFIX}{_WS}/incidents/test-update-001",
-            json={"properties": {"status": "Closed", "classification": "TruePositive"}},
+            # A PUT replaces: the required members come with every write.
+            json={"properties": {
+                "title": "Original", "severity": "Low",
+                "status": "Closed", "classification": "TruePositive",
+            }},
             headers=headers,
         )
         assert resp.status_code == 200
@@ -128,7 +132,7 @@ class TestCRUDIncidents:
         headers = _auth(client)
         client.put(
             f"{SENTINEL_PREFIX}{_WS}/incidents/test-del-001",
-            json={"properties": {"title": "Delete Me", "severity": "Low"}},
+            json={"properties": {"title": "Delete Me", "severity": "Low", "status": "New"}},
             headers=headers,
         )
         resp = client.delete(
@@ -425,3 +429,58 @@ class TestOneHostIsOneEntity:
             assert resp.status_code in (200, 201), resp.text
 
         assert len(sentinel_entity_repo.list_all()) == before
+
+
+class TestPutReplacesTheIncident:
+    """Incidents - Create Or Update is a PUT: it replaces, and three members are required.
+
+    learn.microsoft.com/rest/api/securityinsights/incidents/create-or-update
+    (2024-03-01) marks `properties.title`, `properties.severity` and
+    `properties.status` Required. The mock accepted a body with none of them
+    and merged what was sent over what was there, so a full body that left
+    out `owner` — which is how a client unassigns — kept the assignee.
+    """
+
+    PATH = f"{SENTINEL_PREFIX}{_WS}/incidents/put-replaces-001"
+    FULL = {"properties": {
+        "title": "Before", "severity": "High", "status": "Active",
+        "description": "has a description",
+        "classificationComment": "noted",
+        "owner": {"assignedTo": "Jane Analyst", "email": "jane@acmecorp.internal"},
+        "labels": [{"labelName": "triage", "labelType": "User"}],
+    }}
+
+    @pytest.mark.parametrize("missing", ["title", "severity", "status"])
+    def test_a_required_member_left_out_is_a_400(
+        self, client: TestClient, missing: str,
+    ) -> None:
+        props = {k: v for k, v in self.FULL["properties"].items() if k != missing}
+        resp = client.put(self.PATH, json={"properties": props}, headers=_auth(client))
+        assert resp.status_code == 400, resp.text
+        assert resp.json()["error"]["code"] == "BadRequest"
+        assert f"properties.{missing}" in resp.json()["error"]["message"]
+        assert client.get(self.PATH, headers=_auth(client)).status_code == 404
+
+    def test_a_body_without_properties_is_a_400(self, client: TestClient) -> None:
+        assert client.put(self.PATH, json={}, headers=_auth(client)).status_code == 400
+
+    def test_what_the_body_leaves_out_goes_back_to_its_default(
+        self, client: TestClient,
+    ) -> None:
+        headers = _auth(client)
+        created = client.put(self.PATH, json=self.FULL, headers=headers).json()
+        replaced = client.put(self.PATH, json={"properties": {
+            "title": "After", "severity": "Low", "status": "Closed",
+        }}, headers=headers)
+        assert replaced.status_code == 200
+        props = replaced.json()["properties"]
+        assert props["title"] == "After"
+        assert props["owner"]["assignedTo"] is None
+        assert props["owner"]["email"] is None
+        assert props["labels"] == []
+        assert props["description"] == ""
+        assert props["classificationComment"] is None
+        # What the service owns survives.
+        assert props["incidentNumber"] == created["properties"]["incidentNumber"]
+        assert props["createdTimeUtc"] == created["properties"]["createdTimeUtc"]
+
