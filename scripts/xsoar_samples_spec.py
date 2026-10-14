@@ -27,6 +27,9 @@ XDR = {
     "get_incidents_list.json": "POST /public_api/v1/incidents/get_incidents/",
     "get_incident_extra_data.json": "POST /public_api/v1/incidents/get_incident_extra_data/",
     "update_incident.json": "POST /public_api/v1/incidents/update_incident/",
+    "get_multiple_incidents_extra_data.json": (
+        "POST /public_api/v1/incidents/get_multiple_incidents_extra_data/"
+    ),
     "get_endpoints.json": "POST /public_api/v1/endpoints/get_endpoint/",
     "get_all_endpoints.json": "POST /public_api/v1/endpoints/get_endpoints/",
     "isolate_endpoint.json": "POST /public_api/v1/endpoints/isolate",

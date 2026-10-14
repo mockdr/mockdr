@@ -27,6 +27,17 @@ def get_incidents(
     return incident_queries.get_incidents(request_data)
 
 
+@router.post("/incidents/get_multiple_incidents_extra_data/")
+@xdr_shape("incidents_get_multiple_incidents_extra_data")
+def get_multiple_incidents_extra_data(
+    body: dict = Body(default={}),
+    _: object = Depends(require_xdr_auth),
+) -> dict:
+    """List incidents, each with its alerts and artifacts."""
+    request_data = require_request_data(body)
+    return incident_queries.get_multiple_incidents_extra_data(request_data)
+
+
 @router.post("/incidents/get_incident_extra_data/")
 @xdr_shape("incidents_get_incident_extra_data")
 def get_incident_extra_data(

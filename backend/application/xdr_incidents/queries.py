@@ -51,6 +51,38 @@ def get_incidents(request_data: dict) -> dict:
     return build_xdr_list_reply(page, total_count=total, key="incidents")
 
 
+def _extra_data(incident: object, alerts_limit: int | None = None) -> dict:
+    """One incident with its linked alerts and artifacts, as extra-data serves it."""
+    incident_id = str(getattr(incident, "incident_id", ""))
+    linked_alerts = xdr_alert_repo.get_by_incident_id(incident_id)
+
+    network_artifacts = []
+    for alert in linked_alerts:
+        for ip in alert.host_ip:
+            # Spelled as the recorded artifacts are: upper-case `type`, and
+            # the domain and port members present even when unknown.
+            network_artifacts.append({
+                "type": "IP",
+                "alert_count": 1,
+                "is_manual": False,
+                "network_domain": None,
+                "network_remote_ip": ip,
+                "network_remote_port": None,
+                "network_country": "US",
+            })
+
+    shown = linked_alerts if alerts_limit is None else linked_alerts[:alerts_limit]
+    return {
+        "incident": record_dict(incident),
+        "alerts": {
+            "total_count": len(linked_alerts),
+            "data": [record_dict(a) for a in shown],
+        },
+        "network_artifacts": {"total_count": len(network_artifacts), "data": network_artifacts},
+        "file_artifacts": {"total_count": 0, "data": []},
+    }
+
+
 def get_incident_extra_data(incident_id: str) -> dict | None:
     """Return an incident with its linked alerts and network artifacts.
 
@@ -64,26 +96,55 @@ def get_incident_extra_data(incident_id: str) -> dict | None:
     incident = xdr_incident_repo.get(incident_id)
     if not incident:
         return None
+    return build_xdr_reply(_extra_data(incident))
 
-    linked_alerts = xdr_alert_repo.get_by_incident_id(incident_id)
 
-    network_artifacts = []
-    for alert in linked_alerts:
-        for ip in alert.host_ip:
-            network_artifacts.append({
-                "type": "ip",
-                "alert_count": 1,
-                "is_manual": False,
-                "network_remote_ip": ip,
-                "network_country": "US",
-            })
+#: How many alerts each incident carries in a multi-incident reply. The XSOAR
+#: integration reads it back from `alerts_limit_per_incident` and documents it
+#: as 50 (CortexXDRIR `Client.get_multiple_incidents_extra_data`).
+ALERTS_LIMIT_PER_INCIDENT = 50
+
+#: The artifact lists `fields_to_exclude` may drop — what the XSOAR client
+#: sends for `exclude_artifacts` (CortexXDRIR `FIELDS_TO_EXCLUDE`). The
+#: recorded reply shape then answers them empty.
+_EXCLUDABLE = ("network_artifacts", "file_artifacts")
+
+
+def get_multiple_incidents_extra_data(request_data: dict) -> dict:
+    """Several incidents, each with its alerts and artifacts, in one call.
+
+    The XSOAR integration fetches incidents through this route
+    (`/incidents/get_multiple_incidents_extra_data/`), with the same
+    `filters`, `sort`, `search_from` and `search_to` as `get_incidents`. Its
+    recorded reply (test_data get_multiple_incidents_extra_data.json) is
+    `{total_count, result_count, alerts_limit_per_incident, incidents: [{incident,
+    alerts, network_artifacts, file_artifacts}]}`.
+
+    Args:
+        request_data: The ``request_data`` dict from the POST body.
+
+    Returns:
+        XDR reply with the page of incidents and their extra data.
+    """
+    matched = apply_xdr_filters(
+        xdr_incident_repo.list_all(), request_data.get("filters"), _INCIDENT_FILTER_FIELDS,
+    )
+    matched = apply_xdr_sort(matched, request_data.get("sort"))
+
+    search_from = request_data.get("search_from", 0)
+    search_to = request_data.get("search_to", search_from + 100)
+    excluded = request_data.get("fields_to_exclude") or []
+    items = []
+    for incident in matched[search_from:search_to]:
+        item = _extra_data(incident, ALERTS_LIMIT_PER_INCIDENT)
+        for name in _EXCLUDABLE:
+            if isinstance(excluded, list) and name in excluded:
+                item.pop(name)
+        items.append(item)
 
     return build_xdr_reply({
-        "incident": record_dict(incident),
-        "alerts": {
-            "total_count": len(linked_alerts),
-            "data": [record_dict(a) for a in linked_alerts],
-        },
-        "network_artifacts": {"total_count": len(network_artifacts), "data": network_artifacts},
-        "file_artifacts": {"total_count": 0, "data": []},
+        "total_count": len(matched),
+        "result_count": len(items),
+        "alerts_limit_per_incident": ALERTS_LIMIT_PER_INCIDENT,
+        "incidents": items,
     })

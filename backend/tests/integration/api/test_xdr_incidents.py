@@ -177,6 +177,55 @@ class TestGetIncidentExtraData:
         assert resp.status_code == 500
 
 
+class TestGetMultipleIncidentsExtraData:
+    """`/incidents/get_multiple_incidents_extra_data/` is how XSOAR fetches incidents.
+
+    CortexXDRIR `Client.get_multiple_incidents_extra_data` posts `filters`,
+    `sort`, `search_from`, `search_to` and `fields_to_exclude` there on every
+    fetch-incidents run, and reads `reply.incidents` and
+    `reply.alerts_limit_per_incident`. The route did not exist, so the
+    integration's fetch answered 404 against the mock. Shape from XSOAR
+    test_data get_multiple_incidents_extra_data.json.
+    """
+
+    def test_the_fetch_body_xsoar_sends(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{XDR_PREFIX}/incidents/get_multiple_incidents_extra_data/",
+            json={"request_data": {
+                "search_from": 0, "search_to": 3,
+                "sort": {"field": "creation_time", "keyword": "asc"},
+                "full_alert_fields": True,
+                "filters": [{"field": "creation_time", "operator": "gte", "value": 0}],
+            }},
+            headers=_xdr_headers(),
+        )
+        assert resp.status_code == 200, resp.text
+        reply = resp.json()["reply"]
+        assert reply["result_count"] == len(reply["incidents"]) == 3
+        assert reply["total_count"] >= 3
+        assert isinstance(reply["alerts_limit_per_incident"], int)
+        times = [i["incident"]["creation_time"] for i in reply["incidents"]]
+        assert times == sorted(times)
+        for item in reply["incidents"]:
+            assert set(item) >= {"incident", "alerts", "network_artifacts", "file_artifacts"}
+            assert item["incident"]["incident_id"]
+            assert len(item["alerts"]["data"]) <= reply["alerts_limit_per_incident"]
+
+    def test_incident_id_list_narrows(self, client: TestClient) -> None:
+        first = client.post(
+            f"{XDR_PREFIX}/incidents/get_incidents/",
+            json={"request_data": {}}, headers=_xdr_headers(),
+        ).json()["reply"]["incidents"][0]["incident_id"]
+        reply = client.post(
+            f"{XDR_PREFIX}/incidents/get_multiple_incidents_extra_data/",
+            json={"request_data": {"filters": [
+                {"field": "incident_id_list", "operator": "in", "value": [first]},
+            ]}},
+            headers=_xdr_headers(),
+        ).json()["reply"]
+        assert [i["incident"]["incident_id"] for i in reply["incidents"]] == [first]
+
+
 class TestUpdateIncident:
     """Tests for POST /incidents/update_incident/."""
 
