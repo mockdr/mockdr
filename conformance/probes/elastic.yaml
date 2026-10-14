@@ -3503,6 +3503,27 @@ probes:
       path: /zzz-no-such-index
       auth: basic
 
+  - id: es-delete-missing-index-ignore-unavailable
+    endpoint: search
+    why: >
+      elasticsearch-py's "delete it if it is there",
+      indices.delete(index=..., ignore_unavailable=True). The docs say the
+      flag stops a missing index being an error; mockdr accepted it and
+      answered 404 anyway (found by the SDK smoke test).
+    request:
+      method: DELETE
+      path: /zzz-no-such-index
+      query: {ignore_unavailable: "true"}
+      auth: basic
+
+  - id: es-delete-missing-index
+    endpoint: search
+    why: And without the flag, the 404 it was before.
+    request:
+      method: DELETE
+      path: /zzz-no-such-index
+      auth: basic
+
   # ── The HTTP level itself (2.3.1) ────────────────────────────────────────
   #
   # Kibana and Elasticsearch ship together and differ here in three ways, so

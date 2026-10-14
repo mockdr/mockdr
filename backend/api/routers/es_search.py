@@ -1876,12 +1876,23 @@ async def get_index(request: Request, index: str) -> Response:
     operation_id="es_delete_index",
     dependencies=[es_refuses_unknown(*_DELETE_INDEX_PARAMS, source=False)],
 )
-def delete_index(index: str = "", _: dict = Depends(require_es_write)) -> dict:
+def delete_index(
+    index: str = "",
+    ignore_unavailable: str | None = Query(default=None),
+    _: dict = Depends(require_es_write),
+) -> dict:
     """Delete an index and everything written to it.
 
     `DELETE /` reaches the same endpoint with nothing named, and the cluster
     says so rather than refusing the verb: a client that built its URL from
     an empty variable gets told which argument is missing.  Measured on 8.15.
+
+    `ignore_unavailable`: "If false, the request returns an error if it
+    targets a missing or closed index" (Delete index API) -- so with true, a
+    missing index is acknowledged. The parameter was accepted and never
+    read, and `es.indices.delete(index=..., ignore_unavailable=True)`, the
+    elasticsearch-py idiom for "delete it if it is there" that test set-ups
+    open with, raised NotFoundError on a clean cluster.
     """
     if not index:
         raise HTTPException(status_code=400, detail=build_es_error_response(
@@ -1892,6 +1903,8 @@ def delete_index(index: str = "", _: dict = Depends(require_es_write)) -> dict:
         raise HTTPException(status_code=400, detail=build_es_invalid_index_name(index))
     result = search_queries.delete_index(index)
     if result is None:
+        if _flag(ignore_unavailable):
+            return {"acknowledged": True}
         raise HTTPException(
             status_code=404, detail=build_es_index_not_found(index),
         )
