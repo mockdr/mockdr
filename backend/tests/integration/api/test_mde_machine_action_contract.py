@@ -149,7 +149,12 @@ class TestOneActionOfAKindAtATime:
     ])
     def test_the_second_is_active_request_already_exists(
         self, client: TestClient, mde_headers: dict[str, str], action: str, extra: dict,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        # Held pending: on a loaded machine more than the one-second settle
+        # window passed between the two requests, the first had completed,
+        # and the second was rightly accepted — a race, not a refusal.
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         machine_id = _machines(client, mde_headers)[6]
         body = {"Comment": "zzz first", **extra}
         first = client.post(f"/mde/api/machines/{machine_id}/{action}",
