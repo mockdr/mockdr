@@ -8,20 +8,20 @@
     "confidenceScore": 0,
     "confidenceScoreStatus": "NotApplicable",
     "description": "",
-    "endTimeUtc": "",
+    "endTimeUtc": null,
     "intent": "Unknown",
     "providerAlertId": "",
-    "processingEndTime": "",
+    "processingEndTime": null,
     "productComponentName": "",
     "productName": "",
     "productVersion": "",
     "remediationSteps": [],
     "severity": null,
-    "startTimeUtc": "",
+    "startTimeUtc": null,
     "status": "Unknown",
     "systemAlertId": "",
     "tactics": [],
-    "timeGenerated": "",
+    "timeGenerated": null,
     "vendorName": "",
     "alertLink": "",
     "resourceIdentifiers": [],
@@ -35,9 +35,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

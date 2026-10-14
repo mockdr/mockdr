@@ -15,9 +15,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

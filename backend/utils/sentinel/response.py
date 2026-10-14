@@ -110,6 +110,25 @@ _SYSTEM_DATA = {
 }
 
 
+def _system_data(properties: dict) -> dict:
+    """ARM's ``systemData`` for a resource, dated by the resource's own clock.
+
+    An incident says when it was created and last modified
+    (``createdTimeUtc``, ``lastModifiedTimeUtc``); its systemData saying
+    otherwise would be a second, contradicting answer. A resource without
+    those keeps the fixed default.
+    """
+    data = dict(_SYSTEM_DATA)
+    created = properties.get("createdTimeUtc")
+    modified = properties.get("lastModifiedTimeUtc") or properties.get("lastModifiedUtc")
+    if isinstance(created, str) and created:
+        data["createdAt"] = created
+        data["lastModifiedAt"] = created
+    if isinstance(modified, str) and modified:
+        data["lastModifiedAt"] = modified
+    return data
+
+
 @cache
 def _load_fixture(name: str) -> dict:
     path = _FIXTURES / f"{name}.json"
@@ -205,7 +224,16 @@ def build_arm_resource(
         ARM resource dict.
     """
     fixture = _fixture_for(resource_type, kind)
-    defaults = {k: v for k, v in fixture.items() if k not in ("id", "name", "type", "etag", "kind")}
+    # systemData is left out of the spec defaults: the fixture's blank holds
+    # `""` for createdAt and lastModifiedAt, and completing over it first
+    # meant _SYSTEM_DATA below found every key present and filled nothing --
+    # every resource went out with `"createdAt": ""`, which no date-time
+    # parser reads (azure-mgmt-securityinsight raised DeserializationError on
+    # the first page of incidents).
+    defaults = {
+        k: v for k, v in fixture.items()
+        if k not in ("id", "name", "type", "etag", "kind", "systemData")
+    }
     result: dict = {
         "id": f"{_REQUEST_BASE.get()}/{path}" if path else arm_id(resource_type, name),
         "name": name,
@@ -218,7 +246,9 @@ def build_arm_resource(
     result["properties"] = properties
     completed = deep_complete(defaults, result)
     if "systemData" in fixture:
-        completed["systemData"] = deep_complete(_SYSTEM_DATA, completed.get("systemData") or {})
+        completed["systemData"] = deep_complete(
+            _system_data(properties), completed.get("systemData") or {},
+        )
     return completed
 
 

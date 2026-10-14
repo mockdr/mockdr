@@ -1,6 +1,6 @@
 {
   "properties": {
-    "created": "",
+    "created": null,
     "createdBy": {
       "email": "",
       "name": "",
@@ -11,15 +11,15 @@
     "notes": "",
     "query": "",
     "queryResult": "",
-    "updated": "",
+    "updated": null,
     "updatedBy": {
       "email": "",
       "name": "",
       "objectId": ""
     },
-    "eventTime": "",
-    "queryStartTime": "",
-    "queryEndTime": "",
+    "eventTime": null,
+    "queryStartTime": null,
+    "queryEndTime": null,
     "incidentInfo": {
       "incidentId": "",
       "severity": "High",
@@ -34,9 +34,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

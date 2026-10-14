@@ -5,8 +5,8 @@
     "description": "",
     "displayName": "",
     "enabled": false,
-    "lastModifiedUtc": "",
-    "suppressionDuration": "",
+    "lastModifiedUtc": null,
+    "suppressionDuration": null,
     "suppressionEnabled": false,
     "tactics": [],
     "techniques": [],
@@ -15,7 +15,7 @@
       "groupingConfiguration": {
         "enabled": false,
         "reopenClosedIncident": false,
-        "lookbackDuration": "",
+        "lookbackDuration": null,
         "matchingMethod": "AllEntities",
         "groupByEntities": [],
         "groupByAlertDetails": [],
@@ -23,8 +23,8 @@
       }
     },
     "query": "",
-    "queryFrequency": "",
-    "queryPeriod": "",
+    "queryFrequency": null,
+    "queryPeriod": null,
     "severity": "High",
     "triggerOperator": "GreaterThan",
     "triggerThreshold": 0,
@@ -49,9 +49,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

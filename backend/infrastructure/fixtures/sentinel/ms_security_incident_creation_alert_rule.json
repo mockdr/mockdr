@@ -4,7 +4,7 @@
     "description": "",
     "displayName": "",
     "enabled": false,
-    "lastModifiedUtc": "",
+    "lastModifiedUtc": null,
     "displayNamesFilter": [],
     "displayNamesExcludeFilter": [],
     "productFilter": "Microsoft Cloud App Security",
@@ -18,9 +18,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

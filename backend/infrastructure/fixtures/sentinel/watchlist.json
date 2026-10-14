@@ -4,8 +4,8 @@
     "displayName": "",
     "provider": "",
     "source": "",
-    "created": "",
-    "updated": "",
+    "created": null,
+    "updated": null,
     "createdBy": {
       "email": "",
       "name": "",
@@ -21,7 +21,7 @@
     "watchlistAlias": "",
     "isDeleted": false,
     "labels": [],
-    "defaultDuration": "",
+    "defaultDuration": null,
     "tenantId": "",
     "numberOfLinesToSkip": 0,
     "rawContent": "",
@@ -36,9 +36,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

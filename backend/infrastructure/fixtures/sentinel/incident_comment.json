@@ -1,7 +1,7 @@
 {
   "properties": {
-    "createdTimeUtc": "",
-    "lastModifiedTimeUtc": "",
+    "createdTimeUtc": null,
+    "lastModifiedTimeUtc": null,
     "message": "",
     "author": {
       "email": "",
@@ -17,9 +17,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

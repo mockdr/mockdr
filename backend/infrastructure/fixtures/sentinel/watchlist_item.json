@@ -4,8 +4,8 @@
     "watchlistItemId": "",
     "tenantId": "",
     "isDeleted": false,
-    "created": "",
-    "updated": "",
+    "created": null,
+    "updated": null,
     "createdBy": {
       "email": "",
       "name": "",
@@ -26,9 +26,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

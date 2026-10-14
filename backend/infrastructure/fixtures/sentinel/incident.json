@@ -11,16 +11,16 @@
     "classification": "Undetermined",
     "classificationComment": "",
     "classificationReason": "SuspiciousActivity",
-    "createdTimeUtc": "",
+    "createdTimeUtc": null,
     "description": "",
-    "firstActivityTimeUtc": "",
+    "firstActivityTimeUtc": null,
     "incidentUrl": "",
     "providerName": "",
     "providerIncidentId": "",
     "incidentNumber": 0,
     "labels": [],
-    "lastActivityTimeUtc": "",
-    "lastModifiedTimeUtc": "",
+    "lastActivityTimeUtc": null,
+    "lastModifiedTimeUtc": null,
     "owner": {
       "email": "",
       "assignedTo": "",
@@ -40,9 +40,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

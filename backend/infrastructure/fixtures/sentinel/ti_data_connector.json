@@ -1,7 +1,7 @@
 {
   "properties": {
     "tenantId": "",
-    "tipLookbackPeriod": "",
+    "tipLookbackPeriod": null,
     "dataTypes": {
       "indicators": {
         "state": "Enabled"
@@ -16,9 +16,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

@@ -4,7 +4,7 @@
     "description": "",
     "displayName": "",
     "enabled": false,
-    "lastModifiedUtc": "",
+    "lastModifiedUtc": null,
     "severity": "High",
     "tactics": [],
     "techniques": []
@@ -17,9 +17,9 @@
   "systemData": {
     "createdBy": "",
     "createdByType": "User",
-    "createdAt": "",
+    "createdAt": null,
     "lastModifiedBy": "",
     "lastModifiedByType": "User",
-    "lastModifiedAt": ""
+    "lastModifiedAt": null
   }
 }

@@ -6,7 +6,8 @@ Sentinel cannot be run locally, so the published 2024-03-01 specification is
 the only reference. For each resource definition this resolves every
 declared property — through $ref, allOf, the common types and the `kind`
 discriminator — and writes an object with a type-correct default at every
-path: "" for strings, 0 for numbers, false for booleans, [] for arrays,
+path: "" for strings (null for a date, date-time or duration, which have no
+empty value), 0 for numbers, false for booleans, [] for arrays,
 nested objects recursed. The builders deep-merge their real values over it,
 so a client reading any declared property finds it.
 
@@ -67,6 +68,10 @@ def spec_path(file: str) -> Path:
     return SPECS / f"sentinel_2024-03-01_{file}.json"
 
 
+#: String formats whose values must parse: an empty string is not "unset" for them.
+_FORMATS_WITHOUT_BLANK = {"date-time", "date", "duration"}
+
+
 def default_for(doc: dict, schema, depth: int = 0):
     schema = deref(doc, schema)
     if depth > 7 or not isinstance(schema, dict):
@@ -84,7 +89,15 @@ def default_for(doc: dict, schema, depth: int = 0):
     if kind in ("integer", "number"):
         return 0
     if kind == "string":
-        return "" if "enum" not in schema else schema["enum"][0]
+        if "enum" in schema:
+            return schema["enum"][0]
+        # A date, date-time or duration has no empty value: `""` is not one
+        # its parser reads, and azure-mgmt-securityinsight raised
+        # DeserializationError on a whole page for one such blank. Unset is
+        # null, which every client deserialises as "not set".
+        if schema.get("format") in _FORMATS_WITHOUT_BLANK:
+            return None
+        return ""
     return None
 
 
