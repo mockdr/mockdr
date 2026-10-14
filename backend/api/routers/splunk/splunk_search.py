@@ -22,6 +22,7 @@ from application.splunk.commands.search import (
     control_message,
     create_search_job,
     delete_search_job,
+    require_leading_command,
 )
 from application.splunk.queries.search import (
     SearchJobFailedError,
@@ -102,6 +103,7 @@ async def create_job(
         ]})
 
     try:
+        require_leading_command(search)
         sid = create_search_job(
             search=search,
             earliest_time=earliest_time,
@@ -189,6 +191,7 @@ async def export_search(
         ]})
 
     try:
+        require_leading_command(search)
         sid = create_search_job(
             search=search,
             earliest_time=earliest_time,

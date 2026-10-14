@@ -42,6 +42,33 @@ class UnknownSearchCommandError(ValueError):
         super().__init__(f"Unknown search command '{command}'.")
 
 
+#: The command name splunkd reads off the front of a search string.
+_LEADING_NAME = re.compile(r"[A-Za-z_][\w-]*")
+
+
+def require_leading_command(search: str) -> None:
+    """Refuse a REST search that does not open with a command.
+
+    Over REST the ``search`` parameter is the SPL itself; only Splunk Web
+    prepends the implicit ``search``. Measured on splunkd (oneshot, normal,
+    export and v2 alike): ``index=main | head 1`` answers 400
+    ``Unknown search command 'index'.`` while ``search index=main | head 1``
+    and ``| makeresults`` run. The mock ran all three. A leading macro is
+    let through — its expansion decides, and that was not measured.
+
+    Raises:
+        UnknownSearchCommandError: If the search opens with no command.
+    """
+    text = search.lstrip()
+    if text.startswith(("|", "`")):
+        return
+    first = text.split(None, 1)[0] if text else ""
+    if first.lower() == "search":
+        return
+    match = _LEADING_NAME.match(text)
+    raise UnknownSearchCommandError(match.group(0) if match else first)
+
+
 class InvalidTimeParameterError(ValueError):
     """Raised when ``earliest_time``/``latest_time`` is not a time splunkd takes.
 

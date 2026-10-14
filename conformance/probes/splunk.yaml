@@ -3635,10 +3635,10 @@ probes:
     endpoint: management
     why: >
       Over REST the `search` parameter is the SPL itself, and only Splunk Web
-      prepends the implicit `search` command — so `index=main | head 1` is
-      said to fail as "Unknown search command 'index'" (community reports
-      only; no reference states it). mockdr accepts it. Unmeasured: this
-      probe exists to settle it, and mockdr is unchanged until it has.
+      prepends the implicit `search` command. Measured on splunkd (2.6.0):
+      `index=main | head 1` answers 400 "Unknown search command 'index'." on
+      oneshot, normal, export and v2 alike. mockdr ran it until this probe
+      settled the question.
     request:
       method: POST
       path: /services/search/jobs
