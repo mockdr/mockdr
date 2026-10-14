@@ -337,8 +337,30 @@ _BINARY_COLLECTIONS = {
 }
 
 
+#: Credentials a client was issued, kept across ``/_dev/reset``. ADR-013's
+#: pattern is one server per test session with ``reset()`` between tests, and
+#: the vendors' SDKs cache their token — falconpy and MSAL until it expires,
+#: splunklib its session key for the life of the service object. Emptying
+#: these on reset made every such client 401 on its first call after the
+#: first reset, a failure no real tenant produces. The OAuth clients and
+#: Splunk users they belong to are seeded with fixed ids, so they exist again
+#: after the reset; the token keeps its own expiry. ``generate_all`` itself
+#: still clears them: a restart without persistence, and the test suite's
+#: per-test seed, start with nobody signed in.
+_PRESERVED_ACROSS_RESET: tuple[str, ...] = (
+    "cs_oauth_tokens",
+    "mde_oauth_tokens",
+    "graph_oauth_tokens",
+    "sentinel_oauth_tokens",
+    "splunk_sessions",
+)
+
+
 def reset() -> dict:
     """Re-seed all in-memory repositories with the deterministic initial data set.
+
+    Issued OAuth tokens and Splunk sessions survive (see
+    ``_PRESERVED_ACROSS_RESET``).
 
     Returns:
         Dict with ``data.status`` confirming the reset.
@@ -346,7 +368,12 @@ def reset() -> dict:
     from api.routers.splunk.splunk_hec import reset_ack_state
     from application.webhooks.delivery_log import clear as clear_delivery_log
     from infrastructure.seed import generate_all
+
+    issued = {name: store.get_all_with_keys(name) for name in _PRESERVED_ACROSS_RESET}
     generate_all()
+    for name, entries in issued.items():
+        for key, record in entries.items():
+            store.save(name, key, record)
     # Two pieces of state the store does not hold and `generate_all` cannot
     # reach, both of which the API serves back: HEC's per-channel ack ids and
     # the webhook delivery log.  A reset that leaves them is a reset that

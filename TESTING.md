@@ -213,6 +213,7 @@ backend/tests/
 - All fixtures use the **in-memory store** seeded by `infrastructure.seed.generate_all()` — never a live or persistent store.
 - Fixtures must be **idempotent**: running twice produces identical state (`random.seed(42)` + `Faker.seed(42)` guarantees this).
 - No fixture may share mutable state between tests (no module-scoped mutable objects).
+- `generate_all()` (what `fresh_seed` calls) is a cold start: it cancels a running playbook and clears issued tokens and sessions too. `POST /_dev/reset` — what an external suite calls between tests on one session-scoped server (ADR-013) — re-seeds the same way but keeps issued OAuth tokens and Splunk sessions, so an SDK's cached token stays valid.
 - Fixtures modeling domain entities must respect the full domain dataclass schema — no stripped-down dicts.
 
 ```python

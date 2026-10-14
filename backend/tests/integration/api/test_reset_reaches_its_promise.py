@@ -12,6 +12,7 @@ from __future__ import annotations
 import time
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 HEC = {"Authorization": "Splunk 11111111-1111-1111-1111-111111111111"}
@@ -142,3 +143,96 @@ class TestResetStopsARunningPlaybook:
         generate_all()
 
         assert self._state_after_the_step(agent_id) == seeded
+
+
+def _entra_token(client: TestClient, path: str, client_id: str, secret: str,
+                 scope: str) -> dict[str, str]:
+    resp = client.post(path, data={
+        "client_id": client_id, "client_secret": secret,
+        "grant_type": "client_credentials", "scope": scope,
+    })
+    assert resp.status_code == 200, resp.text
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
+def _cs(client: TestClient) -> dict[str, str]:
+    resp = client.post("/cs/oauth2/token", data={
+        "client_id": "cs-mock-admin-client", "client_secret": "cs-mock-admin-secret",
+    })
+    assert resp.status_code in (200, 201), resp.text
+    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+
+def _mde(client: TestClient) -> dict[str, str]:
+    return _entra_token(
+        client, "/mde/oauth2/v2.0/token", "mde-mock-admin-client",
+        "mde-mock-admin-secret", "https://api.securitycenter.microsoft.com/.default")
+
+
+def _graph(client: TestClient) -> dict[str, str]:
+    return _entra_token(
+        client, "/graph/oauth2/v2.0/token", "graph-mock-admin-client",
+        "graph-mock-admin-secret", "https://graph.microsoft.com/.default")
+
+
+def _sentinel(client: TestClient) -> dict[str, str]:
+    return _entra_token(
+        client, "/sentinel/oauth2/v2.0/token", "sentinel-mock-client-id",
+        "sentinel-mock-client-secret", "https://management.azure.com/.default")
+
+
+def _splunk(client: TestClient) -> dict[str, str]:
+    resp = client.post("/splunk/services/auth/login", params={"output_mode": "json"},
+                       data={"username": "admin", "password": "mockdr-admin"})
+    assert resp.status_code == 200, resp.text
+    return {"Authorization": f"Splunk {resp.json()['sessionKey']}"}
+
+
+_SENTINEL_WS = (
+    "/sentinel/subscriptions/00000000-0000-0000-0000-000000000000"
+    "/resourceGroups/mockdr-rg"
+    "/providers/Microsoft.OperationalInsights/workspaces/mockdr-workspace"
+    "/providers/Microsoft.SecurityInsights"
+)
+
+
+class TestResetKeepsIssuedCredentials:
+    """A token or session issued before a reset still authenticates after it.
+
+    ADR-013's pattern is a session-scoped server with ``reset()`` between
+    tests, and the vendors' SDKs cache what they were issued — falconpy and
+    MSAL their bearer token until it expires, splunklib its session key. The
+    reset emptied every token and session collection, so each of those
+    clients got a 401 on its first call after the first reset: a failure no
+    real tenant produces, and one a test could only survive by knowing the
+    mock's internals.
+    """
+
+    @pytest.mark.parametrize(("issue", "probe"), [
+        (_cs, "/cs/devices/queries/devices/v1"),
+        (_mde, "/mde/api/machines"),
+        (_graph, "/graph/v1.0/users"),
+        (_sentinel, f"{_SENTINEL_WS}/alertRules?api-version=2024-03-01"),
+        (_splunk, "/splunk/services/server/info"),
+    ], ids=["crowdstrike", "defender", "graph", "sentinel", "splunk"])
+    def test_a_credential_survives_the_reset(
+        self, client: TestClient, issue: object, probe: str,
+    ) -> None:
+        headers = issue(client)  # type: ignore[operator]
+        assert client.get(probe, headers=headers).status_code == 200
+
+        assert client.post("/web/api/v2.1/_dev/reset", headers=ADMIN).status_code == 200
+
+        assert client.get(probe, headers=headers).status_code == 200
+
+    def test_a_reseed_still_starts_with_nobody_signed_in(
+        self, client: TestClient,
+    ) -> None:
+        """The suite's per-test seed and a cold start keep isolating tokens."""
+        from infrastructure.seed import generate_all
+
+        headers = _cs(client)
+        generate_all()
+        assert client.get(
+            "/cs/devices/queries/devices/v1", headers=headers).status_code == 401
+

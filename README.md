@@ -690,6 +690,8 @@ search index=sentinelone OR index=crowdstrike OR index=msdefender
 
 All data is **in-memory** by default -- mutations survive until server restart or `/_dev/reset`.
 
+**What `/_dev/reset` resets:** every vendor's data back to the seed, HEC acknowledgement ids and the webhook delivery log; a running playbook is cancelled first, so none of its steps lands in the fresh data. What it keeps: OAuth bearer tokens (CrowdStrike, Defender, Graph, Sentinel) and Splunk session keys already issued, so an SDK that caches its token (falconpy, MSAL, splunklib) keeps working across a reset between tests; and the rate-limit and proxy configuration and the Prometheus counters. A server restart without `MOCKDR_PERSIST` starts with no tokens issued.
+
 **Optional persistence:** set `MOCKDR_PERSIST=/path/to/state.json` to save state across restarts. The server debounces writes (2 s) and uses atomic file replacement to prevent corruption. The snapshot records the version that wrote it; loading one from another release logs which, and a snapshot whose records no longer parse is moved to `state.json.corrupt` and the server seeds fresh rather than serve a hollowed-out store. In Docker the path must be on a writable volume — the compose file runs the container `read_only`.
 
 ## Configuration
@@ -748,7 +750,7 @@ Non-standard endpoints for tooling, test automation, and mock control:
 
 | Endpoint                        | Description                                                                         |
 | ------------------------------- | ----------------------------------------------------------------------------------- |
-| `POST /_dev/reset`              | Re-seed all data (all eight vendors)                                                |
+| `POST /_dev/reset`              | Re-seed all data (all eight vendors); issued tokens and sessions stay valid         |
 | `POST /_dev/scenario`           | Trigger a scenario (see [Scenarios](#scenarios) below)                              |
 | `GET /_dev/stats`               | Collection counts                                                                   |
 | `GET /_dev/tokens`              | All valid API tokens                                                                |
