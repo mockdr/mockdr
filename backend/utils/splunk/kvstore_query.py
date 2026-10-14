@@ -8,21 +8,16 @@ back regardless of what was asked for.
 """
 from __future__ import annotations
 
+import functools
 import json
 import re
 from collections.abc import Callable
 from typing import Any
 
+from utils.numbers import as_float
+from utils.safe_regex import UnsafeRegexError, check_regex
+
 __all__ = ["apply_fields", "apply_query", "apply_sort", "matches"]
-
-
-def _as_number(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _ordered(lhs: float, rhs: float, op: str) -> bool:
@@ -47,7 +42,7 @@ def _ordered_text(lhs: str, rhs: str, op: str) -> bool:
 
 def _compare(left: Any, right: Any, op: str) -> bool:
     """Compare numerically when both sides are numbers, else as text."""
-    left_num, right_num = _as_number(left), _as_number(right)
+    left_num, right_num = as_float(left), as_float(right)
     if left_num is None or right_num is None:
         return _ordered_text(str(left), str(right), op)
     return _ordered(left_num, right_num, op)
@@ -75,12 +70,31 @@ def _match_condition(value: Any, condition: Any) -> bool:
             if bool(operand) != (value is not None):
                 return False
         elif op == "$regex":
-            if not re.search(str(operand), str(value)):
+            pattern = _regex(str(operand))
+            if pattern is None or not pattern.search(str(value)):
                 return False
         else:
             # An operator we do not implement must not silently match.
             return False
     return True
+
+
+@functools.lru_cache(maxsize=256)
+def _regex(pattern: str) -> re.Pattern[str] | None:
+    """*pattern* compiled, or None when it cannot be run safely.
+
+    ``$regex`` went to ``re.search`` as it came: a pattern that does not
+    compile raised out of the handler as a 500, and ``^(a+)+$`` against a
+    thirty-character value held the worker for twenty-five seconds -- the
+    ReDoS foothold :mod:`utils.safe_regex` closes for Splunk's other regex
+    commands, Elasticsearch and KQL. Either selects nothing, as an
+    unparseable query does here.
+    """
+    try:
+        check_regex(pattern)
+        return re.compile(pattern)
+    except (re.error, UnsafeRegexError):
+        return None
 
 
 def matches(record: dict, query: dict) -> bool:
@@ -167,7 +181,7 @@ def _sorter(field: str) -> Callable[[dict], tuple[int, float, str]]:
     """Build a sort key function bound to *field*."""
     def key(record: dict) -> tuple[int, float, str]:
         value = record.get(field)
-        number = _as_number(value)
+        number = as_float(value)
         if number is not None:
             return (0, number, "")
         return (1, 0.0, str(value if value is not None else ""))

@@ -41,6 +41,24 @@ def test_spl_regex_command_refuses_the_hostile_pattern_promptly() -> None:
     assert messages[0]["type"] == "FATAL"
 
 
+def test_kvstore_regex_selects_nothing_promptly() -> None:
+    """The KV store's ``$regex`` ran unguarded: twenty-five seconds for this one."""
+    from utils.splunk.kvstore_query import apply_query
+
+    started = time.perf_counter()
+    found = apply_query([{"user": SUBJECT}], f'{{"user": {{"$regex": "{HOSTILE}"}}}}')
+    assert time.perf_counter() - started < 2
+    assert found == []
+
+
+def test_kvstore_regex_that_does_not_compile_selects_nothing() -> None:
+    """It raised re.error out of the handler as a 500."""
+    from utils.splunk.kvstore_query import apply_query
+
+    assert apply_query([{"user": "x"}], '{"user": {"$regex": "("}}') == []
+    assert apply_query([{"user": "abc"}], '{"user": {"$regex": "^a"}}') == [{"user": "abc"}]
+
+
 def test_spl_match_function_refuses_the_hostile_pattern_promptly() -> None:
     started = time.perf_counter()
     _rows, messages = execute_pipeline(
