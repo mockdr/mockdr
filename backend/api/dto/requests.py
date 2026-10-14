@@ -208,8 +208,14 @@ class FetchFilesBody(BaseModel):
 
 
 class RemoteScriptBody(BaseModel):
-    """POST /remote-scripts/execute."""
+    """POST /remote-scripts/execute.
+
+    ``filter`` names the agents, as on every agent action; without it here
+    the model dropped the member the swagger requires and every documented
+    call was refused as unscoped.
+    """
     data: dict = Field(default_factory=dict)
+    filter: dict = Field(default_factory=dict)
 
 
 # ── Deep Visibility ─────────────────────────────────────────────────────────
