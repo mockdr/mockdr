@@ -73,8 +73,9 @@ same Entra flow against the same tenant.
 
 `$count=true` on directory objects needs the `ConsistencyLevel: eventual`
 header, as real Graph does; without it Graph silently ignores the parameter
-and so does the mock (no `@odata.count`). Intune's `managedDevices` refuses it
-with `400 Request_UnsupportedQuery`.
+and so does the mock (no `@odata.count`). Intune's `managedDevices` does not
+ignore it: `$count=true` there without the header is
+`400 Request_UnsupportedQuery`.
 
 ## Quick Start
 
@@ -131,7 +132,7 @@ Different OAuth clients are associated with different license plans. Endpoints t
   "error": {
     "code": "Authorization_RequestDenied",
     "message": "This feature requires a higher license tier. Current plan: plan1. Required: plan2.",
-    "innerError": { "date": "...", "request-id": "..." }
+    "innerError": { "date": "...", "request-id": "...", "client-request-id": "..." }
   }
 }
 ```
@@ -157,6 +158,7 @@ Different OAuth clients are associated with different license plans. Endpoints t
 # Plan 1 token — should get 403 on hunting
 P1_TOKEN=$(curl -s -X POST http://localhost:8001/graph/oauth2/v2.0/token \
   -d "client_id=graph-mock-p1-client&client_secret=graph-mock-p1-secret&grant_type=client_credentials" \
+  -d "scope=https://graph.microsoft.com/.default" \
   | jq -r .access_token)
 
 # Users: 200 OK (any plan)
@@ -194,6 +196,11 @@ without them the mock answers `400 Request_UnsupportedQuery` like Graph.
 ### $count Example
 
 ```bash
+TOKEN=$(curl -s -X POST http://localhost:8001/graph/oauth2/v2.0/token \
+  -d "client_id=graph-mock-admin-client&client_secret=graph-mock-admin-secret&grant_type=client_credentials" \
+  -d "scope=https://graph.microsoft.com/.default" \
+  | jq -r .access_token)
+
 curl -H "Authorization: Bearer $TOKEN" \
   -H "ConsistencyLevel: eventual" \
   "http://localhost:8001/graph/v1.0/deviceManagement/managedDevices?\$count=true&\$top=1"

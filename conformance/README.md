@@ -94,6 +94,7 @@ did — the first `docker compose down -v` took the password with it. The
 `kibana-credentials` service sets it now, and the harness refuses to run at
 all if Kibana still reports itself unavailable.
 
+<!-- doc-examples: skip needs Docker and the real products -->
 ```bash
 docker compose up -d
 
@@ -213,6 +214,7 @@ are measuring precedes the action.** For an unknown query parameter,
 Elasticsearch and Kibana and splunkd all refuse before doing anything —
 provable in one request:
 
+<!-- doc-examples: skip measures a real Elasticsearch, not the mock -->
 ```bash
 curl -u … -XDELETE "$ES/an-index/_doc/an-id?zzzqqq=1"   # 400, unrecognized parameter
 curl -u … "$ES/an-index/_doc/an-id"                     # 200, the document is still there
@@ -295,6 +297,7 @@ everywhere.
 
 ## Tests
 
+<!-- doc-examples: skip runs the harness's own unit tests -->
 ```bash
 python -m pytest tests/ -q
 ```

@@ -14,11 +14,11 @@ A single `InMemoryStore` singleton (`backend/repository/store.py`) holds all sta
 ```python
 class InMemoryStore:
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._collections: dict[str, dict[str, Any]] = {
-            "agents": {}, "threats": {}, "sites": {}, ...  # 19 collections
+            "agents": {}, "threats": {}, "sites": {},  # ... one per collection
         }
-        self._activity_order: list[str] = []   # newest-first index
+        self._activity_order: deque[str] = deque(maxlen=10000)  # newest-first index
         self._request_log_order: list[str] = []  # capped at 500
 ```
 

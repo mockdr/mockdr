@@ -60,6 +60,7 @@ Commands run in the order they are written, so `| head 1 | sort _time` and
 does not implement is refused the way splunkd refuses an unknown one, rather
 than being ignored.
 
+<!-- doc-examples: skip a grammar, not a query -->
 ```spl
 search index=<index> sourcetype=<sourcetype> <field>=<value>
 | makeresults [count=<n>] [annotate=<bool>]
@@ -135,17 +136,24 @@ POST parameter — so pass it in the URL. HEC (`/services/collector`) always
 answers JSON and ignores the parameter, matching the real service.
 
 ### Search
+Parameters are form-encoded, as splunkd takes them. The search has to open
+with a command (`search ...` or `| makeresults`): only Splunk Web prepends the
+implicit `search`, and a REST search like `index=main | head 1` is refused with
+`400 Unknown search command 'index'.`, as splunkd refuses it.
 ```bash
-curl -X POST http://localhost:8001/splunk/services/search/jobs \
-  -H "Authorization: Basic YWRtaW46bW9ja2RyLWFkbWlu" \
-  -H "Content-Type: application/json" \
-  -d '{"search": "search index=sentinelone | head 5"}'
+SID=$(curl -s -u admin:mockdr-admin -X POST \
+  "http://localhost:8001/splunk/services/search/jobs?output_mode=json" \
+  --data-urlencode "search=search index=sentinelone | head 5" \
+  | jq -r .sid)
 ```
 
 ### Get Results
+With the `SID` from above:
+
+<!-- doc-examples: continue -->
 ```bash
-curl http://localhost:8001/splunk/services/search/v2/jobs/{sid}/results \
-  -H "Authorization: Basic YWRtaW46bW9ja2RyLWFkbWlu"
+curl -u admin:mockdr-admin \
+  "http://localhost:8001/splunk/services/search/v2/jobs/$SID/results?output_mode=json"
 ```
 
 ### Submit HEC Event
@@ -156,11 +164,18 @@ curl -X POST http://localhost:8001/splunk/services/collector/event \
 ```
 
 ### Update Notable
+`ruleUIDs` takes notable `event_id`s (semicolon-separated in the form); the
+answer says how many it updated.
 ```bash
-curl -X POST http://localhost:8001/splunk/services/notable_update \
-  -H "Authorization: Basic YWRtaW46bW9ja2RyLWFkbWlu" \
-  -H "Content-Type: application/json" \
-  -d '{"ruleUIDs": ["event-id"], "status": "2", "comment": "Investigating"}'
+EVENT_ID=$(curl -s -u admin:mockdr-admin -X POST \
+  "http://localhost:8001/splunk/services/search/jobs/export?output_mode=json" \
+  --data-urlencode 'search=search `notable` | head 1 | table event_id' \
+  | jq -r .result.event_id)
+
+curl -u admin:mockdr-admin -X POST \
+  "http://localhost:8001/splunk/services/notable_update?output_mode=json" \
+  --data-urlencode "ruleUIDs=$EVENT_ID" -d status=2 -d comment=Investigating
+# Response includes: "message": "Updated 1 notable event(s)"
 ```
 
 ### Server Info

@@ -98,9 +98,10 @@ orders custom logs by.
 
 ### Get OAuth2 Token
 ```bash
-curl -X POST http://localhost:8001/sentinel/oauth2/v2.0/token \
+TOKEN=$(curl -s -X POST http://localhost:8001/sentinel/oauth2/v2.0/token \
   -d "client_id=sentinel-mock-client-id&client_secret=sentinel-mock-client-secret&grant_type=client_credentials" \
-  --data-urlencode "scope=https://management.azure.com/.default"
+  --data-urlencode "scope=https://management.azure.com/.default" \
+  | jq -r .access_token)
 ```
 
 A token is for the resource its `scope` names, and each API takes only its
@@ -111,16 +112,26 @@ for the other one is refused with `InvalidAuthenticationTokenAudience` — 401
 from ARM, 403 from the query API.
 
 ### List Incidents
+With the management token from above:
+
+<!-- doc-examples: continue -->
 ```bash
 curl http://localhost:8001/sentinel/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mockdr-rg/providers/Microsoft.OperationalInsights/workspaces/mockdr-workspace/providers/Microsoft.SecurityInsights/incidents \
-  -H "Authorization: Bearer <token>" \
-  -G -d '$top=10'
+  -H "Authorization: Bearer $TOKEN" \
+  -G -d 'api-version=2024-03-01' -d '$top=10'
 ```
 
 ### Run KQL Query
+The query endpoint takes a token for Log Analytics, not the management one:
+
 ```bash
+LA_TOKEN=$(curl -s -X POST http://localhost:8001/sentinel/oauth2/v2.0/token \
+  -d "client_id=sentinel-mock-client-id&client_secret=sentinel-mock-client-secret&grant_type=client_credentials" \
+  --data-urlencode "scope=https://api.loganalytics.io/.default" \
+  | jq -r .access_token)
+
 curl -X POST http://localhost:8001/sentinel/v1/workspaces/mockdr-workspace/query \
-  -H "Authorization: Bearer <log-analytics-token>" \
+  -H "Authorization: Bearer $LA_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "SecurityIncident | take 5"}'
 ```

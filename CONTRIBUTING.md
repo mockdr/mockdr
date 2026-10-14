@@ -14,6 +14,7 @@ authorized representative confirm by commenting on the pull request.
 ## Development Setup
 
 ### Backend
+<!-- doc-examples: skip installs dependencies; checked by following the quick start from a clean clone -->
 ```bash
 cd backend
 python -m venv .venv
@@ -23,6 +24,7 @@ python -m uvicorn main:app --reload --port 8001
 ```
 
 ### Frontend
+<!-- doc-examples: skip installs dependencies -->
 ```bash
 cd frontend
 npm ci

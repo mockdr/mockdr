@@ -13,6 +13,7 @@
 
 ## Quick Start (Local)
 
+<!-- doc-examples: skip starts the dev servers; checked by following the quick start from a clean clone -->
 ```bash
 # From the project root:
 ./start.sh
@@ -24,11 +25,14 @@ dependencies, then starts both services:
 | Service              | URL                                          |
 |----------------------|----------------------------------------------|
 | SentinelOne API      | http://localhost:8001/web/api/v2.1            |
-| CrowdStrike API      | http://localhost:8001/ (e.g. `/oauth2/token`) |
-| MDE API              | http://localhost:8001/ (e.g. `/api/machines`) |
+| CrowdStrike API      | http://localhost:8001/cs                      |
+| MDE API              | http://localhost:8001/mde                     |
 | Elastic REST         | http://localhost:8001/elastic/               |
 | Kibana Security      | http://localhost:8001/kibana/                |
 | Cortex XDR API       | http://localhost:8001/xdr/public_api/v1      |
+| Splunk REST + HEC    | http://localhost:8001/splunk                  |
+| Microsoft Sentinel   | http://localhost:8001/sentinel                |
+| Microsoft Graph      | http://localhost:8001/graph                   |
 | Swagger              | http://localhost:8001/web/api/v2.1/doc        |
 | Frontend             | http://localhost:3000                         |
 
@@ -36,14 +40,16 @@ Press `Ctrl+C` to stop both.
 
 **Backend only** (no UI needed for integration testing):
 
+<!-- doc-examples: skip installs dependencies; checked by following the quick start from a clean clone -->
 ```bash
 cd backend
-source .venv/bin/activate   # or: python3 -m venv .venv && pip install -r requirements.txt
-PYTHONPATH=. uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # first time only
+PYTHONPATH=. .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ## Quick Start (Docker)
 
+<!-- doc-examples: skip needs Docker -->
 ```bash
 docker build -t mockdr .
 docker run -p 8001:5001 mockdr
@@ -111,16 +117,18 @@ Token TTL: 1799 seconds (matches real CrowdStrike).
 
 ```bash
 # Obtain a Bearer token
-TOKEN=$(curl -s -X POST http://localhost:8001/oauth2/token \
+TOKEN=$(curl -s -X POST http://localhost:8001/cs/oauth2/token \
   -d "client_id=cs-mock-admin-client&client_secret=cs-mock-admin-secret" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # List host IDs
-curl http://localhost:8001/devices/queries/devices/v1 \
+curl http://localhost:8001/cs/devices/queries/devices/v1 \
   -H "Authorization: Bearer $TOKEN"
 
 # Get host details
-curl "http://localhost:8001/devices/entities/devices/v2?ids=<host-id>" \
+HOST_ID=$(curl -s "http://localhost:8001/cs/devices/queries/devices/v1?limit=1" \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.resources[0]')
+curl "http://localhost:8001/cs/devices/entities/devices/v2?ids=$HOST_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -130,7 +138,7 @@ curl "http://localhost:8001/devices/entities/devices/v2?ids=<host-id>" \
 
 ### Authentication
 
-MDE uses Azure AD-style OAuth2 client credentials. First obtain a Bearer token, then use it on all subsequent requests.
+MDE uses Azure AD-style OAuth2 client credentials. First obtain a Bearer token, then use it on all subsequent requests. As with Entra, the token request needs `grant_type=client_credentials` and a `scope` of this API's `/.default` (`https://api.securitycenter.microsoft.com/.default`).
 
 ### Available Test Credentials
 
@@ -146,20 +154,21 @@ Token TTL: 3599 seconds (matches real Azure AD).
 
 ```bash
 # Obtain a Bearer token
-TOKEN=$(curl -s -X POST http://localhost:8001/oauth2/v2.0/token \
+TOKEN=$(curl -s -X POST http://localhost:8001/mde/oauth2/v2.0/token \
   -d "client_id=mde-mock-admin-client&client_secret=mde-mock-admin-secret&grant_type=client_credentials" \
+  -d "scope=https://api.securitycenter.microsoft.com/.default" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # List machines
-curl http://localhost:8001/api/machines \
+curl http://localhost:8001/mde/api/machines \
   -H "Authorization: Bearer $TOKEN"
 
 # List machines with OData filter
-curl "http://localhost:8001/api/machines?\$filter=osPlatform%20eq%20'Windows10'" \
+curl "http://localhost:8001/mde/api/machines?\$filter=osPlatform%20eq%20'Windows10'" \
   -H "Authorization: Bearer $TOKEN"
 
 # List alerts
-curl http://localhost:8001/api/alerts \
+curl http://localhost:8001/mde/api/alerts \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -174,7 +183,7 @@ Elastic Security supports two authentication mechanisms:
 - **Basic Auth**: `Authorization: Basic base64(user:pass)`
 - **API Key Auth**: `Authorization: ApiKey base64(id:key)`
 
-Kibana endpoints also require `kbn-xsrf: true` header on non-GET requests.
+Kibana endpoints also require a `kbn-xsrf` header (any value) on non-GET requests, as Kibana does; every Kibana API is also served under the default space, `/kibana/s/default/api/...`.
 
 ### Available Test Credentials
 
@@ -187,17 +196,21 @@ Kibana endpoints also require `kbn-xsrf: true` header on non-GET requests.
 ### Example curl — Elasticsearch REST
 
 ```bash
-# Search endpoints (Basic Auth)
-curl http://localhost:8001/elastic/.fleet-agents/_search \
+# List the indices
+curl "http://localhost:8001/elastic/_cat/indices?format=json" \
+  -u "elastic:mock-elastic-password"
+
+# Search the security alerts (Basic Auth)
+curl http://localhost:8001/elastic/.alerts-security.alerts-default/_search \
   -u "elastic:mock-elastic-password" \
   -H "Content-Type: application/json" \
   -d '{"query": {"match_all": {}}}'
 
 # Search with query DSL
-curl http://localhost:8001/elastic/.fleet-agents/_search \
+curl http://localhost:8001/elastic/.alerts-security.alerts-default/_search \
   -u "elastic:mock-elastic-password" \
   -H "Content-Type: application/json" \
-  -d '{"query": {"bool": {"must": [{"term": {"status": "online"}}]}}}'
+  -d '{"query": {"bool": {"filter": [{"term": {"kibana.alert.severity": "high"}}]}}}'
 ```
 
 ### Example curl — Kibana Security API
@@ -207,18 +220,25 @@ curl http://localhost:8001/elastic/.fleet-agents/_search \
 curl http://localhost:8001/kibana/api/detection_engine/rules/_find \
   -u "elastic:mock-elastic-password"
 
-# List security alerts
-curl http://localhost:8001/kibana/api/detection_engine/alerts/_search \
+# List endpoints
+curl http://localhost:8001/kibana/api/endpoint/metadata \
+  -u "elastic:mock-elastic-password"
+
+# Search security alerts (requires kbn-xsrf header)
+curl -X POST http://localhost:8001/kibana/api/detection_engine/signals/search \
   -u "elastic:mock-elastic-password" \
   -H "Content-Type: application/json" \
-  -d '{"query": {"match_all": {}}}'
+  -H "kbn-xsrf: true" \
+  -d '{"query": {"match_all": {}}, "size": 10}'
 
-# Create a case (requires kbn-xsrf header)
+# Create a case (requires kbn-xsrf header, and the members Kibana requires)
 curl -X POST http://localhost:8001/kibana/api/cases \
   -u "elastic:mock-elastic-password" \
   -H "Content-Type: application/json" \
   -H "kbn-xsrf: true" \
-  -d '{"title": "Test case", "description": "Created via curl", "tags": ["test"]}'
+  -d '{"title": "Test case", "description": "Created via curl", "tags": ["test"],
+       "owner": "securitySolution", "settings": {"syncAlerts": true},
+       "connector": {"id": "none", "name": "none", "type": ".none", "fields": null}}'
 ```
 
 ---
@@ -227,7 +247,9 @@ curl -X POST http://localhost:8001/kibana/api/cases \
 
 ### Authentication
 
-Cortex XDR uses HMAC-based authentication. Every request requires four headers:
+Both Cortex XDR security levels are accepted. A **standard** key sends
+`x-xdr-auth-id` and the key itself as `Authorization`. An **advanced** key
+never leaves the client and sends four headers:
 
 | Header              | Value                                              |
 |---------------------|----------------------------------------------------|
@@ -249,7 +271,7 @@ Cortex XDR uses HMAC-based authentication. Every request requires four headers:
 ```bash
 # Generate HMAC auth headers
 NONCE=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-TIMESTAMP=$(python3 -c "import int(time.time()*1000)") # epoch ms
+TIMESTAMP=$(python3 -c "import time; print(int(time.time()*1000))") # epoch ms
 KEY="xdr-admin-secret"
 AUTH=$(python3 -c "
 import hashlib, sys
@@ -258,7 +280,7 @@ print(hashlib.sha256((key + nonce + ts).encode()).hexdigest())
 " "$KEY" "$NONCE" "$TIMESTAMP")
 
 # List incidents
-curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents \
+curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents/ \
   -H "x-xdr-auth-id: 1" \
   -H "x-xdr-nonce: $NONCE" \
   -H "x-xdr-timestamp: $TIMESTAMP" \
@@ -267,7 +289,7 @@ curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents \
   -d '{"request_data": {}}'
 
 # Get alerts
-curl -X POST http://localhost:8001/xdr/public_api/v1/alerts/get_alerts \
+curl -X POST http://localhost:8001/xdr/public_api/v1/alerts/get_alerts_multi_events/ \
   -H "x-xdr-auth-id: 1" \
   -H "x-xdr-nonce: $NONCE" \
   -H "x-xdr-timestamp: $TIMESTAMP" \
@@ -280,11 +302,16 @@ curl -X POST http://localhost:8001/xdr/public_api/v1/alerts/get_alerts \
 
 All XDR endpoints use POST with a JSON body. Requests are wrapped in `request_data`, responses in `reply`:
 
-```json
-// Request
-{"request_data": {"filters": [{"field": "severity", "operator": "in", "value": ["high"]}]}}
+Request:
 
-// Response
+```json
+{"request_data": {"filters": [{"field": "severity", "operator": "in", "value": ["high"]}]}}
+```
+
+Response (abridged):
+
+<!-- doc-examples: skip abridged with an ellipsis -->
+```json
 {"reply": {"total_count": 5, "result_count": 5, "incidents": [...]}}
 ```
 
@@ -292,7 +319,7 @@ All XDR endpoints use POST with a JSON body. Requests are wrapped in `request_da
 
 ## Configuring a SOAR Platform (e.g. Cortex XSOAR, Splunk SOAR)
 
-Point your SOAR integration at the mock server. All four vendor APIs are served from the same host and port.
+Point your SOAR integration at the mock server. All eight vendor APIs are served from the same host and port, each under its own prefix.
 
 ### Cortex XSOAR — SentinelOne example
 
@@ -317,7 +344,7 @@ Point your SOAR integration at the mock server. All four vendor APIs are served 
 
 | Field              | Value                                          |
 |--------------------|------------------------------------------------|
-| **Server URL**     | `http://<host>:8001`                           |
+| **Server URL**     | `http://<host>:8001/cs`                        |
 | **Client ID**      | `cs-mock-admin-client`                         |
 | **Client Secret**  | `cs-mock-admin-secret`                         |
 | **Trust any cert** | Checked                                        |
@@ -329,7 +356,7 @@ Point your SOAR integration at the mock server. All four vendor APIs are served 
 
 | Field              | Value                                          |
 |--------------------|------------------------------------------------|
-| **Server URL**     | `http://<host>:8001`                           |
+| **Server URL**     | `http://<host>:8001/mde`                       |
 | **Client ID**      | `mde-mock-admin-client`                        |
 | **Client Secret**  | `mde-mock-admin-secret`                        |
 | **Trust any cert** | Checked                                        |
@@ -350,13 +377,14 @@ Point your SOAR integration at the mock server. All four vendor APIs are served 
 | **Deep Visibility**  | Returns synthetic process/network events; query finishes in ~2 seconds |
 | **Webhooks**         | Actually POSTs to subscribed URLs with HMAC signature        |
 | **Rate limiting**    | Configurable via `/_dev/rate-limit` (off by default)         |
-| **Pagination**       | Cursor-based (S1), offset/limit (CS), OData (MDE), ES standard (Elastic), search_after (XDR) — all matching real vendor formats |
+| **Pagination**       | Cursor-based (S1), offset/limit (CS), OData (MDE, Graph), ES standard (Elastic), search_from/search_to (XDR) — all matching real vendor formats |
 | **Error format**     | Vendor-specific error envelopes preserved per vendor         |
 
 ---
 
 ## Seed Data Counts (configurable via env vars)
 
+<!-- doc-examples: skip environment settings, not a command -->
 ```bash
 SEED_COUNT_AGENTS=60    # default
 SEED_COUNT_THREATS=30   # default
@@ -364,6 +392,8 @@ SEED_COUNT_ALERTS=20    # default
 ```
 
 Override at startup:
+
+<!-- doc-examples: skip starts a server -->
 ```bash
 SEED_COUNT_AGENTS=200 SEED_COUNT_THREATS=100 uvicorn main:app --port 8001
 ```
@@ -469,7 +499,7 @@ curl http://localhost:8001/web/api/v2.1/_dev/requests \
 curl -X POST http://localhost:8001/web/api/v2.1/_dev/scenario \
   -H "Authorization: ApiToken admin-token-0000-0000-000000000001" \
   -H "Content-Type: application/json" \
-  -d '{"scenario": "ransomware_outbreak"}'
+  -d '{"scenario": "mass_infection"}'
 ```
 
 ### 4. Export / import snapshots
@@ -486,9 +516,11 @@ curl -X POST http://localhost:8001/web/api/v2.1/_dev/import \
 ```
 
 ### 5. Use the Postman collection
-Import `postman_collection.json` from this directory. It includes all endpoints
-with pre-configured auth and example request bodies. Set the `baseUrl` variable
-if your mock runs on a different host/port.
+Import `postman_collection.json` from this directory for the SentinelOne API,
+or `postman/mockdr.postman_collection.json` at the repository root for all
+eight vendors (a Bruno collection of the same lives in `bruno/mockdr`). Each
+comes with pre-configured auth and example request bodies; set the base URL
+variables if your mock runs on a different host/port.
 
 ### 6. Simulate rate limiting
 ```bash

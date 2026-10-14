@@ -42,6 +42,7 @@ SOAR playbooks, SIEM connectors, and automation scripts point at mockdr without 
 
 ### One command (no Docker)
 
+<!-- doc-examples: skip starts the dev servers; checked by following the quick start from a clean clone -->
 ```bash
 ./start.sh
 ```
@@ -52,6 +53,7 @@ SOAR playbooks, SIEM connectors, and automation scripts point at mockdr without 
 
 ### Docker
 
+<!-- doc-examples: skip needs Docker -->
 ```bash
 docker-compose up --build
 ```
@@ -69,6 +71,7 @@ Free tier -- no credit card required. Deploys the Docker image with default seed
 
 ### Manual
 
+<!-- doc-examples: skip installs dependencies; checked by following the quick start from a clean clone -->
 ```bash
 # Backend
 cd backend
@@ -123,7 +126,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/cs/devices/queries/
 
 ### Microsoft Defender for Endpoint
 
-OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, and `grant_type=client_credentials`. The tenant-scoped URL real Entra uses — `/mde/{tenant}/oauth2/v2.0/token`, with tenant `a1b2c3d4-e5f6-7890-abcd-ef1234567890` or the verified domain `acmecorp.onmicrosoft.com` — is accepted too, so MSAL-shaped clients work unchanged. The same applies to `/graph` and `/sentinel`; see the [Graph integration guide](docs/graph-integration-guide.md) for tenant validation and `MOCKDR_STRICT_TENANT`.
+OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, `grant_type=client_credentials` and `scope=https://api.securitycenter.microsoft.com/.default` — Entra requires the scope on this grant, and a request without it is answered `400 invalid_request`. The tenant-scoped URL real Entra uses — `/mde/{tenant}/oauth2/v2.0/token`, with tenant `a1b2c3d4-e5f6-7890-abcd-ef1234567890` or the verified domain `acmecorp.onmicrosoft.com` — is accepted too, so MSAL-shaped clients work unchanged. The same applies to `/graph` and `/sentinel`; see the [Graph integration guide](docs/graph-integration-guide.md) for tenant validation and `MOCKDR_STRICT_TENANT`.
 
 | Role    | Client ID                 | Client Secret             |
 | ------- | ------------------------- | ------------------------- |
@@ -134,6 +137,7 @@ OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8001/mde/oauth2/v2.0/token \
   -d "client_id=mde-mock-admin-client&client_secret=mde-mock-admin-secret&grant_type=client_credentials" \
+  -d "scope=https://api.securitycenter.microsoft.com/.default" \
   | jq -r .access_token)
 
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/mde/api/machines
@@ -239,7 +243,7 @@ curl -H "Authorization: Splunk $SESSION" \
 
 ### Microsoft Sentinel
 
-OAuth2 client credentials flow. POST to `/sentinel/oauth2/v2.0/token` with `client_id` + `client_secret` to receive a Bearer token.
+OAuth2 client credentials flow. POST to `/sentinel/oauth2/v2.0/token` with `client_id`, `client_secret`, `grant_type=client_credentials` and a `scope` to receive a Bearer token. The scope names the API the token is for, and each API takes only its own: `https://management.azure.com/.default` for the management plane, `https://api.loganalytics.io/.default` for the Log Analytics query endpoint. See the [Sentinel integration guide](docs/sentinel-integration-guide.md).
 
 | Client ID                 | Client Secret                 |
 | ------------------------- | ----------------------------- |
@@ -250,6 +254,7 @@ Management-plane requests require `?api-version=`, exactly as Azure Resource Man
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8001/sentinel/oauth2/v2.0/token \
   -d "client_id=sentinel-mock-client-id&client_secret=sentinel-mock-client-secret" \
+  -d "grant_type=client_credentials&scope=https://management.azure.com/.default" \
   | jq -r .access_token)
 
 WS=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mockdr-rg
@@ -262,7 +267,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### Microsoft Graph API
 
-OAuth2 client credentials flow with **plan-based feature gating**. POST to `/graph/oauth2/v2.0/token` with `client_id`, `client_secret`, and `grant_type=client_credentials`.
+OAuth2 client credentials flow with **plan-based feature gating**. POST to `/graph/oauth2/v2.0/token` with `client_id`, `client_secret`, `grant_type=client_credentials` and `scope=https://graph.microsoft.com/.default`.
 
 | Role | Client ID | Client Secret | Plan |
 |---|---|---|---|
@@ -288,7 +293,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 # Plan gating: Plan 1 gets 403 on advanced hunting
 P1_TOKEN=$(curl -s -X POST http://localhost:8001/graph/oauth2/v2.0/token \
-  -d "client_id=graph-mock-p1-client&client_secret=graph-mock-p1-secret&grant_type=client_credentials" \
+  -d "client_id=graph-mock-p1-client&client_secret=graph-mock-p1-secret&grant_type=client_credentials&scope=https://graph.microsoft.com/.default" \
   | jq -r .access_token)
 curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/json" \
   -d '{"Query":"DeviceProcessEvents | take 5"}' \
@@ -318,13 +323,13 @@ pass.
 ### A write to Elasticsearch is not searchable until a refresh
 
 ```bash
-curl -u elastic:mock-elastic-password -XPOST localhost:5001/elastic/my-index/_doc/1 \
+curl -u elastic:mock-elastic-password -XPOST localhost:8001/elastic/my-index/_doc/1 \
      -H 'Content-Type: application/json' -d '{"a":1}'
-curl -u elastic:mock-elastic-password localhost:5001/elastic/my-index/_search
+curl -u elastic:mock-elastic-password localhost:8001/elastic/my-index/_search
 # hits.total.value: 0
 
-curl -u elastic:mock-elastic-password -XPOST localhost:5001/elastic/my-index/_refresh
-curl -u elastic:mock-elastic-password localhost:5001/elastic/my-index/_search
+curl -u elastic:mock-elastic-password -XPOST localhost:8001/elastic/my-index/_refresh
+curl -u elastic:mock-elastic-password localhost:8001/elastic/my-index/_search
 # hits.total.value: 1
 ```
 
@@ -341,13 +346,15 @@ A filter the vendor documents as `integer`, `boolean` or a timestamp is
 checked before it is applied:
 
 ```bash
+TOKEN=admin-token-0000-0000-000000000001
+
 # 400, in SentinelOne's own validation envelope
 curl -H "Authorization: ApiToken $TOKEN" \
-     'localhost:5001/web/api/v2.1/agents?coreCount__lt=abc'
+     'localhost:8001/web/api/v2.1/agents?coreCount__lt=abc'
 curl -H "Authorization: ApiToken $TOKEN" \
-     'localhost:5001/web/api/v2.1/threats?resolved=maybe'
+     'localhost:8001/web/api/v2.1/threats?resolved=maybe'
 curl -H "Authorization: ApiToken $TOKEN" \
-     'localhost:5001/web/api/v2.1/agents?createdAt__gte=not-a-date'
+     'localhost:8001/web/api/v2.1/agents?createdAt__gte=not-a-date'
 ```
 
 Earlier releases answered `200` to all three and quietly ignored the filter,
@@ -535,7 +542,7 @@ Time modifiers (`earliest=-24h@h latest=now`) and the `` `notable` `` macro are 
 # Run a one-shot search
 curl -u admin:mockdr-admin -X POST \
   "http://localhost:8001/splunk/services/search/jobs/export" \
-  -d 'search=search index=sentinelone sourcetype=sentinelone:channel:threats | stats count by classification | sort -count' \
+  -d 'search=search index=sentinelone sourcetype=sentinelone:channel:threats | stats count by threatInfo.classification | sort -count' \
   -d 'output_mode=json'
 ```
 
@@ -548,8 +555,14 @@ Tables: `DeviceInfo`, `DeviceNetworkEvents`, `AlertInfo`, `AlertEvidence`, `Devi
 Operators: `where`, `project`, `project-away`, `extend`, `summarize ... by`, `order by`, `take`/`limit`, `top`, `distinct`, `count` — with `==`, `!=`, `<`, `>`, `contains`, `startswith`, `endswith`, `has`, `in`, `matches regex`, combined with `and`/`or`/`not`; time via `ago(7d)`, `now()` and `datetime(2026-10-01)`.
 
 ```bash
+TOKEN=$(curl -s -X POST http://localhost:8001/mde/oauth2/v2.0/token \
+  -d "client_id=mde-mock-admin-client&client_secret=mde-mock-admin-secret&grant_type=client_credentials" \
+  -d "scope=https://api.securitycenter.microsoft.com/.default" \
+  | jq -r .access_token)
+
 curl -H "Authorization: Bearer $TOKEN" -X POST \
   "http://localhost:8001/mde/api/advancedqueries/run" \
+  -H "Content-Type: application/json" \
   -d '{"Query":"DeviceInfo | where OSPlatform == \"Windows10\" | summarize Devices=count() by HealthStatus | order by Devices desc"}'
 ```
 
@@ -607,7 +620,7 @@ A query naming a table that does not exist, or an operator the engine does not i
 
 ## Seed Data
 
-Deterministic seed (`random.seed(42)` + `Faker.seed(42)`) -- same data every cold start. Reset at any time via the DEV panel or `POST /_dev/reset`.
+Deterministic seed (`random.seed(42)` + `Faker.seed(42)`) -- same data every cold start. Reset at any time via the DEV panel or `POST /web/api/v2.1/_dev/reset` (see [DEV Endpoints](#dev-endpoints)).
 
 ### SentinelOne
 
@@ -683,17 +696,22 @@ All five EDR vendor data sets are **replayed into Splunk indexes** with realisti
 
 #### Training Examples
 
-```bash
+Events keep each product's own field names, flattened with dots the way
+Splunk's JSON extraction names them — `threatInfo.classification`,
+`event.Severity` — and a notable's `status` is the numeric code, with the
+label in `status_label`.
+
+```spl
 # List all SentinelOne threats by classification
 search index=sentinelone sourcetype=sentinelone:channel:threats
-  | stats count by classification | sort -count
+  | stats count by threatInfo.classification | sort -count
 
-# Find high-severity CrowdStrike detections
-search index=crowdstrike sourcetype="CrowdStrike:Event:Streams:JSON"
-  | where Severity>=4 | table _time ComputerName DetectName Severity
+# Find high-severity CrowdStrike detections (Severity runs 10-100)
+search index=crowdstrike metadata.eventType=EppDetectionSummaryEvent event.Severity>=70
+  | table _time event.Hostname event.Name event.Severity
 
 # Triage open notable events across all EDR vendors
-search `notable` | where status="New"
+search `notable` status_label="New"
   | table _time rule_name severity src dest owner
 
 # Cross-vendor threat overview
@@ -792,7 +810,16 @@ Floating bug icon (bottom-right corner of the UI):
 
 ## DEV Endpoints
 
-Non-standard endpoints for tooling, test automation, and mock control:
+Non-standard endpoints for tooling, test automation, and mock control. They
+live under the SentinelOne prefix, `/web/api/v2.1` — `POST /_dev/reset` below is
+`POST http://localhost:8001/web/api/v2.1/_dev/reset` — and take the S1 admin
+token; the one exception is `POST /_dev/webhook-sink`, which a webhook sender
+calls without credentials.
+
+```bash
+curl -X POST http://localhost:8001/web/api/v2.1/_dev/reset \
+  -H "Authorization: ApiToken admin-token-0000-0000-000000000001"
+```
 
 | Endpoint                        | Description                                                                         |
 | ------------------------------- | ----------------------------------------------------------------------------------- |
@@ -1043,6 +1070,7 @@ The action starts the server, waits for it to be healthy, and exposes `base-url`
 
 ## Docker
 
+<!-- doc-examples: skip needs Docker -->
 ```bash
 # Build and run
 docker build -t mockdr .
