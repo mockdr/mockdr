@@ -20,7 +20,8 @@ router = APIRouter(tags=["CrowdStrike Host Groups"])
 def list_host_groups(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=500),
+    # gofalcon query_combined_host_groups_parameters.go: "[1-5000]"
+    limit: int = Query(100, ge=1, le=5000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
@@ -32,7 +33,8 @@ def list_host_groups(
 def query_host_groups(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=500),
+    # gofalcon query_host_groups_parameters.go: "[1-5000]"
+    limit: int = Query(100, ge=1, le=5000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
@@ -172,7 +174,8 @@ def query_host_group_members(
     id: str = Query(...),
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=500),
+    # gofalcon query_group_members_parameters.go: "[1-5000]"
+    limit: int = Query(100, ge=1, le=5000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
@@ -185,7 +188,8 @@ def list_group_members(
     id: str = Query(...),
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=1000),
+    # gofalcon query_combined_group_members_parameters.go: "[1-5000]"
+    limit: int = Query(100, ge=1, le=5000),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return hosts that are members of the specified host group."""

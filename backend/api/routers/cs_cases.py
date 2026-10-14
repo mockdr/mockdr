@@ -18,7 +18,8 @@ router = APIRouter(tags=["CrowdStrike Cases"])
 def query_case_ids(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=500),
+    # gofalcon queries_cases_get_v1_parameters.go: "max: 10000"
+    limit: int = Query(100, ge=1, le=10000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:

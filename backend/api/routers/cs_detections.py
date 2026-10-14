@@ -32,7 +32,8 @@ def _id_list(body: dict) -> list[str]:
 def query_detections(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=1000),
+    # gofalcon query_v2_parameters.go: "max: 10000"
+    limit: int = Query(100, ge=1, le=10000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:

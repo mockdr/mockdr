@@ -18,7 +18,8 @@ router = APIRouter(tags=["CrowdStrike Discover"])
 @router.get("/discover/combined/applications/v1")
 def combined_applications(
     filter: str = Query(None),
-    limit: int = Query(100, ge=1, le=100),
+    # gofalcon combined_applications_parameters.go: "(Min: 1, Max: 1000, Default: 100)"
+    limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0),
     sort: str = Query(None),
     after: str = Query(None),

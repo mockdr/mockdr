@@ -14,16 +14,33 @@ from utils.cs_response import build_cs_error_response, query_ids, require_list
 
 router = APIRouter(tags=["CrowdStrike Hosts"])
 
+#: How far ``/devices/queries/devices/v1`` pages before the scroll route has
+#: to take over (falconpy discussion #536).
+_QUERY_WINDOW = 10000
+
 
 @router.get("/devices/queries/devices/v1")
 def query_hosts(
     filter: str = Query(None),
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=1000),
+    # gofalcon query_devices_by_filter_parameters.go: "[1-5000]"
+    limit: int = Query(100, ge=1, le=5000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
-    """Return host device IDs matching an optional FQL filter."""
+    """Return host device IDs matching an optional FQL filter.
+
+    This route only pages through the first 10,000 hosts; past that Falcon
+    sends a client to the scroll route. Measured in falconpy discussion
+    #536: ``offset=10000, limit=1`` answers 400 ``limit + offset must be
+    less than 10000``. The mock answered 200 with an empty page, which a
+    client reads as "no more hosts" and stops — on a fleet larger than
+    10,000 it silently loses the rest.
+    """
+    if offset + limit >= _QUERY_WINDOW:
+        raise HTTPException(status_code=400, detail=build_cs_error_response(
+            400, f"limit + offset must be less than {_QUERY_WINDOW}",
+        ))
     return host_queries.query_host_ids(filter, offset, limit, sort)
 
 
@@ -31,7 +48,8 @@ def query_hosts(
 def query_hosts_scroll(
     filter: str = Query(None),
     offset: str = Query(None),
-    limit: int = Query(5000, ge=1, le=5000),
+    # gofalcon query_devices_by_filter_scroll_parameters.go: "[1-10000]"
+    limit: int = Query(5000, ge=1, le=10000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
@@ -48,7 +66,8 @@ def query_hosts_scroll(
 def list_hidden_devices(
     filter: str = Query(None),  # noqa: A002 - Falcon's own parameter name
     offset: int = Query(0),
-    limit: int = Query(100, ge=1, le=5000),
+    # gofalcon combined_hidden_devices_by_filter_parameters.go: "[1-10000]"
+    limit: int = Query(100, ge=1, le=10000),
     sort: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
