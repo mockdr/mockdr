@@ -234,14 +234,20 @@ class TestFireEvent:
         assert "passphrase" not in body
         assert "localIp" not in body
 
+    @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post", side_effect=Exception("connection refused"))
-    def test_delivery_failure_does_not_raise(self, mock_post) -> None:
-        mock_post.return_value = _ok()
-        """Transport errors should be swallowed (best-effort delivery)."""
+    def test_delivery_failure_does_not_raise(self, mock_post, mock_sleep) -> None:
+        """Transport errors should be swallowed (best-effort delivery).
+
+        The backoff is patched out: the three attempts are what is under
+        test, not the three seconds between them.
+        """
         self._create_sub(["threat.updated"])
         # Should not raise
         fire_event("threat.updated", {"id": "t1"})
         wait_for_deliveries()
+        assert mock_post.call_count == 3
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [1, 2]
 
     @patch("application.webhooks.commands.httpx.post")
     def test_no_subscriptions_is_noop(self, mock_post) -> None:

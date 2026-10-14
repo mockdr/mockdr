@@ -77,6 +77,10 @@ markers = [
 # ── Coverage ───────────────────────────────────────────────────────────────────
 
 [tool.coverage.run]
+# sys.monitoring rather than settrace, as CI already asks through
+# COVERAGE_CORE: the same numbers, and the full suite at -n 8 in 172 s
+# instead of 272 s here. Pythons before 3.12 fall back to the default core.
+core = "sysmon"
 source = ["."]
 omit = ["tests/*", "infrastructure/seed*", ".venv/*", "main.py"]
 

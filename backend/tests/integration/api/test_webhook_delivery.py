@@ -121,14 +121,25 @@ class TestWebhookDelivery:
         wait_for_deliveries()
         mock_post.assert_not_called()
 
+    @patch("application.webhooks.commands.time.sleep")
     @patch("application.webhooks.commands.httpx.post", side_effect=ConnectionError("refused"))
-    def test_fire_event_logs_delivery_failure(self, mock_post: MagicMock) -> None:
-        """Delivery failures should be logged, not raised."""
-        mock_post.return_value = MagicMock(status_code=200)
+    def test_fire_event_logs_delivery_failure(
+        self, mock_post: MagicMock, mock_sleep: MagicMock,
+    ) -> None:
+        """Delivery failures should be logged, not raised -- after every retry."""
+        from application.webhooks.delivery_log import list_entries
+
         self._create_subscription()
         # Should not raise
         fire_event("threat.created", {"id": "t1"})
         wait_for_deliveries()
+        assert mock_post.call_count == 3
+        assert mock_sleep.call_count == 2
+        # The log is process-wide and outlives the seed: only this test's own.
+        failures = [d for d in list_entries()
+                    if d["status"] == "failure" and d["subscription_id"] == "test-sub-1"
+                    and d["event_type"] == "threat.created"]
+        assert sorted(d["attempt"] for d in failures) == [1, 2, 3]
 
     @patch("application.webhooks.commands.httpx.post")
     def test_fire_event_strips_internal_threat_fields(self, mock_post: MagicMock) -> None:
