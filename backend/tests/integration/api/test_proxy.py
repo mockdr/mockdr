@@ -1,6 +1,8 @@
 """Integration tests for the recording proxy management endpoints."""
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 
 import application.proxy._state as _state
@@ -15,8 +17,18 @@ from domain.proxy_recording import (
 
 
 @pytest.fixture(autouse=True)
-def reset_proxy(client: object) -> None:  # type: ignore[override]
-    """Reset proxy state before each test."""
+def reset_proxy(client: object) -> Iterator[None]:  # type: ignore[override]
+    """Turn the proxy off around each test, after as well as before.
+
+    The proxy's state lives in module globals, outside the store the seed
+    clears. Reset only before, the last test here left replay mode on with
+    a Falcon recording, and whichever test the worker ran next got the
+    recorded ``{"resources": ["cs-recorded"]}`` for the Falcon host listing
+    -- ``TestAnActionThatSettles`` found no host to contain.
+    """
+    _state._config = ProxyConfig(mode="off")
+    _state._recordings.clear()
+    yield
     _state._config = ProxyConfig(mode="off")
     _state._recordings.clear()
 
