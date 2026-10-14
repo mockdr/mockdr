@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.mde_auth import require_mde_auth
 from application.mde_software import queries as software_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response
 
 router = APIRouter(tags=["MDE Software"])
@@ -27,6 +28,7 @@ def list_software(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all software in the TVM inventory with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "software")
     return software_queries.list_software(filter_str, top, skip, orderby, select)
 
 

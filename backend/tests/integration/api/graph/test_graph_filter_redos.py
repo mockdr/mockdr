@@ -56,6 +56,29 @@ class TestHostileFilterIsRejectedQuickly:
         )
         assert status in (200, 400)
 
+    def test_a_long_slash_path_returns_promptly(
+        self, client: TestClient, graph_admin_headers: dict,
+    ) -> None:
+        """`a/a/a/...`: every segment starts a word, so `\\b` did not anchor it.
+
+        32KB of it cost over seven seconds across the lambda patterns once the
+        primitive-collection forms (`groupTypes/any(c:c eq 'Unified')`) were
+        added; they now anchor to the start of the whole path.
+        """
+        def ask(expression: str) -> float:
+            start = time.perf_counter()
+            client.get("/graph/v1.0/users", params={"$filter": expression},
+                       headers=graph_admin_headers)
+            return time.perf_counter() - start
+
+        ordinary_filter = "groupTypes/any(c:c eq 'Unified')"
+        ask(ordinary_filter)
+        ordinary = ask(ordinary_filter)
+        elapsed = ask("a/" * 16_000)
+        assert elapsed < ordinary * _HOSTILE_COST_LIMIT + _NOISE_FLOOR_SECONDS, (
+            f"slash path cost {elapsed:.3f}s against {ordinary:.3f}s"
+        )
+
     def test_cost_grows_linearly_not_quadratically(
         self, client: TestClient, graph_admin_headers: dict,
     ) -> None:

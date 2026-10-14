@@ -63,7 +63,7 @@ onMounted(async () => {
     await ensureMdeAuth()
     const [machineRes, alertsRes] = await Promise.all([
       mdeMachinesApi.get(id),
-      mdeAlertsApi.list({ $filter: `machineId eq '${id}'`, $top: 50 }),
+      mdeAlertsApi.forMachine(id),
     ])
     machine.value = machineRes
     alerts.value = alertsRes.value ?? []

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.mde_auth import require_mde_auth, require_mde_write
 from application.mde_alerts import commands as alert_commands
 from application.mde_alerts import queries as alert_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response, build_mde_list_response
 
 router = APIRouter(tags=["MDE Alerts"])
@@ -29,6 +30,7 @@ def list_alerts(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all alerts with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "alerts")
     return alert_queries.list_alerts(filter_str, top, skip, orderby, select, count)
 
 

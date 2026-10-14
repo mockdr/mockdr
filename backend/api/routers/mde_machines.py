@@ -13,6 +13,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.mde_auth import require_mde_auth, require_mde_write
 from application.mde_machines import commands as machine_commands
 from application.mde_machines import queries as machine_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response
 
 # NOTE: The SoftwareInventoryExport endpoint is on mde_software router.
@@ -53,6 +54,7 @@ def list_machines(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all machines with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "machines")
     return machine_queries.list_machines(filter_str, top, skip, orderby, select, count)
 
 

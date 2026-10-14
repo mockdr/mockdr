@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.mde_auth import require_mde_auth
 from application.mde_machine_actions import queries as action_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response
 
 router = APIRouter(tags=["MDE Machine Actions"])
@@ -26,6 +27,7 @@ def list_machine_actions(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all machine actions with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "machineactions")
     return action_queries.list_machine_actions(filter_str, top, skip, orderby)
 
 

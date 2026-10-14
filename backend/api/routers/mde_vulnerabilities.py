@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.mde_auth import require_mde_auth
 from application.mde_vulnerabilities import queries as vuln_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response
 
 router = APIRouter(tags=["MDE Vulnerabilities"])
@@ -27,6 +28,7 @@ def list_vulnerabilities(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all vulnerabilities with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "vulnerabilities")
     return vuln_queries.list_vulnerabilities(filter_str, top, skip, orderby, select)
 
 

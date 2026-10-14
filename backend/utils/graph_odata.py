@@ -54,14 +54,41 @@ def select_fields(record: dict | None, select: str | None) -> dict | None:
 # Lambda pre-processor
 # ---------------------------------------------------------------------------
 
-# The leading \b matters for more than tidiness: without it the engine retries
-# the match at every offset inside a long word run, and each retry scans to the
-# end — quadratic. A 32KB filter took 2.8s to reject, so a handful of concurrent
-# requests could stall a worker. Anchoring to a word start makes it linear.
+# The leading anchor matters for more than tidiness: without it the engine
+# retries the match at every offset inside a long word run, and each retry
+# scans to the end — quadratic. A 32KB filter took 2.8s to reject, so a handful
+# of concurrent requests could stall a worker. `\b` fixed that for a run of
+# letters but not for `a/a/a/...`, where every segment starts a word: 32KB of
+# it took over 7s across the three patterns below. `(?<![\w/])` anchors to the
+# start of the whole path instead, which is linear for both.
+
+#: A literal operand: a quoted string, or an unquoted GUID, number or keyword
+#: (``assignedLicenses/any(s:s/skuId eq 184efa21-98c3-...)`` is the docs' own
+#: example, and the quoted-only pattern refused it).
+_LITERAL = r"('(?:[^']|'')*'|[\w.:+-]+)"
+
 _LAMBDA_RE = re.compile(
-    r"\b(\w[\w/]*)/any\s*\(\s*(\w+)\s*:\s*\2/(\w+)\s+"
+    r"(?<![\w/])(\w[\w/]*)/any\s*\(\s*(\w+)\s*:\s*\2/(\w+)\s+"
     r"(eq|ne|gt|ge|lt|le)\s+"
-    r"'([^']*)'\s*\)",
+    + _LITERAL + r"\s*\)",
+    re.IGNORECASE,
+)
+
+#: A lambda over a collection of primitives, where the range variable is the
+#: member itself: ``groupTypes/any(c:c eq 'Unified')``,
+#: ``businessPhones/any(p:startswith(p, '44'))``. Both forms are documented
+#: (https://learn.microsoft.com/en-us/graph/filter-query-parameter, "any"
+#: tables) and the mock refused them with a parse error. ``ne`` is left out:
+#: ``any(c: c ne 'x')`` means "some member differs", which the flat rewrite
+#: below cannot say.
+_PRIMITIVE_LAMBDA_RE = re.compile(
+    r"(?<![\w/])(\w[\w/]*)/any\s*\(\s*(\w+)\s*:\s*\2\s+(eq|gt|ge|lt|le)\s+"
+    + _LITERAL + r"\s*\)",
+    re.IGNORECASE,
+)
+_PRIMITIVE_LAMBDA_FUNC_RE = re.compile(
+    r"(?<![\w/])(\w[\w/]*)/any\s*\(\s*(\w+)\s*:\s*(startswith|endswith|contains)\s*\(\s*\2\s*,\s*"
+    r"('(?:[^']|'')*')\s*\)\s*\)",
     re.IGNORECASE,
 )
 
@@ -72,9 +99,18 @@ def _preprocess_lambda(filter_str: str) -> str:
     ``assignedLicenses/any(l: l/skuId eq '...')``
     →  ``_lambda_match_assignedLicenses_skuId eq '...'``
 
-    The actual matching is handled by :func:`_match_lambda_field`.
+    and, over a collection of primitives,
+
+    ``groupTypes/any(c: c eq 'Unified')`` → ``groupTypes eq 'Unified'``
+    ``businessPhones/any(p: startswith(p, '44'))`` → ``startswith(businessPhones, '44')``
+
+    which mean the same thing, because a comparison against a list-valued
+    field matches when any member does (``utils/mde_odata._match_clause``).
+    The sub-property form is resolved by :func:`_match_lambda_field`.
     """
-    return _LAMBDA_RE.sub(r"_lambda_\1_\3 \4 '\5'", filter_str)
+    rewritten = _LAMBDA_RE.sub(r"_lambda_\1_\3 \4 \5", filter_str)
+    rewritten = _PRIMITIVE_LAMBDA_RE.sub(r"\1 \3 \4", rewritten)
+    return _PRIMITIVE_LAMBDA_FUNC_RE.sub(r"\3(\1, \4)", rewritten)
 
 
 def _normalise_slash_paths(filter_str: str) -> str:
@@ -152,7 +188,8 @@ def apply_graph_filter(records: list[dict], filter_str: str) -> list[dict]:
     # try/finally: a malformed filter now raises, and leaking the synthetic
     # _lambda_* keys back to the caller would corrupt the records themselves.
     try:
-        result = apply_odata_filter(records, processed)
+        # Graph documents `in` (filter-query-parameter: "In (`in`)").
+        result = apply_odata_filter(records, processed, allow_in=True)
     finally:
         if has_lambda:
             for record in records:

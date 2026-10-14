@@ -104,6 +104,15 @@ export const mdeAlertsApi = {
   get: (id: string): Promise<MdeAlert> =>
     mdeClient.get(`/api/alerts/${id}`) as Promise<MdeAlert>,
 
+  /**
+   * A machine's alerts. Defender documents `GET /api/machines/{id}/alerts`
+   * for this, and `machineId` is not among the properties `$filter` may name
+   * on `/api/alerts` (get-alerts on learn.microsoft.com), which the mock now
+   * refuses with 400 the way the product does.
+   */
+  forMachine: (machineId: string): Promise<MdeODataResponse<MdeAlert>> =>
+    mdeClient.get(`/api/machines/${machineId}/alerts`) as Promise<MdeODataResponse<MdeAlert>>,
+
   /** Update alert (PATCH). */
   update: (id: string, body: Record<string, unknown>): Promise<MdeAlert> =>
     mdeClient.patch(`/api/alerts/${id}`, body) as Promise<MdeAlert>,

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.mde_auth import require_mde_auth
 from application.mde_investigations import queries as investigation_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response
 
 router = APIRouter(tags=["MDE Investigations"])
@@ -26,6 +27,7 @@ def list_investigations(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all automated investigations with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "investigations")
     return investigation_queries.list_investigations(filter_str, top, skip, orderby)
 
 

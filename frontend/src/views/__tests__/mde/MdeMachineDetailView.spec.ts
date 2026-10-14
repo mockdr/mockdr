@@ -27,8 +27,8 @@ vi.mock('../../../api/defender', () => ({
     unisolate: vi.fn().mockResolvedValue(undefined),
     scanAction: vi.fn().mockResolvedValue(undefined),
   },
-  mdeAlertsApi: {
-    list: vi.fn().mockResolvedValue({
+  mdeAlertsApi: (() => {
+    const forMachine = vi.fn().mockResolvedValue({
       '@odata.context': 'https://api.securitycenter.microsoft.com/api/$metadata#Alerts',
       value: [
         {
@@ -86,8 +86,9 @@ vi.mock('../../../api/defender', () => ({
           determination: '',
         },
       ],
-    }),
-  },
+    })
+    return { list: forMachine, forMachine }
+  })(),
 }))
 
 import MdeMachineDetailView from '@/views/mde/MdeMachineDetailView.vue'
@@ -133,9 +134,7 @@ describe('MdeMachineDetailView', () => {
     await flushPromises()
     expect(ensureMdeAuth).toHaveBeenCalled()
     expect(mdeMachinesApi.get).toHaveBeenCalledWith('test-machine-id')
-    expect(mdeAlertsApi.list).toHaveBeenCalledWith(
-      expect.objectContaining({ $filter: expect.stringContaining('test-machine-id') })
-    )
+    expect(mdeAlertsApi.forMachine).toHaveBeenCalledWith('test-machine-id')
   })
 
   it('displays machine health status', async () => {

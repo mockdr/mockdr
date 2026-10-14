@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from api.mde_auth import require_mde_auth, require_mde_write
 from application.mde_indicators import commands as indicator_commands
 from application.mde_indicators import queries as indicator_queries
+from utils.mde_filterable import refuse_unfilterable
 from utils.mde_response import build_mde_error_response
 
 router = APIRouter(tags=["MDE Indicators"])
@@ -28,6 +29,7 @@ def list_indicators(
     _: dict = Depends(require_mde_auth),
 ) -> dict:
     """List all threat indicators with optional OData query parameters."""
+    refuse_unfilterable(filter_str, "indicators")
     return indicator_queries.list_indicators(filter_str, top, skip, orderby, select)
 
 

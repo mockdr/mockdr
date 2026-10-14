@@ -13,7 +13,12 @@ integration:
 - Single-quoted string literals (``''`` escapes a quote), unquoted numbers
   and unquoted ISO-8601 date/time literals
 
-Anything outside that subset — ``not``, ``in``, nested function calls,
+Graph additionally documents ``in`` -- ``mail in ('a@x.com', 'b@x.com')``
+(https://learn.microsoft.com/en-us/graph/filter-query-parameter) -- which
+the parser takes when the caller asks for it (``allow_in``); Defender's
+pages document no ``in`` and keep refusing it.
+
+Anything outside that subset — ``not``, nested function calls,
 arithmetic — raises :class:`ODataFilterError`, which the app maps to the
 ``400`` the real APIs return.  Nothing is skipped silently: ignoring input
 would widen the filter and hand back more records than were asked for.
@@ -94,7 +99,7 @@ _TOKEN_RE = re.compile(
     # A doubled quote is OData's escape for a literal one, so it must not end
     # the token: 'O''Brien' is one string, not 'O' followed by junk.
     r"|(?P<string>'(?:[^']|'')*')"
-    r"|(?P<op>eq|ne|ge|gt|le|lt)\b"
+    r"|(?P<op>eq|ne|ge|gt|le|lt|in)\b"
     r"|(?P<conj>and|or)\b"
     # Unquoted keyword literals. Must precede `word`, which would otherwise
     # swallow them and compare "true" against str(True) == "True" — never
@@ -183,10 +188,11 @@ class _Parser:
     #: handler as a 500. No real caller nests anywhere near this far.
     MAX_DEPTH = 50
 
-    def __init__(self, tokens: list[tuple[str, str]]) -> None:
+    def __init__(self, tokens: list[tuple[str, str]], *, allow_in: bool = False) -> None:
         self.tokens = tokens
         self.pos = 0
         self.depth = 0
+        self.allow_in = allow_in
 
     def _peek(self) -> tuple[str, str] | None:
         if self.pos < len(self.tokens):
@@ -322,6 +328,8 @@ class _Parser:
         if tok[0] == "WORD":
             field_name = self._advance()[1]
             op = self._expect("OP")
+            if op == "in":
+                return self._parse_in(field_name)
             value, literal = self._expect_value()
             return ODataClause(
                 field=field_name, operator=op, value=value, literal=literal,
@@ -329,6 +337,33 @@ class _Parser:
 
         msg = f"unexpected token: {tok[1]!r}"
         raise ODataFilterError(msg)
+
+    def _parse_in(self, field_name: str) -> ODataNode:
+        """``field in (v1, v2, ...)``: true when the field equals any member.
+
+        Built as an ``or`` of ``eq`` clauses, so a collection-valued field
+        matches when any of its members is listed, as ``eq`` already does.
+
+        Raises:
+            ODataFilterError: Where ``in`` is not documented, or the list is
+                empty or malformed.
+        """
+        if not self.allow_in:
+            msg = "the 'in' operator is not supported here"
+            raise ODataFilterError(msg)
+        self._expect_exact("PAREN", "(")
+        clauses: list[ODataNode] = []
+        while True:
+            value, literal = self._expect_value()
+            clauses.append(ODataClause(field=field_name, operator="eq",
+                                       value=value, literal=literal))
+            tok = self._advance()
+            if tok == ("PAREN", ")"):
+                break
+            if tok[0] != "COMMA":
+                msg = f"expected ',' or ')' in the 'in' list, got {tok[1]!r}"
+                raise ODataFilterError(msg)
+        return clauses[0] if len(clauses) == 1 else ODataGroup(operator="or", children=clauses)
 
     #: Token kinds usable as an operand, mapped to the literal kind recorded
     #: on the clause. Only bool/null need non-string comparison.
@@ -364,12 +399,13 @@ class _Parser:
 # Public API — parsing
 # ---------------------------------------------------------------------------
 
-def parse_odata_filter(filter_str: str) -> ODataNode | None:
+def parse_odata_filter(filter_str: str, *, allow_in: bool = False) -> ODataNode | None:
     """Parse an OData ``$filter`` string into a node tree.
 
     Args:
         filter_str: OData filter expression, e.g.
                     ``"severity eq 'High' and status ne 'Resolved'"``.
+        allow_in:   Accept the ``in`` operator (Graph documents it).
 
     Returns:
         Root :class:`ODataClause` or :class:`ODataGroup`, or ``None`` when the
@@ -378,7 +414,7 @@ def parse_odata_filter(filter_str: str) -> ODataNode | None:
     if not filter_str or not filter_str.strip():
         return None
     tokens = _tokenise(filter_str)
-    parser = _Parser(tokens)
+    parser = _Parser(tokens, allow_in=allow_in)
     return parser.parse()
 
 
@@ -536,17 +572,20 @@ def _compare_range(field_val: Any, target: str, op: str) -> bool:
     return fs <= target
 
 
-def apply_odata_filter(records: list[dict], filter_str: str) -> list[dict]:
+def apply_odata_filter(
+    records: list[dict], filter_str: str, *, allow_in: bool = False,
+) -> list[dict]:
     """Apply an OData ``$filter`` expression to a list of records.
 
     Args:
         records:    List of dicts to filter.
         filter_str: OData filter string.
+        allow_in:   Accept the ``in`` operator (Graph documents it).
 
     Returns:
         Filtered subset matching all conditions.
     """
-    root = parse_odata_filter(filter_str)
+    root = parse_odata_filter(filter_str, allow_in=allow_in)
     if root is None:
         return list(records)
     return [record for record in records if _match_node(record, root)]
