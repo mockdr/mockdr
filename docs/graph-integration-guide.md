@@ -50,11 +50,31 @@ in both modes, because Entra does not support them for client credentials.
 The same applies to the `/mde` and `/sentinel` token endpoints, which mock the
 same Entra flow against the same tenant.
 
+### Client authentication, scope and discovery
+
+- The secret goes in the form body (`client_secret_post`) or in an
+  `Authorization: Basic` header (`client_secret_basic`), both of which Entra
+  accepts.
+- `scope` must be this API's `/.default` -- `https://graph.microsoft.com/.default`
+  here, `https://api.securitycenter.microsoft.com/.default` (or
+  `https://api.security.microsoft.com/.default`) on `/mde`. Anything else,
+  including another API's resource, is `400 invalid_scope` (AADSTS70011).
+- An unknown `client_id` is `400 unauthorized_client` (AADSTS700016); a known
+  one with the wrong secret is `401 invalid_client` (AADSTS7000215).
+- `GET /graph/{tenant}/v2.0/.well-known/openid-configuration` (and the same on
+  `/mde`) serves the discovery document MSAL and azure-identity read first; its
+  `token_endpoint` points back at the mount. Use `http(s)://<mock>/graph/<tenant>`
+  as the authority, with instance discovery / authority validation turned off
+  (`instance_discovery=False` in MSAL Python, `disable_instance_discovery=True`
+  in azure-identity), since those ask login.microsoftonline.com about the host.
+  Tokens are opaque, not JWTs.
+
 ### $count
 
-`$count=true` requires the `ConsistencyLevel: eventual` header on directory
-objects, as real Graph does; without it the request is refused with
-`400 Request_UnsupportedQuery` rather than silently answered.
+`$count=true` on directory objects needs the `ConsistencyLevel: eventual`
+header, as real Graph does; without it Graph silently ignores the parameter
+and so does the mock (no `@odata.count`). Intune's `managedDevices` refuses it
+with `400 Request_UnsupportedQuery`.
 
 ## Quick Start
 

@@ -110,14 +110,16 @@ class TestMdeTokenEndpoint:
         assert body["ext_expires_in"] == 3599
         assert "access_token" in body
 
-    def test_invalid_client_id_returns_401(self, client: TestClient) -> None:
+    def test_invalid_client_id_returns_400_unauthorized_client(self, client: TestClient) -> None:
+        """Entra answers an unknown application with AADSTS700016, not AADSTS7000215."""
         resp = client.post("/mde/oauth2/v2.0/token", data={
             "client_id": "wrong-client",
             "client_secret": "mde-mock-admin-secret",
             "grant_type": "client_credentials",
         "scope": "https://api.securitycenter.microsoft.com/.default",
         })
-        assert resp.status_code == 401
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "unauthorized_client"
 
     def test_invalid_client_secret_returns_401(self, client: TestClient) -> None:
         resp = client.post("/mde/oauth2/v2.0/token", data={

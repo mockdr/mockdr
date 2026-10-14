@@ -18,10 +18,16 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Request
 
 from repository.graph.oauth_client_repo import graph_oauth_client_repo
 from repository.store import store
+from utils.entra_client_auth import (
+    GRAPH_RESOURCES,
+    require_default_scope,
+    resolve_client_credentials,
+)
+from utils.entra_discovery import empty_key_set, openid_configuration
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
@@ -29,6 +35,7 @@ from utils.entra_token_errors import (
     AADSTS_TENANT_NOT_FOUND,
     AADSTS_UNSUPPORTED_GRANT,
     build_token_error,
+    unknown_client_error,
 )
 
 router = APIRouter(tags=["Graph Auth"])
@@ -38,16 +45,19 @@ _TOKEN_LIFETIME_SECONDS: int = 3599
 
 @router.post("/oauth2/v2.0/token")
 async def create_token(
-    client_id: str = Form(...),
-    client_secret: str = Form(...),
+    request: Request,
+    client_id: str = Form(default=""),
+    client_secret: str = Form(default=""),
     grant_type: str = Form(...),
     scope: str = Form(default=""),
 ) -> dict:
     """Exchange client credentials for an access token.
 
     Args:
-        client_id:     OAuth2 client identifier (form-encoded).
-        client_secret: OAuth2 client secret (form-encoded).
+        request:       Read for an ``Authorization: Basic`` header, the
+                       ``client_secret_basic`` method Entra also accepts.
+        client_id:     OAuth2 client identifier (form-encoded, or Basic).
+        client_secret: OAuth2 client secret (form-encoded, or Basic).
         grant_type:    Must be ``"client_credentials"``.
         scope:         The resource being asked for. Entra requires it on
                        this grant and refuses a request without one.
@@ -55,14 +65,17 @@ async def create_token(
     Returns:
         Token response — see :func:`_issue_token`.
     """
+    client_id, client_secret = resolve_client_credentials(
+        request.headers.get("authorization"), client_id, client_secret)
     return _issue_token(None, client_id, client_secret, grant_type, scope)
 
 
 @router.post("/{tenant_id}/oauth2/v2.0/token")
 async def create_token_for_tenant(
     tenant_id: str,
-    client_id: str = Form(...),
-    client_secret: str = Form(...),
+    request: Request,
+    client_id: str = Form(default=""),
+    client_secret: str = Form(default=""),
     grant_type: str = Form(...),
     scope: str = Form(default=""),
 ) -> dict:
@@ -72,8 +85,10 @@ async def create_token_for_tenant(
         tenant_id:     Tenant GUID or verified domain name from the URL. Must
                        address the credential's tenant unless
                        ``MOCKDR_STRICT_TENANT=false``.
-        client_id:     OAuth2 client identifier (form-encoded).
-        client_secret: OAuth2 client secret (form-encoded).
+        request:       Read for an ``Authorization: Basic`` header, the
+                       ``client_secret_basic`` method Entra also accepts.
+        client_id:     OAuth2 client identifier (form-encoded, or Basic).
+        client_secret: OAuth2 client secret (form-encoded, or Basic).
         grant_type:    Must be ``"client_credentials"``.
         scope:         The resource being asked for. Entra requires it on
                        this grant and refuses a request without one.
@@ -81,6 +96,8 @@ async def create_token_for_tenant(
     Returns:
         Token response — see :func:`_issue_token`.
     """
+    client_id, client_secret = resolve_client_credentials(
+        request.headers.get("authorization"), client_id, client_secret)
     return _issue_token(tenant_id, client_id, client_secret, grant_type, scope)
 
 
@@ -111,8 +128,10 @@ def _issue_token(
         ``ext_expires_in``.
 
     Raises:
-        HTTPException: 400 if grant_type is invalid or the tenant is unknown.
-        HTTPException: 401 if the credentials are invalid.
+        HTTPException: 400 if grant_type is invalid, the tenant is unknown,
+            the client ID names no application (AADSTS700016), or the scope is
+            not this API's ``/.default`` (AADSTS70011).
+        HTTPException: 401 if the secret is wrong.
     """
     if not scope:
         raise HTTPException(status_code=400, detail=build_token_error(
@@ -134,7 +153,12 @@ def _issue_token(
         )
 
     client = graph_oauth_client_repo.get(client_id)
-    if client is None or client.client_secret != client_secret:
+    if client is None:
+        raise HTTPException(
+            status_code=400,
+            detail=unknown_client_error(client_id, tenant_id or "common"),
+        )
+    if client.client_secret != client_secret:
         raise HTTPException(
             status_code=401,
             detail=build_token_error(
@@ -153,6 +177,8 @@ def _issue_token(
                 AADSTS_TENANT_NOT_FOUND,
             ),
         )
+
+    require_default_scope(scope, GRAPH_RESOURCES)
 
     access_token = str(uuid.uuid4())
     expires_at = datetime.now(UTC) + timedelta(seconds=_TOKEN_LIFETIME_SECONDS)
@@ -174,3 +200,23 @@ def _issue_token(
         "ext_expires_in": _TOKEN_LIFETIME_SECONDS,
         "access_token": access_token,
     }
+
+
+# ---------------------------------------------------------------------------
+# OpenID Connect discovery
+# ---------------------------------------------------------------------------
+
+@router.get("/{tenant_id}/v2.0/.well-known/openid-configuration")
+async def openid_configuration_document(tenant_id: str, request: Request) -> dict:
+    """The authority's discovery document, which MSAL reads before the token call.
+
+    See :mod:`utils.entra_discovery`. ``token_endpoint`` is this mount's own
+    tenant-scoped token route on the host the client called.
+    """
+    return openid_configuration(request, "/graph", tenant_id)
+
+
+@router.get("/{tenant_id}/discovery/v2.0/keys")
+async def signing_keys(tenant_id: str) -> dict:
+    """The key set ``jwks_uri`` names -- empty, as Graph mock tokens are opaque."""
+    return empty_key_set()

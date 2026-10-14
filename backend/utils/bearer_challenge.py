@@ -44,3 +44,42 @@ def bearer_challenge(
         parts.append('error="invalid_token"')
         parts.append(f'error_description="{description}"')
     return {"WWW-Authenticate": ", ".join(parts)}
+
+
+#: Microsoft Graph's well-known application ID, which its challenge names.
+GRAPH_APP_ID = "00000003-0000-0000-c000-000000000000"
+
+
+def graph_bearer_challenge(
+    request: Request | None, mount: str, description: str = "",
+) -> dict[str, str]:
+    """The challenge Microsoft Graph itself sends with a 401.
+
+    Graph's header is ``Bearer realm="", authorization_uri="https://login.
+    microsoftonline.com/common/oauth2/authorize", client_id="00000003-0000-
+    0000-c000-000000000000"``
+    (https://learn.microsoft.com/en-us/entra/msal/dotnet/advanced/extract-authentication-parameters).
+    The URI is the authority's ``/authorize`` endpoint -- a client strips
+    ``/oauth2/authorize`` from it to find the authority -- and
+    :func:`bearer_challenge` pointed it at the token endpoint instead, from
+    which no authority can be derived. The same shape is kept here on the
+    mock's own base URL and mount, so the authority a client derives is one
+    whose ``/v2.0/.well-known/openid-configuration`` this mock serves.
+
+    Args:
+        request:     The refused request, read for the base URL.
+        mount:       The mount prefix, e.g. ``/graph``.
+        description: What was wrong with a token that was sent; empty when
+                     none was.
+
+    Returns:
+        A single-entry header mapping.
+    """
+    base = str(request.base_url).rstrip("/") if request is not None else ""
+    parts = ['Bearer realm=""',
+             f'authorization_uri="{base}{mount}/common/oauth2/authorize"',
+             f'client_id="{GRAPH_APP_ID}"']
+    if description:
+        parts.append('error="invalid_token"')
+        parts.append(f'error_description="{description}"')
+    return {"WWW-Authenticate": ", ".join(parts)}

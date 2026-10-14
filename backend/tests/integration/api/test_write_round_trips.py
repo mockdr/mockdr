@@ -3033,7 +3033,9 @@ class TestARefusedBearerRequestSaysWhereToGetOne:
     MOUNTS = [
         ("/cs/devices/queries/devices/v1", "/cs/oauth2/token"),
         ("/mde/api/machines", "/mde/oauth2/v2.0/token"),
-        ("/graph/v1.0/users", "/graph/oauth2/v2.0/token"),
+        # Graph's own challenge names the authority's /authorize endpoint,
+        # not the token endpoint (utils/bearer_challenge.py).
+        ("/graph/v1.0/users", "/graph/common/oauth2/authorize"),
     ]
 
     @pytest.mark.parametrize(("path", "token_path"), MOUNTS)

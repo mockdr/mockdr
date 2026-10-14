@@ -21,7 +21,7 @@ from fastapi import Depends, Header, HTTPException
 from starlette.requests import Request
 
 from repository.store import store
-from utils.bearer_challenge import bearer_challenge
+from utils.bearer_challenge import graph_bearer_challenge
 from utils.graph_response import build_graph_error_response
 from utils.token_expiry import is_token_expired
 
@@ -66,8 +66,8 @@ FEATURE_GATES: dict[str, set[str] | str] = {
 # ── Public dependencies ──────────────────────────────────────────────────────
 
 
-#: Where this mount issues the tokens it asks for.
-_TOKEN_PATH = "/graph/oauth2/v2.0/token"
+#: The mount the challenge's authority sits under.
+_MOUNT = "/graph"
 
 
 async def require_graph_auth(
@@ -97,7 +97,7 @@ async def require_graph_auth(
                 "InvalidAuthenticationToken",
                 "Access token is missing or malformed",
             ),
-            headers=bearer_challenge(request, _TOKEN_PATH),
+            headers=graph_bearer_challenge(request, _MOUNT),
         )
 
     token = authorization[7:]
@@ -109,7 +109,8 @@ async def require_graph_auth(
                 "InvalidAuthenticationToken",
                 "Access token is invalid or expired",
             ),
-            headers=bearer_challenge(request, _TOKEN_PATH, "Access token is invalid or expired"),
+            headers=graph_bearer_challenge(
+                request, _MOUNT, "Access token is invalid or expired"),
         )
 
     if is_token_expired(record, key="expires_at"):
@@ -119,7 +120,7 @@ async def require_graph_auth(
                 "InvalidAuthenticationToken",
                 "Access token has expired",
             ),
-            headers=bearer_challenge(request, _TOKEN_PATH, "Access token has expired"),
+            headers=graph_bearer_challenge(request, _MOUNT, "Access token has expired"),
         )
 
     return cast(dict[str, Any], record)

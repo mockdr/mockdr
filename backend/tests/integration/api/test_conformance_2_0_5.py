@@ -305,6 +305,6 @@ class TestNoRouteAnswers500ToAMalformedBody:
         assert not resp.headers["content-type"].startswith("text/plain")
 
     def test_kql_bare_pipe_is_a_400(self, client: TestClient) -> None:
-        token = client.post("/mde/oauth2/v2.0/token", data={"grant_type": "client_credentials", "client_id": "mde-mock-admin-client", "client_secret": "mde-mock-admin-secret", "scope": "x"}).json()["access_token"]
+        token = client.post("/mde/oauth2/v2.0/token", data={"grant_type": "client_credentials", "client_id": "mde-mock-admin-client", "client_secret": "mde-mock-admin-secret", "scope": "https://api.securitycenter.microsoft.com/.default"}).json()["access_token"]
         resp = client.post("/mde/api/advancedqueries/run", headers={"Authorization": f"Bearer {token}"}, json={"Query": "|"})
         assert resp.status_code == 400

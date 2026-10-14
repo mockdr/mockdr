@@ -52,8 +52,8 @@ class TestGraphAuth:
         assert "AADSTS7000215" in body["error_description"]
         assert body["error_codes"] == [7000215]
 
-    def test_invalid_client_id_returns_401(self, client: TestClient) -> None:
-        """Unknown client_id should return 401."""
+    def test_invalid_client_id_returns_400_unauthorized_client(self, client: TestClient) -> None:
+        """Unknown client_id is 400 unauthorized_client AADSTS700016, not a bad secret's 401."""
         resp = client.post(
             "/graph/oauth2/v2.0/token",
             data={
@@ -63,7 +63,9 @@ class TestGraphAuth:
                 "scope": "https://graph.microsoft.com/.default",
             },
         )
-        assert resp.status_code == 401
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "unauthorized_client"
+        assert resp.json()["error_codes"] == [700016]
 
     def test_invalid_grant_type_returns_400(self, client: TestClient) -> None:
         """Invalid grant_type should return 400."""
