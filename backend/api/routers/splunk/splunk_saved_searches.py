@@ -1,12 +1,11 @@
 """Splunk saved searches router."""
 from __future__ import annotations
 
-from typing import Any, cast
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from api.splunk_auth import require_splunk_auth
+from api.splunk_body import parse_body
 from application.splunk.commands.saved_search import (
     create_saved_search,
     delete_saved_search,
@@ -38,7 +37,7 @@ async def create_search(
     current_user: dict = Depends(require_splunk_auth),
 ) -> JSONResponse:
     """Create a new saved search."""
-    body = await _parse_body(request)
+    body = await parse_body(request)
     name = body.get("name", "")
     search = body.get("search", "")
     if not name:
@@ -86,7 +85,7 @@ async def update_search(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
     """Update a saved search."""
-    body = await _parse_body(request)
+    body = await parse_body(request)
     ss = update_saved_search(name, **body)
     if not ss:
         raise HTTPException(status_code=404, detail={"messages": [
@@ -138,17 +137,3 @@ def get_history(
         ]})
     return result
 
-
-async def _parse_body(request: Request) -> dict:
-    """Parse request body from form or JSON."""
-    content_type = request.headers.get("content-type", "")
-    if "form" in content_type:
-        form = await request.form()
-        return {k: str(v) for k, v in form.items()}
-    try:
-        parsed = await request.json()
-    except Exception:
-        return {}
-    # A JSON array or scalar was cast to dict unchecked, so the next .get()
-    # raised AttributeError out of the handler as a plain-text 500.
-    return cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}

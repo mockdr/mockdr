@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from fnmatch import fnmatch
 from typing import Any
 
+from utils.numbers import as_float
 from utils.splunk.spl_expr import (
     SPLExprError,
     evaluate,
@@ -510,7 +511,7 @@ def _convert_value(kind: str, value: Any, timeformat: str) -> Any:
             seconds = seconds * 60 + float(part)
         return _shrink(seconds)
     if kind == "ctime":
-        moment = _as_float(text)
+        moment = as_float(text)
         if moment is None:
             return None
         return datetime.fromtimestamp(moment, tz=UTC).strftime(timeformat)
@@ -525,7 +526,7 @@ def _convert_value(kind: str, value: Any, timeformat: str) -> Any:
 
 
 def _as_float_or_none(text: str) -> float | int | None:
-    number = _as_float(text)
+    number = as_float(text)
     return _shrink(number) if number is not None else None
 
 
@@ -605,13 +606,13 @@ def _cmd_bin(rows: Rows, command: SPLCommand) -> Rows:
         msg = "You must specify a field to discretize."
         raise ValueError(msg)
 
-    numbers = [n for n in (_as_float(r.get(field)) for r in rows) if n is not None]
+    numbers = [n for n in (as_float(r.get(field)) for r in rows) if n is not None]
     span, is_time, decimals = _bin_span(options, numbers)
     target = options.get("as", field)
 
     out: Rows = []
     for row in rows:
-        value = _as_float(row.get(field))
+        value = as_float(row.get(field))
         if value is None:
             out.append(dict(row))
             continue
@@ -695,7 +696,7 @@ def _time_ordered(rows: Rows) -> bool:
     ``makeresults`` are refused there even though their times do not fall —
     the one corner of this option mockdr does not imitate.
     """
-    stamps = [_as_float(r.get("_time")) for r in rows]
+    stamps = [as_float(r.get("_time")) for r in rows]
     if any(s is None for s in stamps):
         return False
     ordered = [s for s in stamps if s is not None]
@@ -755,8 +756,8 @@ def _cmd_streamstats(rows: Rows, command: SPLCommand) -> Rows:
         if span:
             # The far edge is open: with events an hour apart, a one-hour
             # window holds only the event itself (measured).
-            edge = (_as_float(row.get("_time")) or 0.0) - span
-            pool = [r for r in pool if (_as_float(r.get("_time")) or 0.0) > edge]
+            edge = (as_float(row.get("_time")) or 0.0) - span
+            pool = [r for r in pool if (as_float(r.get("_time")) or 0.0) > edge]
 
         computed = dict(row)
         computed.update(_aggregated(aggs, pool))
@@ -1180,7 +1181,7 @@ def _cmd_timechart(rows: Rows, command: SPLCommand) -> Rows:
 
     buckets: OrderedDict[float, Rows] = OrderedDict()
     for row in rows:
-        stamp = _as_float(row.get("_time"))
+        stamp = as_float(row.get("_time"))
         bucket = (stamp // span) * span if stamp is not None else 0.0
         buckets.setdefault(bucket, []).append(row)
 
@@ -1301,7 +1302,7 @@ def _aggregate(func: str, field: str, rows: Rows) -> Any:
         timed = [r for r in rows if r.get(field) is not None]
         if not timed:
             return _ABSENT
-        by_time = sorted(timed, key=lambda r: _as_float(r.get("_time")) or 0.0)
+        by_time = sorted(timed, key=lambda r: as_float(r.get("_time")) or 0.0)
         return by_time[0 if name == "earliest" else -1].get(field)
 
     if name == "mode":
@@ -1311,7 +1312,7 @@ def _aggregate(func: str, field: str, rows: Rows) -> Any:
         best = max(counts.values())
         return sorted(v for v, c in counts.items() if c == best)[0]
 
-    numbers = [n for n in (_as_float(v) for v in values) if n is not None]
+    numbers = [n for n in (as_float(v) for v in values) if n is not None]
     if name in ("min", "max"):
         if numbers:
             # A number wins over text: over 1, "a" and 3, `max` is 3.
@@ -1479,14 +1480,6 @@ def _split_eval_clauses(arg: str) -> list[str]:
     return [c for c in clauses if c.strip()]
 
 
-def _as_float(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
 
 def _shrink(value: float) -> float | int:
     return int(value) if float(value).is_integer() else round(value, 6)
@@ -1501,7 +1494,7 @@ def _sorter(field: str) -> Callable[[dict[str, Any]], tuple[int, float, str]]:
 
 def _sort_key(value: Any) -> tuple[int, float, str]:
     """Sort numerically when possible, so "20" precedes "120"."""
-    number = _as_float(value)
+    number = as_float(value)
     if number is not None:
         return (0, number, "")
     return (1, 0.0, str(value if value is not None else ""))

@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from utils.nested import get_nested
+from utils.numbers import as_float
 
 __all__ = ["XdrFilterError", "apply_xdr_filters"]
 
@@ -28,14 +29,6 @@ def _as_list(value: Any) -> list[Any]:
 def _text(value: Any) -> str:
     return "" if value is None else str(value)
 
-
-def _numeric(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _compare(record_value: Any, operand: Any, operator: str) -> bool:  # noqa: PLR0911
@@ -58,7 +51,7 @@ def _compare(record_value: Any, operand: Any, operator: str) -> bool:  # noqa: P
         needle = _text(operand).lower()
         return not any(needle in _text(v).lower() for v in _as_list(record_value))
 
-    left, right = _numeric(record_value), _numeric(operand)
+    left, right = as_float(record_value), as_float(operand)
     if left is None or right is None:
         return False
     if operator == "gte":

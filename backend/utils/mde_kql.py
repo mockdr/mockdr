@@ -28,6 +28,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from utils.dt import parse_utc
+from utils.numbers import as_float
 from utils.safe_regex import UnsafeRegexError, check_regex
 
 __all__ = ["KqlError", "KqlQuery", "evaluate_kql", "parse_kql"]
@@ -354,14 +355,6 @@ def _as_datetime(value: Any) -> datetime | None:
         return None
 
 
-def _numeric(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
 
 def _comparison(
     operator: str,
@@ -386,7 +379,7 @@ def _comparison(
             # and a seeded `...00.000Z` against an `ago()` does not.
             at, bt = _as_datetime(a), _as_datetime(b)
             return at is not None and bt is not None and _order(operator, at, bt)
-        an, bn = _numeric(a), _numeric(b)
+        an, bn = as_float(a), as_float(b)
         if an is None or bn is None:
             an_s, bn_s = str(a), str(b)
             return _order(operator, an_s, bn_s)
@@ -411,7 +404,7 @@ def _equal(a: Any, b: Any) -> bool:
     if isinstance(a, datetime) or isinstance(b, datetime):
         at, bt = _as_datetime(a), _as_datetime(b)
         return at is not None and at == bt
-    an, bn = _numeric(a), _numeric(b)
+    an, bn = as_float(a), as_float(b)
     if an is not None and bn is not None:
         return an == bn
     return str(a) == str(b)
@@ -630,7 +623,7 @@ def _aggregate(function: str, column: str, rows: list[Row]) -> Any:
     if function in ("any", "take_any", "arg_max", "arg_min"):
         return rows[0].get(column) if rows else None
 
-    numbers = [n for n in (_numeric(r.get(column)) for r in rows) if n is not None]
+    numbers = [n for n in (as_float(r.get(column)) for r in rows) if n is not None]
     if not numbers:
         return 0
     if function == "sum":
@@ -678,7 +671,7 @@ def _sorter(column: str) -> Callable[[Row], tuple[int, float, str]]:
         value = row.get(column)
         if value is None:
             return (2, 0.0, "")
-        number = _numeric(value)
+        number = as_float(value)
         if number is not None:
             return (0, number, "")
         return (1, 0.0, str(value))

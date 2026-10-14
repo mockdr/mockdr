@@ -32,7 +32,7 @@ from urllib.parse import parse_qs
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from utils.asgi_headers import request_header
+from utils.asgi import request_header
 
 _ES_PREFIX = "/elastic"
 _JSON = "application/json"

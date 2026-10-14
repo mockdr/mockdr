@@ -34,7 +34,7 @@ from dataclasses import dataclass
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from utils.asgi_headers import stamping
+from utils.asgi import stamping
 from utils.cs_response import reset_trace_id, set_trace_id
 from utils.dev_paths import is_dev_path
 from utils.vendor_errors import build_vendor_error, vendor_for_path

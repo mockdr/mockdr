@@ -18,9 +18,10 @@ import re
 from urllib.parse import parse_qs
 from xml.sax.saxutils import escape
 
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api.middleware.json_rewrite import rewrite_json_body
+from utils.asgi import buffered_body
 from utils.splunk.csv_output import render_splunk_csv
 from utils.splunk.xml_output import render_splunk_xml
 from utils.splunk_json import splunk_json
@@ -192,7 +193,7 @@ class SplunkOutputModeMiddleware:
             # splunklib's post() puts every parameter, output_mode included,
             # into the form body; reading only the query string rendered every
             # SDK form POST as Atom XML. The body is replayed to the route.
-            body, receive = await _buffered_body(receive)
+            body, receive = await buffered_body(receive)
             form = parse_qs(body.decode("latin-1"))
             mode = _values(form, "output_mode").lower() or mode
             wants_json = mode == "json"
@@ -432,26 +433,3 @@ def _is_form_post(scope: Scope) -> bool:
         if name.lower() == b"content-type":
             return bool(value.startswith(_FORM_TYPE))
     return False
-
-
-async def _buffered_body(receive: Receive) -> tuple[bytes, Receive]:
-    """Read the request body, and a ``receive`` that replays it to the route."""
-    chunks: list[bytes] = []
-    more = True
-    while more:
-        message = await receive()
-        if message["type"] == "http.disconnect":
-            break
-        chunks.append(bytes(message.get("body", b"")))
-        more = bool(message.get("more_body"))
-    body = b"".join(chunks)
-    replayed = False
-
-    async def replay() -> Message:
-        nonlocal replayed
-        if replayed:
-            return await receive()
-        replayed = True
-        return {"type": "http.request", "body": body, "more_body": False}
-
-    return body, replay

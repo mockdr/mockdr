@@ -21,7 +21,7 @@ import uuid
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from utils.asgi_headers import request_header, stamping
+from utils.asgi import request_header, stamping
 from utils.sentinel.response import address_workspace, release_workspace
 
 #: The Sentinel mount's ARM paths: the workspace resources and the provider's

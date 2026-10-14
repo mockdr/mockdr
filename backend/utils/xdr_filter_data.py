@@ -21,6 +21,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from utils.numbers import as_float
 from utils.xdr_filters import XdrFilterError
 
 __all__ = ["apply_filter_data", "filter_data_page", "sort_filter_data"]
@@ -33,14 +34,6 @@ def _values(value: Any) -> list[Any]:
 def _text(value: Any) -> str:
     return "" if value is None else str(value)
 
-
-def _number(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _empty(value: Any) -> bool:
@@ -67,12 +60,12 @@ def _leaf(record: dict, node: dict) -> bool:  # noqa: PLR0911
         return not _empty(held)
     if kind == "RANGE":
         bounds = wanted if isinstance(wanted, dict) else {}
-        number = _number(held)
-        low, high = _number(bounds.get("from")), _number(bounds.get("to"))
+        number = as_float(held)
+        low, high = as_float(bounds.get("from")), as_float(bounds.get("to"))
         return number is not None and (low is None or number >= low) and (
             high is None or number <= high)
     if kind == "RELATIVE_TIMESTAMP":
-        back, number = _number(wanted), _number(held)
+        back, number = as_float(wanted), as_float(held)
         if back is None or number is None:
             return False
         return number >= time.time() * 1000 - back
@@ -115,7 +108,7 @@ def sort_filter_data(records: list[dict], filter_data: dict) -> list[dict]:
 
     def key(record: dict) -> tuple[int, Any]:
         value = record.get(field)
-        number = _number(value)
+        number = as_float(value)
         return (0, number) if number is not None else (1, _text(value))
 
     present = [r for r in records if r.get(field) is not None]

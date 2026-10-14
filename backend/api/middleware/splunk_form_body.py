@@ -36,7 +36,9 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qsl, urlencode
 
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+from utils.asgi import buffered_body
 
 _FORM = b"application/x-www-form-urlencoded"
 
@@ -84,16 +86,7 @@ def _is_form(scope: Scope) -> bool:
 
 async def _body_into_query(scope: Scope, receive: Receive) -> tuple[Scope, Receive]:
     """Append the form body's fields to the query string; replay the body."""
-    chunks: list[bytes] = []
-    more = True
-    while more:
-        message = await receive()
-        if message["type"] == "http.disconnect":
-            break
-        chunks.append(bytes(message.get("body", b"")))
-        more = bool(message.get("more_body"))
-    body = b"".join(chunks)
-
+    body, replay = await buffered_body(receive)
     query = parse_qsl(scope.get("query_string", b"").decode("latin-1"), keep_blank_values=True)
     named = {k for k, _ in query}
     extra = [
@@ -102,16 +95,6 @@ async def _body_into_query(scope: Scope, receive: Receive) -> tuple[Scope, Recei
     ]
     if extra:
         scope = {**scope, "query_string": urlencode([*query, *extra]).encode("latin-1")}
-
-    replayed = False
-
-    async def replay() -> Message:
-        nonlocal replayed
-        if replayed:
-            return await receive()
-        replayed = True
-        return {"type": "http.request", "body": body, "more_body": False}
-
     return scope, replay
 
 

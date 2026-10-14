@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from api.reserved_names import register as _register_convertors
 from api.splunk_auth import require_splunk_admin, require_splunk_auth
+from api.splunk_body import parse_body
 from application.splunk.commands.kvstore import (
     DuplicateKeyError,
     batch_save,
@@ -116,7 +116,7 @@ async def create_kv_collection(
     current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
     """Create a KV Store collection."""
-    body = await _parse_body(request)
+    body = await parse_body(request)
     name = body.get("name", "")
     if not name:
         raise HTTPException(status_code=400, detail={"messages": [
@@ -345,20 +345,6 @@ def delete_all_kv_records(
         ]})
     return JSONResponse(status_code=200, content={})
 
-
-async def _parse_body(request: Request) -> dict:
-    """Parse request body from form or JSON."""
-    content_type = request.headers.get("content-type", "")
-    if "form" in content_type:
-        form = await request.form()
-        return {k: str(v) for k, v in form.items()}
-    try:
-        parsed = await request.json()
-    except Exception:
-        return {}
-    # A JSON `null` or array is not a parameter set; treating it as an empty
-    # one lets the route report the parameter it needed, instead of 500.
-    return cast(dict[str, Any], parsed) if isinstance(parsed, dict) else {}
 
 
 # ── Status ───────────────────────────────────────────────────────────────────

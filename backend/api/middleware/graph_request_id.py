@@ -26,7 +26,7 @@ import uuid
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from utils.asgi_headers import request_header, stamping
+from utils.asgi import request_header, stamping
 from utils.graph_response import graph_request_ids
 
 _NOT_GRAPH = ("/oauth2/", "/.well-known/", "/discovery/")

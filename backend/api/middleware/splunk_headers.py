@@ -41,7 +41,7 @@ from email.utils import formatdate
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from utils.asgi_headers import request_header
+from utils.asgi import request_header
 
 _SPLUNK_PREFIX = "/splunk"
 _HEC_PREFIX = "/splunk/services/collector"

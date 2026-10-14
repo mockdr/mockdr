@@ -35,6 +35,7 @@ from utils.es_query import (
     wrap_as_hits,
 )
 from utils.nested import get_nested
+from utils.numbers import as_float
 
 __all__ = ["ESAggregationError", "apply_aggregations"]
 
@@ -466,7 +467,7 @@ def _histogram(
 
     groups: OrderedDict[float, list[dict]] = OrderedDict()
     for record in records:
-        value = _as_float(get_nested(record, field))
+        value = as_float(get_nested(record, field))
         if value is None:
             continue
         groups.setdefault((value // interval) * interval, []).append(record)
@@ -485,11 +486,11 @@ def _range(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int
     field = body.get("field", "")
     buckets = []
     for spec in body.get("ranges", []):
-        lower = _as_float(spec.get("from"))
-        upper = _as_float(spec.get("to"))
+        lower = as_float(spec.get("from"))
+        upper = as_float(spec.get("to"))
         members = [
             r for r in records
-            if _in_range(_as_float(get_nested(r, field)), lower, upper)
+            if _in_range(as_float(get_nested(r, field)), lower, upper)
         ]
         bucket: dict[str, Any] = {
             "key": spec.get("key") or _range_key(lower, upper),
@@ -564,7 +565,7 @@ def _metric(agg_type: str, body: dict, records: list[dict], ctx: _Context) -> di
     if agg_type == "top_hits":
         return _top_hits(body, records, ctx)
 
-    numbers = [n for n in (_as_float(v) for v in values) if n is not None]
+    numbers = [n for n in (as_float(v) for v in values) if n is not None]
     # Every numeric metric is a double in Elasticsearch, so an average that
     # happens to divide evenly still comes back as `30.0`. Rendering it as
     # `30` made the mock's JSON a different document from the real one, and
@@ -746,18 +747,10 @@ def _values_of(record: dict, field: str) -> list[Any]:
     return [m for m in members if m is not None]
 
 
-def _as_float(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
 
 def _as_epoch(value: Any) -> float | None:
     """Read a date field as epoch seconds, accepting ISO-8601 or a number."""
-    number = _as_float(value)
+    number = as_float(value)
     if number is not None:
         # Values in the millisecond range are epoch millis.
         return number / 1000 if number > 1e11 else number
