@@ -25,7 +25,13 @@ from utils.splunk.spl_expr import (
     parse_search,
     parse_where,
 )
-from utils.splunk.spl_functions import json_path, one_or_many, values_of
+from utils.splunk.spl_functions import (
+    MAX_MV_TOTAL,
+    MV_BUDGET,
+    json_path,
+    one_or_many,
+    values_of,
+)
 from utils.splunk.spl_parser import (
     SPLCommand,
     SPLQuery,
@@ -108,7 +114,17 @@ def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, 
     messages: list[dict[str, str]] = [
         {"type": "WARN", "text": text} for text in query.errors
     ]
+    budget = MV_BUDGET.set(MAX_MV_TOTAL)
+    try:
+        return _run_commands(rows, query, messages)
+    finally:
+        MV_BUDGET.reset(budget)
 
+
+def _run_commands(
+    rows: Rows, query: SPLQuery, messages: list[dict[str, str]],
+) -> tuple[Rows, list[dict[str, str]]]:
+    """The body of ``execute_pipeline``, once the search is known to run."""
     # The search clause is the first stage of the pipeline. Applying it here
     # keeps selection and the commands in one place, so the two cannot drift.
     if query.search_expr is not None:
@@ -142,7 +158,11 @@ def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, 
             rows = handler(rows, command)
             if command.name == "table" and before and not rows:
                 messages.append({"type": "INFO", "text": "No matching fields exist."})
-        except (SPLExprError, ValueError, TypeError, KeyError, IndexError) as exc:
+        # ArithmeticError: `pow(10, 1000)` and `exp(100000)` overflow a
+        # float, and answered 500 with nothing from the search.
+        except (
+            SPLExprError, ValueError, TypeError, KeyError, IndexError, ArithmeticError,
+        ) as exc:
             messages.append({"type": "FATAL", "text": _failure_text(command, exc)})
             return [], messages
     return rows, messages
@@ -349,6 +369,8 @@ def _cmd_mvexpand(rows: Rows, command: SPLCommand) -> Rows:
             continue
         values = values_of(row[field])
         for value in values[:limit] if limit else values:
+            if len(out) >= MAX_EXPANDED_ROWS:
+                return out
             out.append({**row, field: value})
     return out
 
@@ -770,6 +792,16 @@ _FALSE_WORDS = frozenset({"false", "f", "no", "0"})
 #: `-1` and ` 2 ` do not.
 _COUNT_RE = re.compile(r"\+?\d+")
 
+#: The most rows ``makeresults`` generates: limits.conf ``[makeresults]
+#: maxresultrows``, 50,000 by default.
+MAX_GENERATED_ROWS = 50_000
+
+#: The most rows ``mvexpand`` produces. splunkd stops expanding when the
+#: command reaches limits.conf ``[mvexpand] max_mem_usage_mb`` (500 MB);
+#: a row count stands in for that here, sized so one search cannot hold a
+#: worker for seconds.
+MAX_EXPANDED_ROWS = 100_000
+
 _INLINE_PAIR = (
     "You must specify both 'format' and 'data' arguments for 'makeresults' "
     "to read inline data. If you are providing inline data, specify both "
@@ -929,7 +961,10 @@ def _cmd_makeresults(_rows: Rows, command: SPLCommand) -> Rows:
     row: dict[str, Any] = {"_time": float(int(current_time()))}
     if "annotate" in options and _boolean_option("annotate", options["annotate"]):
         row["splunk_server"] = SPLUNK_SERVER
-    return [dict(row) for _ in range(int(raw_count))]
+    # limits.conf caps what makeresults generates at `maxresultrows`, 50,000
+    # by default. Uncapped, `count=100000000` built every row in memory
+    # before answering — one request could take the process down.
+    return [dict(row) for _ in range(min(int(raw_count), MAX_GENERATED_ROWS))]
 
 
 def _cmd_eval(rows: Rows, command: SPLCommand) -> Rows:

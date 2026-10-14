@@ -31,6 +31,7 @@ import re
 import time
 import urllib.parse
 from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -170,7 +171,28 @@ def _mvdedup(args: list[Any]) -> Any:
 def _mvrange(args: list[Any]) -> Any:
     start, end = _integer("mvrange", args[0]), _integer("mvrange", args[1])
     step = _integer("mvrange", args[2]) if len(args) > 2 else 1
-    return one_or_many([str(n) for n in range(start, end, step or 1)])
+    span = range(start, end, step or 1)
+    left = MV_BUDGET.get()
+    if len(span) > MAX_MV_VALUES or len(span) > left:
+        # mockdr's own ceilings, not ones splunkd documents: uncapped,
+        # `mvrange(0, 10000000000)` built the whole list in memory, and
+        # 50,000 rows each building 50,000 values held a worker for minutes.
+        msg = (
+            f"mvrange would produce {len(span)} values; mockdr allows "
+            f"{MAX_MV_VALUES} per call and {MAX_MV_TOTAL} per search"
+        )
+        raise ValueError(msg)
+    MV_BUDGET.set(left - len(span))
+    return one_or_many([str(n) for n in span])
+
+
+#: The most values one ``mvrange`` call builds (see ``_mvrange``).
+MAX_MV_VALUES = 50_000
+#: The most values all ``mvrange`` calls of one search build together.
+MAX_MV_TOTAL = 1_000_000
+#: What is left of ``MAX_MV_TOTAL`` in the search being run; the pipeline
+#: resets it for each search.
+MV_BUDGET: ContextVar[int] = ContextVar("spl_mv_budget", default=MAX_MV_TOTAL)
 
 
 # ---------------------------------------------------------------------------

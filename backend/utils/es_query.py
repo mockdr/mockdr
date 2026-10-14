@@ -508,7 +508,13 @@ def calculate_min_should_match(optional: int, spec: Any) -> int:
             bound, _, rest = part.partition("<")
             if optional <= _java_int(bound):
                 return result
-            result = calculate_min_should_match(optional, rest)
+            # Lucene recurses on `rest`, which (split on spaces already)
+            # can only be another `n<spec` chain; each step starts from
+            # `optional` again. Walked as a loop: recursion turned a
+            # `0<0<0<…` spec into a RecursionError — a 500 — at ~1,000 links.
+            *bounds, last = rest.split("<")
+            stops = any(optional <= _java_int(link) for link in bounds)
+            result = optional if stops else calculate_min_should_match(optional, last)
         return result
     if "%" in text:
         percent = _java_int(text[:-1])

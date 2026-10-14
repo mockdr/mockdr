@@ -150,19 +150,26 @@ def _ungrouped(raw: str) -> str:
     with a 200.
     """
     text = raw.strip()
-    while text.startswith("(") and text.endswith(")"):
-        depth = 0
-        for index, ch in enumerate(text):
-            if ch == "(":
-                depth += 1
-            elif ch == ")":
-                depth -= 1
-                # The opening bracket closes before the end: the parentheses
-                # are not enclosing the whole term (`(a),(b)`).
-                if depth == 0 and index != len(text) - 1:
-                    return text
-        text = text[1:-1].strip()
-    return text
+    # Each bracket's partner, found in one pass. Peeling a layer at a time
+    # and rescanning the rest made this quadratic: 8,000 nested brackets in
+    # a 16 KB filter held a worker for three seconds.
+    partner: dict[int, int] = {}
+    opened: list[int] = []
+    for index, ch in enumerate(text):
+        if ch == "(":
+            opened.append(index)
+        elif ch == ")" and opened:
+            partner[opened.pop()] = index
+    lo, hi = 0, len(text) - 1
+    # A pair encloses the term only when the opening bracket's partner is
+    # the closing one at the end — not `(a),(b)`.
+    while lo < hi and text[lo] == "(" and partner.get(lo) == hi:
+        lo, hi = lo + 1, hi - 1
+        while lo <= hi and text[lo].isspace():
+            lo += 1
+        while hi >= lo and text[hi].isspace():
+            hi -= 1
+    return text[lo:hi + 1]
 
 
 def _parse_term(raw: str) -> FqlClause | None:
