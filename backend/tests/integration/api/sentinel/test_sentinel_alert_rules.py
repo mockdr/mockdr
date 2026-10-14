@@ -52,7 +52,7 @@ class TestAlertRules:
             },
             headers=_auth(client),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # created
 
     def test_delete_rule(self, client: TestClient) -> None:
         headers = _auth(client)

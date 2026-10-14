@@ -1,12 +1,13 @@
 """Sentinel Watchlists router."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import watchlists as watchlist_cmds
 from application.sentinel.queries import watchlists as watchlist_queries
-from utils.sentinel.response import build_arm_error, build_arm_resource
+from repository.sentinel.watchlist_repo import sentinel_watchlist_repo
+from utils.sentinel.response import arm_deleted, build_arm_error, build_arm_resource
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Watchlists"])
@@ -59,6 +60,7 @@ async def create_or_update_watchlist(
     workspace: str,
     alias: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
@@ -70,6 +72,8 @@ async def create_or_update_watchlist(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    # Create Or Update: 201 for a new resource, 200 for an existing one.
+    response.status_code = 200 if sentinel_watchlist_repo.get(alias) is not None else 201
     properties = body.get("properties", {})
     watchlist_cmds.create_or_update_watchlist(alias, properties)
     return watchlist_queries.get_watchlist(alias) or {}
@@ -83,14 +87,9 @@ def delete_watchlist(
     alias: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete a watchlist."""
-    if not watchlist_cmds.delete_watchlist(alias):
-        raise HTTPException(
-            status_code=404,
-            detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
-        )
-    return {}
+    return arm_deleted(watchlist_cmds.delete_watchlist(alias))
 
 
 # ── Watchlist Items CRUD ─────────────────────────────────────────────────
@@ -143,6 +142,7 @@ async def create_or_update_watchlist_item(
     alias: str,
     item_id: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
@@ -155,12 +155,14 @@ async def create_or_update_watchlist_item(
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
     properties = body.get("properties", {})
+    existed = watchlist_queries.get_watchlist_item(alias, item_id) is not None
     result = watchlist_cmds.create_or_update_watchlist_item(alias, item_id, properties)
     if not result:
         raise HTTPException(
             status_code=404,
             detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
         )
+    response.status_code = 200 if existed else 201
     return build_arm_resource("watchlistItems", item_id, {"itemsKeyValue": result})
 
 
@@ -173,11 +175,12 @@ def delete_watchlist_item(
     item_id: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete a watchlist item."""
-    if not watchlist_cmds.delete_watchlist_item(alias, item_id):
+    if watchlist_queries.get_watchlist(alias) is None:
+        # The parent is missing: there is no collection to delete from.
         raise HTTPException(
             status_code=404,
-            detail=build_arm_error("ResourceNotFound", f"Watchlist item '{item_id}' not found"),
+            detail=build_arm_error("ResourceNotFound", f"Watchlist '{alias}' not found"),
         )
-    return {}
+    return arm_deleted(watchlist_cmds.delete_watchlist_item(alias, item_id))

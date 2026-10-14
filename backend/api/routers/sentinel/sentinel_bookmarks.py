@@ -1,7 +1,7 @@
 """Sentinel Bookmarks router."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands.bookmarks import (
@@ -10,7 +10,7 @@ from application.sentinel.commands.bookmarks import (
 )
 from domain.sentinel.bookmark import SentinelBookmark
 from repository.sentinel.bookmark_repo import sentinel_bookmark_repo
-from utils.sentinel.response import build_arm_error, build_arm_list, build_arm_resource
+from utils.sentinel.response import arm_deleted, build_arm_error, build_arm_list, build_arm_resource
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Bookmarks"])
@@ -77,6 +77,7 @@ async def upsert_bookmark(
     workspace: str,
     bookmark_id: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
@@ -88,6 +89,8 @@ async def upsert_bookmark(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    # Create Or Update: 201 for a new resource, 200 for an existing one.
+    response.status_code = 200 if sentinel_bookmark_repo.get(bookmark_id) is not None else 201
     properties = body.get("properties", {})
     bm = create_or_update_bookmark(bookmark_id, properties)
     return _bookmark_to_arm(bm)
@@ -101,11 +104,6 @@ def delete_single_bookmark(
     bookmark_id: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete a bookmark."""
-    if not delete_bookmark(bookmark_id):
-        raise HTTPException(
-            status_code=404,
-            detail=build_arm_error("ResourceNotFound", f"Bookmark '{bookmark_id}' not found"),
-        )
-    return {}
+    return arm_deleted(delete_bookmark(bookmark_id))

@@ -76,7 +76,7 @@ class TestXsoarSentinelFlow:
             json={"properties": {"message": "Automated triage by XSOAR"}},
             headers=headers,
         )
-        assert comment_resp.status_code == 200
+        assert comment_resp.status_code == 201  # created
 
         # Step 7: Update incident (close with classification). PUT replaces,
         # so XSOAR sends the incident it read with its changes applied —

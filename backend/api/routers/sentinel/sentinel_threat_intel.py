@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import threat_intel as ti_cmds
 from application.sentinel.queries import threat_intel as ti_queries
-from utils.sentinel.response import build_arm_error
+from repository.sentinel.threat_indicator_repo import sentinel_threat_indicator_repo
+from utils.sentinel.response import arm_deleted, build_arm_error
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Threat Intelligence"])
@@ -138,6 +139,7 @@ async def create_or_update_indicator(
     workspace: str,
     name: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
@@ -149,6 +151,8 @@ async def create_or_update_indicator(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    # Create Or Update: 201 for a new resource, 200 for an existing one.
+    response.status_code = 200 if sentinel_threat_indicator_repo.get(name) is not None else 201
     properties = body.get("properties", {})
     ti_cmds.create_or_update_indicator(name, properties)
     return ti_queries.get_indicator(name) or {}
@@ -162,14 +166,9 @@ def delete_indicator(
     name: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete a threat intelligence indicator."""
-    if not ti_cmds.delete_indicator(name):
-        raise HTTPException(
-            status_code=404,
-            detail=build_arm_error("ResourceNotFound", f"Indicator '{name}' not found"),
-        )
-    return {}
+    return arm_deleted(ti_cmds.delete_indicator(name))
 
 
 # ── Create with auto-name ────────────────────────────────────────────────

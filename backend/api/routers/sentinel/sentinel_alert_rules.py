@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.commands import alert_rules as rule_cmds
 from application.sentinel.queries import alert_rules as rule_queries
-from utils.sentinel.response import build_arm_error, build_arm_list, build_arm_resource
+from repository.sentinel.alert_rule_repo import sentinel_alert_rule_repo
+from utils.sentinel.response import arm_deleted, build_arm_error, build_arm_list, build_arm_resource
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Alert Rules"])
@@ -58,6 +59,7 @@ async def create_or_update_alert_rule(
     workspace: str,
     rule_id: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
@@ -69,6 +71,8 @@ async def create_or_update_alert_rule(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
+    # Create Or Update: 201 for a new resource, 200 for an existing one.
+    response.status_code = 200 if sentinel_alert_rule_repo.get(rule_id) is not None else 201
     kind = body.get("kind", "Scheduled")
     properties = body.get("properties", {})
     properties["kind"] = kind
@@ -84,14 +88,9 @@ def delete_alert_rule(
     rule_id: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete an alert rule."""
-    if not rule_cmds.delete_rule(rule_id):
-        raise HTTPException(
-            status_code=404,
-            detail=build_arm_error("ResourceNotFound", f"Alert rule '{rule_id}' not found"),
-        )
-    return {}
+    return arm_deleted(rule_cmds.delete_rule(rule_id))
 
 
 #: Built-in Scheduled templates, as the content hub ships them. A real

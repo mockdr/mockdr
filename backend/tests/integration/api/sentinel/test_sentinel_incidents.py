@@ -188,7 +188,7 @@ class TestIncidentSubResources:
             json={"properties": {"message": "Test comment from integration test"}},
             headers=headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # created
 
         # List comments
         resp = client.get(
@@ -233,7 +233,7 @@ class TestWhoCommentedAndWhen:
             headers=_auth(client), params={"api-version": "2024-03-01"},
             json={"properties": {"message": "first look"}},
         )
-        assert created.status_code == 200
+        assert created.status_code == 201  # created
         author = created.json()["properties"]["author"]
         # An app-only token has no signed-in user: the application names
         # itself, and the two user fields stay empty.

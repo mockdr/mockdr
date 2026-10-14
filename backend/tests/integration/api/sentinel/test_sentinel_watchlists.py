@@ -52,7 +52,7 @@ class TestWatchlists:
             }},
             headers=headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # created
 
     def test_delete_watchlist(self, client: TestClient) -> None:
         headers = _auth(client)
@@ -86,7 +86,7 @@ class TestWatchlistItems:
             json={"properties": {"itemsKeyValue": {"UserPrincipalName": "test@test.com"}}},
             headers=headers,
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # created
 
     def test_delete_item(self, client: TestClient) -> None:
         headers = _auth(client)

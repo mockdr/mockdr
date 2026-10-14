@@ -17,6 +17,8 @@ import json
 from functools import cache
 from pathlib import Path
 
+from starlette.responses import JSONResponse, Response
+
 _SUB = "00000000-0000-0000-0000-000000000000"
 _RG = "mockdr-rg"
 _WS = "mockdr-workspace"
@@ -189,6 +191,21 @@ def build_arm_list(
     if next_link:
         result["nextLink"] = next_link
     return result
+
+
+def arm_deleted(existed: bool) -> Response:
+    """The answer to an ARM DELETE: 200 when something went, 204 when nothing was there.
+
+    Every Sentinel DELETE in the 2024-03-01 specification declares exactly
+    200 and 204, and ARM's convention for the pair is that a delete of a
+    resource that does not exist succeeds with `204 No Content` — the same
+    rule the Azure REST API guidelines state ("return a 204-No Content …
+    even if the URL identifies a resource that does not exist; do not return
+    404-Not Found"). The mock answered 404, which a client that deletes
+    idempotently, or retries a delete whose first answer it lost, reads as a
+    failure.
+    """
+    return JSONResponse({}) if existed else Response(status_code=204)
 
 
 def build_arm_error(code: str, message: str) -> dict:

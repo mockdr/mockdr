@@ -13,7 +13,7 @@ from domain.sentinel.incident_comment import comment_key
 from repository.sentinel.incident_comment_repo import sentinel_incident_comment_repo
 from repository.sentinel.incident_repo import sentinel_incident_repo
 from utils.sentinel.preconditions import check_if_match
-from utils.sentinel.response import build_arm_error, build_arm_resource
+from utils.sentinel.response import arm_deleted, build_arm_error, build_arm_resource
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Incidents"])
@@ -122,14 +122,9 @@ def delete_incident(
     incident_id: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete an incident."""
-    if not incident_cmds.delete_incident(incident_id):
-        raise HTTPException(
-            status_code=404,
-            detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
-        )
-    return {}
+    return arm_deleted(incident_cmds.delete_incident(incident_id))
 
 
 # ── Incident sub-resources ────────────────────────────────────────────────
@@ -220,6 +215,7 @@ async def create_or_update_comment(
     incident_id: str,
     comment_id: str,
     request: Request,
+    response: Response,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
 ) -> dict:
@@ -241,6 +237,7 @@ async def create_or_update_comment(
     known = sentinel_incident_comment_repo.get(comment_key(incident_id, comment_id))
     if known is not None:
         check_if_match(request.headers.get("if-match"), known.etag)
+    response.status_code = 200 if known is not None else 201
     message = body.get("properties", {}).get("message", "")
     comment = comment_cmds.create_or_update_comment(
         incident_id, comment_id, message, str(_auth.get("client_id", "")),
@@ -262,10 +259,14 @@ def delete_incident_comment(
     comment_id: str,
     api_version: str = Query(default="2024-03-01", alias="api-version"),
     _auth: dict = Depends(require_sentinel_auth),
-) -> dict:
+) -> Response:
     """Delete a comment."""
-    comment_cmds.delete_comment(incident_id, comment_id)
-    return {}
+    if sentinel_incident_repo.get(incident_id) is None:
+        raise HTTPException(
+            status_code=404,
+            detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
+        )
+    return arm_deleted(comment_cmds.delete_comment(incident_id, comment_id))
 
 
 # ── Relations ─────────────────────────────────────────────────────────────
