@@ -19,7 +19,7 @@ from repository.site_repo import site_repo
 from repository.store import store
 from repository.tag_repo import tag_repo
 from utils.dt import utc_now
-from utils.filtering import apply_filters
+from utils.filter_selection import select_ids
 from utils.serde import record_dict
 
 
@@ -70,34 +70,29 @@ def _resolve_ids(body: dict) -> list[str]:
         )
         raise UnscopedActionError(msg)
 
-    if raw_filter.get("ids"):
-        return cast(list[str], raw_filter["ids"])
+    return resolve_agent_filter(raw_filter)
 
-    # Everything else goes through the same filter engine the list endpoint
-    # uses, so an action selects exactly what a GET with those params returns
-    # — the documented specs as well as the hand-written ones, because the
-    # seventeen hand-written ones alone were not the set the GET applies.
+
+def resolve_agent_filter(raw_filter: dict) -> list[str]:
+    """The agent IDs a non-empty agent ``filter`` selects.
+
+    Everything but ``ids`` goes through the same filter engine the list
+    endpoint uses, so an action selects exactly what a GET with those params
+    returns — the documented specs as well as the hand-written ones, because
+    the seventeen hand-written ones alone were not the set the GET applies.
+
+    A member this mock cannot apply is refused, not ignored. `apply_filters`
+    answers with every record when nothing matches a spec, so an action
+    scoped by a filter the mock does not know — a typo, or a parameter the
+    vendor documents and this does not — selected the whole fleet and did
+    its work on all of it. `approve-uninstall` scoped to sixteen servers
+    uninstalled all sixty and answered `{"affected": 60}`.
+
+    Raises:
+        UnselectableFilterError: A member the agents listing cannot filter on.
+    """
     specs = [*AGENT_FILTER_SPECS, *DOCUMENTED_FILTERS.get("/agents", [])]
-    params = {k: v for k, v in raw_filter.items() if v is not None}
-
-    # A member this mock cannot apply is refused, not ignored. `apply_filters`
-    # answers with every record when nothing matches a spec, so an action
-    # scoped by a filter the mock does not know — a typo, or a parameter the
-    # vendor documents and this does not — selected the whole fleet and did
-    # its work on all of it. `approve-uninstall` scoped to sixteen servers
-    # uninstalled all sixty and answered `{"affected": 60}`.
-    known = {spec.param for spec in specs} | {"ids"}
-    unknown = sorted(set(params) - known)
-    if unknown:
-        msg = (
-            f"The filter names {'members' if len(unknown) > 1 else 'a member'} "
-            f"this endpoint cannot select on: {', '.join(unknown)}."
-        )
-        raise UnscopedActionError(msg)
-
-    records = [record_dict(a) for a in agent_repo.list_all()]
-    matched = apply_filters(records, params, specs)
-    return [str(r["id"]) for r in matched]
+    return select_ids(agent_repo.list_all(), raw_filter, specs)
 
 
 #: Actions the swagger documents that leave no mark on the agent record —
