@@ -39,6 +39,7 @@ from utils.es_datemath import ROUNDS_UP, DateMathError, is_date_math
 from utils.es_datemath import parse_datetime as parse_es_datetime
 from utils.es_datemath import resolve as resolve_date_math
 from utils.nested import get_nested as _get_nested
+from utils.safe_regex import UnsafeRegexError, check_regex
 
 _DEFAULT_SIZE = 10
 
@@ -952,8 +953,12 @@ def _build_regexp(body: dict) -> Callable[[dict], bool]:
     pattern = str(spec.get("value", ""))
     flags = re.IGNORECASE if spec.get("case_insensitive") else 0
     try:
+        check_regex(pattern, flags)
         compiled = re.compile(pattern, flags)
-    except re.error as exc:
+    except (re.error, UnsafeRegexError) as exc:
+        # Lucene runs a determinised automaton, so it never backtracks;
+        # Python's engine does, and a nested unbounded quantifier backtracks
+        # catastrophically. Refused as a pattern the shards cannot run.
         raise ESQueryError(
             f"Can't parse regexp: {pattern}",
             es_type="illegal_argument_exception",

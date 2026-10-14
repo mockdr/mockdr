@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from fnmatch import fnmatch, fnmatchcase
 from typing import Any
 
+from utils.safe_regex import check_regex
 from utils.splunk.spl_functions import (
     FUNCTIONS,
     ArgumentError,
@@ -679,7 +680,13 @@ def _func(name: str, args: list[Any]) -> Any:
     if name == "like":
         return fnmatch(str(args[0]).lower(), str(args[1]).lower().replace("%", "*"))
     if name in ("match", "searchmatch"):
-        return bool(re.search(str(args[1]), str(args[0]))) if len(args) > 1 else False
+        if len(args) <= 1:
+            return False
+        pattern = str(args[1])
+        # `match("aaaa…!", "^(a+)+$")` backtracks for seconds; refuse the
+        # nesting before it runs, the way the regex commands do.
+        check_regex(pattern)
+        return bool(re.search(pattern, str(args[0])))
     if name in ("min", "max"):
         return _extreme(name, [(a, _UNKNOWN) for a in args])
 

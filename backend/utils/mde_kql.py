@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from utils.safe_regex import UnsafeRegexError, check_regex
+
 __all__ = ["KqlError", "KqlQuery", "evaluate_kql", "parse_kql"]
 
 Row = dict[str, Any]
@@ -440,7 +442,14 @@ def _string_op(
         elif base == "has":
             result = str(target).lower() in re.split(r"[^0-9a-z_]+", text)
         elif base == "matches":
-            result = bool(re.search(str(target), str(value or "")))
+            pattern = str(target)
+            # Refuse a nested unbounded quantifier before it runs: the real
+            # KQL engine does not backtrack, Python's does.
+            try:
+                check_regex(pattern)
+            except UnsafeRegexError as exc:
+                raise KqlError(f"regex '{pattern}' can backtrack catastrophically") from exc
+            result = bool(re.search(pattern, str(value or "")))
         else:  # pragma: no cover - guarded by _STRING_OPS
             msg = f"The operator '{operator}' is not supported"
             raise KqlError(msg)

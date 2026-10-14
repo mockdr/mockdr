@@ -25,6 +25,8 @@ from __future__ import annotations
 import re
 from typing import Final
 
+from utils.safe_regex import UnsafeRegexError, check_regex
+
 
 class RegexError(ValueError):
     """A pattern splunkd's PCRE2 would refuse, worded the way it refuses it.
@@ -92,11 +94,28 @@ def compile_client_regex(
     rewrites to Python's before compiling, and splunkd quotes back what it
     was given rather than what it compiled.
     """
+    written = expression if echo is None else echo
+    try:
+        check_regex(expression)
+    except UnsafeRegexError:
+        # splunkd's PCRE2 runs under a backtracking limit mockdr has no
+        # equal of; `(a+)+` against a 30-char subject held a worker here for
+        # 26 s. Refused as a bad pattern in the frame's own words.
+        clause = "catastrophic backtracking"
+        if frame == REX:
+            msg = (
+                f"Encountered the following error while compiling the regex "
+                f"'{written}': Regex: {clause}."
+            )
+        elif frame == REGEX:
+            msg = f"The regex '{written}' is invalid. Regex: {clause}."
+        else:
+            msg = f"Regex: {clause}"
+        raise RegexError(msg) from None
     try:
         return re.compile(expression)
     except re.error as error:
         clause = _clause(error)
-        written = expression if echo is None else echo
         if frame == REX:
             msg = (
                 f"Encountered the following error while compiling the regex "
