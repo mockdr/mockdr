@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from repository.mde_machine_action_repo import mde_machine_action_repo
-from utils.dt import utc_now
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.mde_response import build_mde_list_response, mde_context
@@ -19,10 +18,18 @@ def _resource(record: dict) -> dict:
     return complete_mde(to_mde_resource(record, "actionId"), "machineaction")
 
 
+#: How long Defender takes to carry an action out, in the mock.
+_SETTLE_SECONDS = 1.0
+
+
 def _auto_promote(action_dict: dict) -> dict:
     """Auto-promote Pending actions to Succeeded after 1 second.
 
-    MDE actions are async; this simulates completion for test tooling.
+    MDE actions are async; this simulates completion for test tooling. The
+    action completes about a second after it was created whether or not
+    anyone reads it, so ``lastUpdateDateTimeUtc`` says *then*: stamped at
+    the read that noticed, an action left unread for a day reported a day's
+    run time, and its completion moved with whoever looked first.
 
     Args:
         action_dict: Machine action dict to potentially promote.
@@ -39,18 +46,31 @@ def _auto_promote(action_dict: dict) -> dict:
         created_dt = datetime.strptime(created, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
             tzinfo=UTC,
         )
-        if (datetime.now(UTC) - created_dt).total_seconds() > 1.0:
-            action_dict["status"] = "Succeeded"
-            action_dict["lastUpdateDateTimeUtc"] = utc_now()
-            # Persist the promotion
-            stored = mde_machine_action_repo.get(action_dict["actionId"])
-            if stored:
-                stored.status = "Succeeded"
-                stored.lastUpdateDateTimeUtc = action_dict["lastUpdateDateTimeUtc"]
-                mde_machine_action_repo.save(stored)
     except (ValueError, TypeError):
-        pass
+        return action_dict
+    if (datetime.now(UTC) - created_dt).total_seconds() <= _SETTLE_SECONDS:
+        return action_dict
+    completed = (created_dt + timedelta(seconds=_SETTLE_SECONDS)).isoformat(
+        timespec="milliseconds",
+    ).replace("+00:00", "Z")
+    action_dict["status"] = "Succeeded"
+    action_dict["lastUpdateDateTimeUtc"] = completed
+    # Persist the promotion
+    stored = mde_machine_action_repo.get(action_dict["actionId"])
+    if stored:
+        stored.status = "Succeeded"
+        stored.lastUpdateDateTimeUtc = completed
+        mde_machine_action_repo.save(stored)
     return action_dict
+
+
+def settle_due() -> int:
+    """Complete every pending action Defender would have finished; how many."""
+    done = 0
+    for action in mde_machine_action_repo.list_all():
+        if action.status == "Pending" and _auto_promote(record_dict(action))["status"] != "Pending":
+            done += 1
+    return done
 
 
 def list_machine_actions(

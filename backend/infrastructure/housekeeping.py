@@ -97,9 +97,18 @@ def _sweepers() -> dict[str, Callable[[float], int]]:
 
 
 def sweep(now: float | None = None) -> dict[str, int]:
-    """Apply every lifetime at once; how many things each rule forgot."""
+    """Apply every lifetime at once; how many things each rule forgot.
+
+    Also settles every pending action whose device has answered
+    (``application.settling``), so a pending state does not outlive its
+    second for want of a reader.
+    """
+    from application.settling import settle_due
+
     moment = time.time() if now is None else now
-    return {name: reap(moment) for name, reap in _sweepers().items()}
+    freed = {name: reap(moment) for name, reap in _sweepers().items()}
+    freed["settled"] = settle_due()
+    return freed
 
 
 async def run_periodically(interval: float | None = None) -> None:

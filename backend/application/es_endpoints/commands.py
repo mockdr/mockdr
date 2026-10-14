@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from domain.es_action_response import EsActionResponse
 from repository.es_action_response_repo import es_action_response_repo
@@ -148,9 +149,32 @@ def _settled(action: EsActionResponse) -> EsActionResponse:
     if waited is None or waited <= _SETTLE_SECONDS:
         return action
     action.status = _SETTLED_STATUS
-    action.completed_at = utc_now()
+    # Done about a second after it started, not whenever someone looked:
+    # stamped at the read, an action unread for a day completed a day late.
+    action.completed_at = _plus_seconds(action.started_at, _SETTLE_SECONDS) or utc_now()
     es_action_response_repo.save(action)
     return action
+
+
+def _plus_seconds(timestamp: str, seconds: float) -> str | None:
+    """*timestamp* moved *seconds* later, in the same ISO-8601 form; None if unreadable."""
+    try:
+        moment = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    later = moment + timedelta(seconds=seconds)
+    return later.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def settle_due() -> int:
+    """Complete every pending action the endpoint has answered; how many."""
+    done = 0
+    for action in es_action_response_repo.list_all():
+        if action.status == "pending" and _settled(action).status != "pending":
+            done += 1
+    return done
 
 
 def list_actions(agent_id: str | None = None) -> list[dict]:

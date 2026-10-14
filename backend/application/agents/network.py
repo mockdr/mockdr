@@ -26,6 +26,7 @@ import time
 
 from application import bridge
 from repository.agent_repo import agent_repo
+from repository.store import store
 from utils.dt import utc_now
 
 #: The state each action leaves the agent in until it acknowledges.
@@ -39,10 +40,14 @@ _SETTLES_INTO = {"connecting": "connected", "disconnecting": "disconnected"}
 _SETTLE_SECONDS = 1.0
 
 
-#: Each in-flight transition by agent id: when it was asked for, and the
-#: ``updatedAt`` it stamped on the agent — a record that no longer carries
-#: that stamp (reseeded, or changed since) is not the one that asked.
-_REQUESTED: dict[str, tuple[float, str]] = {}
+#: Each in-flight transition by agent id: when it was asked for (epoch
+#: seconds), and the ``updatedAt`` it stamped on the agent — a record that no
+#: longer carries that stamp (reseeded, or changed since) is not the one that
+#: asked. Kept in the store rather than in this module, so it is persisted
+#: and exported with the agent it belongs to: held in process memory, a
+#: restart with ``MOCKDR_PERSIST`` (or an export and import) in the second a
+#: transition was in flight left that agent ``connecting`` for ever.
+_REQUESTS = "agent_network_requests"
 
 
 def begin(agent: object, action: str) -> None:
@@ -50,26 +55,32 @@ def begin(agent: object, action: str) -> None:
     stamp = utc_now()
     agent.networkStatus = PENDING_FOR[action]  # type: ignore[attr-defined]
     agent.updatedAt = stamp  # type: ignore[attr-defined]
-    _REQUESTED[str(getattr(agent, "id", ""))] = (time.monotonic(), stamp)
+    store.save(_REQUESTS, str(getattr(agent, "id", "")),
+               {"requested_at": time.time(), "stamp": stamp})
 
 
 def settled(agent: object) -> object:
-    """Move *agent* out of a transitional network state once the wait is over."""
+    """Move *agent* out of a transitional network state once the wait is over.
+
+    The agent answers about a second after it was asked, whether or not
+    anyone is looking: the change reaches the SIEM dated then, not at the
+    read that happened to notice it.
+    """
     agent_id = str(getattr(agent, "id", ""))
-    pending = _REQUESTED.get(agent_id)
+    pending = store.get(_REQUESTS, agent_id)
     if pending is None:
         return agent
-    requested, stamp = pending
+    requested, stamp = float(pending["requested_at"]), pending["stamp"]
     target = _SETTLES_INTO.get(str(getattr(agent, "networkStatus", "")))
     if target is None or getattr(agent, "updatedAt", None) != stamp:
-        _REQUESTED.pop(agent_id, None)
+        store.delete(_REQUESTS, agent_id)
         return agent
-    if time.monotonic() - requested <= _SETTLE_SECONDS:
+    if time.time() - requested <= _SETTLE_SECONDS:
         return agent
-    _REQUESTED.pop(agent_id, None)
+    store.delete(_REQUESTS, agent_id)
     agent.networkStatus = target  # type: ignore[attr-defined]
     agent_repo.save(agent)  # type: ignore[arg-type]
-    bridge.agent_changed(agent)
+    bridge.agent_changed(agent, at=requested + _SETTLE_SECONDS)
     return agent
 
 
@@ -78,3 +89,17 @@ def settle_all(agents: list) -> list:
     for agent in agents:
         settled(agent)
     return agents
+
+
+def settle_due() -> int:
+    """Settle every transition whose agent has answered; how many settled."""
+    done = 0
+    for agent_id in list(store.get_all_with_keys(_REQUESTS)):
+        agent = agent_repo.get(agent_id)
+        if agent is None:
+            store.delete(_REQUESTS, agent_id)
+            continue
+        before = agent.networkStatus
+        if getattr(settled(agent), "networkStatus", before) != before:
+            done += 1
+    return done

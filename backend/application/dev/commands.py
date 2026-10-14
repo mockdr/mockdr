@@ -277,6 +277,9 @@ _RAW_COLLECTIONS = {
     "api_tokens",
     "star_rules",
     "remote_script_runs",
+    # A connect or disconnect still in flight: without it a restart left the
+    # agent `connecting` for ever.
+    "agent_network_requests",
     # CrowdStrike
     "cs_oauth_tokens",
     # Elastic Security

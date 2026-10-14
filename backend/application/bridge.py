@@ -36,12 +36,12 @@ def _payload(record: object) -> dict:
     return record if isinstance(record, dict) else record_dict(record)
 
 
-def agent_changed(agent: object) -> None:
-    """A SentinelOne agent's state changed."""
+def agent_changed(agent: object, at: float | None = None) -> None:
+    """A SentinelOne agent's state changed — *at* when it did, if not now."""
     event_bus.publish(AgentUpdated(
         entity_id=str(getattr(agent, "id", "")),
         payload=_payload(agent),
-        timestamp=time.time(),
+        timestamp=time.time() if at is None else at,
     ))
 
 
@@ -99,10 +99,10 @@ def xdr_alert_changed(alert: object) -> None:
     ))
 
 
-def xdr_endpoint_changed(endpoint: object) -> None:
-    """A Cortex XDR endpoint's own state changed."""
+def xdr_endpoint_changed(endpoint: object, at: float | None = None) -> None:
+    """A Cortex XDR endpoint's own state changed — *at* when it did, if not now."""
     event_bus.publish(XdrEndpointUpdated(
         entity_id=str(getattr(endpoint, "endpoint_id", "")),
         payload=_payload(endpoint),
-        timestamp=time.time(),
+        timestamp=time.time() if at is None else at,
     ))

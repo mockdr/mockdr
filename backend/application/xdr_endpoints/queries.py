@@ -89,8 +89,25 @@ def settle_isolation(endpoint: object, *, now: bool = False) -> object:
     if settled == AGENT_UNISOLATED:
         endpoint.isolated_date = None  # type: ignore[attr-defined]
     xdr_endpoint_repo.save(endpoint)  # type: ignore[arg-type]
-    bridge.xdr_endpoint_changed(endpoint)
+    # The agent answered about a second after it was asked, whoever noticed
+    # and whenever: the SIEM gets the change dated then.
+    answered = requested / 1000 + _SETTLE_SECONDS if requested else None
+    bridge.xdr_endpoint_changed(
+        endpoint, at=min(answered, time.time()) if answered else None,
+    )
     return endpoint
+
+
+def settle_due() -> int:
+    """Settle every endpoint whose agent has answered; how many settled."""
+    done = 0
+    for endpoint in xdr_endpoint_repo.list_all():
+        before = endpoint.is_isolated
+        if before not in _SETTLES_INTO:
+            continue
+        if getattr(settle_isolation(endpoint), "is_isolated", before) != before:
+            done += 1
+    return done
 
 
 def _translated_filters(filters: object) -> object:

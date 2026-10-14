@@ -56,6 +56,16 @@ def _settled(host: object) -> object:
     return host
 
 
+def settle_due() -> int:
+    """Settle every host whose sensor has acknowledged; how many settled."""
+    done = 0
+    for host in cs_host_repo.list_all():
+        before = host.status
+        if before in _SETTLES_INTO and getattr(_settled(host), "status", before) != before:
+            done += 1
+    return done
+
+
 def _public(host: object) -> dict:
     """One host as Falcon serves it, without mockdr's own bookkeeping."""
     return strip_fields(record_dict(_settled(host)), CS_HOST_INTERNAL_FIELDS)

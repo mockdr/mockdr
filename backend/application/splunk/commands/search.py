@@ -309,6 +309,11 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
         ``(events, results, messages)`` — the matched events before the
         pipeline ran, the rows the pipeline produced, and any diagnostics.
     """
+    # An action whose device has answered is indexed before the search reads
+    # the index, whether or not its own API was asked since (ADR-009).
+    from application.settling import settle_due
+
+    settle_due()
     time_messages, usable = _time_term_messages(parsed)
     if not usable:
         # splunkd refuses the whole search rather than dropping the bound it

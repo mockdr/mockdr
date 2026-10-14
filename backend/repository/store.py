@@ -76,6 +76,8 @@ class InMemoryStore:
             "star_rules": {},      # STAR custom detection rules
             "remote_script_runs": {},  # remote script execution records
             "agent_uploads": {},   # keyed by activity_id; value is raw zip bytes
+            # connect/disconnect in flight, keyed by agent id (agents/network)
+            "agent_network_requests": {},
             # ── CrowdStrike Falcon collections ────────────────────────────────
             "cs_hosts": {},
             "cs_detections": {},
