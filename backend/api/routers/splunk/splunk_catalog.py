@@ -172,8 +172,6 @@ _GENERATING: dict[str, tuple[str, str, bool, str]] = {
     "inputlookup": ("report", "SP_REPORT", True, ""),
 }
 
-_PARSER_405 = {"messages": [{"type": "FATAL", "text": "The method is not allowed."}]}
-
 
 def _parse_query(q: str) -> dict:
     """Parse a query the way ``POST /services/search/parser`` reports it.

@@ -8,7 +8,6 @@ from __future__ import annotations
 import random
 import time
 
-XDR_TENANT_ID: str = "xdr-tenant-acmecorp-001"
 """Mock Cortex XDR tenant ID."""
 
 XDR_SEVERITIES: list[str] = ["low", "medium", "medium", "high", "high", "critical"]

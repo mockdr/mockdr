@@ -25,15 +25,6 @@ _RULE_TYPE_LIST = (
     "| 'new_terms' | 'esql'"
 )
 
-#: The fields rules/_find sorts by, in the order zod lists them (measured).
-_SORTABLE = (
-    "created_at", "createdAt", "enabled", "execution_summary.last_execution.date",
-    "execution_summary.last_execution.metrics.execution_gap_duration_s",
-    "execution_summary.last_execution.metrics.total_indexing_duration_ms",
-    "execution_summary.last_execution.metrics.total_search_duration_ms",
-    "execution_summary.last_execution.status", "name", "risk_score", "riskScore",
-    "severity", "updated_at", "updatedAt",
-)
 _BULK_ACTIONS = ("delete", "disable", "enable", "export", "duplicate", "edit", "run")
 
 router = APIRouter(tags=["Elastic Detection Rules"])
@@ -207,18 +198,6 @@ def delete_rule(
 
 
 # ── Find ─────────────────────────────────────────────────────────────────────
-
-
-_ALLOWED_SORT_FIELDS = {
-    "created_at",
-    "updated_at",
-    "name",
-    "enabled",
-    "severity",
-    "risk_score",
-    "rule_id",
-    "execution_summary.last_execution.date",
-}
 
 
 @router.get("/api/detection_engine/rules/_find")

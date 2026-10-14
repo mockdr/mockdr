@@ -310,20 +310,6 @@ def delete_item(
     return {}
 
 
-def _require_iots(body: dict, fields: tuple[str, ...]) -> None:
-    """Refuse a body missing io-ts-required fields the way Kibana does.
-
-    One ``Invalid value "undefined" supplied to "<field>"`` per missing
-    field, comma-joined, in schema order, in the Boom envelope. Measured on
-    8.15 for cases and exception lists.
-    """
-    missing = [f for f in fields if body.get(f) is None]
-    if missing:
-        raise HTTPException(status_code=400, detail=build_kbn_error_response(
-            400, ",".join(f'Invalid value "undefined" supplied to "{f}"' for f in missing),
-        ))
-
-
 def _validated_item(body: dict, *, update: bool = False) -> None:
     """Refuse an item body the way Kibana refuses it."""
     try:

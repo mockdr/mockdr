@@ -31,13 +31,6 @@ SKU_ID_M365_BUSINESS_PREMIUM: str = "cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46"
 SKU_ID_MDE_P2: str = "64bfac92-2b17-4482-b5e5-a0304429de3e"
 SKU_ID_INTUNE_P1: str = "882e1d05-acd1-4ccb-8708-6ee03664b117"
 
-SKU_PART_NUMBERS: dict[str, str] = {
-    SKU_ID_M365_E5: "SPE_E5",
-    SKU_ID_M365_E3: "SPE_E3",
-    SKU_ID_M365_BUSINESS_PREMIUM: "SPB",
-    SKU_ID_MDE_P2: "WIN_DEF_ATP",
-    SKU_ID_INTUNE_P1: "INTUNE_A",
-}
 
 # ---------------------------------------------------------------------------
 # ID generation

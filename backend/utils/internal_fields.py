@@ -30,5 +30,3 @@ GROUP_INTERNAL_FIELDS: frozenset[str] = frozenset({"siteName", "accountId", "acc
 SITE_INTERNAL_FIELDS: frozenset[str] = frozenset({"location"})
 
 USER_INTERNAL_FIELDS: frozenset[str] = frozenset({"role", "accountId", "accountName", "_apiToken"})
-
-THREAT_INTERNAL_FIELDS: frozenset[str] = frozenset({"_fetched_file"})

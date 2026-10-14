@@ -20,13 +20,6 @@ from typing import Any
 #: rule a CSV writer needs — it is the rule splunkd uses.
 _BARE = re.compile(r"[A-Za-z0-9]+")
 
-#: The order each endpoint puts its columns in, measured per endpoint:
-#: results keep the order the search produced, events sort by name, and a job
-#: entry keeps splunkd's own key order — which is neither, and not derivable
-#: from outside, so mockdr keeps its own.
-_ALPHABETICAL = "alphabetical"
-_AS_GIVEN = "as-given"
-
 
 def render_splunk_csv(payload: object, *, sort_columns: bool = False) -> str:
     """Render a Splunk JSON response body as CSV.

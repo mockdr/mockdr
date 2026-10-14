@@ -10,7 +10,6 @@ from repository.splunk.splunk_event_repo import splunk_event_repo
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
 
-_INDEX_LINKS = ("_reload", "alternate", "disable", "edit", "list")
 #: The top-level relations the indexes collection offers, on the single-entry
 #: answer as much as on the listing.
 _INDEX_COLLECTION_LINKS = {

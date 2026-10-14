@@ -136,4 +136,3 @@ def get_history(
             {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     return result
-

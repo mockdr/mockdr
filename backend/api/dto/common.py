@@ -10,23 +10,10 @@ class Pagination(BaseModel):
     nextCursor: str | None = None
 
 
-class ListResponse(BaseModel):
-    """Standard S1 API list response envelope."""
-
-    data: list[Any]
-    pagination: Pagination
-
-
 class SingleResponse(BaseModel):
     """Standard S1 API single-item response envelope."""
 
     data: Any
-
-
-class AffectedResponse(BaseModel):
-    """Standard S1 API action response indicating affected record count."""
-
-    data: dict  # {"affected": N}
 
 
 class ErrorDetail(BaseModel):
@@ -35,13 +22,6 @@ class ErrorDetail(BaseModel):
     code: int
     detail: str
     title: str
-
-
-class ErrorResponse(BaseModel):
-    """Standard S1 API error response envelope."""
-
-    errors: list[ErrorDetail]
-    data: None = None
 
 
 class FilterBody(BaseModel):

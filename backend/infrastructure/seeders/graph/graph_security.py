@@ -127,40 +127,6 @@ _SEVERITY_RANK: dict[str, int] = {
     "high": 3,
 }
 
-#: Where an MDE indicator's value belongs on a ``tiIndicator``. Graph has no
-#: ``indicatorValue``: the observable goes in the property that names it, and
-#: a file hash carries its algorithm in ``fileHashType`` beside it.
-_MDE_OBSERVABLE_MAP: dict[str, tuple[str, str | None]] = {
-    "FileSha256": ("fileHashValue", "sha256"),
-    "FileSha1": ("fileHashValue", "sha1"),
-    "FileMd5": ("fileHashValue", "md5"),
-    "IpAddress": ("networkDestinationIPv4", None),
-    "DomainName": ("domainName", None),
-    "Url": ("url", None),
-}
-
-_MDE_ACTION_MAP: dict[str, str] = {
-    "Alert": "alert",
-    "AlertAndBlock": "block",
-    "Allowed": "allow",
-    "Block": "block",
-    "Warn": "alert",
-    "Audit": "alert",
-    "BlockAndRemediate": "block",
-}
-
-_CONTROL_SCORE_NAMES: list[str] = [
-    "MFARegistration",
-    "AdminMFAV2",
-    "BlockLegacyAuthentication",
-    "RoleOverlap",
-    "SigninRiskPolicy",
-    "UserRiskPolicy",
-    "IntegratedApps",
-    "OneAdmin",
-]
-
-
 
 def _incident_state(group: list[GraphSecurityAlert]) -> tuple[str, str | None, str | None]:
     """What an incident's own status, classification and determination are.

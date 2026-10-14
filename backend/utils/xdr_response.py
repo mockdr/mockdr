@@ -67,15 +67,6 @@ XDR_ERR_NOT_FOUND = "XDR Not found: The provided URL may not be of an active XDR
 XDR_ERR_TOO_LARGE = "Request entity too large. Please reach out to the XDR support team."
 XDR_ERR_INTERNAL = "XDR internal server error."
 
-XDR_DOCUMENTED_ERRORS: dict[int, str] = {
-    401: XDR_ERR_UNAUTHORIZED,
-    402: XDR_ERR_LICENSE,
-    403: XDR_ERR_FORBIDDEN,
-    404: XDR_ERR_NOT_FOUND,
-    413: XDR_ERR_TOO_LARGE,
-    500: XDR_ERR_INTERNAL,
-}
-
 
 def build_xdr_error(err_code: int, err_msg: str, err_extra: str | None = None) -> dict:
     """Build a Cortex XDR error response.

@@ -120,11 +120,6 @@ def _encode_keyset(item: object, spec: CursorSpec) -> str:
     return base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
 
 
-def _decode_keyset(cursor: str) -> Any:
-    """Extract ``id_value`` from a URL-safe S1 keyset cursor string."""
-    return _decode_keyset_payload(cursor).get("id_value")
-
-
 def _decode_keyset_payload(cursor: str) -> dict:
     """Decode the whole cursor payload; an unreadable cursor yields ``{}``."""
     try:

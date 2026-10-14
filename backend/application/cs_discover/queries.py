@@ -13,18 +13,6 @@ from utils.cs_sort import parse_cs_sort, sort_key
 from utils.nested import get_nested
 
 
-def _build_id_map() -> dict[str, str]:
-    """Build a mapping from S1 agent_id → CS device_id."""
-    return {
-        agent_id: mapping["cs_device_id"]
-        for agent_id, mapping in (
-            (aid, store.get("edr_id_map", aid))
-            for aid in [m["cs_device_id"] for m in store.get_all("edr_id_map")]
-        )
-        if mapping and "cs_device_id" in mapping
-    }
-
-
 def _build_agent_to_cs_map() -> dict[str, str]:
     """Build agent_id → cs_device_id mapping from edr_id_map store."""
     result: dict[str, str] = {}

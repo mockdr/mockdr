@@ -22,7 +22,6 @@ from utils.id_gen import new_hex
 # An incident is dated at its source record's time (utils.event_time); a
 # fixed epoch here once put every seeded incident in 2023.
 
-_SENTINEL_SEVERITIES = ["High", "Medium", "Medium", "Low", "Informational"]
 _SENTINEL_STATUSES = ["New", "New", "New", "Active", "Active", "Closed"]
 
 _INC_NUM = 0

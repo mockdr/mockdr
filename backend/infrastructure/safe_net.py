@@ -52,8 +52,3 @@ def doc_url(rng: random.Random | None = None) -> str:
     r = rng or random
     path = r.choice(_WORDS)  # noqa: S311
     return f"https://{doc_domain(subdomain=True, rng=rng)}/{path}/"
-
-
-def doc_email(local: str, host: str = "personal-mail.example") -> str:
-    """An address that cannot be delivered anywhere real."""
-    return f"{local}@{host}"

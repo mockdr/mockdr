@@ -13,9 +13,6 @@ from repository.splunk.splunk_event_repo import splunk_event_repo
 from utils.sentinel.kql_parser import UnsupportedKqlError, parse_kql
 from utils.sentinel.response import build_log_analytics_response
 
-# Table name → (fetch_fn, column_mapping)
-_TABLE_REGISTRY: dict[str, tuple] = {}
-
 #: The custom tables this workspace's own data connectors advertise, and the
 #: events each one ingests. `dataConnectors` publishes the table name *and*
 #: the query a client runs against it — `SentinelOne_CL | summarize
@@ -411,7 +408,6 @@ def _parse_time(val: object) -> float:
         except (ValueError, TypeError):
             pass
     return 0.0
-
 
 
 def _summarize_extreme(rows: list[dict], field_name: str, func: str) -> dict:
