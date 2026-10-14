@@ -138,9 +138,11 @@ class TestIsolateEndpoint:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["agent_id"] == agent_id
-        assert body["action"] == "isolate"
-        assert body["status"] == "pending"
+        assert body["action"] == body["data"]["id"]
+        assert body["data"]["agents"] == [agent_id]
+        assert body["data"]["command"] == "isolate"
+        assert body["data"]["status"] == "pending"
+        assert body["data"]["comment"] == "Isolate for investigation"
 
     def test_isolate_changes_isolation_status(self, client: TestClient) -> None:
         """After isolation, Endpoint.state.isolation should be true."""
@@ -204,7 +206,7 @@ class TestUnisolateEndpoint:
             json={"endpoint_ids": [agent_id], "comment": "Release from isolation"},
         )
         assert resp.status_code == 200
-        assert resp.json()["action"] == "unisolate"
+        assert resp.json()["data"]["command"] == "unisolate"
 
     def test_unisolate_restores_normal_status(self, client: TestClient) -> None:
         """After unisolation, Endpoint.state.isolation should be false."""
@@ -256,7 +258,7 @@ class TestListActions:
         ).json()
         assert body["total"] >= 1
         actions = body["data"]
-        action_types = [a["action"] for a in actions]
+        action_types = [a["command"] for a in actions]
         assert "isolate" in action_types
 
 
@@ -271,14 +273,14 @@ class TestGetActionStatus:
             headers=KBN_WRITE_HEADERS,
             json={"endpoint_ids": [agent_id]},
         ).json()
-        action_id = isolate_resp["id"]
+        action_id = isolate_resp["data"]["id"]
 
         resp = client.get(
             f"/kibana/api/endpoint/action/{action_id}",
             headers=ES_AUTH,
         )
         assert resp.status_code == 200
-        assert resp.json()["id"] == action_id
+        assert resp.json()["data"]["id"] == action_id
 
     def test_get_nonexistent_action_returns_404(self, client: TestClient) -> None:
         """Non-existent action_id should return 404."""
@@ -322,7 +324,7 @@ class TestTheOlderPathRedirects:
         )
 
         assert resp.status_code == 200
-        assert resp.json()["agent_id"] == agent_id
+        assert resp.json()["data"]["agents"] == [agent_id]
 
     def test_isolate_is_served_where_it_stands(self, client: TestClient) -> None:
         resp = client.post(

@@ -2917,14 +2917,16 @@ class TestAnActionThatSettles:
         action = client.post("/kibana/api/endpoint/action/isolate",
                              headers=self.KBN,
                              json={"endpoint_ids": [agent], "comment": "x"}).json()
-        assert action["status"] == "pending"
-        assert action["completed_at"] is None
+        assert action["data"]["status"] == "pending"
+        assert action["data"]["isCompleted"] is False
+        assert "completedAt" not in action["data"]
 
         monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
-        settled = client.get(f"/kibana/api/endpoint/action/{action['id']}",
-                             headers=self.KBN).json()
+        settled = client.get(f"/kibana/api/endpoint/action/{action['action']}",
+                             headers=self.KBN).json()["data"]
         assert settled["status"] == "successful"
-        assert settled["completed_at"]
+        assert settled["isCompleted"] is True
+        assert settled["completedAt"]
 
     def test_the_status_is_one_kibana_validates(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,

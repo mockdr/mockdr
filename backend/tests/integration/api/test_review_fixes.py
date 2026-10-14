@@ -734,8 +734,10 @@ class TestTheResponseActionsKibanaRoutes:
         assert resp.status_code == 200, resp.text
         # Kibana's own command vocabulary is hyphenated — the one its
         # `commands` filter validates against.
-        assert resp.json()["action"] == command
-        assert resp.json()["agent_id"] == agent
+        assert resp.json()["data"]["command"] == command
+        assert resp.json()["data"]["agents"] == [agent]
+        # Only isolate and unisolate repeat the id as a legacy `action`.
+        assert "action" not in resp.json()
 
     def test_parameters_are_checked_where_the_schema_declares_them(
         self, client: TestClient,

@@ -6,11 +6,14 @@ detail, and response actions (isolate, unisolate, kill process, scan).
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_endpoints import commands as endpoint_commands
 from application.es_endpoints import queries as endpoint_queries
+from utils.es_datemath import DateMathError, parse_datetime, resolve
 from utils.es_response import build_kbn_error_response, build_security_solution_error
 from utils.kibana_query import refuses_unknown
 from utils.kibana_validation import (
@@ -112,7 +115,7 @@ def isolate_endpoint(
             status_code=404,
             detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
-    return result
+    return endpoint_commands.action_response(result)
 
 
 @router.post("/api/endpoint/unisolate", dependencies=[Depends(require_kbn_xsrf)],
@@ -157,7 +160,7 @@ def unisolate_endpoint(
             status_code=404,
             detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
-    return result
+    return endpoint_commands.action_response(result)
 
 
 # Kibana 8.15 serves the response actions under `/api/endpoint/action/…`
@@ -215,7 +218,7 @@ def _record_action(body: dict, command: str, params: dict) -> dict:
             status_code=404,
             detail=build_security_solution_error(404, f"Endpoint {agent_id} not found"),
         )
-    return result
+    return endpoint_commands.action_response(result)
 
 
 @router.post("/api/endpoint/action/suspend_process", dependencies=[Depends(require_kbn_xsrf)])
@@ -270,6 +273,10 @@ def execute_command(
 )
 def list_actions(
     agent_ids: list[str] = Query(default=[], alias="agentIds"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=10000, alias="pageSize"),
+    start_date: str = Query(default="now-24h/h", alias="startDate"),
+    end_date: str = Query(default="now", alias="endDate"),
     _: dict = Depends(require_es_auth),
 ) -> dict:
     """List endpoint action responses, optionally filtered by agent.
@@ -279,10 +286,57 @@ def list_actions(
     the schema is checked before the endpoint authorisation that otherwise
     answers this route. mockdr took the snake_case spelling, so a client that
     filtered here saw its filter work against the mock and 400 in production.
+
+    The answer is Kibana's ``ActionListApiResponse``: ``page``, ``pageSize``
+    (1 and 10 by default), the window, ``total`` and a page of
+    ``ActionDetails``, newest first. It was the storage records under
+    ``per_page``, every one of them on one page. The window -- ``startDate``
+    and ``endDate``, date math or ISO, ``now-24h/h`` to ``now`` by default --
+    selects the actions started inside it.
     """
     agent_id = agent_ids[0] if agent_ids else None
-    actions = endpoint_commands.list_actions(agent_id)
-    return {"data": actions, "total": len(actions), "page": 1, "per_page": len(actions) or 20}
+    window_start = _window_instant("startDate", start_date, round_up=False)
+    window_end = _window_instant("endDate", end_date, round_up=True)
+    # Newest first; actions started in the same second keep the order they
+    # were created in, latest first (the stored list is oldest first).
+    actions = sorted(
+        (
+            a for a in reversed(endpoint_commands.list_actions(agent_id))
+            if (started := parse_datetime(a.get("started_at"))) is not None
+            and window_start <= started <= window_end
+        ),
+        key=lambda a: str(a.get("started_at") or ""),
+        reverse=True,
+    )
+    start = (page - 1) * page_size
+    return {
+        "page": page,
+        "pageSize": page_size,
+        "startDate": start_date,
+        "endDate": end_date,
+        "elasticAgentIds": agent_ids or None,
+        "data": [endpoint_commands.action_details(a) for a in actions[start:start + page_size]],
+        "total": len(actions),
+    }
+
+
+def _window_instant(name: str, value: str, *, round_up: bool) -> datetime:
+    """``startDate`` / ``endDate`` as an instant: date math or an ISO date.
+
+    Raises:
+        HTTPException: 400 for a value that is neither.
+    """
+    try:
+        instant = resolve(value, round_up=round_up) or parse_datetime(value)
+    except DateMathError:
+        instant = None
+    if instant is None:
+        raise HTTPException(
+            status_code=400,
+            detail=build_kbn_error_response(
+                400, f"[request query.{name}]: invalid date: {value}"),
+        )
+    return instant
 
 
 @router.get("/api/endpoint/action/{action_id}")
@@ -297,7 +351,7 @@ def get_action(
             status_code=404,
             detail=build_kbn_error_response(404, f"Action with id '{action_id}' not found."),
         )
-    return result
+    return {"data": endpoint_commands.action_details(result)}
 
 
 #: What each response action requires inside `parameters`, and how Kibana

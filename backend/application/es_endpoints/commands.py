@@ -177,6 +177,79 @@ def settle_due() -> int:
     return done
 
 
+#: Kibana answers the two oldest actions with the action id at the top level
+#: as well, for the clients written before `data` existed
+#: (`responseActionsWithLegacyActionProperty` in the security solution's
+#: response-actions route handler).
+_LEGACY_ACTION_PROPERTY = frozenset({"isolate", "unisolate"})
+
+
+def action_details(record: dict) -> dict:
+    """An action record in Kibana's ``ActionDetails`` shape.
+
+    The response-action routes answer ``{data: ActionDetails}`` -- with the
+    action id repeated as ``action`` for isolate and unisolate -- and the
+    details route ``{data: ActionDetails}``: ``id``, ``agents``,
+    ``agentType``, ``hosts``, ``command``, ``isExpired``, ``isCompleted``,
+    ``wasSuccessful``, ``errors``, ``startedAt``, ``completedAt``, ``status``,
+    ``outputs``, ``agentState``, ``createdBy``, ``comment``, ``parameters``
+    (Kibana security solution ``common/endpoint/types/actions.ts``; the
+    "Isolate an endpoint" and "Get action details" API references). The
+    mock answered its own storage record -- ``agent_id``, ``action``,
+    ``started_at`` and no ``data`` envelope -- so a client that isolated a
+    host and polled ``data.isCompleted``, the documented way to wait for an
+    action, never found the action it had just created.
+
+    Args:
+        record: The stored action, as a dict.
+
+    Returns:
+        The action's ``ActionDetails``.
+    """
+    agent = str(record.get("agent_id") or "")
+    endpoint = es_endpoint_repo.get(agent)
+    status = str(record.get("status") or "pending")
+    completed = status != "pending"
+    successful = status == "successful"
+    completed_at = record.get("completed_at") or None
+    parameters = dict(record.get("parameters") or {})
+    comment = parameters.pop("comment", None)
+    details: dict = {
+        "id": record.get("id"),
+        "agents": [agent],
+        "agentType": "endpoint",
+        "hosts": {agent: {"name": endpoint.hostname if endpoint else ""}},
+        "command": record.get("action"),
+        "isExpired": False,
+        "isCompleted": completed,
+        "wasSuccessful": successful,
+        "errors": [] if successful or not completed else ["The action failed."],
+        "startedAt": record.get("started_at"),
+        "status": status,
+        "outputs": {},
+        "agentState": {agent: {
+            "isCompleted": completed,
+            "wasSuccessful": successful,
+            "errors": [] if successful or not completed else ["The action failed."],
+            "completedAt": completed_at,
+        }},
+        "createdBy": record.get("created_by"),
+        "comment": comment,
+        "parameters": parameters or None,
+    }
+    if completed_at:
+        details["completedAt"] = completed_at
+    return details
+
+
+def action_response(record: dict) -> dict:
+    """What a response-action route answers when it creates ``record``."""
+    details = action_details(record)
+    if details["command"] in _LEGACY_ACTION_PROPERTY:
+        return {"action": details["id"], "data": details}
+    return {"data": details}
+
+
 def list_actions(agent_id: str | None = None) -> list[dict]:
     """List action responses, optionally filtered by agent ID.
 
