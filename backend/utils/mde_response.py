@@ -17,6 +17,25 @@ _TARGET_NAMESPACE = uuid.UUID("6f1a3d52-0c2e-4a7f-9b8d-2c5e7a1f4b30")
 # Public API
 # ---------------------------------------------------------------------------
 
+#: The host Defender's API pages now show in every response example.
+_CONTEXT_BASE = "https://api.security.microsoft.com/api/$metadata"
+
+
+def mde_context(entity_set: str) -> str:
+    """The ``@odata.context`` of a Defender collection, e.g. ``...#Machines``.
+
+    Every list example on learn.microsoft.com/en-us/defender-endpoint/api/
+    names its entity set -- ``$metadata#Machines``, ``#Alerts``,
+    ``#Indicators``, ``#MachineActions``, ``#Software``,
+    ``#Vulnerabilities``, ``#Investigations``, ``#MachineReferences`` -- on
+    ``api.security.microsoft.com``. The mock answered the bare
+    ``$metadata`` on the legacy host for all of them, so a client that reads
+    the context to tell one collection from another (OData clients do) could
+    not.
+    """
+    return f"{_CONTEXT_BASE}#{entity_set}"
+
+
 def build_mde_list_response(
     value: list[dict],
     context: str = "https://api.securitycenter.microsoft.com/api/$metadata",

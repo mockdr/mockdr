@@ -7,7 +7,7 @@ from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
-from utils.mde_response import build_mde_list_response
+from utils.mde_response import build_mde_list_response, mde_context
 from utils.mde_serde import to_mde_resource
 from utils.odata_paging import page_link
 from utils.serde import record_dict
@@ -80,6 +80,7 @@ def list_machines(
     )
     return build_mde_list_response(
         page,
+        context=mde_context("Machines"),
         next_link=next_link,
         count=total if count else None,
     )
@@ -130,6 +131,7 @@ def get_machine_alerts(machine_id: str) -> dict | None:
     alerts = mde_alert_repo.get_by_machine_id(machine_id)
     return build_mde_list_response(
         [to_mde_resource(record_dict(a), "alertId") for a in alerts],
+        context=mde_context("Alerts"),
     )
 
 
@@ -191,7 +193,7 @@ def get_machine_software(
 
     agent_id = _get_agent_id_for_machine(machine_id)
     if not agent_id:
-        return build_mde_list_response([])
+        return build_mde_list_response([], context=mde_context("Software"))
 
     from repository.store import store
 
@@ -203,7 +205,8 @@ def get_machine_software(
         skip + top, len(software),
         fallback=f"https://api.security.microsoft.com/api/machines/{machine_id}/software?$top={top}",
     )
-    return build_mde_list_response(software[skip : skip + top], next_link=next_link)
+    return build_mde_list_response(software[skip : skip + top],
+                                   context=mde_context("Software"), next_link=next_link)
 
 
 def get_software_inventory_export() -> dict:

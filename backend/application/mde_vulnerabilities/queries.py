@@ -5,7 +5,7 @@ from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
-from utils.mde_response import build_mde_list_response
+from utils.mde_response import build_mde_list_response, mde_context
 from utils.mde_serde import to_mde_resource
 from utils.odata_paging import page_link
 from utils.serde import record_dict
@@ -81,7 +81,8 @@ def list_vulnerabilities(
         skip + top, total,
         fallback=f"https://api.security.microsoft.com/api/vulnerabilities?$top={top}",
     )
-    return build_mde_list_response(page, next_link=next_link)
+    return build_mde_list_response(page, context=mde_context("Vulnerabilities"),
+                                   next_link=next_link)
 
 
 def get_vulnerability(vuln_id: str) -> dict | None:
@@ -124,4 +125,6 @@ def get_vulnerability_machine_references(
         skip + top, len(refs),
         fallback=f"https://api.security.microsoft.com/api/vulnerabilities/{vuln_id}/machineReferences?$top={top}",
     )
-    return build_mde_list_response(refs[skip : skip + top], next_link=next_link)
+    return build_mde_list_response(refs[skip : skip + top],
+                                   context=mde_context("MachineReferences"),
+                                   next_link=next_link)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from repository.mde_investigation_repo import mde_investigation_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
-from utils.mde_response import build_mde_list_response
+from utils.mde_response import build_mde_list_response, mde_context
 from utils.mde_serde import to_mde_resource
 from utils.odata_paging import page_link
 from utils.serde import record_dict
@@ -43,7 +43,8 @@ def list_investigations(
         skip + top, total,
         fallback=f"https://api.security.microsoft.com/api/investigations?$top={top}",
     )
-    return build_mde_list_response(page, next_link=next_link)
+    return build_mde_list_response(page, context=mde_context("Investigations"),
+                                   next_link=next_link)
 
 
 def get_investigation(investigation_id: str) -> dict | None:

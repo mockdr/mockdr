@@ -5,7 +5,7 @@ from repository.mde_machine_repo import mde_machine_repo
 from repository.mde_software_repo import mde_software_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
-from utils.mde_response import build_mde_list_response
+from utils.mde_response import build_mde_list_response, mde_context
 from utils.mde_serde import to_mde_resource
 from utils.odata_paging import page_link
 from utils.serde import record_dict
@@ -81,7 +81,8 @@ def list_software(
         skip + top, total,
         fallback=f"https://api.security.microsoft.com/api/software?$top={top}",
     )
-    return build_mde_list_response(page, next_link=next_link)
+    return build_mde_list_response(page, context=mde_context("Software"),
+                                   next_link=next_link)
 
 
 def get_software(software_id: str) -> dict | None:
