@@ -9,6 +9,7 @@ import uuid
 
 from repository.store import store
 from utils.cs_fql import apply_fql
+from utils.cs_pagination import decode_page_token, encode_page_token
 
 
 def _build_id_map() -> dict[str, str]:
@@ -77,10 +78,10 @@ def combined_applications(
 
     Args:
         filter_fql: FQL filter string.
-        limit: Page size (max 100).
+        limit: Page size (max 1000).
         offset: Numeric offset (used when ``after`` is not provided).
         sort: Sort expression (e.g. ``"name.asc"``).
-        after: Cursor for next page (stringified index).
+        after: Opaque token from the previous page's ``meta.pagination.after``.
 
     Returns:
         CrowdStrike combined response with Discover application resources.
@@ -126,10 +127,14 @@ def combined_applications(
 
     total = len(discover_apps)
 
-    # Cursor-based pagination (via ``after``)
-    start = int(after) if after else offset
+    # Cursor-based pagination (via ``after``). The token is opaque, as
+    # Falcon's is: `int(after)` made any token the mock had not minted itself
+    # a 500. And `total` is the whole result on every page, not 0 after the
+    # first — a client that loops while it has fewer than `total` stopped
+    # after one page.
+    start = decode_page_token(after) if after else offset
     page = discover_apps[start : start + limit]
-    next_after = str(start + limit) if start + limit < total else ""
+    next_after = encode_page_token(start + limit) if start + limit < total else ""
 
     return {
         "meta": {
@@ -139,7 +144,7 @@ def combined_applications(
             "pagination": {
                 "after": next_after,
                 "limit": limit,
-                "total": total if start == 0 else 0,
+                "total": total,
             },
         },
         "resources": page,

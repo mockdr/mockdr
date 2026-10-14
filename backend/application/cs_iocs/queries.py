@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from repository.cs_ioc_repo import cs_ioc_repo
 from utils.cs_fql import apply_fql
-from utils.cs_pagination import paginate_cs
+from utils.cs_pagination import decode_page_token, encode_page_token, paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_list_response
 from utils.serde import record_dict
 
@@ -30,6 +30,7 @@ def search_iocs(
     offset: int,
     limit: int,
     sort: str | None,
+    after: str | None = None,
 ) -> dict:
     """Search custom IOCs with FQL filter.
 
@@ -41,6 +42,9 @@ def search_iocs(
         offset:     Zero-based pagination offset.
         limit:      Maximum number of entities to return.
         sort:       Sort string (``field.asc`` or ``field.desc``).
+        after:      Opaque token from the previous page's
+                    ``meta.pagination.after``; when given it, not ``offset``,
+                    says where the page starts.
 
     Returns:
         CS list response envelope with full IOC entities and pagination.
@@ -50,8 +54,12 @@ def search_iocs(
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
     records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
-    page, total = paginate_cs(records, offset, limit)
-    return build_cs_list_response(page, total, offset, limit)
+    start = decode_page_token(after) if after else offset
+    page, total = paginate_cs(records, start, limit)
+    response = build_cs_list_response(page, total, start, limit)
+    response["meta"]["pagination"]["after"] = (
+        encode_page_token(start + limit) if start + limit < total else "")
+    return response
 
 
 def get_ioc_entities(ids: list[str]) -> dict:

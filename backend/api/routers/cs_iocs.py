@@ -21,10 +21,19 @@ def search_iocs(
     offset: int = Query(0),
     limit: int = Query(100, ge=1, le=500),
     sort: str = Query(None),
+    after: str = Query(None),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
-    """Search custom IOCs with an optional FQL filter (combined response)."""
-    return ioc_queries.search_iocs(filter, offset, limit, sort)
+    """Search custom IOCs with an optional FQL filter (combined response).
+
+    gofalcon documents ``after`` here (indicator_combined_v1_parameters.go:
+    "provide the 'after' token from the previous response to continue from
+    that place in the results"), and the response model carries
+    ``meta.pagination.after``. The route did not declare it, so a client
+    paging by token was handed the first page again on every call and never
+    reached the end.
+    """
+    return ioc_queries.search_iocs(filter, offset, limit, sort, after)
 
 
 @router.get("/iocs/entities/indicators/v1")

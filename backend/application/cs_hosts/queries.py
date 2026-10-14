@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_fql import apply_fql
-from utils.cs_pagination import paginate_cs
+from utils.cs_pagination import decode_page_token, encode_page_token, paginate_cs
 from utils.cs_response import (
     build_cs_entity_response,
     build_cs_id_response,
@@ -132,12 +132,17 @@ def query_host_ids_scroll(
 ) -> dict:
     """Query host IDs with scroll-based pagination.
 
-    Uses a string offset cursor (index encoded as string) matching
-    FalconPy's ``query_devices_by_filter_scroll()`` contract.
+    The ``offset`` is an opaque token handed back from the previous page's
+    ``meta.pagination.offset``, matching FalconPy's
+    ``query_devices_by_filter_scroll()`` contract. ``total`` is the size of
+    the whole result on every page: falconpy's own scrolling sample
+    (``samples/hosts/sensor_versions_by_hostname_scrolling.py``) re-reads it
+    from each response as its loop bound, and the mock reported 0 after the
+    first page — so that loop stopped after two pages, whatever the fleet.
 
     Args:
         filter_fql: FQL filter string, or None for all hosts.
-        offset:     Scroll cursor (stringified integer index), or None/empty.
+        offset:     Scroll token from the previous page, or None/empty.
         limit:      Maximum number of IDs to return per page.
         sort:       Sort string (``field.asc`` or ``field.desc``).
 
@@ -151,11 +156,11 @@ def query_host_ids_scroll(
     records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
     total = len(records)
 
-    start = int(offset) if offset else 0
+    start = decode_page_token(offset)
     page = records[start : start + limit]
     ids = [get_nested(r, "device_id") for r in page]
 
-    next_offset = "" if start + limit >= total else str(start + limit)
+    next_offset = "" if start + limit >= total else encode_page_token(start + limit)
 
     return {
         "meta": {
@@ -165,7 +170,7 @@ def query_host_ids_scroll(
             "pagination": {
                 "offset": next_offset,
                 "limit": limit,
-                "total": total if start == 0 else 0,
+                "total": total,
             },
         },
         "resources": ids,
