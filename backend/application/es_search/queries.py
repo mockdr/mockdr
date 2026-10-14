@@ -410,7 +410,67 @@ _CONTEXTS = "es_search_contexts"
 _SCROLL_DEFAULT_SIZE = 10
 
 
-def open_context(index: str, body: dict, kind: str) -> str:
+#: Elasticsearch's time units, in seconds (``TimeValue.parseTimeValue``).
+_TIME_UNITS = {
+    "nanos": 1e-9, "micros": 1e-6, "ms": 1e-3, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0,
+}
+_TIME_VALUE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(nanos|micros|ms|s|m|h|d)\s*$")
+
+
+def keep_alive_seconds(value: object) -> float | None:
+    """A ``scroll`` / ``keep_alive`` time value in seconds; None if absent or unreadable."""
+    if not isinstance(value, str):
+        return None
+    match = _TIME_VALUE.match(value)
+    return float(match.group(1)) * _TIME_UNITS[match.group(2)] if match else None
+
+
+def _context_expired(context: dict, now: float) -> bool:
+    lifetime = context.get("keep_alive")
+    if lifetime is None:
+        return False
+    return now > float(context.get("accessed_at", now)) + float(lifetime)
+
+
+def _live_context(context_id: str, keep_alive: object = None) -> dict | None:
+    """The context with this id, its keep-alive restarted; None once it has expired.
+
+    A search context lives for its keep-alive after it was last used: "The
+    scroll parameter tells Elasticsearch how long it should keep the search
+    context alive", and each scroll request may give it a new one
+    (Elasticsearch 8.15, "Paginate search results"); a point in time stays
+    open for its ``keep_alive``, which every search through it can extend.
+    The mock kept every context until a cap of 1,000 evicted the oldest, so
+    one client's abandoned scrolls pushed out another's live one, and a
+    scroll id read back a day later still paged.
+    """
+    context = store.get(_CONTEXTS, context_id)
+    if not context:
+        return None
+    now = time.time()
+    if _context_expired(context, now):
+        store.delete(_CONTEXTS, context_id)
+        return None
+    renewed = keep_alive_seconds(keep_alive)
+    if renewed is not None:
+        context["keep_alive"] = renewed
+    context["accessed_at"] = now
+    return dict(context)
+
+
+def reap_contexts(now: float | None = None) -> int:
+    """Free every scroll and point in time past its keep-alive; how many were freed."""
+    moment = time.time() if now is None else now
+    expired = [
+        key for key, context in store.get_all_with_keys(_CONTEXTS).items()
+        if _context_expired(context, moment)
+    ]
+    for key in expired:
+        store.delete(_CONTEXTS, key)
+    return len(expired)
+
+
+def open_context(index: str, body: dict, kind: str, keep_alive: object = None) -> str:
     """Remember a search so the client can page through it.
 
     Returns:
@@ -419,13 +479,14 @@ def open_context(index: str, body: dict, kind: str) -> str:
     context_id = new_hex()[:32]
     store.save(_CONTEXTS, context_id, {
         "index": index, "body": dict(body), "offset": 0, "kind": kind,
+        "keep_alive": keep_alive_seconds(keep_alive), "accessed_at": time.time(),
     })
     return context_id
 
 
-def context_index(context_id: str) -> str | None:
-    """The index a point-in-time id stands for, or None if it is gone."""
-    context = store.get(_CONTEXTS, context_id)
+def context_index(context_id: str, keep_alive: object = None) -> str | None:
+    """The index a point-in-time id stands for, or None if it is gone or expired."""
+    context = _live_context(context_id, keep_alive)
     return str(context["index"]) if context else None
 
 
@@ -464,16 +525,16 @@ class SearchContextMissingError(LookupError):
 _SCROLL_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
-def scroll(context_id: str) -> dict:
+def scroll(context_id: str, keep_alive: object = None) -> dict:
     """The next page of a scrolled search.
 
     Raises:
         ScrollIdUnparsableError: If the id is not one this cluster issues.
-        SearchContextMissingError: If the scroll is gone or was never opened.
+        SearchContextMissingError: If the scroll is gone, expired, or was never opened.
     """
     if not _SCROLL_ID.match(context_id):
         raise ScrollIdUnparsableError(context_id)
-    context = store.get(_CONTEXTS, context_id)
+    context = _live_context(context_id, keep_alive)
     if not context:
         raise SearchContextMissingError(context_id)
     body = dict(context["body"])

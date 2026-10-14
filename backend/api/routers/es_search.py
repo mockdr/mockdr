@@ -537,7 +537,9 @@ def es_search_all(
 
 def _search_in_pit(pit_id: str, body: dict) -> dict:
     """A search addressed to a point in time rather than to an index."""
-    index = search_queries.context_index(pit_id) if pit_id else None
+    pit = body.get("pit") or {}
+    keep_alive = pit.get("keep_alive") if isinstance(pit, dict) else None
+    index = search_queries.context_index(pit_id, keep_alive) if pit_id else None
     if index is None:
         raise HTTPException(status_code=404, detail=build_es_error_response(
             404, "search_context_missing_exception",
@@ -949,7 +951,9 @@ def es_search(
     if scroll:
         # A scrolled search hands back the id the client pages with; without
         # it a fetch that works against a cluster stops after one page here.
-        page["_scroll_id"] = search_queries.open_context(index, search_body, "scroll")
+        page["_scroll_id"] = search_queries.open_context(
+            index, search_body, "scroll", keep_alive=scroll,
+        )
     return page
 
 
@@ -960,13 +964,13 @@ def es_search(
 )
 def open_pit(
     index: str,
-    _keep_alive: str | None = Query(default=None, alias="keep_alive"),
+    keep_alive: str | None = Query(default=None),
     _: dict = Depends(require_es_auth),
 ) -> dict:
-    """Open a point in time over an index."""
+    """Open a point in time over an index, kept alive for ``keep_alive``."""
     if not search_queries.index_exists(index) and not search_queries.indices_for_alias(index):
         raise _missing_index(IndexNotFoundError(index))
-    return {"id": search_queries.open_context(index, {}, "pit")}
+    return {"id": search_queries.open_context(index, {}, "pit", keep_alive=keep_alive)}
 
 
 @router.delete("/_pit", operation_id="es_close_pit")
@@ -990,6 +994,7 @@ def close_pit(body: dict = Body(...), _: dict = Depends(require_es_auth)) -> dic
 def scroll_search(
     body: dict = Body(default={}),
     scroll_id_param: str | None = Query(default=None, alias="scroll_id"),
+    scroll_param: str | None = Query(default=None, alias="scroll"),
     caller: dict = Depends(require_es_auth),
 ) -> dict:
     """The next page of a scrolled search.
@@ -1015,7 +1020,8 @@ def scroll_search(
             "reason": reason,
         }, "status": 400})
     try:
-        return search_queries.scroll(scroll_id)
+        # `scroll` renews the context's keep-alive, from the body or the query.
+        return search_queries.scroll(scroll_id, body.get("scroll") or scroll_param)
     except search_queries.ScrollIdUnparsableError as exc:
         # A scroll id encodes which indices the scroll reads, so one the
         # cluster cannot parse cannot be authorised either — 8.15 refuses it
