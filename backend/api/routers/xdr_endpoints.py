@@ -11,7 +11,12 @@ from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_endpoints import commands as endpoint_commands
 from application.xdr_endpoints import queries as endpoint_queries
 from utils.xdr_fixtures import xdr_shape
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
+from utils.xdr_response import (
+    XDR_ERR_INTERNAL,
+    build_xdr_error,
+    no_endpoint_error,
+    require_request_data,
+)
 
 router = APIRouter(tags=["XDR Endpoints"])
 
@@ -40,8 +45,7 @@ def isolate_endpoint(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result
 
@@ -59,8 +63,7 @@ def unisolate_endpoint(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result
 
@@ -78,8 +81,7 @@ def scan_endpoint(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result
 
@@ -143,8 +145,7 @@ def terminate_process(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result
 
@@ -162,8 +163,7 @@ def quarantine_file(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result
 
@@ -181,8 +181,7 @@ def restore_file(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result
 
@@ -200,7 +199,6 @@ def file_retrieval(
     if result is None:
         raise HTTPException(
             status_code=500,
-            detail=build_xdr_error(
-                500, XDR_ERR_INTERNAL, f"Endpoint {', '.join(targets)} not found"),
+            detail=no_endpoint_error(),
         )
     return result

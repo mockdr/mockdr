@@ -67,6 +67,24 @@ XDR_ERR_NOT_FOUND = "XDR Not found: The provided URL may not be of an active XDR
 XDR_ERR_TOO_LARGE = "Request entity too large. Please reach out to the XDR support team."
 XDR_ERR_INTERNAL = "XDR internal server error."
 
+#: What Cortex answers an endpoint action -- isolate, scan, a script run --
+#: whose target selects no endpoint the tenant has: a 500 whose message
+#: XSOAR's CoreIRApiModule matches (``catch_and_exit_gracefully``, called by
+#: ``isolate_endpoint_command`` and ``quarantine_files_command``) and turns
+#: into "The operation executed is not supported on the given machine." The
+#: wording is the one its tests mock (``GRACEFULLY_FAILING`` in
+#: CoreIRApiModule_test.py); Cortex's own 500s open with the same "An error
+#: occurred while processing XDR public API".
+XDR_ERR_NO_ENDPOINT = (
+    "An error occurred while processing XDR public API - No endpoint was found "
+    "for creating the requested action"
+)
+
+
+def no_endpoint_error() -> dict:
+    """The 500 body for an action whose target selects no endpoint."""
+    return build_xdr_error(500, XDR_ERR_NO_ENDPOINT)
+
 
 def build_xdr_error(err_code: int, err_msg: str, err_extra: str | None = None) -> dict:
     """Build a Cortex XDR error response.

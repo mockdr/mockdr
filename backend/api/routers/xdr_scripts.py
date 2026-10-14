@@ -11,7 +11,12 @@ from api.xdr_auth import require_xdr_auth, require_xdr_write
 from application.xdr_scripts import commands as script_commands
 from application.xdr_scripts import queries as script_queries
 from utils.xdr_fixtures import xdr_shape
-from utils.xdr_response import XDR_ERR_INTERNAL, build_xdr_error, require_request_data
+from utils.xdr_response import (
+    XDR_ERR_INTERNAL,
+    build_xdr_error,
+    no_endpoint_error,
+    require_request_data,
+)
 
 router = APIRouter(tags=["XDR Scripts"])
 
@@ -57,6 +62,10 @@ def run_script(
 
     endpoint_ids = endpoints_named_by(request_data)
     script_id = request_data.get("script_uid") or request_data.get("script_id", "")
+    if not endpoint_ids and script_queries.get_script_metadata(script_id) is not None:
+        # The script exists; the filters selected nobody. Answered "Script …
+        # not found" before, naming the one thing that was there.
+        raise HTTPException(status_code=500, detail=no_endpoint_error())
     result = script_commands.run_script(endpoint_ids, script_id, request_data)
     if result is None:
         raise HTTPException(
