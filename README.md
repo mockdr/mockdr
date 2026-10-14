@@ -707,6 +707,7 @@ All data is **in-memory** by default -- mutations survive until server restart o
 | `MOCKDR_SPLUNK_DISPATCH_SECONDS` | `0`                             | How long a Splunk search job takes to reach `DONE`. `0` completes immediately and keeps responses deterministic; set e.g. `5` to make `QUEUED` → `PARSING` → `RUNNING` → `FINALIZING` observable, so a client's `isDone` polling loop is actually exercised |
 | `MOCKDR_SPLUNK_HEC_QUERY_STRING_AUTH` | `false`                 | Whether HEC honours its token as `?token=`, mirroring `inputs.conf`'s `allowQueryStringAuth`. Off by default because that is splunkd's default: a valid token sent this way is refused with `400 {"code": 16}` until the setting is on |
 | `MOCKDR_MAX_BODY_BYTES` | `16777216` (16 MiB)                        | Largest request body accepted; a larger one answers `413` before any byte is read, as a reverse proxy in front of the real products would |
+| `MOCKDR_PUBLIC`      | `false`                                       | Set `true` on an instance anyone can reach (the Render blueprint does). Refuses the recording proxy, outbound webhooks, `POST /_dev/import`, `POST /_dev/rate-limit` and `POST /_dev/fault-injection` with `403`, and makes no outbound request at all; the mocked APIs, `/_dev/reset` and scenarios work as usual. See [SECURITY.md](SECURITY.md#running-a-shared-or-public-instance) |
 | `SPLUNK_SESSION_TTL_SECONDS` | `28800`                               | Lifetime of a Splunk session key from `/services/auth/login` |
 | `ES_ADMIN_PASSWORD`, `ES_ANALYST_PASSWORD`, `ES_VIEWER_PASSWORD` | `mock-elastic-password`, `mock-analyst-password`, `mock-viewer-password` | Passwords of the three Elasticsearch users; the only credentials that can be changed without editing a seeder |
 
@@ -719,7 +720,7 @@ Eight ASGI middleware layers run on every request (outermost first):
 | Metrics          | Request timing, status code counters (`GET /metrics`)        |
 | Request Logging  | Structured JSON logs for every request                       |
 | Rate Limit       | Configurable per-minute rate limiting (`/_dev/rate-limit`)   |
-| Security Headers | HSTS, X-Content-Type-Options, CSP, etc.                      |
+| Security Headers | X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy |
 | Request Audit    | Append to queryable audit log (`/_dev/requests`)             |
 | Tenant Scope     | Non-admin tokens auto-scoped to their account                |
 | Fault Injection  | Artificial latency + random errors (`/_dev/fault-injection`) |
@@ -829,6 +830,8 @@ The proxy supports **all eight vendors** with vendor-appropriate authentication:
 | `replay` | Serve from saved recordings (matched by vendor + method + path); fall back to mock if no match |
 
 Dev paths (`/_dev/*`) always bypass the proxy.
+
+**Who can use it.** In `record` mode every request under a configured vendor's prefix is forwarded with *your* upstream credentials attached, whoever sends it — the mock does not check the caller's mock credentials first. Run a recording session on an instance only you can reach (bind to `127.0.0.1`). Upstream and token URLs must be `http(s)`, and link-local and cloud-metadata addresses (`169.254.0.0/16`, `fe80::/10`, `fd00:ec2::254`) are refused, at configuration and again before each request. With `MOCKDR_PUBLIC=true` the proxy cannot be switched on. `GET /_dev/export` leaves upstream secrets out; `MOCKDR_PERSIST` keeps them, so protect that file.
 
 ### Configuration
 

@@ -6,6 +6,14 @@ services:
     plan: free
     healthCheckPath: /web/api/v2.1/system/status
     envVars:
+      # Anyone on the internet can reach this demo, and the admin token is a
+      # documented constant, so "admin only" gates nothing here. Public mode
+      # refuses the control routes whose effect leaves the mock or outlives a
+      # visitor (recording proxy, outbound webhooks, state import, rate-limit
+      # and fault-injection switches) and makes no outbound request at all.
+      # See SECURITY.md#running-a-shared-or-public-instance.
+      - key: MOCKDR_PUBLIC
+        value: "true"
       - key: SEED_COUNT_AGENTS
         value: "60"
       - key: SEED_COUNT_THREATS
