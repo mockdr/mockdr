@@ -9,6 +9,7 @@ for ids issued before the reset.
 """
 from __future__ import annotations
 
+import time
 import uuid
 
 from fastapi.testclient import TestClient
@@ -85,3 +86,59 @@ class TestResetReachesTheWebhookDeliveryLog:
         after = client.get("/web/api/v2.1/_dev/webhooks/deliveries", headers=ADMIN)
         assert after.status_code == 200
         assert after.json()["data"] == []
+
+
+class TestResetStopsARunningPlaybook:
+    """A playbook started before a reset must not write into the fresh seed.
+
+    The executor fetched the target agent once, before its first delay, and
+    a later step saved that object back — with delays of up to 20 s in the
+    built-in playbooks. `reset` never cancelled the run, so the agent as it
+    stood before the reset (plus the step's change) reappeared in the store
+    the reset had just rebuilt.
+    """
+
+    _PLAYBOOK = {
+        "id": "reset-probe",
+        "steps": [{
+            "stepId": "late", "action": "agent_state", "delayMs": 600,
+            "infected": True, "activeThreats": 7, "networkStatus": "disconnected",
+        }],
+    }
+
+    def _start(self) -> tuple[str, tuple[object, ...]]:
+        from application.playbook import executor
+        from repository.agent_repo import agent_repo
+
+        agent = agent_repo.list_all()[0]
+        seeded = (agent.infected, agent.activeThreats, agent.networkStatus)
+        executor.start(self._PLAYBOOK, agent.id)
+        return agent.id, seeded
+
+    @staticmethod
+    def _state_after_the_step(agent_id: str) -> tuple[object, ...]:
+        from repository.agent_repo import agent_repo
+
+        time.sleep(1.0)  # past the step's delay
+        agent = agent_repo.get(agent_id)
+        assert agent is not None
+        return (agent.infected, agent.activeThreats, agent.networkStatus)
+
+    def test_the_reset_endpoint_stops_it(self, client: TestClient) -> None:
+        from application.playbook._run_state import get_run
+
+        agent_id, seeded = self._start()
+        assert client.post("/web/api/v2.1/_dev/reset", headers=ADMIN).status_code == 200
+
+        assert self._state_after_the_step(agent_id) == seeded
+        run = get_run()
+        assert run is not None and run.status == "cancelled"
+
+    def test_a_reseed_stops_it_too(self) -> None:
+        """The suite's per-test seed is the same boundary as a reset."""
+        from infrastructure.seed import generate_all
+
+        agent_id, seeded = self._start()
+        generate_all()
+
+        assert self._state_after_the_step(agent_id) == seeded

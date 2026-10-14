@@ -464,6 +464,11 @@ def import_state(snapshot: dict) -> dict:
     Returns:
         Dict with ``data.imported`` containing the total number of records loaded.
     """
+    # A running playbook would write the objects it holds into the store
+    # being loaded, as it would into a fresh seed (see `generate_all`).
+    from application.playbook.executor import stop as stop_playbook
+    stop_playbook()
+
     store.clear_all()
     total = 0
     skipped = 0

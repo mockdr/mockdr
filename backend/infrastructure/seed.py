@@ -10,6 +10,7 @@ import random
 from faker import Faker
 
 from application.playbook._registry import reset_registry
+from application.playbook.executor import stop as stop_playbook
 from infrastructure.seeders.account import seed_account
 from infrastructure.seeders.activities import seed_activities
 from infrastructure.seeders.agents import seed_agents
@@ -109,6 +110,13 @@ def generate_all() -> None:
     in dependency order.  The RNG is re-seeded at entry so repeated calls
     always produce the same data set.
     """
+    # A playbook started before this call holds objects from the store about
+    # to be cleared and has steps up to 20 s out; left running it saved them
+    # into the fresh seed. Stopped here rather than in `/_dev/reset` alone
+    # because every re-seed — the reset, the test suite's per-test seed —
+    # replaces the store a playbook would write into.
+    stop_playbook()
+
     random.seed(SEED)
     fake = Faker()
     Faker.seed(SEED)

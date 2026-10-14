@@ -25,6 +25,11 @@ from utils.id_gen import new_id
 
 _executor_thread: threading.Thread | None = None
 
+#: Held while a step writes. A step checks for cancellation under it, and
+#: :func:`stop` takes it after requesting cancellation, so once ``stop``
+#: returns no step is mid-write and none will start.
+_step_lock = threading.Lock()
+
 
 def _resolve_template(text: str, agent: Agent) -> str:
     """Replace ``{agentName}`` and similar template placeholders in *text*.
@@ -319,19 +324,29 @@ def _run_playbook(playbook: dict, agent_id: str) -> None:
                 time.sleep(min(0.1, deadline - time.monotonic()))
         last_delay = delay_ms
 
-        run.currentStep = i
-        step_result = run.steps[i]
-        step_result.status = "running"
-        step_result.startedAt = utc_now()
+        with _step_lock:
+            # Checked again under the lock: a cancel that arrived after the
+            # sleep must not be followed by a write. The step holds the
+            # `agent` fetched before the first delay, and saving it into a
+            # store that was reset meanwhile put the old agent back.
+            if is_cancelled():
+                run.status = "cancelled"
+                run.completedAt = utc_now()
+                return
 
-        try:
-            _execute_step(step, agent, run, threat_id_ref)
-            step_result.status = "done"
-        except Exception as exc:
-            step_result.status = "error"
-            step_result.error = str(exc)
+            run.currentStep = i
+            step_result = run.steps[i]
+            step_result.status = "running"
+            step_result.startedAt = utc_now()
 
-        step_result.completedAt = utc_now()
+            try:
+                _execute_step(step, agent, run, threat_id_ref)
+                step_result.status = "done"
+            except Exception as exc:
+                step_result.status = "error"
+                step_result.error = str(exc)
+
+            step_result.completedAt = utc_now()
 
     run.status = "done"
     run.completedAt = utc_now()
@@ -386,3 +401,26 @@ def cancel() -> bool:
         request_cancel()
         return True
     return False
+
+
+def stop() -> bool:
+    """Cancel the running playbook and wait until it can no longer write.
+
+    :func:`cancel` only raises the flag, which the thread notices at its
+    next step or sleep tick; a caller about to replace the store — a reset,
+    an import — needs the thread to be done writing first, or a step that
+    was already under way lands its objects in the fresh store.
+
+    Returns:
+        ``True`` if a playbook was running, ``False`` otherwise.
+    """
+    thread = _executor_thread
+    if thread is None or not thread.is_alive():
+        return False
+    request_cancel()
+    # Any step already writing finishes; no later one starts (it re-checks
+    # the flag under this lock).
+    with _step_lock:
+        pass
+    thread.join(timeout=3.0)
+    return True
