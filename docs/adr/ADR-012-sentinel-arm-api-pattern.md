@@ -17,7 +17,7 @@ Options considered for path handling:
 ## Decision
 
 - Mount all Sentinel routes under `/sentinel` prefix
-- ARM workspace path components are accepted as path parameters but ignored
+- ARM workspace path components are accepted as path parameters but ignored for lookup; the `id` of every resource answered echoes the subscription, resource group and workspace the request path named, as ARM's does (2.5.x: ids used to name `mockdr-workspace` whatever the path said)
 - KQL parser supports the subset XSOAR sends: `SecurityIncident`, `SecurityAlert` tables, `where`, `project`, `sort by`, `take`, `summarize count() by`, `where ... in (...)`, `ago()`
 - MDE alerts automatically create Sentinel incidents with `providerName: "Microsoft 365 Defender"` — replicating the real M365 Defender bi-directional sync
 - All other EDR vendors create incidents with `providerName: "Azure Sentinel"` via scheduled analytics rules

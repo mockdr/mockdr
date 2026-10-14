@@ -7,6 +7,10 @@ together every call one operation makes, echoed when the client sent one.
 Azure support asks for them, and the SDKs read them into their exceptions;
 a client that logs them found nothing here, on success or on error.
 
+It also tells the response builders which workspace the request addressed,
+so a resource's `id` names the subscription, resource group and workspace
+the path did (see `utils.sentinel.response.address_workspace`).
+
 Pure ASGI, scoped to the Sentinel ARM routes: the token endpoint belongs to
 Entra and the query API to Log Analytics, and neither is ARM.
 """
@@ -17,6 +21,8 @@ import uuid
 
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from utils.sentinel.response import address_workspace, release_workspace
 
 #: The Sentinel mount's ARM paths: the workspace resources and the provider's
 #: operation list.
@@ -50,4 +56,9 @@ class ArmRequestHeadersMiddleware:
                 headers["x-ms-correlation-request-id"] = correlation_id
             await send(message)
 
-        await self.app(scope, receive, stamped)
+        # The ids this request's answers build name the workspace it addressed.
+        token = address_workspace(path)
+        try:
+            await self.app(scope, receive, stamped)
+        finally:
+            release_workspace(token)

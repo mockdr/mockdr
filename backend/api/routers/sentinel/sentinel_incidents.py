@@ -250,7 +250,7 @@ async def create_or_update_comment(
         "author": incident_queries.client_info(comment),
         "createdTimeUtc": comment.created_time_utc,
         "lastModifiedTimeUtc": comment.last_modified_time_utc,
-    }, etag=comment.etag)
+    }, etag=comment.etag, **incident_queries.comment_address(incident_id, comment.comment_id))
 
 
 @router.delete(_WS + "/incidents/{incident_id}/comments/{comment_id}")

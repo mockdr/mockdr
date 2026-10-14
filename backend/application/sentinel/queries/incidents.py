@@ -189,8 +189,22 @@ def get_incident_comments(incident_id: str) -> dict:
             "author": client_info(c),
             "lastModifiedTimeUtc": c.last_modified_time_utc,
             "createdTimeUtc": c.created_time_utc,
-        }, etag=c.etag))
+        }, etag=c.etag, **comment_address(c.incident_id, c.comment_id)))
     return build_arm_list(items)
+
+
+def comment_address(incident_id: str, comment_id: str) -> dict[str, str]:
+    """Where a comment lives: under its incident, as Sentinel names it.
+
+    Incident Comments - Create Or Update (learn.microsoft.com, 2024-03-01)
+    answers `id` `.../incidents/{incidentId}/comments/{commentId}` and `type`
+    `Microsoft.SecurityInsights/incidents/comments`; the mock answered
+    `.../incidentComments/{commentId}`, a path that addresses nothing.
+    """
+    return {
+        "path": f"incidents/{incident_id}/comments/{comment_id}",
+        "type_name": "incidents/comments",
+    }
 
 
 def get_incident_bookmarks(incident_id: str) -> dict:

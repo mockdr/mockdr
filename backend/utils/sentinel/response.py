@@ -14,6 +14,8 @@ are deep-merged over it. A client that reads any declared property finds it.
 from __future__ import annotations
 
 import json
+import re
+from contextvars import ContextVar, Token
 from functools import cache
 from pathlib import Path
 
@@ -27,6 +29,41 @@ _BASE = (
     f"/providers/Microsoft.OperationalInsights/workspaces/{_WS}"
     f"/providers/Microsoft.SecurityInsights"
 )
+
+#: The workspace a request addressed, as its path spelled it. ARM answers a
+#: resource's `id` under the subscription, resource group and workspace the
+#: request named; the mock answered every id under its own default workspace,
+#: so a client addressing `/subscriptions/<its own>/resourceGroups/<its own>`
+#: was handed ids that named someone else's, and a client that follows an
+#: `id` back went to a path it never used. ADR-012 keeps accepting any
+#: workspace — the mock has one, and serves it under every name — so the id
+#: echoes the one asked for. Outside a request (seeding) the default holds.
+_REQUEST_BASE: ContextVar[str] = ContextVar("sentinel_arm_base", default=_BASE)
+
+_WORKSPACE_PATH = re.compile(
+    r"^/sentinel(/subscriptions/[^/]+/resourceGroups/[^/]+"
+    r"/providers/Microsoft\.OperationalInsights/workspaces/[^/]+"
+    r"/providers/Microsoft\.SecurityInsights)(?:/|$)",
+    re.IGNORECASE,
+)
+
+
+def address_workspace(path: str) -> Token[str] | None:
+    """Make ids built for this request name the workspace its path names.
+
+    Returns:
+        The token to reset the context with, or None when the path names no
+        workspace.
+    """
+    match = _WORKSPACE_PATH.match(path)
+    return _REQUEST_BASE.set(match.group(1)) if match else None
+
+
+def release_workspace(token: Token[str] | None) -> None:
+    """Undo :func:`address_workspace` once the request is answered."""
+    if token is not None:
+        _REQUEST_BASE.reset(token)
+
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "infrastructure" / "fixtures" / "sentinel"
 
@@ -135,8 +172,8 @@ def _blank(default: object) -> object:
 
 
 def arm_id(resource_type: str, name: str) -> str:
-    """The fully qualified ARM id of a workspace resource."""
-    return f"{_BASE}/{resource_type}/{name}"
+    """The fully qualified ARM id of a workspace resource, under the workspace addressed."""
+    return f"{_REQUEST_BASE.get()}/{resource_type}/{name}"
 
 
 def build_arm_resource(
@@ -146,6 +183,8 @@ def build_arm_resource(
     *,
     etag: str = "",
     kind: str = "",
+    path: str = "",
+    type_name: str = "",
 ) -> dict:
     """Build a single ARM resource envelope, completed against the spec.
 
@@ -156,6 +195,11 @@ def build_arm_resource(
         etag:          Optional ETag value.
         kind:          Polymorphic discriminator (alert rules, templates,
                        data connectors); emitted at the top level as ARM does.
+        path:          The resource's path below the workspace provider, for a
+                       child resource (``incidents/{id}/comments/{name}``);
+                       defaults to ``{resource_type}/{name}``.
+        type_name:     The resource type ARM names, when it is not
+                       ``resource_type`` (``incidents/comments``).
 
     Returns:
         ARM resource dict.
@@ -163,9 +207,9 @@ def build_arm_resource(
     fixture = _fixture_for(resource_type, kind)
     defaults = {k: v for k, v in fixture.items() if k not in ("id", "name", "type", "etag", "kind")}
     result: dict = {
-        "id": arm_id(resource_type, name),
+        "id": f"{_REQUEST_BASE.get()}/{path}" if path else arm_id(resource_type, name),
         "name": name,
-        "type": f"Microsoft.SecurityInsights/{resource_type}",
+        "type": f"Microsoft.SecurityInsights/{type_name or resource_type}",
     }
     if kind:
         result["kind"] = kind

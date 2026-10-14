@@ -58,6 +58,45 @@ class TestEveryAnswerCarriesItsRequestIds:
         assert "x-ms-correlation-request-id" not in resp.headers
 
 
+class TestAnIdNamesTheWorkspaceTheRequestAddressed:
+    """A resource's `id` is under the subscription, group and workspace of the path.
+
+    ARM answers `id` as the resource's full path — the reference examples
+    answer `/subscriptions/d0cfe6b2-…/resourceGroups/myRg/…/workspaces/
+    myWorkspace/…` to a request for exactly that. The mock answered every id
+    under its own default workspace whatever the path said, so a client
+    following an `id` back went somewhere it had never been. ADR-012 keeps
+    serving the one workspace under any name; the id now echoes the name.
+    """
+
+    OTHER = (
+        "/subscriptions/d0cfe6b2-9ac0-4464-9919-dccaee2e48c0/resourceGroups/myRg"
+        "/providers/Microsoft.OperationalInsights/workspaces/myWorkspace"
+        "/providers/Microsoft.SecurityInsights"
+    )
+
+    def test_a_listing_and_a_write(self, client: TestClient) -> None:
+        headers = _auth(client)
+        listed = client.get(f"{SENTINEL_PREFIX}{self.OTHER}/incidents", headers=headers).json()
+        first = listed["value"][0]
+        assert first["id"] == f"{self.OTHER}/incidents/{first['name']}"
+
+        written = client.put(
+            f"{SENTINEL_PREFIX}{self.OTHER}/incidents/{first['name']}/comments/where",
+            json={"properties": {"message": "m"}}, headers=headers,
+        ).json()
+        # A comment is a child of its incident (Incident Comments - Create Or
+        # Update: `.../incidents/{incidentId}/comments/{commentId}`, type
+        # `Microsoft.SecurityInsights/incidents/comments`); it was answered
+        # as `.../incidentComments/{commentId}`.
+        assert written["id"] == f"{self.OTHER}/incidents/{first['name']}/comments/where"
+        assert written["type"] == "Microsoft.SecurityInsights/incidents/comments"
+
+    def test_the_default_workspace_is_unchanged(self, client: TestClient) -> None:
+        listed = client.get(f"{SENTINEL_PREFIX}{_WS}/alertRules", headers=_auth(client)).json()
+        assert all(r["id"].startswith(f"{_WS}/alertRules/") for r in listed["value"])
+
+
 class TestANameIsMatchedWithoutRegardToCase:
     """ARM resource names are case-insensitive; the mock matched them exactly.
 
