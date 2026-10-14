@@ -7,6 +7,30 @@ plus ``resources`` and ``errors`` arrays.
 from __future__ import annotations
 
 import uuid
+from contextvars import ContextVar, Token
+
+#: The trace id of the request being answered. Falcon sends the same id in
+#: the ``X-CS-TRACEID`` header and in the body's ``meta.trace_id`` (psfalcon
+#: issue #442 shows both on one response); the rate-limit middleware sets it
+#: for each /cs request so the header and every envelope built for that
+#: request agree.
+_TRACE_ID: ContextVar[str | None] = ContextVar("cs_trace_id", default=None)
+
+
+def set_trace_id(trace_id: str) -> Token[str | None]:
+    """Make *trace_id* the one this request's envelopes carry."""
+    return _TRACE_ID.set(trace_id)
+
+
+def reset_trace_id(token: Token[str | None]) -> None:
+    """Forget the trace id :func:`set_trace_id` set."""
+    _TRACE_ID.reset(token)
+
+
+def current_trace_id() -> str:
+    """This request's trace id, or a fresh one outside a request."""
+    return _TRACE_ID.get() or str(uuid.uuid4())
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -29,7 +53,7 @@ def _build_meta(
     meta: dict = {
         "query_time": query_time,
         "powered_by": "crowdstrike-api",
-        "trace_id": str(uuid.uuid4()),
+        "trace_id": current_trace_id(),
     }
     if pagination is not None:
         meta["pagination"] = pagination

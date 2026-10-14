@@ -8,6 +8,7 @@ from utils.cs_response import (
     build_cs_entity_response,
     build_cs_id_response,
     build_cs_list_response,
+    current_trace_id,
 )
 from utils.cs_sort import parse_cs_sort, sort_key
 from utils.dt import seconds_since
@@ -155,7 +156,7 @@ def query_host_ids_scroll(
         "meta": {
             "query_time": 0.01,
             "powered_by": "device-api",
-            "trace_id": build_cs_id_response([], 0)["meta"]["trace_id"],
+            "trace_id": current_trace_id(),
             "pagination": {
                 "offset": next_offset,
                 "limit": limit,

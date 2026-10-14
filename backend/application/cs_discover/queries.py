@@ -5,11 +5,10 @@ mapping S1 agent IDs to CS device IDs via the ``edr_id_map`` collection.
 """
 from __future__ import annotations
 
-import uuid
-
 from repository.store import store
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import decode_page_token, encode_page_token
+from utils.cs_response import current_trace_id
 from utils.cs_sort import parse_cs_sort, sort_key
 from utils.nested import get_nested
 
@@ -137,7 +136,7 @@ def combined_applications(
         "meta": {
             "query_time": 0.01,
             "powered_by": "discover-api",
-            "trace_id": str(uuid.uuid4()),
+            "trace_id": current_trace_id(),
             "pagination": {
                 "after": next_after,
                 "limit": limit,

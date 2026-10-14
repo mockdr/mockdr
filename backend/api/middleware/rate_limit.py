@@ -10,18 +10,32 @@ looks for and falls back to its own backoff
 
 No other mocked vendor's SDK or connector reads a rate-limit header, so no
 other mount sends one.
+
+gofalcon declares three headers on every Falcon response — ``X-CS-TRACEID``,
+``X-RateLimit-Limit`` and ``X-RateLimit-Remaining`` (each ``*_responses.go``
+hydrates them) — and the mount sent only ``Remaining``, and only while the
+dev limiter was switched on. Captured Falcon responses carry all three on
+every answer: ``X-Ratelimit-Limit: 6000`` on an authenticated API call
+(falconpy issue #1209, psfalcon issues #513, #519) and ``300`` where no
+token is presented (the token and revoke routes, psfalcon #442; an
+unauthorised call, falconpy #1455), with ``X-Cs-Traceid`` equal to the body's
+``meta.trace_id`` (psfalcon #442). So the Falcon mount now always counts and
+always says so; it only *refuses* when the dev limiter is on, at the rate
+configured there.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import time
+import uuid
 from collections import deque
 from dataclasses import dataclass
 
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from utils.cs_response import reset_trace_id, set_trace_id
 from utils.vendor_errors import build_vendor_error, vendor_for_path
 
 #: Seconds a client is told to wait. The window is per-minute, so a full minute
@@ -49,6 +63,13 @@ _UNAUTHENTICATED_EXEMPT_PATHS = {"/web/api/v2.1/system/status"}
 
 #: The one mount whose client reads a rate-limit header.
 _CS_PREFIX = "/cs"
+
+#: Falcon's per-minute budget for an authenticated API client, as its
+#: responses state it (``X-Ratelimit-Limit: 6000``, falconpy issue #1209).
+_CS_API_LIMIT = 6000
+#: ...and for a request that carries no token — the token route itself
+#: (``X-Ratelimit-Limit=300`` on ``/oauth2/revoke``, psfalcon issue #442).
+_CS_UNAUTHENTICATED_LIMIT = 300
 
 
 @dataclass
@@ -112,6 +133,7 @@ class RateLimitMiddleware:
         """
         self.app = app
 
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Handle an ASGI request, enforcing the rate limit if enabled.
 
@@ -131,72 +153,100 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if not _config.enabled:
-            await self.app(scope, receive, send)
+        token_hint = _token_hint(scope)
+        if path.startswith(_CS_PREFIX):
+            await self._falcon(scope, receive, send, token_hint)
             return
-
-        # Determine rate-limit key from a hash of the full auth token
-        token_hint = "anonymous"
-        for header_name, header_value in scope.get("headers", []):
-            if header_name.lower() == b"authorization":
-                raw = header_value.decode("utf-8", errors="replace")
-                token_hint = hashlib.sha256(raw.encode()).hexdigest()
-                break
 
         # Unauthenticated requests are not rate-limited
-        if token_hint == "anonymous":
+        if not _config.enabled or token_hint is None:
             await self.app(scope, receive, send)
             return
 
-        now = time.monotonic()
-        window_start = now - 60.0
-
-        # Evict stale buckets to prevent unbounded memory growth
-        stale = [k for k, v in _counters.items() if not v or v[-1] < window_start]
-        for k in stale:
-            del _counters[k]
-
-        bucket = _counters.setdefault(token_hint, deque())
-        # Evict timestamps outside the sliding window
-        while bucket and bucket[0] < window_start:
-            bucket.popleft()
-
+        bucket = _bucket(token_hint)
         if len(bucket) >= _config.requests_per_minute:
-            # Return 429
-            headers = [
-                (b"content-type", b"application/json"),
-                # Every mocked vendor tells a throttled client when to
-                # return; without it a client can only guess or spin.
-                (b"retry-after", str(_RETRY_AFTER_SECONDS).encode()),
-            ]
-            if scope.get("path", "").startswith(_CS_PREFIX):
-                # Falcon's is a Unix epoch, and its SDK reads no other.
-                headers += [
+            await _refuse(scope, send, [])
+            return
+        bucket.append(time.monotonic())
+        await self.app(scope, receive, send)
+
+    async def _falcon(
+        self, scope: Scope, receive: Receive, send: Send, token_hint: str | None,
+    ) -> None:
+        """Count a Falcon request and state its budget and trace id on the answer.
+
+        Every answer carries ``X-CS-TRACEID`` (the same id as the body's
+        ``meta.trace_id``), ``X-RateLimit-Limit`` and
+        ``X-RateLimit-Remaining``. The budget is the dev limiter's when it is
+        on — and only then is a request over it refused — and Falcon's own
+        otherwise.
+        """
+        path: str = scope.get("path", "")
+        unauthenticated = token_hint is None or path.startswith(f"{_CS_PREFIX}/oauth2/")
+        if _config.enabled:
+            limit = _config.requests_per_minute
+        else:
+            limit = _CS_UNAUTHENTICATED_LIMIT if unauthenticated else _CS_API_LIMIT
+        trace_id = str(uuid.uuid4())
+        reset = set_trace_id(trace_id)
+        try:
+            bucket = _bucket("unauthenticated" if unauthenticated else str(token_hint))
+            if _config.enabled and not unauthenticated and len(bucket) >= limit:
+                await _refuse(scope, send, [
+                    (b"x-cs-traceid", trace_id.encode()),
+                    (b"x-ratelimit-limit", str(limit).encode()),
+                    # Falcon's is a Unix epoch, and its SDK reads no other.
                     (b"x-ratelimit-remaining", b"0"),
                     (b"x-ratelimit-retryafter",
                      str(int(time.time()) + _RETRY_AFTER_SECONDS).encode()),
-                ]
-            await send({
-                "type": "http.response.start",
-                "status": 429,
-                "headers": headers,
-            })
-            await send({
-                "type": "http.response.body",
-                "body": _rate_limited_body(scope),
-            })
-            return
+                ])
+                return
+            bucket.append(time.monotonic())
+            remaining = str(max(0, limit - len(bucket)))
 
-        bucket.append(now)
-        if not scope.get("path", "").startswith(_CS_PREFIX):
-            await self.app(scope, receive, send)
-            return
+            async def send_with_budget(message: Message) -> None:
+                if message["type"] == "http.response.start":
+                    headers = MutableHeaders(scope=message)
+                    headers["x-cs-traceid"] = trace_id
+                    headers["x-ratelimit-limit"] = str(limit)
+                    headers["x-ratelimit-remaining"] = remaining
+                await send(message)
 
-        remaining = str(max(0, _config.requests_per_minute - len(bucket))).encode()
+            await self.app(scope, receive, send_with_budget)
+        finally:
+            reset_trace_id(reset)
 
-        async def send_with_remaining(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                MutableHeaders(scope=message)["x-ratelimit-remaining"] = remaining.decode()
-            await send(message)
 
-        await self.app(scope, receive, send_with_remaining)
+def _token_hint(scope: Scope) -> str | None:
+    """A hash of the request's ``Authorization`` header, or None without one."""
+    for header_name, header_value in scope.get("headers", []):
+        if header_name.lower() == b"authorization":
+            raw = header_value.decode("utf-8", errors="replace")
+            return hashlib.sha256(raw.encode()).hexdigest()
+    return None
+
+
+def _bucket(key: str) -> deque[float]:
+    """The request times inside the last minute for *key*, stale ones dropped."""
+    window_start = time.monotonic() - 60.0
+    # Evict stale buckets to prevent unbounded memory growth
+    stale = [k for k, v in _counters.items() if not v or v[-1] < window_start]
+    for k in stale:
+        del _counters[k]
+    bucket = _counters.setdefault(key, deque())
+    while bucket and bucket[0] < window_start:
+        bucket.popleft()
+    return bucket
+
+
+async def _refuse(scope: Scope, send: Send, extra: list[tuple[bytes, bytes]]) -> None:
+    """Answer 429 in the envelope of the vendor that owns the path."""
+    headers = [
+        (b"content-type", b"application/json"),
+        # Every mocked vendor tells a throttled client when to return;
+        # without it a client can only guess or spin.
+        (b"retry-after", str(_RETRY_AFTER_SECONDS).encode()),
+        *extra,
+    ]
+    await send({"type": "http.response.start", "status": 429, "headers": headers})
+    await send({"type": "http.response.body", "body": _rate_limited_body(scope)})
