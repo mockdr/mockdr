@@ -4,6 +4,346 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6.0] - 2026-10-14
+
+An audit of all eight mounts against the products they stand in for, done
+for what the drift scripts cannot see: protocol semantics, paging, auth
+flows, status codes and behaviour rather than property names. Five audits
+reported; every behaviour they described was reproduced against the code
+before it was changed, and every change carries the vendor source it
+follows. What could not be verified was left alone and is named below.
+
+### Upgrading from 2.5
+
+Most of this release makes the mock refuse, or answer differently, where the
+product does. A client test written against 2.5 may have pinned the old
+behaviour. In particular:
+
+- **Status codes.** Defender machine actions answer `201`; Falcon device
+  actions `202`, IOC and host-group creates `201`; Sentinel PUT answers `201`
+  on create and DELETE of a missing resource `204`.
+- **Defaults and limits.** SentinelOne list routes default to `limit=10`
+  (was 25) and refuse `skip` above 1000. Defender takes `$top` up to 10,000.
+  Falcon query limits rise to gofalcon's documented bounds. Cortex incidents
+  and endpoints answer at most 100 per call.
+- **Graph paging and queries.** `@odata.nextLink` now points at the mock and
+  carries the whole query. Directory collections refuse `$skip` and page by
+  `$skiptoken`. `$search` and the other advanced queries need
+  `ConsistencyLevel: eventual`; `$count=true` without it is ignored instead
+  of refused.
+- **Graph hunting** applies the documented 30-day default `Timespan`. On a
+  fresh seed that hides 2 of 355 `DeviceNetworkEvents` rows, and more as a
+  long-running instance ages, as retention does.
+- **Tokens.** The Entra token endpoints on `/graph` and `/mde` refuse any
+  scope that is not that API's `/.default`, and an unknown client is
+  `400 unauthorized_client`. A Sentinel token is for the resource its scope
+  named: ARM and Log Analytics each need their own. Elasticsearch's
+  `/_security/oauth2/token` now needs an authenticated caller.
+- **Vocabulary.** Cortex `is_isolated` is `AGENT_ISOLATED` /
+  `AGENT_UNISOLATED` (and two pending states); XQL status is
+  `PENDING` / `SUCCESS` and `start_xql_query` answers the id as a string.
+  SentinelOne `threatInfo.mitigationStatus` stays inside its documented enum.
+  The Kibana signals route reads `.alerts-security.alerts-default` and
+  answers `kibana.alert.*` documents.
+- **Writes that need what the product needs.** Defender actions need
+  `Comment`; Sentinel incident PUT replaces and needs `title`, `severity`,
+  `status`; Kibana `signals/search` and `/api/console/proxy` need `kbn-xsrf`;
+  a Splunk REST search must open with `search` or `|`, as splunkd requires.
+- **Seed data.** S1 hostnames and hardware now fit the OS, one agent in twelve
+  is network-quarantined, and every other vendor copies host facts from S1.
+  Hostnames, users and isolation therefore differ from 2.5 across vendors;
+  record ids do not. Seeded indicators use documentation ranges and
+  `.example`/`.test`.
+- **`/_dev/reset`** keeps the tokens and Splunk sessions it issued, turns
+  fault injection off, and stops a running playbook.
+
+### Added
+
+- **Cortex:** `/incidents/get_multiple_incidents_extra_data/`, the route
+  XSOAR's fetch-incidents uses, in the recorded shape;
+  `/xql/get_query_results_stream` for results above 1,000 rows.
+- **Splunk:** `search/jobs/{sid}/results_preview` (v1 and v2), which
+  splunklib's `Job.preview()` reads.
+- **Entra:** `/{tenant}/v2.0/.well-known/openid-configuration` on `/graph`
+  and `/mde`, which MSAL and azure-identity read before the token call
+  (tokens remain opaque; see the Graph integration guide for the discovery
+  flags). A tenant the mount does not host is refused `400 invalid_tenant`
+  (AADSTS90002), as Entra refuses it.
+- **Elasticsearch:** a working token service — password, client-credentials
+  and refresh grants, 20-minute tokens accepted as `Bearer`, and
+  `DELETE /_security/oauth2/token`.
+- **Kibana:** every API also under `/s/default/`.
+- **SentinelOne:** `countOnly=true` on list routes.
+- **Splunk:** a REST search that does not open with a command is refused, as
+  splunkd refuses it (see Fixed).
+- **Conformance:** 26 new probes against real Splunk and Elasticsearch/Kibana
+  for bulk, compatibility headers, array queries, `bool` forms, aggregation
+  order, SPL case handling, and the Kibana routes above.
+
+### Fixed
+
+#### Microsoft Graph and Defender for Endpoint
+
+**A `@odata.nextLink` led to Microsoft, and forgot the query.** Graph and
+Defender built every next link as a fixed string on the production host,
+without `$filter`, `$select`, `$orderby` or `$search`. A pager following it
+verbatim, as every SDK does, left the mock; pointed back at it, page two of a
+filtered query was page two of everything. The link is now the URL the
+client called, every parameter kept and only the cursor advanced, as
+<https://learn.microsoft.com/en-us/graph/paging> describes.
+
+**Directory objects took `$skip`.** Graph refuses it on users, groups,
+applications, service principals, directory roles, administrative units and
+the organization with `400 Request_BadRequest`, and pages them by an opaque
+`$skiptoken`. Collections that document `$skip` keep it.
+`/users/{id}/memberOf` now announces its next page.
+
+**Advanced directory queries without `ConsistencyLevel`.** `$search`,
+`endsWith`, `ne`, `not`, and `$filter` with `$orderby` on users and groups
+answer `400 Request_UnsupportedQuery` without the advanced-query parameters.
+`$count=true` without the header is silently ignored, as documented, where
+the mock refused it. `/groups` takes `$count`.
+
+**The Entra token endpoints behaved like no Entra.** `/graph` and `/mde`
+accept HTTP Basic client authentication, refuse a scope that is not this
+API's `/.default` with `invalid_scope` AADSTS70011 (`scope=x` minted a
+working token), and answer an unknown application with
+`400 unauthorized_client` AADSTS700016. Refusing a foreign resource at the
+token endpoint, where Entra would issue the token and the API reject it, is a
+documented deviation. Graph's 401 challenge names the authority's
+`/authorize` endpoint and Graph's app id.
+
+**Defender machine actions answered 200 and took anything.** They answer
+`201 Created`, require `Comment` (`MissingRequiredParameter`,
+case-sensitive), check `IsolationType` and `ScanType`, and refuse a second
+action of a kind while one is pending with `ActiveRequestAlreadyExists`. A
+refused isolation no longer changes the machine; `runliveresponse` with
+`Commands` no longer answers 500.
+
+**The console says why Defender refused an action.** A second scan pressed
+while the first is pending is refused with `ActiveRequestAlreadyExists`; the
+machine view swallowed the refusal and now shows Defender's message.
+
+**Defender's `$top` stopped at 1,000.** The documented maximum is 10,000
+(8,000 on vulnerabilities).
+
+**`$filter` as each product documents it.** Graph takes `in`, lambdas over
+primitive collections and unquoted GUIDs in lambdas. Defender filters only
+on the properties each collection page lists (`400 ODataError` otherwise) and
+keeps refusing `in`. A slash-heavy filter no longer costs seconds in the
+lambda patterns.
+
+**Alert updates stored any value.** Defender alert updates and Graph
+alerts_v2 PATCH refuse a status, classification or determination their page
+does not list. `batchUpdate` requires `alertIds` and answers an empty 200.
+alerts_v2 and incidents take `$count`.
+
+**Defender collections shared one `@odata.context`.** Each names its entity
+set (`#Machines`, `#Alerts`, …) on `api.security.microsoft.com`.
+
+**Graph answers carried no `request-id`.** Every Graph answer carries
+`request-id` and `client-request-id`, echoing the caller's id when sent, and
+`innerError` names the same two.
+
+**`runHuntingQuery` ignored `Timespan`, and an empty hunt misreported its
+columns.** All five documented `Timespan` forms are honoured, with the
+30-day default. A hunt matching nothing reports the projection's schema, on
+Graph and Defender alike.
+
+#### CrowdStrike Falcon
+
+**Falcon's repeated `ids` were read as one.** gofalcon sends
+`?ids=a&ids=b&ids=c` (`collectionFormat: multi`); six routes kept only the
+last, so three hosts asked for came back as one with a 200, and an IOC delete
+by three ids deleted one. Every repetition is read; the comma form still
+works.
+
+**Falcon page sizes up to what gofalcon documents.** Ten query routes refused
+page sizes Falcon serves. `/devices/queries/devices/v1` refuses
+`offset + limit` of 10,000 or more as Falcon does, instead of an empty page
+that reads as the end of the fleet.
+
+**Scroll and `after` tokens are opaque, and `total` holds on every page.**
+devices-scroll reported `total: 0` after page one, so falconpy's own
+scrolling sample stopped after two pages; a foreign token was a 500 and is a
+400. The IOC combined route reads `after`.
+
+**`field|direction` sort orders the answer.** gofalcon documents
+`status|asc`; every parser split on the last `.`, so the pipe form was
+ignored and a dotted field lost its last segment. Both spellings work
+everywhere.
+
+**FQL reads `~` and `'now-24h'`.** A text match was refused and a relative
+timestamp compared as a string — nothing matched `>`, everything `<`.
+
+**Falcon writes answer the status gofalcon expects** — device actions 202,
+IOC and host-group creates 201. gofalcon reported each of these writes as a
+failure.
+
+**Every Falcon answer carries `X-CS-TRACEID` and its rate-limit budget**
+(`X-RateLimit-Limit`, `X-RateLimit-Remaining`), as gofalcon declares.
+
+**A scope refusal says "access denied, authorization failed"**, as captured
+Falcon 403s do. The case-tag delete reads `id` and `tag` from the query
+string, as the SDKs send them.
+
+#### SentinelOne
+
+**Mitigation writes the documented `mitigationStatus`.** Actions wrote
+"killed", "quarantined" and the like into an enum of `not_mitigated`,
+`mitigated`, `marked_as_benign`, so `mitigationStatuses=mitigated` never
+found a freshly mitigated threat. The action is recorded in the threat's
+`mitigationStatus` list; `remove_macros` and `restore_macros` are accepted.
+
+**`totalItems` counts before `skip`, and `skip` stops at 1000.** `skip=50`
+over 60 agents answered `totalItems: 10`.
+
+**Threat actions honour their whole filter.** Six actions read only
+`filter.ids`, so one scoped by `agentIds` affected nothing with a 200. Verdict
+and incident-status values outside their enums are refused.
+
+**List pages default to ten**, as every list route documents.
+`/agents/applications` and `/agents/processes` are no longer cut short.
+
+**Connect and disconnect pass through `connecting` / `disconnecting`** and
+settle about a second later.
+
+#### Cortex XDR
+
+**XQL answers the execution id as a string, and polls the way Cortex does.**
+`start_xql_query` answered `{"reply": {"query_id": …}}`, and the XSOAR client
+sent the dict back. `get_query_results` speaks `PENDING`/`SUCCESS`, honours
+`pending_flag` and `limit`, and above 1,000 rows hands out a `stream_id`. A
+malformed `query_id` or an empty `query` is a 400, not a 500; `get_quota`
+answers numbers.
+
+**Endpoints speak `AGENT_*` and isolate asynchronously**, through
+`AGENT_PENDING_ISOLATION` (or `_CANCELLATION`) until the agent acknowledges,
+so XSOAR's isolate-and-poll completes. The `isolate` filter keeps its
+lower-case values.
+
+**`update_incident` unassigns on `"none"`** instead of assigning a user
+called "none".
+
+**Incidents and endpoints page at most 100, and a bad bound is a 400.** A
+`search_from` or `search_to` that is not a non-negative integer answered 500.
+
+#### Microsoft Sentinel
+
+**An incident PUT replaces, and requires its three members.** It merged like
+a PATCH. Server-owned properties survive; `title`, `severity` and `status` are
+required; a create answers 201.
+
+**PUT answers 201 on create; DELETE of nothing is 204**, for incidents,
+comments, alert rules, watchlists and their items, bookmarks and indicators,
+as the 2024-03-01 spec declares.
+
+**Comments belong to their incident.** Keyed by name alone, comment `x` under
+one incident rewrote another's. A comment under a missing incident is a 404,
+and its id is `.../incidents/{id}/comments/{name}`.
+
+**Incident entities answer `metaData` as an array**, with full ARM entity ids.
+
+**Log Analytics answers its own error envelope, typed columns, and a schema
+when empty** — `BadArgumentError` with an `innererror`, Kusto column types.
+
+**A Sentinel token is for the resource its scope named.** ARM refuses a
+non-ARM token with 401 `InvalidAuthenticationTokenAudience`; Log Analytics
+refuses a foreign one with 403. Bruno and Postman fetch a separate token.
+
+**ARM plumbing.** Every ARM answer carries `x-ms-request-id` and
+`x-ms-correlation-request-id`; names match without regard to case; a
+resource's `id` names the subscription, group and workspace the request
+addressed (the one workspace is still served under any name, ADR-012).
+
+#### Elasticsearch and Kibana
+
+**Bulk works the way the official 8.x clients send it.** elasticsearch-py
+sends `application/vnd.elasticsearch+x-ndjson; compatible-with=8`, refused
+with a 406. All `vnd.elasticsearch+` types are read; `/{index}/_bulk` exists;
+an action with no index anywhere refuses the request whole before anything is
+written; a delete of a missing document no longer sets `errors: true`.
+
+**`compatible-with` is read.** Versions 7 and 8 are served, anything else is
+`400 media_type_header_exception`, as a 9.x client meets against an 8.x
+cluster — with `X-Elastic-Product` on the refusal, as measured.
+
+**`term`, `terms` and `range` see into arrays, and `bool` takes every
+documented form.** `terms` on the alerts' own `event.category` list found
+nothing. `bool` arms accept a single object; every documented
+`minimum_should_match` string works, where some answered 500.
+
+**`terms` aggregations obey `order`, and metrics count every array value.**
+
+**The token service issues tokens that work** (see Added); it used to issue
+anyone an hour-long uuid that mockdr's own Bearer check refused.
+
+**`signals/search` passes the search through to the alerts index**, as Kibana
+8.15 does: `query`, `aggs`, `_source`, `fields`, `track_total_hits`, `size`,
+`runtime_mappings` and `sort` reach `.alerts-security.alerts-default`; `from`
+does not. Status changes by query use the same index.
+
+**Kibana checks `kbn-xsrf` and `kbn-version`, and both products say 8.15.0**,
+the release all of this is measured on (Lucene 9.11.1). Other space ids than
+`default` stay a 404, deliberately.
+
+#### Splunk
+
+**`count` goes to 50,000**, limits.conf's `maxresultrows` default, not 10,000.
+
+**A REST search has to open with a command.** Only Splunk Web prepends the
+implicit `search`. Measured on splunkd for this release, on oneshot, normal,
+export and v2 alike: `index=main | head 1` answers 400 `Unknown search command
+'index'.`, while `search index=main …` and `| makeresults` run. mockdr ran all
+three. Saved searches, stored without the leading `search`, still dispatch.
+
+**A search ignores case, a `where` does not.** `host=WEB01` finds `web01`,
+`CASE()` makes case count; `where` compares case and treats `*` literally —
+only `like()` globs.
+
+#### Across the mounts
+
+**The same seed is the same store in every process.** Defender's
+`rbacGroupId` came from Python's salted `hash()`, a Graph incident's name
+from set order, sign-in app ids from draws made at import. They are stable,
+and the sign-in log names Teams, Exchange Online, the Office 365 Portal and
+Graph Explorer by their real first-party ids.
+
+**A client's Elasticsearch indices survive a restart** and an export/import.
+The collections deliberately not persisted are named with a reason, and a
+test holds every store collection to one or the other.
+
+**`/_dev/reset` stops a running playbook first**, which used to save stale
+objects into the fresh seed up to 20 s later; **keeps the tokens and sessions
+it issued**, so SDKs that cache credentials no longer get a 401 after the
+first reset; and **turns fault injection off**.
+
+**Scenarios hit the same targets after every reset**, whatever was served
+before; Cortex's canned exclusion no longer changes on every read.
+
+**A record's later timestamp no longer precedes its earlier one**, in seven
+places.
+
+**One host tells one story across vendors.** S1 hostnames and models fit the
+OS — no more `RHEL-` hosts running Ubuntu or ThinkPad servers — and Intune,
+Cortex, Defender and Elastic copy hardware, users, domain, addresses, dates
+and isolation from the S1 agent. Cortex and Elastic endpoints are in
+`edr_id_map`.
+
+**Seeded indicators name nobody's real infrastructure.** S1, Cortex and
+Defender indicators used real, often registered domains and real addresses,
+Tor exits among them.
+
+### Not changed, and why
+
+Measured or documented evidence was missing for: Falcon's entity-id caps (the
+refusal is undocumented); `/results` before DONE answering 204; Cortex update-incident
+enum and comment handling, the advanced-auth replay window, and XQL
+`PARTIAL_SUCCESS`/`FAIL`; Sentinel's body `etag` and incident-number reuse;
+Defender's `Requestor` source and offboard's status; Teams 404 codes;
+`tstats`, `lookup`, `chart`, `append` and other SPL commands, which still fail
+loudly. Tokens on the Microsoft mounts remain opaque rather than JWTs.
+
 ## [2.5.0] - 2026-10-14
 
 ### Added
