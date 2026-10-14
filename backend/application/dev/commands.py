@@ -4,11 +4,12 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
-import random
 import time
+import uuid
 from collections.abc import Callable
 from typing import Any
 
+from application.dev._scenario_rng import scenario_rng
 from domain.account import Account
 from domain.activity import Activity
 from domain.agent import Agent
@@ -600,13 +601,16 @@ def trigger_scenario(scenario: str) -> dict:
         Dict with ``data`` containing the scenario name and affected count, or
         an error key if the scenario name is unknown.
     """
+    # Each run draws from its own generator (see `_scenario_rng`): the shared
+    # `random` made the targets depend on every request served since the reset.
+    rng = scenario_rng(scenario)
     if scenario == "mass_infection":
         agents = agent_repo.list_all()
-        targets = random.sample(agents, min(20, len(agents)))
+        targets = rng.sample(agents, min(20, len(agents)))
         for agent in targets:
             agent.isInfected = True
             agent.infected = True
-            agent.activeThreats = random.randint(1, 5)
+            agent.activeThreats = rng.randint(1, 5)
             _save_agent(agent)
         activity_repo.create(
             activity_type=5100,
@@ -616,7 +620,7 @@ def trigger_scenario(scenario: str) -> dict:
 
     if scenario == "agent_offline":
         agents = agent_repo.list_all()
-        targets = random.sample(agents, max(1, len(agents) // 3))
+        targets = rng.sample(agents, max(1, len(agents) // 3))
         for agent in targets:
             agent.networkStatus = "disconnected"
             agent.isActive = False
@@ -650,11 +654,11 @@ def trigger_scenario(scenario: str) -> dict:
 
     if scenario == "apt_campaign":
         agents = agent_repo.list_all()
-        targets = random.sample(agents, min(10, len(agents)))
+        targets = rng.sample(agents, min(10, len(agents)))
         for agent in targets:
             agent.isInfected = True
             agent.infected = True
-            agent.activeThreats = random.randint(3, 8)
+            agent.activeThreats = rng.randint(3, 8)
             agent.networkStatus = "disconnected"
             _save_agent(agent)
         activity_repo.create(
@@ -668,7 +672,7 @@ def trigger_scenario(scenario: str) -> dict:
     if scenario == "compliance_drift":
         devices = store.get_all("graph_managed_devices")
         target_count = max(1, int(len(devices) * 0.30))
-        targets = random.sample(devices, min(target_count, len(devices)))
+        targets = rng.sample(devices, min(target_count, len(devices)))
         for device in targets:
             device.complianceState = "noncompliant"  # type: ignore[attr-defined]
             store.save("graph_managed_devices", device.id, device)
@@ -677,7 +681,7 @@ def trigger_scenario(scenario: str) -> dict:
     if scenario == "mfa_gap":
         details = store.get_all("graph_user_registration_details")
         target_count = max(1, int(len(details) * 0.40))
-        targets = random.sample(details, min(target_count, len(details)))
+        targets = rng.sample(details, min(target_count, len(details)))
         for detail in targets:
             detail.isMfaRegistered = False  # type: ignore[attr-defined]
             detail.isMfaCapable = False  # type: ignore[attr-defined]
@@ -688,14 +692,13 @@ def trigger_scenario(scenario: str) -> dict:
 
     if scenario == "risky_signin_wave":
         from domain.graph.sign_in_log import GraphSignInLog
-        from infrastructure.seeders.graph.graph_shared import graph_uuid
         from utils.dt import utc_now
 
         users = store.get_all("graph_users")
         created = 0
         for _ in range(20):
-            entry_id = graph_uuid()
-            user = random.choice(users) if users else None
+            entry_id = str(uuid.UUID(int=rng.getrandbits(128), version=4))
+            user = rng.choice(users) if users else None
             log = GraphSignInLog(
                 id=entry_id,
                 createdDateTime=utc_now(),
@@ -706,7 +709,7 @@ def trigger_scenario(scenario: str) -> dict:
                 ),
                 userId=getattr(user, "id", "") if user else "",
                 appDisplayName="Microsoft 365 Portal",
-                ipAddress=f"198.51.100.{random.randint(1, 254)}",
+                ipAddress=f"198.51.100.{rng.randint(1, 254)}",
                 clientAppUsed="Browser",
                 status={"errorCode": 0, "failureReason": ""},
                 riskLevelDuringSignIn="high",

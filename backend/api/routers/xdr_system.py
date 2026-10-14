@@ -6,7 +6,6 @@ All POST endpoints use ``{"request_data": {...}}`` body wrapper.
 
 from __future__ import annotations
 
-import random
 import time
 
 from fastapi import APIRouter, Body, Depends
@@ -22,8 +21,14 @@ router = APIRouter(tags=["XDR System"])
 
 
 def _recent_ms() -> int:
-    """An epoch-millisecond timestamp within the last day, so a time-bounded client sees it."""
-    return int((time.time() - random.uniform(0, 86400)) * 1000)  # noqa: S311
+    """Midnight UTC today in epoch milliseconds: within the last day, the same on every call.
+
+    This drew `random.uniform(0, 86400)` per call, so the one canned
+    exclusion reported a different modification time on every request — a
+    client diffing two polls saw it modified each time — and each call
+    consumed a draw from the stream the seed and the dev scenarios share.
+    """
+    return int(time.time() // 86400 * 86400 * 1000)
 
 
 # ── System ────────────────────────────────────────────────────────────────────

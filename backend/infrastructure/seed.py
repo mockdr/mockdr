@@ -9,6 +9,7 @@ import random
 
 from faker import Faker
 
+from application.dev._scenario_rng import reset_scenario_runs
 from application.playbook._registry import reset_registry
 from application.playbook.executor import stop as stop_playbook
 from infrastructure.seeders.account import seed_account
@@ -126,6 +127,8 @@ def generate_all() -> None:
 
     store.clear_all()
     reset_registry()
+    # The first run of a scenario after a re-seed picks the same targets.
+    reset_scenario_runs()
 
     account_id, account_name = seed_account(fake)
     user_ids = seed_users(fake, account_id, account_name)

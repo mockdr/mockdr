@@ -34,6 +34,14 @@ class FaultInjectionConfig:
 
 _config = FaultInjectionConfig()
 
+#: What jitter and the error roll draw from. They drew from the module-level
+#: `random`, the stream `generate_all` seeds for the seed data and the dev
+#: scenarios read afterwards — so every request under fault injection moved
+#: what the next scenario picked. Re-seeded whenever the config changes, so a
+#: given configuration fails the same requests of a sequence every time.
+_FAULT_SEED = "fault-injection"
+_rng = random.Random(_FAULT_SEED)  # noqa: S311 - simulated faults, not security
+
 
 def get_fault_config() -> FaultInjectionConfig:
     """Return the current fault injection configuration."""
@@ -48,6 +56,7 @@ def set_fault_config(
 ) -> FaultInjectionConfig:
     """Update fault injection configuration. Only non-None fields are changed."""
     global _config
+    _rng.seed(_FAULT_SEED)
     _config = FaultInjectionConfig(
         delay_ms=delay_ms if delay_ms is not None else _config.delay_ms,
         delay_jitter_ms=delay_jitter_ms if delay_jitter_ms is not None else _config.delay_jitter_ms,
@@ -60,7 +69,16 @@ def set_fault_config(
 def reset_fault_config() -> None:
     """Reset fault injection to defaults (all disabled)."""
     global _config
+    _rng.seed(_FAULT_SEED)
     _config = FaultInjectionConfig()
+
+#: What jitter and the error roll draw from. They drew from the module-level
+#: `random`, the stream `generate_all` seeds for the seed data and the dev
+#: scenarios read afterwards — so every request under fault injection moved
+#: what the next scenario picked. Re-seeded whenever the config changes, so a
+#: given configuration fails the same requests of a sequence every time.
+_FAULT_SEED = "fault-injection"
+_rng = random.Random(_FAULT_SEED)  # noqa: S311 - simulated faults, not security
 
 
 class FaultInjectionMiddleware:
@@ -87,12 +105,12 @@ class FaultInjectionMiddleware:
         # Inject delay
         total_delay = cfg.delay_ms
         if cfg.delay_jitter_ms > 0:
-            total_delay += random.randint(0, cfg.delay_jitter_ms)
+            total_delay += _rng.randint(0, cfg.delay_jitter_ms)
         if total_delay > 0:
             await asyncio.sleep(total_delay / 1000.0)
 
         # Inject error
-        if cfg.error_rate > 0 and random.random() < cfg.error_rate:
+        if cfg.error_rate > 0 and _rng.random() < cfg.error_rate:
             # Shaped for whichever vendor owns the path: an injected fault is
             # meant to exercise a client's error handling, which it cannot do
             # if the body is another vendor's envelope.

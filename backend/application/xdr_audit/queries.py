@@ -1,9 +1,6 @@
 """Cortex XDR Audit query handlers (read-only)."""
 from __future__ import annotations
 
-import random
-import time
-
 from repository.xdr_audit_log_repo import xdr_audit_log_repo
 from utils.serde import record_dict
 from utils.xdr_response import build_xdr_list_reply
@@ -116,8 +113,3 @@ def get_agent_reports(request_data: dict) -> dict:
     return build_xdr_list_reply(
         reports[search_from:search_to], total_count=len(reports),
     )
-
-
-def _recent_ms() -> int:
-    """An epoch-millisecond timestamp within the last day, so a time-bounded client sees it."""
-    return int((time.time() - random.uniform(0, 86400)) * 1000)  # noqa: S311
