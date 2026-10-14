@@ -84,6 +84,7 @@ from domain.mde_indicator import MdeIndicator
 from domain.mde_investigation import MdeInvestigation
 from domain.mde_machine import MdeMachine
 from domain.mde_machine_action import MdeMachineAction
+from domain.mde_network_event import MdeNetworkEvent
 from domain.mde_oauth_client import MdeOAuthClient
 from domain.mde_software import MdeSoftware
 from domain.mde_vulnerability import MdeVulnerability
@@ -178,6 +179,7 @@ _TYPED_COLLECTIONS: dict[str, type] = {
     "mde_investigations": MdeInvestigation,
     "mde_software": MdeSoftware,
     "mde_vulnerabilities": MdeVulnerability,
+    "mde_network_events": MdeNetworkEvent,
     # Cortex XDR
     "xdr_incidents": XdrIncident,
     "xdr_alerts": XdrAlert,

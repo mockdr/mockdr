@@ -10,7 +10,10 @@ summarize … by … | order by … | take/limit N | distinct … | count``, wit
 comparison and string operators hunting queries actually use (``==``, ``!=``,
 ``>``, ``>=``, ``<``, ``<=``, ``contains``, ``!contains``, ``startswith``,
 ``endswith``, ``has``, ``in``, ``!in``, ``matches regex``), combined with
-``and`` / ``or`` / ``not`` and parentheses.
+``and`` / ``or`` / ``not`` and parentheses. Time is ``ago(<timespan>)``,
+``now()`` and ``datetime(<ISO 8601>)``, with timespans in ``d``, ``h``, ``m``,
+``s`` and ``ms``; a datetime compares with a timestamp column as a point in
+time, not as text.
 
 Anything outside that subset raises :class:`KqlError` so the caller can answer
 a 400, the way Defender does, rather than returning rows that were never asked
@@ -21,6 +24,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 __all__ = ["KqlError", "KqlQuery", "evaluate_kql", "parse_kql"]
@@ -281,8 +285,71 @@ class _PredicateParser:
                 else:
                     values.append(item.text)
             return lambda _row: values
+        if token.kind == "word" and token.text.lower() in _TIME_FUNCTIONS:
+            return self._parse_time_function(token.text.lower())
         column = token.text
         return lambda row: row.get(column)
+
+    def _parse_time_function(self, name: str) -> Callable[[Row], Any]:
+        """Parse ``ago(…)``, ``now()`` or ``datetime(…)`` into a fixed instant.
+
+        The argument is the raw text up to the closing parenthesis: the
+        tokenizer splits ``7d`` into a number and a word, and an ISO date
+        into a number and two negative ones.
+        """
+        if not self._accept("("):
+            msg = f"Expected '(' after '{name}'"
+            raise KqlError(msg)
+        parts: list[str] = []
+        while not self._accept(")"):
+            parts.append(self._next().text)
+        argument = "".join(parts)
+
+        if name == "now" and not argument:
+            instant = datetime.now(UTC)
+        elif name == "ago":
+            instant = datetime.now(UTC) - _timespan(argument)
+        elif name == "datetime":
+            instant = _parse_datetime(argument)
+        else:
+            msg = f"'{name}()' takes no argument in this mock"
+            raise KqlError(msg)
+        return lambda _row: instant
+
+
+_TIME_FUNCTIONS = frozenset({"ago", "now", "datetime"})
+
+_TIMESPAN_RE = re.compile(r"^(\d+(?:\.\d+)?)(d|h|m|s|ms)$")
+_TIMESPAN_UNITS = {"d": "days", "h": "hours", "m": "minutes", "s": "seconds", "ms": "milliseconds"}
+
+
+def _timespan(text: str) -> timedelta:
+    match = _TIMESPAN_RE.match(text.lower())
+    if match is None:
+        msg = f"A timespan literal is expected, found '{text}'"
+        raise KqlError(msg)
+    return timedelta(**{_TIMESPAN_UNITS[match.group(2)]: float(match.group(1))})
+
+
+def _parse_datetime(text: str) -> datetime:
+    try:
+        value = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        msg = f"A datetime literal is expected, found '{text}'"
+        raise KqlError(msg) from None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def _as_datetime(value: Any) -> datetime | None:
+    """Read *value* as an instant, or None when it is not one."""
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        return _parse_datetime(value)
+    except KqlError:
+        return None
 
 
 def _numeric(value: Any) -> float | None:
@@ -312,6 +379,11 @@ def _comparison(
         # Ordering against a missing value is false, as in KQL.
         if a is None or b is None:
             return False
+        if isinstance(a, datetime) or isinstance(b, datetime):
+            # Text order is time order only while both sides share a format,
+            # and a seeded `...00.000Z` against an `ago()` does not.
+            at, bt = _as_datetime(a), _as_datetime(b)
+            return at is not None and bt is not None and _order(operator, at, bt)
         an, bn = _numeric(a), _numeric(b)
         if an is None or bn is None:
             an_s, bn_s = str(a), str(b)
@@ -334,6 +406,9 @@ def _order(operator: str, a: Any, b: Any) -> bool:
 def _equal(a: Any, b: Any) -> bool:
     if a is None or b is None:
         return a is b
+    if isinstance(a, datetime) or isinstance(b, datetime):
+        at, bt = _as_datetime(a), _as_datetime(b)
+        return at is not None and at == bt
     an, bn = _numeric(a), _numeric(b)
     if an is not None and bn is not None:
         return an == bn
@@ -416,7 +491,11 @@ def _op_extend(rows: list[Row], argument: str) -> list[Row]:
         updated = dict(row)
         for assignment in assignments:
             name, _, expression = assignment.partition("=")
-            updated[name.strip()] = _evaluate_operand(expression.strip(), updated)
+            value = _evaluate_operand(expression.strip(), updated)
+            if isinstance(value, datetime):
+                # Rows hold timestamps as text, the way the tables serve them.
+                value = value.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            updated[name.strip()] = value
         out.append(updated)
     return out
 

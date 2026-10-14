@@ -499,9 +499,9 @@ curl -u admin:mockdr-admin -X POST \
 
 `POST /mde/api/advancedqueries/run` evaluates the query against tables projected from the same seeded data the REST endpoints serve, so a hunting result cannot contradict `/api/machines` or `/api/alerts`.
 
-Tables: `DeviceInfo`, `AlertInfo`, `AlertEvidence`, `DeviceTvmSoftwareInventory`, `DeviceTvmSoftwareVulnerabilities`.
+Tables: `DeviceInfo`, `DeviceNetworkEvents`, `AlertInfo`, `AlertEvidence`, `DeviceTvmSoftwareInventory`, `DeviceTvmSoftwareVulnerabilities`.
 
-Operators: `where`, `project`, `project-away`, `extend`, `summarize ... by`, `order by`, `take`/`limit`, `top`, `distinct`, `count` — with `==`, `!=`, `<`, `>`, `contains`, `startswith`, `endswith`, `has`, `in`, `matches regex`, combined with `and`/`or`/`not`.
+Operators: `where`, `project`, `project-away`, `extend`, `summarize ... by`, `order by`, `take`/`limit`, `top`, `distinct`, `count` — with `==`, `!=`, `<`, `>`, `contains`, `startswith`, `endswith`, `has`, `in`, `matches regex`, combined with `and`/`or`/`not`; time via `ago(7d)`, `now()` and `datetime(2026-10-01)`.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" -X POST \

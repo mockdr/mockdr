@@ -33,6 +33,34 @@ from infrastructure.seeders.es_exception_lists import seed_es_exception_lists
 from infrastructure.seeders.es_rules import seed_es_rules
 from infrastructure.seeders.exclusions import seed_exclusions
 from infrastructure.seeders.firewall import seed_firewall_rules
+from infrastructure.seeders.graph.graph_administrative_units import seed_graph_administrative_units
+from infrastructure.seeders.graph.graph_app_management import seed_graph_app_management
+from infrastructure.seeders.graph.graph_applications import seed_graph_applications
+from infrastructure.seeders.graph.graph_audit_logs import seed_graph_audit_logs
+from infrastructure.seeders.graph.graph_autopilot import seed_graph_autopilot
+from infrastructure.seeders.graph.graph_compliance import seed_graph_compliance
+from infrastructure.seeders.graph.graph_conditional_access import seed_graph_conditional_access
+from infrastructure.seeders.graph.graph_defender_office import seed_graph_defender_office
+from infrastructure.seeders.graph.graph_detected_apps import seed_graph_detected_apps
+from infrastructure.seeders.graph.graph_directory_roles import seed_graph_directory_roles
+from infrastructure.seeders.graph.graph_files import seed_graph_files
+from infrastructure.seeders.graph.graph_groups import seed_graph_groups
+from infrastructure.seeders.graph.graph_identity_protection import seed_graph_identity_protection
+from infrastructure.seeders.graph.graph_mail import seed_graph_mail
+from infrastructure.seeders.graph.graph_mail_rules import seed_graph_mail_rules
+from infrastructure.seeders.graph.graph_managed_devices import seed_graph_managed_devices
+from infrastructure.seeders.graph.graph_named_locations import seed_graph_named_locations
+from infrastructure.seeders.graph.graph_oauth import seed_graph_oauth_clients
+from infrastructure.seeders.graph.graph_organization import seed_graph_organization
+from infrastructure.seeders.graph.graph_security import seed_graph_security
+from infrastructure.seeders.graph.graph_service_health import seed_graph_service_health
+from infrastructure.seeders.graph.graph_service_principals import seed_graph_service_principals
+from infrastructure.seeders.graph.graph_sign_in_logs import seed_graph_sign_in_logs
+from infrastructure.seeders.graph.graph_subscribed_skus import seed_graph_subscribed_skus
+from infrastructure.seeders.graph.graph_teams import seed_graph_teams
+from infrastructure.seeders.graph.graph_update_rings import seed_graph_update_rings
+from infrastructure.seeders.graph.graph_user_auth import seed_graph_user_auth
+from infrastructure.seeders.graph.graph_users import seed_graph_users
 from infrastructure.seeders.groups import seed_groups
 from infrastructure.seeders.installed_apps import seed_installed_apps
 from infrastructure.seeders.ioc import seed_iocs
@@ -41,37 +69,10 @@ from infrastructure.seeders.mde_indicators import seed_mde_indicators
 from infrastructure.seeders.mde_investigations import seed_mde_investigations
 from infrastructure.seeders.mde_machine_actions import seed_mde_machine_actions
 from infrastructure.seeders.mde_machines import seed_mde_machines
+from infrastructure.seeders.mde_network_events import seed_mde_network_events
 from infrastructure.seeders.mde_oauth import seed_mde_oauth_clients
 from infrastructure.seeders.mde_software import seed_mde_software
 from infrastructure.seeders.mde_vulnerabilities import seed_mde_vulnerabilities
-from infrastructure.seeders.graph.graph_administrative_units import seed_graph_administrative_units
-from infrastructure.seeders.graph.graph_applications import seed_graph_applications
-from infrastructure.seeders.graph.graph_conditional_access import seed_graph_conditional_access
-from infrastructure.seeders.graph.graph_app_management import seed_graph_app_management
-from infrastructure.seeders.graph.graph_audit_logs import seed_graph_audit_logs
-from infrastructure.seeders.graph.graph_autopilot import seed_graph_autopilot
-from infrastructure.seeders.graph.graph_compliance import seed_graph_compliance
-from infrastructure.seeders.graph.graph_detected_apps import seed_graph_detected_apps
-from infrastructure.seeders.graph.graph_groups import seed_graph_groups
-from infrastructure.seeders.graph.graph_identity_protection import seed_graph_identity_protection
-from infrastructure.seeders.graph.graph_directory_roles import seed_graph_directory_roles
-from infrastructure.seeders.graph.graph_mail_rules import seed_graph_mail_rules
-from infrastructure.seeders.graph.graph_managed_devices import seed_graph_managed_devices
-from infrastructure.seeders.graph.graph_named_locations import seed_graph_named_locations
-from infrastructure.seeders.graph.graph_sign_in_logs import seed_graph_sign_in_logs
-from infrastructure.seeders.graph.graph_update_rings import seed_graph_update_rings
-from infrastructure.seeders.graph.graph_subscribed_skus import seed_graph_subscribed_skus
-from infrastructure.seeders.graph.graph_oauth import seed_graph_oauth_clients
-from infrastructure.seeders.graph.graph_organization import seed_graph_organization
-from infrastructure.seeders.graph.graph_service_principals import seed_graph_service_principals
-from infrastructure.seeders.graph.graph_user_auth import seed_graph_user_auth
-from infrastructure.seeders.graph.graph_defender_office import seed_graph_defender_office
-from infrastructure.seeders.graph.graph_security import seed_graph_security
-from infrastructure.seeders.graph.graph_service_health import seed_graph_service_health
-from infrastructure.seeders.graph.graph_users import seed_graph_users
-from infrastructure.seeders.graph.graph_mail import seed_graph_mail
-from infrastructure.seeders.graph.graph_files import seed_graph_files
-from infrastructure.seeders.graph.graph_teams import seed_graph_teams
 from infrastructure.seeders.sentinel.incident_seeder import seed_sentinel_incidents
 from infrastructure.seeders.sentinel.sentinel_seeder import seed_sentinel_infrastructure
 from infrastructure.seeders.sites import resync_site_licences, seed_sites
@@ -93,7 +94,6 @@ from infrastructure.seeders.xdr_rbac import seed_xdr_users
 from infrastructure.seeders.xdr_scripts import seed_xdr_scripts
 from repository.store import store
 from utils import id_gen
-
 
 #: What every draw in this install comes from. A test sweeps the seeders
 #: over other values of it, because an invariant that holds for one draw is
@@ -165,6 +165,7 @@ def generate_all() -> None:
     seed_mde_investigations(fake, mde_machine_ids, mde_alert_ids)
     seed_mde_software(fake, mde_machine_ids)
     seed_mde_vulnerabilities(fake)
+    seed_mde_network_events()
 
     # ── Elastic Security seeders ─────────────────────────────────────────────
     seed_es_api_keys()

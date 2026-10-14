@@ -6,6 +6,8 @@ synthetic rows. A query naming a table that does not exist, or carrying a
 detection engineer testing a hunting query against mockdr learned nothing
 about whether it worked.
 """
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -252,3 +254,197 @@ class TestTablesAgreeWithRest:
 
         assert evidence
         assert all(r["DeviceId"] in devices for r in evidence)
+
+
+class TestDeviceNetworkEvents:
+    """``DeviceNetworkEvents`` is a table, not a 400.
+
+    It is the table a connector watching device-to-provider traffic is built
+    around, and naming it answered "a recognized table name is expected".
+    """
+
+    #: The columns such a connector reads (mockdr/mockdr#51).
+    COLUMNS = (
+        "Timestamp", "DeviceId", "DeviceName",
+        "InitiatingProcessFileName", "InitiatingProcessFolderPath",
+        "InitiatingProcessVersionInfoCompanyName",
+        "InitiatingProcessAccountUpn", "InitiatingProcessAccountObjectId",
+        "RemoteUrl", "RemoteIP", "RemotePort",
+    )
+
+    def test_table_answers_with_the_columns_a_connector_reads(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        body = _hunt(client, mde_headers, "DeviceNetworkEvents | take 1")
+
+        assert len(body["Results"]) == 1
+        assert set(self.COLUMNS) <= set(body["Results"][0])
+        types = {c["Name"]: c["Type"] for c in body["Schema"]}
+        assert types["Timestamp"] == "DateTime"
+        assert types["RemotePort"] == "Int64"
+
+    def test_every_event_belongs_to_an_onboarded_device(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        devices = {
+            r["DeviceId"]: r for r in _rows(client, mde_headers, "DeviceInfo")
+        }
+        events = _rows(client, mde_headers, "DeviceNetworkEvents")
+
+        assert events
+        for event in events:
+            device = devices[event["DeviceId"]]
+            assert event["DeviceName"] == device["DeviceName"]
+            assert device["OnboardingStatus"] == "Onboarded"
+
+    def test_columns_are_populated(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        events = _rows(client, mde_headers, "DeviceNetworkEvents")
+
+        assert all(e["RemoteIP"] and e["RemotePort"] for e in events)
+        assert all(
+            e["InitiatingProcessFolderPath"].endswith(e["InitiatingProcessFileName"])
+            for e in events
+        )
+        # A user's process carries the user's identity; a system process has none.
+        user_events = [e for e in events if e["InitiatingProcessAccountUpn"]]
+        assert user_events
+        assert all(e["InitiatingProcessAccountObjectId"] for e in user_events)
+        assert any(
+            e["InitiatingProcessVersionInfoCompanyName"] for e in events
+        )
+
+    def test_one_user_is_one_directory_object(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        events = _rows(client, mde_headers, "DeviceNetworkEvents")
+        ids: dict[str, set[str]] = {}
+        for e in events:
+            if e["InitiatingProcessAccountUpn"]:
+                ids.setdefault(e["InitiatingProcessAccountUpn"], set()).add(
+                    e["InitiatingProcessAccountObjectId"],
+                )
+        assert all(len(objects) == 1 for objects in ids.values())
+
+    def test_a_pipeline_over_remote_url_filters_and_projects(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        rows = _rows(
+            client, mde_headers,
+            'DeviceNetworkEvents | where RemoteUrl endswith "openai.com"'
+            " | project DeviceId, RemoteUrl, InitiatingProcessFileName",
+        )
+
+        assert rows
+        assert all(r["RemoteUrl"].endswith("openai.com") for r in rows)
+        assert all(
+            set(r) == {"DeviceId", "RemoteUrl", "InitiatingProcessFileName"} for r in rows
+        )
+
+    def test_reseeding_reproduces_the_same_events(self) -> None:
+        # Read the table directly: reseeding also clears the issued tokens.
+        from application.mde_advanced_hunting.tables import get_table
+        from infrastructure.seed import generate_all
+
+        def stable() -> list:
+            # Timestamps are relative to now, like every other seeded time.
+            return [
+                {k: v for k, v in r.items() if k != "Timestamp"}
+                for r in get_table("DeviceNetworkEvents") or []
+            ]
+
+        before = stable()
+        generate_all()
+
+        assert before
+        assert stable() == before
+
+
+class TestTimeFilters:
+    """``ago()``, ``now()`` and ``datetime()`` filter on time.
+
+    Nearly every production hunting query opens with ``where Timestamp >
+    ago(…)``, and the evaluator refused it as an unknown column comparison —
+    so a connector that got past the table name met a 400 on its first line.
+    """
+
+    @staticmethod
+    def _instant(text: str) -> datetime:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+    def test_ago_keeps_only_recent_rows(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        everything = _rows(client, mde_headers, "DeviceNetworkEvents")
+        recent = _rows(
+            client, mde_headers, "DeviceNetworkEvents | where Timestamp > ago(3d)",
+        )
+        cutoff = datetime.now(UTC) - timedelta(days=3, minutes=1)
+
+        assert 0 < len(recent) < len(everything)
+        assert all(self._instant(r["Timestamp"]) > cutoff for r in recent)
+        assert len(recent) == sum(
+            self._instant(r["Timestamp"]) > cutoff for r in everything
+        )
+
+    @pytest.mark.parametrize(
+        ("expression", "max_age"),
+        [
+            ("Timestamp > ago(36500d)", timedelta(days=36500)),
+            ("Timestamp > datetime(2000-01-01)", None),
+            ("Timestamp >= datetime(2000-01-01T00:00:00Z)", None),
+            ("Timestamp > ago(1.5h)", timedelta(hours=1.5)),
+            ("Timestamp > ago(90m)", timedelta(minutes=90)),
+            ("Timestamp > now()", timedelta(0)),
+        ],
+    )
+    def test_time_literals_are_understood(
+        self, client: TestClient, mde_headers: dict,
+        expression: str, max_age: timedelta | None,
+    ) -> None:
+        everything = _rows(client, mde_headers, "DeviceInfo")
+        filtered = _rows(client, mde_headers, f"DeviceInfo | where {expression}")
+
+        if max_age is None:
+            # Nothing in the seed predates 2000.
+            assert filtered == everything
+            return
+        cutoff = datetime.now(UTC) - max_age
+        expected = [r for r in everything if self._instant(r["Timestamp"]) > cutoff]
+        assert filtered == expected
+
+    def test_a_connector_shaped_query_runs(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        rows = _rows(
+            client, mde_headers,
+            "DeviceNetworkEvents | where Timestamp > ago(7d)"
+            ' | where RemoteUrl has "openai" or RemoteUrl has "anthropic"'
+            " | project Timestamp, DeviceId, RemoteUrl, InitiatingProcessAccountUpn",
+        )
+        assert all(
+            "openai" in r["RemoteUrl"] or "anthropic" in r["RemoteUrl"] for r in rows
+        )
+
+    def test_extend_with_ago_yields_a_timestamp(
+        self, client: TestClient, mde_headers: dict,
+    ) -> None:
+        body = _hunt(client, mde_headers, "DeviceInfo | extend Cutoff = ago(1d) | take 1")
+        types = {c["Name"]: c["Type"] for c in body["Schema"]}
+
+        assert types["Cutoff"] == "DateTime"
+        cutoff = self._instant(body["Results"][0]["Cutoff"])
+        assert abs(cutoff - (datetime.now(UTC) - timedelta(days=1))) < timedelta(minutes=1)
+
+    @pytest.mark.parametrize(
+        "expression",
+        ["Timestamp > ago(7x)", "Timestamp > ago(7d", "Timestamp > datetime(yesterday)"],
+    )
+    def test_malformed_time_is_rejected(
+        self, client: TestClient, mde_headers: dict, expression: str,
+    ) -> None:
+        resp = client.post(
+            HUNT_URL, json={"Query": f"DeviceInfo | where {expression}"}, headers=mde_headers,
+        )
+        assert resp.status_code == 400

@@ -13,6 +13,7 @@ from typing import Any
 
 from repository.mde_alert_repo import mde_alert_repo
 from repository.mde_machine_repo import mde_machine_repo
+from repository.mde_network_event_repo import mde_network_event_repo
 from repository.mde_software_repo import mde_software_repo
 from repository.mde_vulnerability_repo import mde_vulnerability_repo
 
@@ -119,10 +120,40 @@ def _device_software_vulnerabilities() -> list[Row]:
     ]
 
 
+def _device_network_events() -> list[Row]:
+    return [
+        {
+            "Timestamp": e.timestamp,
+            "DeviceId": e.machineId,
+            "DeviceName": e.computerDnsName,
+            "ActionType": e.actionType,
+            "RemoteIP": e.remoteIp,
+            "RemotePort": e.remotePort,
+            "RemoteUrl": e.remoteUrl,
+            "LocalIP": e.localIp,
+            "LocalPort": e.localPort,
+            "Protocol": e.protocol,
+            "RemoteIPType": e.remoteIpType,
+            "InitiatingProcessFileName": e.processFileName,
+            "InitiatingProcessFolderPath": e.processFolderPath,
+            "InitiatingProcessCommandLine": e.processCommandLine,
+            "InitiatingProcessId": e.processId,
+            "InitiatingProcessVersionInfoCompanyName": e.processCompanyName,
+            "InitiatingProcessAccountDomain": e.accountDomain,
+            "InitiatingProcessAccountName": e.accountName,
+            "InitiatingProcessAccountUpn": e.accountUpn,
+            "InitiatingProcessAccountObjectId": e.accountObjectId,
+            "ReportId": e.reportId,
+        }
+        for e in mde_network_event_repo.list_all()
+    ]
+
+
 #: Tables this mock backs. A query naming anything else is an error, the way
 #: Defender rejects an unknown table, rather than silently returning rows.
 _TABLES: dict[str, Callable[[], list[Row]]] = {
     "DeviceInfo": _device_info,
+    "DeviceNetworkEvents": _device_network_events,
     "AlertInfo": _alert_info,
     "AlertEvidence": _alert_evidence,
     "DeviceTvmSoftwareInventory": _device_software_inventory,

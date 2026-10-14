@@ -25,9 +25,14 @@ _LABELS = (
 )
 
 
-def doc_ipv4() -> str:
-    """A routable-looking address from a documentation range."""
-    return f"{random.choice(_DOC_NETS)}.{random.randint(1, 254)}"  # noqa: S311
+def doc_ipv4(rng: random.Random | None = None) -> str:
+    """A routable-looking address from a documentation range.
+
+    Args:
+        rng: The generator to draw from; the shared seeded one when omitted.
+    """
+    r = rng or random
+    return f"{r.choice(_DOC_NETS)}.{r.randint(1, 254)}"  # noqa: S311
 
 
 def doc_domain(subdomain: bool = False) -> str:

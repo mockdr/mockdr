@@ -102,6 +102,7 @@ class InMemoryStore:
             "mde_investigations": {},
             "mde_software": {},
             "mde_vulnerabilities": {},
+            "mde_network_events": {},
             # ── Palo Alto Cortex XDR collections ────────────────────────────
             "xdr_incidents": {},
             "xdr_alerts": {},
