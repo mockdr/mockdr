@@ -125,7 +125,7 @@ class TestXsoarSentinelFlow:
             data={"client_id": "sentinel-mock-client-id",
                   "client_secret": "sentinel-mock-client-secret",
                   "grant_type": "client_credentials",
-        "scope": "https://management.azure.com/.default"},
+        "scope": "https://api.loganalytics.io/.default"},
         )
         headers = {"Authorization": f"Bearer {token_resp.json()['access_token']}"}
 

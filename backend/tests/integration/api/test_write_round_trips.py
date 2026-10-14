@@ -3954,18 +3954,22 @@ class TestTheConnectorsOwnQueryFindsSomething:
     them, from the same four products.
     """
 
-    def _headers(self, client: TestClient) -> dict:
+    def _headers(
+        self, client: TestClient, scope: str = "https://management.azure.com/.default",
+    ) -> dict:
         token = client.post("/sentinel/oauth2/v2.0/token", data={
             "client_id": "sentinel-mock-client-id",
             "client_secret": "sentinel-mock-client-secret",
             "grant_type": "client_credentials",
-            "scope": "https://management.azure.com/.default",
+            "scope": scope,
         }).json()["access_token"]
         return {"Authorization": f"Bearer {token}"}
 
     def _query(self, client: TestClient, kql: str) -> dict:
+        # The Logs query API takes a token for its own audience, not ARM's.
         return dict(client.post("/sentinel/v1/workspaces/mockdr-workspace/query",
-                                headers=self._headers(client),
+                                headers=self._headers(
+                                    client, "https://api.loganalytics.io/.default"),
                                 json={"query": kql}).json()["tables"][0])
 
     def _connector_tables(self, client: TestClient) -> list[str]:

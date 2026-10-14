@@ -26,13 +26,18 @@ _WS = (
 )
 
 
-def _auth(client: TestClient) -> dict[str, str]:
+#: A token is for one resource: the Logs query API refuses an ARM token.
+LOG_ANALYTICS = "https://api.loganalytics.io/.default"
+ARM = "https://management.azure.com/.default"
+
+
+def _auth(client: TestClient, scope: str = LOG_ANALYTICS) -> dict[str, str]:
     resp = client.post(
         f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
         data={"client_id": "sentinel-mock-client-id",
               "client_secret": "sentinel-mock-client-secret",
               "grant_type": "client_credentials",
-              "scope": "https://management.azure.com/.default"},
+              "scope": scope},
     )
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -61,7 +66,7 @@ class TestEveryShippedRuleRuns:
         self, client: TestClient,
     ) -> None:
         rules = client.get(f"{SENTINEL_PREFIX}{_WS}/alertRules",
-                           headers=_auth(client)).json()["value"]
+                           headers=_auth(client, ARM)).json()["value"]
         queries = [
             (r["name"], (r.get("properties") or {}).get("query"))
             for r in rules

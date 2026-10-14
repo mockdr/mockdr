@@ -201,6 +201,10 @@
       "type": "string"
     },
     {
+      "key": "sentinel_la_token",
+      "value": ""
+    },
+    {
       "key": "sentinel_subscription_id",
       "value": "mock-subscription-id",
       "type": "string"
@@ -8113,6 +8117,51 @@
                       "key": "grant_type",
                       "value": "client_credentials",
                       "type": "text"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "https://management.azure.com/.default",
+                      "type": "text"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Log Analytics token",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{sentinel_base_url}}/oauth2/v2.0/token",
+                  "host": [
+                    "{{sentinel_base_url}}/oauth2/v2.0/token"
+                  ],
+                  "path": []
+                },
+                "description": "Saves access_token to sentinel_la_token variable (the Logs query API's audience)",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_id",
+                      "value": "sentinel-mock-client-id",
+                      "type": "text"
+                    },
+                    {
+                      "key": "client_secret",
+                      "value": "sentinel-mock-client-secret",
+                      "type": "text"
+                    },
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials",
+                      "type": "text"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "https://api.loganalytics.io/.default",
+                      "type": "text"
                     }
                   ]
                 }
@@ -8966,7 +9015,7 @@
                 "header": [
                   {
                     "key": "Authorization",
-                    "value": "Bearer {{sentinel_token}}"
+                    "value": "Bearer {{sentinel_la_token}}"
                   }
                 ],
                 "url": {

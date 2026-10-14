@@ -24,13 +24,15 @@ def raw_client(fresh_seed: None) -> TestClient:
     return TestClient(main.app)
 
 
-def _auth(client: TestClient) -> dict[str, str]:
+def _auth(
+    client: TestClient, scope: str = "https://management.azure.com/.default",
+) -> dict[str, str]:
     """Return Sentinel Bearer headers."""
     resp = client.post(f"{SENTINEL_PREFIX}/oauth2/v2.0/token", data={
         "client_id": "sentinel-mock-client-id",
         "client_secret": "sentinel-mock-client-secret",
         "grant_type": "client_credentials",
-        "scope": "https://management.azure.com/.default",
+        "scope": scope,
     })
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -86,7 +88,7 @@ class TestApiVersionRequired:
         """The query endpoint is api.loganalytics.io, not ARM."""
         resp = raw_client.post(
             f"{SENTINEL_PREFIX}/v1/workspaces/mockdr-workspace/query",
-            headers=_auth(raw_client),
+            headers=_auth(raw_client, "https://api.loganalytics.io/.default"),
             json={"query": "SecurityAlert | take 1"},
         )
         assert resp.status_code == 200

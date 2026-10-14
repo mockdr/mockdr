@@ -99,8 +99,16 @@ orders custom logs by.
 ### Get OAuth2 Token
 ```bash
 curl -X POST http://localhost:8001/sentinel/oauth2/v2.0/token \
-  -d "client_id=sentinel-mock-client-id&client_secret=sentinel-mock-client-secret&grant_type=client_credentials"
+  -d "client_id=sentinel-mock-client-id&client_secret=sentinel-mock-client-secret&grant_type=client_credentials" \
+  --data-urlencode "scope=https://management.azure.com/.default"
 ```
+
+A token is for the resource its `scope` names, and each API takes only its
+own, as Azure does: the ARM routes want
+`https://management.azure.com/.default` (or `https://management.core.windows.net/.default`),
+the Log Analytics query wants `https://api.loganalytics.io/.default`. A token
+for the other one is refused with `InvalidAuthenticationTokenAudience` — 401
+from ARM, 403 from the query API.
 
 ### List Incidents
 ```bash
@@ -112,7 +120,7 @@ curl http://localhost:8001/sentinel/subscriptions/00000000-0000-0000-0000-000000
 ### Run KQL Query
 ```bash
 curl -X POST http://localhost:8001/sentinel/v1/workspaces/mockdr-workspace/query \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer <log-analytics-token>" \
   -H "Content-Type: application/json" \
   -d '{"query": "SecurityIncident | take 5"}'
 ```

@@ -10,7 +10,8 @@ def _auth(client: TestClient) -> dict[str, str]:
         data={"client_id": "sentinel-mock-client-id",
               "client_secret": "sentinel-mock-client-secret",
               "grant_type": "client_credentials",
-        "scope": "https://management.azure.com/.default"},
+              # the Logs query API takes a token for its own audience
+              "scope": "https://api.loganalytics.io/.default"},
     )
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 

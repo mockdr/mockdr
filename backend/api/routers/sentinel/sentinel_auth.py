@@ -121,7 +121,7 @@ def _issue_token(
             AADSTS_TENANT_NOT_FOUND,
         ))
 
-    result = token_exchange(client_id, client_secret)
+    result = token_exchange(client_id, client_secret, scope)
     if not result:
         raise HTTPException(status_code=401, detail=build_token_error(
             "invalid_client",

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from api.sentinel_auth import require_sentinel_auth
+from api.sentinel_auth import require_log_analytics_auth
 from application.sentinel.queries.log_analytics import UnknownTableError, query_logs
 from utils.sentinel.kql_parser import UnsupportedKqlError
 from utils.sentinel.response import build_log_analytics_error
@@ -16,7 +16,7 @@ router = APIRouter(tags=["Sentinel Log Analytics"])
 async def run_query(
     workspace_id: str,
     request: Request,
-    _auth: dict = Depends(require_sentinel_auth),
+    _auth: dict = Depends(require_log_analytics_auth),
 ) -> dict:
     """Execute a KQL query against the workspace."""
     body = await request.json()

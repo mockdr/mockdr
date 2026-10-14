@@ -25,12 +25,13 @@ def client_tenant(client_id: str) -> tuple[str, str]:
     return "", ""
 
 
-def token_exchange(client_id: str, client_secret: str) -> dict | None:
+def token_exchange(client_id: str, client_secret: str, scope: str) -> dict | None:
     """Exchange client credentials for an access token.
 
     Args:
         client_id:     Azure AD application client ID.
         client_secret: Client secret.
+        scope:         The resource the token is for; the token keeps it.
 
     Returns:
         Token response dict, or None if credentials are invalid.
@@ -42,5 +43,5 @@ def token_exchange(client_id: str, client_secret: str) -> dict | None:
         id_ok = hmac.compare_digest(stored_id, client_id)
         secret_ok = hmac.compare_digest(stored_secret, client_secret)
         if id_ok and secret_ok:
-            return create_sentinel_token(client_id)
+            return create_sentinel_token(client_id, scope)
     return None

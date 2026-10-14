@@ -28,7 +28,43 @@ _SENTINEL_TOKEN_COLLECTION = "sentinel_oauth_tokens"
 _TOKEN_TTL = 3600  # 1 hour
 
 
-def create_sentinel_token(client_id: str) -> dict:
+#: The audiences Azure Resource Manager accepts, as its refusal lists them.
+ARM_AUDIENCES = (
+    "https://management.core.windows.net/",
+    "https://management.core.windows.net",
+    "https://management.azure.com/",
+    "https://management.azure.com",
+)
+
+#: The audiences the Logs query API (api.loganalytics.io) accepts.
+LOG_ANALYTICS_AUDIENCES = (
+    "https://api.loganalytics.io",
+    "https://api.loganalytics.io/",
+    "https://api.loganalytics.azure.com",
+    "https://api.loganalytics.azure.com/",
+)
+
+
+def audience_of(scope: str) -> str:
+    """The resource a client-credentials `scope` asks a token for.
+
+    A v2 scope names the resource and a permission —
+    `https://management.azure.com/.default` — and the token's `aud` is the
+    resource. With several scopes the first names the resource, as Entra
+    issues one token per resource.
+    """
+    first = (scope or "").split()[0] if (scope or "").split() else ""
+    for suffix in ("/.default", "/user_impersonation"):
+        if first.endswith(suffix):
+            resource = first[: -len(suffix)]
+            # ARM's audiences carry the trailing slash; Log Analytics' do not.
+            return resource + "/" if resource.startswith("https://management.") else resource
+    return first
+
+
+def create_sentinel_token(
+    client_id: str, scope: str = "https://management.azure.com/.default",
+) -> dict:
     """Create a new OAuth2 access token for the given client.
 
     The members Entra's v2 endpoint answers with, and no more: `resource`
@@ -36,8 +72,15 @@ def create_sentinel_token(client_id: str) -> dict:
     mounts in this mock — Defender and Graph, the same directory — have
     never sent it.
 
+    The token remembers the resource its `scope` asked for. A token is
+    issued for one audience, and each API accepts only its own: Azure
+    Resource Manager refuses a Log Analytics token, and Log Analytics an
+    ARM one. The mock accepted any token anywhere, so a client that asked
+    for the wrong scope passed here and failed against Azure.
+
     Args:
         client_id: The authenticated client ID.
+        scope:     The scope the token request named.
 
     Returns:
         Token response dict with ``access_token``, ``token_type``,
@@ -47,6 +90,7 @@ def create_sentinel_token(client_id: str) -> dict:
     store.save(_SENTINEL_TOKEN_COLLECTION, access_token, {
         "client_id": client_id,
         "created_at": time.time(),
+        "audience": audience_of(scope),
     })
     return {
         "access_token": access_token,
@@ -56,8 +100,8 @@ def create_sentinel_token(client_id: str) -> dict:
     }
 
 
-def _resolve_token(token: str) -> str | None:
-    """Return the client_id for a valid token, or None."""
+def _resolve_token(token: str) -> dict | None:
+    """Return the record of a valid token — client and audience — or None."""
     record = store.get(_SENTINEL_TOKEN_COLLECTION, token)
     if not record:
         return None
@@ -65,18 +109,53 @@ def _resolve_token(token: str) -> str | None:
     if time.time() - created_at > _TOKEN_TTL:
         store.delete(_SENTINEL_TOKEN_COLLECTION, token)
         return None
-    return cast(str, record["client_id"])
+    return cast(dict, record)
 
 
 #: Where this mount issues the tokens it asks for.
 _TOKEN_PATH = "/sentinel/oauth2/v2.0/token"
 
 
+def _bearer_record(request: Request, authorization: str | None) -> dict:
+    """The record of the request's bearer token, or a 401 refusal."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail=build_arm_error("AuthenticationFailed", "Bearer token required"),
+            headers=bearer_challenge(request, _TOKEN_PATH),
+        )
+
+    token = authorization[7:]
+    record = _resolve_token(token)
+    if not record:
+        raise HTTPException(
+            status_code=401,
+            detail=build_arm_error("AuthenticationFailed", "Invalid or expired token"),
+            headers=bearer_challenge(
+                request, _TOKEN_PATH, "Invalid or expired token"),
+        )
+    return record
+
+
+def _audience_message(audience: str, allowed: tuple[str, ...]) -> str:
+    """Azure's own wording for a token issued to someone else."""
+    listed = ",".join(f"'{a}'" for a in allowed)
+    return (
+        f"The access token has been obtained for wrong audience or resource "
+        f"'{audience}'. It should exactly match with one of the allowed "
+        f"audiences {listed}."
+    )
+
+
 async def require_sentinel_auth(
     request: Request,
     authorization: str | None = Header(None),
 ) -> dict:
-    """Validate Azure AD Bearer token and return client info.
+    """Validate an Azure Resource Manager bearer token and return client info.
+
+    A token issued for another resource — Log Analytics, Graph — is refused
+    the way ARM refuses it: 401 `InvalidAuthenticationTokenAudience`, naming
+    the audience the token has and the ones ARM takes.
 
     Args:
         request:       The refused request, for the challenge's own URL.
@@ -86,26 +165,48 @@ async def require_sentinel_auth(
         Dict with ``client_id`` key.
 
     Raises:
-        HTTPException: 401 if token is missing or invalid.
+        HTTPException: 401 if the token is missing, invalid, or not for ARM.
     """
-    if not authorization or not authorization.lower().startswith("bearer "):
+    record = _bearer_record(request, authorization)
+    audience = str(record.get("audience", ""))
+    if audience not in ARM_AUDIENCES:
         raise HTTPException(
             status_code=401,
-            detail=build_arm_error("AuthenticationFailed", "Bearer token required"),
-            headers=bearer_challenge(request, _TOKEN_PATH),
+            detail=build_arm_error(
+                "InvalidAuthenticationTokenAudience",
+                _audience_message(audience, ARM_AUDIENCES),
+            ),
+            headers=bearer_challenge(request, _TOKEN_PATH, "Invalid audience"),
         )
+    return {"client_id": record["client_id"]}
 
-    token = authorization[7:]
-    client_id = _resolve_token(token)
-    if not client_id:
+
+async def require_log_analytics_auth(
+    request: Request,
+    authorization: str | None = Header(None),
+) -> dict:
+    """Validate a Logs query API bearer token and return client info.
+
+    The Logs query API takes tokens for `https://api.loganalytics.io`; one
+    issued for ARM is refused with `InvalidAuthenticationTokenAudience`,
+    which the Azure Monitor "Logs query timeouts and errors" page lists as a
+    403.
+
+    Raises:
+        HTTPException: 401 if the token is missing or invalid, 403 if it is
+            for another resource.
+    """
+    record = _bearer_record(request, authorization)
+    audience = str(record.get("audience", ""))
+    if audience not in LOG_ANALYTICS_AUDIENCES:
         raise HTTPException(
-            status_code=401,
-            detail=build_arm_error("AuthenticationFailed", "Invalid or expired token"),
-            headers=bearer_challenge(
-                request, _TOKEN_PATH, "Invalid or expired token"),
+            status_code=403,
+            detail=build_arm_error(
+                "InvalidAuthenticationTokenAudience",
+                _audience_message(audience, LOG_ANALYTICS_AUDIENCES[::2]),
+            ),
         )
-
-    return {"client_id": client_id}
+    return {"client_id": record["client_id"]}
 
 
 # ── ARM api-version enforcement ──────────────────────────────────────────────

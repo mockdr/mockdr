@@ -10,13 +10,15 @@ _WS = (
 )
 
 
-def _auth(client: TestClient) -> dict[str, str]:
+def _auth(
+    client: TestClient, scope: str = "https://management.azure.com/.default",
+) -> dict[str, str]:
     resp = client.post(
         f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
         data={"client_id": "sentinel-mock-client-id",
               "client_secret": "sentinel-mock-client-secret",
               "grant_type": "client_credentials",
-        "scope": "https://management.azure.com/.default"},
+        "scope": scope},
     )
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -71,7 +73,7 @@ class TestARMEnvelopeFormat:
         resp = client.post(
             f"{SENTINEL_PREFIX}/v1/workspaces/mockdr-workspace/query",
             json={"query": "SecurityIncident | take 1"},
-            headers=_auth(client),
+            headers=_auth(client, "https://api.loganalytics.io/.default"),
         )
         body = resp.json()
         assert "tables" in body
