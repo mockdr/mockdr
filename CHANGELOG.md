@@ -4,6 +4,218 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.7.0] - 2026-10-14
+
+2.6.0 checked the mock against the vendors' documentation. This release checks
+it with four other lenses: the vendors' **own client libraries** run end to
+end against it, an instance **left running for days** under traffic, whether
+the mock is **safe to host**, and whether every example the **documentation**
+prints actually runs. Each found real defects; each now has a check that keeps
+it found — `scripts/sdk_smoke.py`, `scripts/soak_test.py`,
+`scripts/doc_examples.py` (in CI), and regression tests for every fix.
+
+### Security
+
+Anyone operating an instance others can reach — the Render blueprint among
+them — should upgrade and set `MOCKDR_PUBLIC=true` (the blueprint now does).
+
+- **The recording proxy was an open, credential-forwarding proxy.** With the
+  documented admin token, anyone could point it at an internal or cloud-metadata
+  address and have anonymous requests forwarded there with the configured
+  upstream credential attached, and the answer relayed back. Outbound targets
+  are now checked — http(s) only, no link-local or metadata addresses
+  (169.254.0.0/16, fe80::/10, fd00:ec2::254, 100.100.100.200) — when configured
+  and again before every request.
+- **Webhook subscriptions could make the mock POST to any URL**, internal ones
+  included, on every matching event. Same check, at subscription and before
+  each delivery.
+- **`MOCKDR_PUBLIC`** (default `false`): refuses the recording proxy, outbound
+  webhooks, `POST /_dev/import`, `/_dev/rate-limit` and `/_dev/fault-injection`
+  with 403, and makes no outbound request at all. The mocked APIs, `/_dev/reset`
+  and scenarios work as usual. Local and CI use is unchanged.
+- `GET /_dev/export` no longer carries the proxy's upstream credentials; proxy
+  recordings are admin-only.
+- `POST /_dev/import` validates a snapshot before clearing anything, so a
+  malformed one can no longer leave a shared instance empty.
+- Kibana's `/api/console/proxy` clamps `..` at the Elasticsearch root; a crafted
+  path reached other vendors' APIs on the same instance.
+- Rate limiting, fault injection, tenant scoping and metrics recognise `/_dev`
+  by its real prefix; a vendor path merely containing `/_dev/` bypassed them.
+- **Request-driven resource caps.** Client regular expressions (SPL `rex`,
+  `regex`, `match()`; Elasticsearch `regexp`; KQL `matches`) that nest an
+  unbounded quantifier are refused — `^(a+)+$` hung a worker for 26 s.
+  Elasticsearch queries hold at most 4096 clauses (`maxClauseCount`); FQL
+  grouping is linear, not quadratic; SPL `makeresults`, `mvexpand` and
+  `mvrange` are bounded; deep JSON bodies and float overflow answer 400/FATAL
+  instead of 500.
+- The request audit log masks `client_secret`, `refresh_token`,
+  `client_assertion` and `code` as well.
+
+### Upgrading from 2.6
+
+- **Splunk sessions** expire after an hour *unused* (splunkd's
+  `sessionTimeout`), not eight hours after login. **HEC** answers an ack `true`
+  once and forgets idle channels after 600 s. **Search jobs** are reaped 600 s
+  after completion or last read; Elasticsearch scrolls and PITs at their
+  keep-alive. The Splunk event store holds 20,000 events (was 100,000).
+- **Kibana response actions** answer `{data: ActionDetails}` as Kibana does;
+  clients reading the old flat `agent_id`/`action` fields need updating.
+- **Sentinel** unset dates are `null`, not `""`.
+- **Regular expressions** with nested unbounded quantifiers are refused (see
+  Security).
+- An unknown `/_dev` scenario is a 400.
+- **Defender** unset dates are `null`, not `""`; **Cortex** alert `internal_id`
+  is an integer (older snapshots are migrated on import).
+- **SentinelOne** writes apply their whole `filter`; a filter with an unknown
+  member, or with every member null, is a 400 instead of acting on everything.
+- **Splunk** `eventCount` is the events a search returns (`| head 25` reports
+  25, not every match).
+- **Packaging:** `pip install ./backend` works (it did not), and pins FastAPI
+  and Starlette to the measured versions.
+- `toolkit/postman_collection.json` is removed; use `postman/` or `bruno/`.
+
+### Added
+
+- `scripts/sdk_smoke.py` — falconpy, msgraph-sdk with azure-identity and MSAL,
+  elasticsearch-py, splunklib, azure-mgmt-securityinsight, azure-monitor-query,
+  and the XSOAR SentinelOne and Cortex XDR integrations, driven end to end
+  against a running mock. Against 2.6.0 it failed six of nine vendors; it
+  passes nine of nine.
+- `scripts/soak_test.py` — two simulated days of traffic across all mounts;
+  fails on anything that grows without bound. `load_test.py` gains a "reset
+  under load" scenario.
+- `scripts/doc_examples.py` — runs every curl, SPL and KQL example in the docs,
+  in CI. `scripts/run_collections.py` runs the Postman and Bruno collections
+  before a release.
+- `MOCKDR_RESEED_INTERVAL` — re-seeds on a schedule, exactly as `/_dev/reset`,
+  so a long-running demo does not age into an empty estate; the blueprint sets
+  `12h`. README, "A long-running instance", lists what ages and when.
+- OIDC discovery on `/sentinel`, so azure-identity can authenticate.
+- `pip install ./backend` installs `mockdr.testing` for suites outside the
+  repository (TESTING.md, section 9).
+- README: pointing each vendor SDK at the mock, and serving TLS, which the
+  Azure SDKs require.
+
+### Fixed
+
+#### With the vendors' own SDKs
+
+**splunklib could not talk to the mock at all.** uvicorn never echoed
+`Connection: close`, so splunklib read empty bodies; its untyped form POSTs were
+not read as forms, so even the login failed; the `<sid>` answer was not
+well-formed XML; Atom entries lacked the `alternate` link every `.list()` uses.
+A job also answers as the bare `<entry>` `Job.is_done()` reads, v2 readers take
+`count`/`offset` from a POSTed body, and `data/inputs` lists the input kinds.
+
+**Sentinel through the Azure SDKs.** Unset dates were `""`, which made
+azure-mgmt-securityinsight fail to deserialize whole pages; systemData carries
+real dates; the Logs API applies `timespan`.
+
+**Graph hunting accepts the SDK's body.** msgraph-sdk sends `query`/`timespan`
+in lower case, as the CSDL declares; every SDK hunt was a 400.
+
+**Kibana response actions answer `ActionDetails`**, so a client can poll
+`data.isCompleted`; the action list applies paging and the date window.
+
+**Cortex answers what the XSOAR integration reads**: extra-data `host_ip` as a
+comma-separated string (the list crashed every fetch), `get_versions` per
+platform, and `get_alerts_by_filter_data` evaluating its filters.
+
+**`indices.delete(ignore_unavailable=True)`** on a missing index is acknowledged.
+
+#### Over a long-running instance
+
+**A long-running instance kept everything.** Expired tokens (which 2.6.0's
+reset preserved forever), Splunk jobs and sessions, HEC channels, ES contexts
+and token documents are forgotten on each product's schedule by a sweep every
+minute; Deep Visibility and XQL queries and Defender/Cortex actions are capped.
+50,000 requests now leave nothing growing without bound.
+
+**Actions settle on the device's time**, whether or not anyone reads them, so
+Splunk shows the settled state, dated when it settled; an S1 transition in
+flight survives a restart.
+
+**Expired tokens say so** — Elasticsearch `token expired` with its Bearer
+challenge, refresh tokens refused after 24 h; Sentinel ARM
+`ExpiredAuthenticationToken`.
+
+**Reset and import are atomic.** A request served during either saw a cleared
+store — half the requests of 16 concurrent clients got 401s during an import.
+
+**`MOCKDR_PERSIST` saved nothing under steady traffic**: its debounce restarted
+on every write. It saves after 2 s of quiet or at most 30 s after the first
+unsaved write, fsync'd before the rename; a 2.5 snapshot's renamed values are
+rewritten to the current vocabulary on load.
+
+#### In the documentation
+
+**Every runnable example works** — 33 of 100 failed against 2.6.0, among them
+token examples without the `scope` Entra now requires, SPL examples searching
+fields no event carries, DEV routes named without `/web/api/v2.1`, and a setup
+guide documenting Falcon and Defender at the wrong paths.
+
+**The collections run end to end from the base URLs alone** — Postman 314/315
+(was 67/316), Bruno 240/240 (was 29/245). Two requests used to lock a run out
+until a restart.
+
+**Also:** Splunk `'single quoted'` names a field in `eval`/`where`; SentinelOne
+`remote-scripts/execute` reads its `filter`; the GitHub Action's base-URL
+outputs include `/cs`, `/mde` and Graph.
+
+#### Left over from the passes
+
+**`pip install ./backend` failed** — a build backend that does not exist, a
+readme outside the project, a conflicting licence classifier. It installs now,
+with the fixtures and vendor references the app reads at run time, and pins
+FastAPI and Starlette as `requirements.txt` does, so an installed copy cannot
+pull the Starlette that sends `Vary: Origin`.
+
+**A partial `/_dev/import` locked everyone out** by dropping the S1 API tokens,
+until a restart. Import keeps the tokens and sessions a reset keeps.
+
+**Sentinel's token endpoint** accepts HTTP Basic, as its discovery document
+advertises, and answers an unknown client 400 AADSTS700016 like the other two
+Entra mounts; a request without `grant_type` gets Entra's AADSTS900144 wording
+on all three.
+
+**SentinelOne writes honour `filter`.** Device control, STAR rules,
+exclusions, restrictions, IOCs and firewall creates are scoped by it; bulk
+deletes, move-agents and the alert actions select by the whole filter.
+Cloud-detection alerts carry `agentRealtimeInfo`, which XSOAR reads and the
+recorded product replies contain.
+
+**Splunk:** a KV store collection's configuration names the app its data is
+served from; `$regex` is guarded against catastrophic backtracking (24.7 s
+before) and a pattern that does not compile no longer answers 500.
+
+**Cortex:** `run_script` and the endpoint actions answer "No endpoint was found
+for creating the requested action" when their filters select nobody, the phrase
+XSOAR's integration recognises.
+
+**Defender** fixtures and records answer null for unset dates, as Microsoft's
+examples do.
+
+### Changed
+
+- Graph, Defender and Sentinel serve their token, discovery and key-set routes
+  from one Entra authority implementation; the five pending actions share one
+  settle wait and sweep (`application/settling.py`); one ISO-8601 reader, one
+  next-page URL builder, shared ASGI helpers and one write-filter selector
+  replace their copies; 23 unused definitions are gone. A recorded diff of
+  5,710 requests showed no behaviour change from the consolidation.
+- The test suite runs in about 180 s instead of 270 s (coverage through
+  `sys.monitoring`, no real sleeps in the webhook retry tests), and an
+  order-dependent failure under xdist is fixed.
+
+### Not changed, and why
+
+Falcon's incidents routes stay absent: CrowdStrike removed the collection from
+the API in August 2026. Unverified, and left: the real wording of Falcon's and
+the Microsoft mounts' expired-token answers; per-scope SentinelOne system
+configuration; Cortex's 403 wording; whether Cortex puts the no-endpoint detail
+in `err_msg` or `err_extra`; real-time response and automation rules, which the
+mock does not serve.
+
 ## [2.6.0] - 2026-10-14
 
 An audit of all eight mounts against the products they stand in for, done
