@@ -32,9 +32,12 @@ _DOMAIN_NAMES: list[str] = [
     "malware-drop.test", "exfil-data.test",
 ]
 
+#: Documentation ranges (RFC 5737). These were real networks — Tor exits
+#: among them — filed as indicators to block. Five entries still, so the
+#: draw over them is the draw it was.
 _IP_PREFIXES: list[str] = [
-    "185.220.101.", "91.219.236.", "45.155.205.",
-    "194.26.192.", "23.129.64.",
+    "192.0.2.", "198.51.100.", "203.0.113.",
+    "192.0.2.", "198.51.100.",
 ]
 
 

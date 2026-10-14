@@ -20,22 +20,26 @@ _HASH_IOCS: list[str] = [
     "aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f",
 ]
 
+#: Documentation ranges (RFC 5737) and reserved TLDs (RFC 2606/6761). These
+#: were real addresses — a Tor exit, `scanme.nmap.org` — and domains under
+#: real TLDs, filed as malicious: a client blocking what the seed reports
+#: would block somebody's real host.
 _IP_IOCS: list[str] = [
-    "185.220.101.42",
-    "91.219.237.108",
-    "23.129.64.130",
-    "198.98.56.128",
-    "45.33.32.156",
-    "104.248.39.107",
+    "203.0.113.42",
+    "198.51.100.108",
+    "192.0.2.130",
+    "203.0.113.128",
+    "198.51.100.156",
+    "192.0.2.107",
 ]
 
 _DOMAIN_IOCS: list[str] = [
-    "evil-payload.badactor.com",
-    "c2-server.malware-domain.net",
-    "exfil-data.darkweb.org",
-    "phishing-site.fake-bank.com",
-    "crypto-miner.botnet.io",
-    "backdoor.apt-group.net",
+    "evil-payload.badactor.example",
+    "c2-server.malware-domain.test",
+    "exfil-data.darkweb.example",
+    "phishing-site.fake-bank.test",
+    "crypto-miner.botnet.example",
+    "backdoor.apt-group.test",
 ]
 
 _REPUTATIONS: list[str] = [

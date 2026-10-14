@@ -5,7 +5,7 @@ from collections.abc import Callable
 from faker import Faker
 
 from domain.ioc import IOC
-from infrastructure.safe_net import doc_ipv4
+from infrastructure.safe_net import doc_domain, doc_ipv4, doc_url
 from infrastructure.seeders._shared import MALWARE_NAMES, ago, rand_after, rand_ago
 from repository.ioc_repo import ioc_repo
 from repository.user_repo import user_repo
@@ -40,11 +40,19 @@ def seed_iocs(fake: Faker) -> None:
     Args:
         fake: Shared :class:`~faker.Faker` instance (seeded externally).
     """
+    # A DNS or URL indicator came from `fake.domain_name()` / `fake.url()`:
+    # surname domains under real TLDs (`jefferson.com`), often registered,
+    # filed here as malicious. The Faker draw is still made, so every value
+    # after it is unchanged, and seeds a reserved-domain replacement drawn
+    # from its own generator rather than the shared stream.
+    def _reserved(draw: Callable[[], str], make: Callable[..., str]) -> Callable[[], str]:
+        return lambda: make(rng=random.Random(draw()))  # noqa: S311
+
     value_map: dict[str, Callable[[], str]] = {
         "IPV4":   doc_ipv4,
         "IPV6":   fake.ipv6,
-        "DNS":    fake.domain_name,
-        "URL":    fake.url,
+        "DNS":    _reserved(fake.domain_name, doc_domain),
+        "URL":    _reserved(fake.url, doc_url),
         "SHA1":   fake.sha1,
         "SHA256": fake.sha256,
         "MD5":    fake.md5,

@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import random
+import zlib
 
 from faker import Faker
 
 from domain.xdr_audit_log import XdrAuditLog
 from infrastructure.seeders.xdr_shared import XDR_AUDIT_SUB_TYPES, rand_epoch_ms, xdr_id
 from repository.xdr_audit_log_repo import xdr_audit_log_repo
+from repository.xdr_endpoint_repo import xdr_endpoint_repo
 
 _RESULTS: list[str] = ["SUCCESS", "SUCCESS", "SUCCESS", "SUCCESS", "FAILURE"]
 
@@ -27,6 +29,16 @@ _DESCRIPTIONS: dict[str, list[str]] = {
 }
 
 
+def _fleet_host(drawn: str, fleet: list[str]) -> str:
+    """An endpoint of this tenant, picked by the hostname Faker drew.
+
+    An isolation or a script run happens on one of the tenant's endpoints;
+    `fake.hostname()` named a host no endpoint list had (and under real
+    TLDs). The draw is kept, so nothing after it moves, and picks the host.
+    """
+    return fleet[zlib.crc32(drawn.encode()) % len(fleet)] if fleet else ""
+
+
 def seed_xdr_audit_logs(fake: Faker) -> None:
     """Seed ~30 XDR management audit log entries.
 
@@ -34,6 +46,7 @@ def seed_xdr_audit_logs(fake: Faker) -> None:
         fake: Shared Faker instance (seeded externally).
     """
     count = 30
+    fleet = [ep.endpoint_name for ep in xdr_endpoint_repo.list_all()]
 
     for _ in range(count):
         sub_type = random.choice(XDR_AUDIT_SUB_TYPES)
@@ -48,5 +61,7 @@ def seed_xdr_audit_logs(fake: Faker) -> None:
             user_name=user_name,
             user_email=f"{user_name.lower().replace(' ', '.')}@acmecorp.internal",
             description=random.choice(descriptions),
-            host_name=fake.hostname() if sub_type in {"Endpoint Isolation", "Endpoint Unisolation", "Script Execution"} else "",
+            host_name=_fleet_host(fake.hostname(), fleet)
+            if sub_type in {"Endpoint Isolation", "Endpoint Unisolation", "Script Execution"}
+            else "",
         ))
