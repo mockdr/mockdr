@@ -9,6 +9,7 @@ is present.
 from __future__ import annotations
 
 import json
+import re
 from functools import cache
 from pathlib import Path
 
@@ -74,7 +75,34 @@ def deep_complete(defaults: dict, actual: dict) -> dict:
     return out
 
 
+#: Leaf names Defender's property tables type DateTimeOffset / Nullable
+#: DateTime: every date in them is spelled this way (`creationDateTimeUtc`,
+#: `resolvedTime`, `lastSeen`, `firstDetected`, `publishedOn`,
+#: `globalFirstObserved`). scripts/gen_mde_fixtures.py reads it too.
+DATE_FIELD = re.compile(r"(?:Time|DateTimeUtc|Seen|Observed|On|Detected)$")
+
+
+def null_unset_dates(value: object) -> object:
+    """*value* with every date field that holds "" set to null, at any depth.
+
+    Defender answers an unset date as null -- the docs' examples carry
+    `"resolvedTime": null`, `"endTime": null`, `"cancellationDateTimeUtc":
+    null` -- and "" is a value no date parser reads. The records keep ""
+    for "not yet" (a running investigation's `endTime`, an unresolved
+    alert's `resolvedTime`), so the answer is where it becomes null.
+    """
+    if isinstance(value, dict):
+        return {
+            k: None if v == "" and DATE_FIELD.search(k) else null_unset_dates(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [null_unset_dates(v) for v in value]
+    return value
+
+
 def complete_mde(record: dict, entity: str) -> dict:
-    """``record`` with every documented property of ``entity`` present."""
+    """``record`` with every documented property of ``entity`` present, unset dates null."""
     defaults = _fixture(entity)
-    return deep_complete(defaults, record) if defaults else record
+    completed = deep_complete(defaults, record) if defaults else record
+    return null_unset_dates(completed)  # type: ignore[return-value]

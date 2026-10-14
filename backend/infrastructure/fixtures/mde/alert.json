@@ -1,6 +1,6 @@
 {
  "aadTenantId": "",
- "alertCreationTime": "",
+ "alertCreationTime": null,
  "alertDomains": "",
  "alertFiles": "",
  "alertIps": "",
@@ -12,7 +12,7 @@
   {
    "comment": "",
    "createdBy": "",
-   "createdTime": ""
+   "createdTime": null
   }
  ],
  "computerDnsName": "",
@@ -27,7 +27,7 @@
    "detectionStatus": null,
    "domainName": null,
    "entityType": "",
-   "evidenceCreationTime": "",
+   "evidenceCreationTime": null,
    "fileName": null,
    "filePath": null,
    "ipAddress": null,
@@ -49,13 +49,13 @@
    "userSid": null
   }
  ],
- "firstEventTime": "",
+ "firstEventTime": null,
  "id": "",
  "incidentId": 0,
  "investigationId": null,
  "investigationState": "",
- "lastEventTime": "",
- "lastUpdateTime": "",
+ "lastEventTime": null,
+ "lastUpdateTime": null,
  "machineId": "",
  "mitreTechniques": [],
  "rbacGroupName": "",

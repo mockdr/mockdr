@@ -2,10 +2,10 @@
  "State": "",
  "cancelledBy": "",
  "computerDnsName": "",
- "endTime": "",
+ "endTime": null,
  "id": "",
  "machineId": "",
- "startTime": "",
+ "startTime": null,
  "state": "",
  "statusDetails": "",
  "triggeringAlertId": ""

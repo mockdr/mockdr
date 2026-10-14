@@ -1,6 +1,6 @@
 {
  "cancellationComment": "",
- "cancellationDateTimeUtc": "",
+ "cancellationDateTimeUtc": null,
  "cancellationRequestor": "",
  "command": {
   "params": "",
@@ -19,28 +19,28 @@
     "type": ""
    },
    "commandStatus": "",
-   "endTime": "",
+   "endTime": null,
    "errors": "",
    "index": "",
-   "startTime": ""
+   "startTime": null
   }
  ],
  "computerDnsName": "",
- "creationDateTimeUtc": "",
- "endTime": "",
+ "creationDateTimeUtc": null,
+ "endTime": null,
  "errorHResult": "",
  "errors": "",
  "externalID": "",
  "id": "",
  "index": "",
- "lastUpdateDateTimeUtc": "",
+ "lastUpdateDateTimeUtc": null,
  "machineId": "",
  "relatedFileInfo": "",
  "requestSource": "",
  "requestor": "",
  "requestorComment": "",
  "scope": "",
- "startTime": "",
+ "startTime": null,
  "status": "",
  "title": "",
  "type": ""

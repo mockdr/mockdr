@@ -15,9 +15,13 @@ record over it.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
+from utils.mde_fixtures import DATE_FIELD  # the serialiser's own rule
+
 REDUCED = ROOT / "data" / "vendor-specs" / "mde_docs_reduced.json"
 OUT = ROOT / "backend" / "infrastructure" / "fixtures" / "mde"
 
@@ -141,6 +145,25 @@ def _apply_types(tree: dict, observed: dict[str, str], prefix: str = "") -> None
                 tree[key] = wanted
 
 
+def _unset_dates(tree: dict) -> None:
+    """An unset date is null, not "": Defender sends null, and "" is no date.
+
+    The docs' examples answer an unset date as null (`"endTime": null` on an
+    investigation, `"resolvedTime": null` on an alert, and the older
+    machine-action examples' `"cancellationDateTimeUtc": null`), and "" is a
+    value no date parser reads -- the defect that made
+    azure-mgmt-securityinsight refuse whole Sentinel pages until
+    gen_arm_fixtures.py wrote null for its date formats.
+    """
+    for key, value in tree.items():
+        if isinstance(value, dict):
+            _unset_dates(value)
+        elif isinstance(value, list) and value and isinstance(value[0], dict):
+            _unset_dates(value[0])
+        elif value == "" and DATE_FIELD.search(key):
+            tree[key] = None
+
+
 def main() -> int:
     doc = json.load(open(REDUCED))
     observed = _recorded_types()
@@ -170,6 +193,7 @@ def main() -> int:
             tree.setdefault(name, "")
         tree = {k: v for k, v in tree.items() if k and k not in ("[]",)}
         _apply_types(tree, observed)
+        _unset_dates(tree)
         (OUT / f"{entity}.json").write_text(json.dumps(tree, indent=1, sort_keys=True) + "\n")
         print(f"  {entity:14} {len(tree):3} keys")
     return 0
