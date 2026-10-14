@@ -5,24 +5,14 @@ from repository.cs_ioc_repo import cs_ioc_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import decode_page_token, encode_page_token, paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_list_response
+from utils.cs_sort import parse_cs_sort, sort_key
+from utils.nested import get_nested
 from utils.serde import record_dict
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
-    """Parse a CrowdStrike sort string into field name and direction.
-
-    Args:
-        sort: Sort string in ``field.asc`` or ``field.desc`` format, or None.
-
-    Returns:
-        Tuple of ``(field_name, descending)`` with sensible defaults.
-    """
-    if not sort:
-        return "modified_on", True
-    parts = sort.rsplit(".", 1)
-    field_name = parts[0]
-    desc = len(parts) > 1 and parts[1].lower() == "desc"
-    return field_name, desc
+    """Parse a CrowdStrike sort (``field|asc`` or ``field.asc``) — see ``utils.cs_sort``."""
+    return parse_cs_sort(sort, "modified_on", True)
 
 
 def search_iocs(
@@ -41,7 +31,7 @@ def search_iocs(
         filter_fql: FQL filter string, or None for all IOCs.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of entities to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
         after:      Opaque token from the previous page's
                     ``meta.pagination.after``; when given it, not ``offset``,
                     says where the page starts.
@@ -53,7 +43,7 @@ def search_iocs(
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     start = decode_page_token(after) if after else offset
     page, total = paginate_cs(records, start, limit)
     response = build_cs_list_response(page, total, start, limit)

@@ -9,6 +9,7 @@ from utils.cs_response import (
     build_cs_id_response,
     build_cs_list_response,
 )
+from utils.cs_sort import parse_cs_sort, sort_key
 from utils.dt import seconds_since
 from utils.internal_fields import CS_HOST_INTERNAL_FIELDS
 from utils.nested import get_nested
@@ -60,20 +61,8 @@ def _public(host: object) -> dict:
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
-    """Parse a CrowdStrike sort string into field name and direction.
-
-    Args:
-        sort: Sort string in ``field.asc`` or ``field.desc`` format, or None.
-
-    Returns:
-        Tuple of ``(field_name, descending)`` with sensible defaults.
-    """
-    if not sort:
-        return "last_seen", True
-    parts = sort.rsplit(".", 1)
-    field_name = parts[0]
-    desc = len(parts) > 1 and parts[1].lower() == "desc"
-    return field_name, desc
+    """Parse a CrowdStrike sort (``field|asc`` or ``field.asc``) — see ``utils.cs_sort``."""
+    return parse_cs_sort(sort, "last_seen", True)
 
 
 def query_host_ids(
@@ -90,7 +79,7 @@ def query_host_ids(
         filter_fql: FQL filter string, or None for all hosts.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of IDs to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response envelope.
@@ -99,7 +88,7 @@ def query_host_ids(
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     page, total = paginate_cs(records, offset, limit)
     ids = [get_nested(r, "device_id") for r in page]
     return build_cs_id_response(ids, total, offset, limit)
@@ -144,7 +133,7 @@ def query_host_ids_scroll(
         filter_fql: FQL filter string, or None for all hosts.
         offset:     Scroll token from the previous page, or None/empty.
         limit:      Maximum number of IDs to return per page.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response with scroll-style pagination metadata.
@@ -153,7 +142,7 @@ def query_host_ids_scroll(
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     total = len(records)
 
     start = decode_page_token(offset)
@@ -190,7 +179,7 @@ def list_hidden_hosts(filter_fql: str | None, offset: int, limit: int,
         filter_fql: FQL filter string, or None for all hidden hosts.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of hosts to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS list response envelope with full host entities.
@@ -213,7 +202,7 @@ def query_hidden_host_ids(filter_fql: str | None, offset: int, limit: int,
         filter_fql: FQL filter string, or None for all hidden hosts.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of ids to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response envelope with the hidden hosts' device ids.
@@ -233,5 +222,5 @@ def _hidden_page(filter_fql: str | None, offset: int, limit: int,
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     return paginate_cs(records, offset, limit)

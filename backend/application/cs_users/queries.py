@@ -5,6 +5,8 @@ from repository.cs_user_repo import cs_user_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.cs_sort import parse_cs_sort, sort_key
+from utils.nested import get_nested
 from utils.serde import record_dict
 
 
@@ -25,7 +27,7 @@ def query_user_ids(
         filter_fql: FQL filter string, or None for all users.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of IDs to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response envelope with user UUIDs.
@@ -33,13 +35,8 @@ def query_user_ids(
     records = [_public(record_dict(u)) for u in cs_user_repo.list_all()]
     if filter_fql:
         records = apply_fql(records, filter_fql)
-    if sort:
-        parts = sort.rsplit(".", 1)
-        field_name = parts[0]
-        desc = len(parts) > 1 and parts[1].lower() == "desc"
-    else:
-        field_name, desc = "last_login_at", True
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    field_name, desc = parse_cs_sort(sort, "last_login_at", True)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     page, total = paginate_cs(records, offset, limit)
     ids = [r["uuid"] for r in page]
     return build_cs_id_response(ids, total, offset, limit)

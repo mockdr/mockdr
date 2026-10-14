@@ -10,6 +10,8 @@ import uuid
 from repository.store import store
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import decode_page_token, encode_page_token
+from utils.cs_sort import parse_cs_sort, sort_key
+from utils.nested import get_nested
 
 
 def _build_id_map() -> dict[str, str]:
@@ -115,15 +117,10 @@ def combined_applications(
         discover_apps = apply_fql(discover_apps, filter_fql)
 
     # Sort
-    if sort:
-        parts = sort.rsplit(".", 1)
-        field_name = parts[0]
-        desc = len(parts) > 1 and parts[1].lower() == "desc"
-        discover_apps.sort(
-            key=lambda r: str(r.get(field_name, "")), reverse=desc,
-        )
-    else:
-        discover_apps.sort(key=lambda r: str(r.get("name", "")))
+    field_name, desc = parse_cs_sort(sort, "name", False)
+    discover_apps.sort(
+        key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc,
+    )
 
     total = len(discover_apps)
 

@@ -10,7 +10,9 @@ from utils.cs_response import (
     build_cs_id_response,
     build_cs_list_response,
 )
+from utils.cs_sort import parse_cs_sort, sort_key
 from utils.internal_fields import CS_HOST_INTERNAL_FIELDS
+from utils.nested import get_nested
 from utils.serde import record_dict
 from utils.strip import strip_fields
 
@@ -21,20 +23,8 @@ def _public_host(host: object) -> dict:
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
-    """Parse a CrowdStrike sort string into field name and direction.
-
-    Args:
-        sort: Sort string in ``field.asc`` or ``field.desc`` format, or None.
-
-    Returns:
-        Tuple of ``(field_name, descending)`` with sensible defaults.
-    """
-    if not sort:
-        return "name", False
-    parts = sort.rsplit(".", 1)
-    field_name = parts[0]
-    desc = len(parts) > 1 and parts[1].lower() == "desc"
-    return field_name, desc
+    """Parse a CrowdStrike sort (``field|asc`` or ``field.asc``) — see ``utils.cs_sort``."""
+    return parse_cs_sort(sort, "name", False)
 
 
 def query_host_group_ids(
@@ -49,7 +39,7 @@ def query_host_group_ids(
         filter_fql: FQL filter string, or None for all groups.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of IDs to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response envelope.
@@ -58,7 +48,7 @@ def query_host_group_ids(
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     page, total = paginate_cs(records, offset, limit)
     ids = [r["id"] for r in page]
     return build_cs_id_response(ids, total, offset, limit)
@@ -95,7 +85,7 @@ def list_host_groups(
         filter_fql: FQL filter string, or None for all groups.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of entities to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS list response envelope with full entities and pagination.
@@ -104,7 +94,7 @@ def list_host_groups(
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     page, total = paginate_cs(records, offset, limit)
     return build_cs_list_response(page, total, offset, limit)
 
@@ -156,7 +146,7 @@ def query_group_member_ids(
         filter_fql: FQL filter string to further filter group members.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of IDs to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response envelope.
@@ -167,6 +157,6 @@ def query_group_member_ids(
     if filter_fql:
         members = apply_fql(members, filter_fql)
     field_name, desc = _parse_sort(sort)
-    members.sort(key=lambda r: r.get(field_name, ""), reverse=desc)
+    members.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     page, total = paginate_cs(members, offset, limit)
     return build_cs_id_response([h["device_id"] for h in page], total, offset, limit)

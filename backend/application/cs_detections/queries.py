@@ -5,25 +5,14 @@ from repository.cs_detection_repo import cs_detection_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import paginate_cs
 from utils.cs_response import build_cs_entity_response, build_cs_id_response
+from utils.cs_sort import parse_cs_sort, sort_key
 from utils.nested import get_nested
 from utils.serde import record_dict
 
 
 def _parse_sort(sort: str | None) -> tuple[str, bool]:
-    """Parse a CrowdStrike sort string into field name and direction.
-
-    Args:
-        sort: Sort string in ``field.asc`` or ``field.desc`` format, or None.
-
-    Returns:
-        Tuple of ``(field_name, descending)`` with sensible defaults.
-    """
-    if not sort:
-        return "last_behavior", True
-    parts = sort.rsplit(".", 1)
-    field_name = parts[0]
-    desc = len(parts) > 1 and parts[1].lower() == "desc"
-    return field_name, desc
+    """Parse a CrowdStrike sort (``field|asc`` or ``field.asc``) — see ``utils.cs_sort``."""
+    return parse_cs_sort(sort, "last_behavior", True)
 
 
 def query_detection_ids(
@@ -38,7 +27,7 @@ def query_detection_ids(
         filter_fql: FQL filter string, or None for all detections.
         offset:     Zero-based pagination offset.
         limit:      Maximum number of IDs to return.
-        sort:       Sort string (``field.asc`` or ``field.desc``).
+        sort:       Sort string (``field|asc`` or ``field.asc``).
 
     Returns:
         CS ID response envelope.
@@ -47,7 +36,7 @@ def query_detection_ids(
     if filter_fql:
         records = apply_fql(records, filter_fql)
     field_name, desc = _parse_sort(sort)
-    records.sort(key=lambda r: get_nested(r, field_name) or "", reverse=desc)
+    records.sort(key=lambda r: sort_key(get_nested(r, field_name)), reverse=desc)
     page, total = paginate_cs(records, offset, limit)
     ids = [get_nested(r, "composite_id") for r in page]
     return build_cs_id_response(ids, total, offset, limit)
