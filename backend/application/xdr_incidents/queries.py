@@ -5,7 +5,7 @@ from repository.xdr_alert_repo import xdr_alert_repo
 from repository.xdr_incident_repo import xdr_incident_repo
 from utils.serde import record_dict
 from utils.xdr_filters import apply_xdr_filters, apply_xdr_sort
-from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
+from utils.xdr_response import XDR_MAX_PAGE, build_xdr_list_reply, build_xdr_reply, page_bounds
 
 #: The filter fields Cortex XDR documents for this route, as the XSOAR
 #: integration sends them. A field outside this map is an error rather than a
@@ -44,8 +44,7 @@ def get_incidents(request_data: dict) -> dict:
     matched = apply_xdr_sort(matched, request_data.get("sort"))
 
     total = len(matched)
-    search_from = request_data.get("search_from", 0)
-    search_to = request_data.get("search_to", search_from + 100)
+    search_from, search_to = page_bounds(request_data, XDR_MAX_PAGE)
     page = [record_dict(r) for r in matched[search_from:search_to]]
 
     return build_xdr_list_reply(page, total_count=total, key="incidents")
@@ -131,8 +130,7 @@ def get_multiple_incidents_extra_data(request_data: dict) -> dict:
     )
     matched = apply_xdr_sort(matched, request_data.get("sort"))
 
-    search_from = request_data.get("search_from", 0)
-    search_to = request_data.get("search_to", search_from + 100)
+    search_from, search_to = page_bounds(request_data, XDR_MAX_PAGE)
     excluded = request_data.get("fields_to_exclude") or []
     items = []
     for incident in matched[search_from:search_to]:

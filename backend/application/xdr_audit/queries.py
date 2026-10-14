@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from repository.xdr_audit_log_repo import xdr_audit_log_repo
 from utils.serde import record_dict
-from utils.xdr_response import build_xdr_list_reply
+from utils.xdr_response import build_xdr_list_reply, page_bounds
 
 
 def get_management_logs(request_data: dict) -> dict:
@@ -36,8 +36,7 @@ def get_management_logs(request_data: dict) -> dict:
                 all_logs = [log for log in all_logs if log["timestamp"] <= lte]
 
     total = len(all_logs)
-    search_from = request_data.get("search_from", 0)
-    search_to = request_data.get("search_to", search_from + 100)
+    search_from, search_to = page_bounds(request_data)
     page = all_logs[search_from:search_to]
 
     return build_xdr_list_reply([_audit_row(log) for log in page], total_count=total)
@@ -108,8 +107,7 @@ def get_agent_reports(request_data: dict) -> dict:
         for endpoint in endpoints
     ]
 
-    search_from = request_data.get("search_from", 0)
-    search_to = request_data.get("search_to", search_from + 100)
+    search_from, search_to = page_bounds(request_data)
     return build_xdr_list_reply(
         reports[search_from:search_to], total_count=len(reports),
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 from repository.xdr_action_repo import xdr_action_repo
 from repository.xdr_script_repo import xdr_script_repo
 from utils.serde import record_dict
-from utils.xdr_response import build_xdr_list_reply, build_xdr_reply
+from utils.xdr_response import build_xdr_list_reply, build_xdr_reply, page_bounds
 
 
 def _script_to_api(record: dict) -> dict:
@@ -41,8 +41,7 @@ def get_scripts(request_data: dict) -> dict:
         all_scripts = [s for s in all_scripts if s["script_type"] in values]
 
     total = len(all_scripts)
-    search_from = request_data.get("search_from", 0)
-    search_to = request_data.get("search_to", search_from + 100)
+    search_from, search_to = page_bounds(request_data)
     page = all_scripts[search_from:search_to]
 
     return build_xdr_list_reply(page, total_count=total, key="scripts")

@@ -14,7 +14,13 @@ from repository.xdr_endpoint_repo import xdr_endpoint_repo
 from utils.nested import get_nested
 from utils.serde import record_dict
 from utils.xdr_filters import apply_xdr_filters, apply_xdr_sort
-from utils.xdr_response import build_xdr_list_reply, build_xdr_reply, serialise_endpoint
+from utils.xdr_response import (
+    XDR_MAX_PAGE,
+    build_xdr_list_reply,
+    build_xdr_reply,
+    page_bounds,
+    serialise_endpoint,
+)
 
 #: The filter fields Cortex publishes for the endpoints routes, mapped onto
 #: the record keys that answer them. Cortex's own client builds exactly these
@@ -143,8 +149,7 @@ def get_endpoints(request_data: dict) -> dict:
     matched = apply_xdr_sort(select_endpoints(request_data), request_data.get("sort"))
 
     total = len(matched)
-    search_from = request_data.get("search_from", 0)
-    search_to = request_data.get("search_to", search_from + 100)
+    search_from, search_to = page_bounds(request_data, XDR_MAX_PAGE)
     page = [serialise_endpoint(record_dict(r)) for r in matched[search_from:search_to]]
 
     return build_xdr_list_reply(page, total_count=total, key="endpoints")

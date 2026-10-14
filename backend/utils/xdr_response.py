@@ -160,3 +160,41 @@ def serialise_endpoint(record: dict) -> dict:
     tags = rendered.pop("endpoint_tags", []) or []
     rendered["endpointTags"] = ",".join(tags) if isinstance(tags, list) else str(tags)
     return rendered
+
+
+#: The most records Cortex answers per page on the routes that page with
+#: `search_from`/`search_to` and document a ceiling: incidents ("0 <
+#: search_size <= 100", Palo Alto LIVEcommunity on get_incidents) and
+#: endpoints (XSOAR CoreIRApiModule `get_endpoints_command`: "the max limit
+#: supported by the API (100)").
+XDR_MAX_PAGE = 100
+
+
+def page_bounds(request_data: dict, cap: int | None = None) -> tuple[int, int]:
+    """The ``search_from``/``search_to`` slice a request asks for.
+
+    A string, float or object here used to reach a list slice and answer a
+    plain 500 (``"0"`` included); it is the request's mistake, answered 400
+    in the XDR envelope. ``search_to`` defaults to a page past
+    ``search_from``; with ``cap`` the page is never longer than that.
+    """
+    from fastapi import HTTPException  # local: utils must not import the API layer at module load
+
+    def bound(key: str, default: int) -> int:
+        value = request_data.get(key, default)
+        if value is None:
+            return default
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise HTTPException(
+                status_code=400,
+                detail=build_xdr_error(
+                    400, "Bad Request", f"{key} must be a non-negative integer",
+                ),
+            )
+        return value
+
+    search_from = bound("search_from", 0)
+    search_to = bound("search_to", search_from + (cap or XDR_MAX_PAGE))
+    if cap is not None:
+        search_to = min(search_to, search_from + cap)
+    return search_from, search_to
