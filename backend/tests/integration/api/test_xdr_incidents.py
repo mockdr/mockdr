@@ -225,6 +225,33 @@ class TestUpdateIncident:
         incident = extra_resp.json()["reply"]["incident"]
         assert incident["assigned_user_mail"] == "analyst@acmecorp.internal"
 
+    def test_unassign_with_none_clears_the_assignee(self, client: TestClient) -> None:
+        """XSOAR unassigns with `assigned_user_mail: "none"` — a sentinel, not a user.
+
+        CortexXDRIR `Client.update_incident` sends the literal string for
+        `unassign_user`. The mock stored it, so the incident read as assigned
+        to "none" and kept the old assignee's name beside it.
+        """
+        incident_id = self._get_first_incident_id(client)
+        for update in (
+            {"assigned_user_mail": "analyst@acmecorp.internal",
+             "assigned_user_pretty_name": "Jane Analyst"},
+            {"assigned_user_mail": "none"},
+        ):
+            resp = client.post(
+                f"{XDR_PREFIX}/incidents/update_incident/",
+                json={"request_data": {"incident_id": incident_id, "update_data": update}},
+                headers=_xdr_headers(),
+            )
+            assert resp.status_code == 200
+        incident = client.post(
+            f"{XDR_PREFIX}/incidents/get_incident_extra_data/",
+            json={"request_data": {"incident_id": incident_id}},
+            headers=_xdr_headers(),
+        ).json()["reply"]["incident"]
+        assert incident["assigned_user_mail"] == ""
+        assert incident["assigned_user_pretty_name"] == ""
+
     def test_update_nonexistent_incident_returns_500(self, client: TestClient) -> None:
         resp = client.post(
             f"{XDR_PREFIX}/incidents/update_incident/",

@@ -35,6 +35,16 @@ def update_incident(incident_id: str, update_data: dict) -> dict | None:
         if key in allowed and hasattr(incident, key):
             setattr(incident, key, value)
 
+    # Cortex's own client unassigns with the literal `"none"`
+    # (CortexXDRIR `Client.update_incident`: `update_data["assigned_user_mail"]
+    # = "none"` for `unassign_user`). Stored verbatim, the incident read as
+    # assigned to a user called "none"; it is unassigned, and with no assignee
+    # there is no assignee name either — the mock's unassigned value is "".
+    mail = update_data.get("assigned_user_mail")
+    if isinstance(mail, str) and mail.strip().lower() == "none":
+        incident.assigned_user_mail = ""
+        incident.assigned_user_pretty_name = ""
+
     xdr_incident_repo.save(incident)
     bridge.xdr_incident_changed(incident)
     return build_xdr_reply(True)
