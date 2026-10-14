@@ -60,6 +60,7 @@ Every script prints what it is for at the top of its file; this is the map.
 Setting up and running `sdk_smoke.py` (the SDKs never go into the backend's
 venv or requirements):
 
+<!-- doc-examples: skip installs the SDKs and starts a TLS server; this is the pre-release recipe itself -->
 ```bash
 python3 -m venv /tmp/sdk-venv
 /tmp/sdk-venv/bin/pip install crowdstrike-falconpy msgraph-sdk azure-identity msal \

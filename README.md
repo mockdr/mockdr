@@ -358,6 +358,7 @@ will not send a token over http — so Graph, Defender and Sentinel cannot be
 reached through the Microsoft SDKs on a plain-http mock. uvicorn serves TLS
 itself:
 
+<!-- doc-examples: skip creates a certificate and starts a TLS server; exercised by scripts/sdk_smoke.py before a release -->
 ```bash
 openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=127.0.0.1 \
   -addext subjectAltName=IP:127.0.0.1,DNS:localhost -keyout mock.key -out mock.crt
