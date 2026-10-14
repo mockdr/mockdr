@@ -1,160 +1,29 @@
-"""Sentinel OAuth2 authentication router."""
+"""Sentinel's Entra authority: token endpoint, discovery document and key set.
+
+The same authority Graph and Defender front (:mod:`api.entra_authority`),
+so the three answer one way: the secret in the body or in HTTP Basic, an
+unknown application ``400 unauthorized_client`` AADSTS700016, a wrong
+secret ``401 invalid_client``. This directory's own part is the token: it
+is issued for whichever resource the ``scope`` names and remembers it as
+its audience, and Azure Resource Manager and the Logs query API each refuse
+a token issued for the other (:mod:`api.sentinel_auth`) -- so no scope rule
+is applied here, the APIs apply it.
+
+azure-identity's ``ClientSecretCredential`` -- the credential
+``azure-mgmt-securityinsight`` and ``azure-monitor-query`` take -- hands its
+authority to MSAL, which reads the discovery document before anything else
+(``msal/authority.py``, ``tenant_discovery``), and the document advertises
+``client_secret_basic``, which this directory did not accept until it shared
+the authority.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from api.entra_authority import EntraDirectory, entra_authority_router
+from application.sentinel.commands.auth import find_client, mint_token, registered_clients
 
-from application.sentinel.commands.auth import client_tenant, hosted_tenants, token_exchange
-from utils.entra_discovery import empty_key_set, openid_configuration, refuse_unhosted_tenant
-from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
-from utils.entra_token_errors import (
-    AADSTS_INVALID_CLIENT,
-    AADSTS_MISSING_PARAMETER,
-    AADSTS_TENANT_NOT_FOUND,
-    AADSTS_UNSUPPORTED_GRANT,
-    build_token_error,
-)
-
-router = APIRouter(tags=["Sentinel Auth"])
-
-
-@router.post("/oauth2/v2.0/token")
-async def oauth2_token(
-    client_id: str = Form(default=""),
-    client_secret: str = Form(default=""),
-    grant_type: str = Form(default=""),
-    scope: str = Form(default=""),
-) -> dict:
-    """Exchange client credentials for an access token."""
-    return _issue_token(None, client_id, client_secret, grant_type, scope)
-
-
-@router.post("/{tenant_id}/oauth2/v2.0/token")
-async def oauth2_token_for_tenant(
-    tenant_id: str,
-    client_id: str = Form(default=""),
-    client_secret: str = Form(default=""),
-    grant_type: str = Form(default=""),
-    scope: str = Form(default=""),
-) -> dict:
-    """Exchange client credentials on the tenant-scoped URL real Entra uses.
-
-    Args:
-        tenant_id:     Tenant GUID or verified domain name from the URL. Must
-                       address the credential's tenant unless
-                       ``MOCKDR_STRICT_TENANT=false``.
-        client_id:     Azure AD application client ID (form-encoded).
-        client_secret: Client secret (form-encoded).
-        grant_type:    Must be ``"client_credentials"``.
-        scope:         The resource being asked for. Entra requires it on
-                       this grant and refuses a request without one.
-
-    Returns:
-        Token response — see :func:`_issue_token`.
-    """
-    return _issue_token(tenant_id, client_id, client_secret, grant_type, scope)
-
-
-# ---------------------------------------------------------------------------
-# OpenID Connect discovery
-# ---------------------------------------------------------------------------
-
-@router.get("/{tenant_id}/v2.0/.well-known/openid-configuration")
-async def openid_configuration_document(tenant_id: str, request: Request) -> dict:
-    """The authority's discovery document, which MSAL reads before the token call.
-
-    azure-identity's ``ClientSecretCredential`` -- the credential the Azure
-    management SDKs (``azure-mgmt-securityinsight``) and ``azure-monitor-query``
-    are built to take -- hands its authority to MSAL, and MSAL fetches
-    ``{authority}/{tenant}/v2.0/.well-known/openid-configuration`` before it
-    sends anything else (``msal/authority.py``, ``tenant_discovery``). Graph
-    and Defender served the document; this directory did not, so pointing the
-    credential at ``/sentinel`` failed with "Unable to get authority
-    configuration" before a single ARM call. See :mod:`utils.entra_discovery`.
-    """
-    refuse_unhosted_tenant(tenant_id, hosted_tenants())
-    return openid_configuration(request, "/sentinel", tenant_id)
-
-
-@router.get("/{tenant_id}/discovery/v2.0/keys")
-async def signing_keys(tenant_id: str) -> dict:
-    """The key set ``jwks_uri`` names -- empty, as Sentinel mock tokens are opaque."""
-    refuse_unhosted_tenant(tenant_id, hosted_tenants())
-    return empty_key_set()
-
-
-def _issue_token(
-    tenant_id: str | None, client_id: str, client_secret: str, grant_type: str = "",
-    scope: str = "",
-) -> dict:
-    """Resolve the tenant, validate the credentials and mint a token.
-
-    Args:
-        tenant_id:     Tenant from the URL, or ``None`` on the bare path.
-        client_id:     Azure AD application client ID.
-        client_secret: Client secret.
-        grant_type:    Must be ``"client_credentials"``, the only grant this
-        scope:         The resource being asked for. Entra requires it on
-                       this grant and refuses a request without one.
-                       directory issues for.
-
-    Returns:
-        Token response dict.
-
-    Raises:
-        HTTPException: 400 if a required field is absent or the tenant does not
-            address this directory.
-        HTTPException: 401 if the credentials are invalid.
-    """
-    # `grant_type` was taken as a form field and never looked at, so this
-    # directory minted a token for `grant_type=password` — and for a request
-    # that named no grant at all — where the two other Entra mounts in this
-    # mock refuse both. One identity platform cannot answer three ways.
-    if not scope:
-        raise HTTPException(status_code=400, detail=build_token_error(
-            "invalid_request",
-            "AADSTS900144: The request body must contain the following "
-            "parameter: 'scope'.",
-            AADSTS_MISSING_PARAMETER,
-        ))
-
-    if grant_type != "client_credentials":
-        raise HTTPException(status_code=400, detail=build_token_error(
-            "unsupported_grant_type" if grant_type else "invalid_request",
-            "AADSTS70003: The app requested an unsupported grant type. "
-            "Only client_credentials is supported."
-            if grant_type else
-            "AADSTS900144: The request body must contain the following "
-            "parameter: 'grant_type'.",
-            AADSTS_UNSUPPORTED_GRANT if grant_type else AADSTS_MISSING_PARAMETER,
-        ))
-
-    # An absent field is a malformed request, not a rejected credential: Entra
-    # answers it 400 invalid_request, and a client that retries on 401 would
-    # otherwise loop on a request that can never succeed.
-    missing = [
-        name for name, value in (("client_id", client_id), ("client_secret", client_secret))
-        if not value
-    ]
-    if missing:
-        raise HTTPException(status_code=400, detail=build_token_error(
-            "invalid_request",
-            f"AADSTS900144: The request body must contain the following parameter: "
-            f"'{missing[0]}'.",
-            AADSTS_MISSING_PARAMETER,
-        ))
-
-    if not tenant_segment_matches(tenant_id, *client_tenant(client_id)):
-        raise HTTPException(status_code=400, detail=build_token_error(
-            "invalid_request",
-            tenant_rejection_message(tenant_id),
-            AADSTS_TENANT_NOT_FOUND,
-        ))
-
-    result = token_exchange(client_id, client_secret, scope)
-    if not result:
-        raise HTTPException(status_code=401, detail=build_token_error(
-            "invalid_client",
-            "AADSTS7000215: Invalid client secret provided.",
-            AADSTS_INVALID_CLIENT,
-        ))
-    return result
+router = entra_authority_router(EntraDirectory(
+    mount="/sentinel",
+    find_client=find_client,
+    clients=registered_clients,
+    mint=mint_token,
+), "Sentinel Auth")

@@ -156,13 +156,28 @@ class TestOAuth2TokenExchange:
         resp = client.post(
             f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
             data={
-                "client_id": "wrong",
+                "client_id": "sentinel-mock-client-id",
                 "client_secret": "wrong",
                 "grant_type": "client_credentials",
         "scope": "https://management.azure.com/.default",
             },
         )
         assert resp.status_code == 401
+        assert resp.json()["error_codes"] == [7000215]
+
+    def test_an_unknown_application_is_not_a_wrong_secret(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{SENTINEL_PREFIX}/oauth2/v2.0/token",
+            data={
+                "client_id": "wrong",
+                "client_secret": "wrong",
+                "grant_type": "client_credentials",
+                "scope": "https://management.azure.com/.default",
+            },
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"] == "unauthorized_client"
+        assert resp.json()["error_codes"] == [700016]
 
     def test_bearer_token_works(self, client: TestClient) -> None:
         _get_token(client)

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hmac
+from dataclasses import dataclass
+from typing import Any
 
 from api.sentinel_auth import create_sentinel_token
 from repository.store import store
@@ -9,51 +11,43 @@ from repository.store import store
 _OAUTH_CLIENTS_COLLECTION = "sentinel_oauth_clients"
 
 
-def client_tenant(client_id: str) -> tuple[str, str]:
-    """Look up the tenant a registered client belongs to.
+@dataclass(frozen=True)
+class SentinelClient:
+    """A registered application, as the Entra authority reads one."""
 
-    Args:
-        client_id: Azure AD application client ID.
+    client_id: str
+    client_secret: str
+    tenant_id: str
+    tenant_domain: str
 
-    Returns:
-        ``(tenant_id, tenant_domain)`` for the client, or two empty strings if
-        the client is unknown or carries no tenant.
+
+def _client(record: dict) -> SentinelClient:
+    return SentinelClient(
+        client_id=record.get("client_id", ""),
+        client_secret=record.get("client_secret", ""),
+        tenant_id=record.get("tenant_id", ""),
+        tenant_domain=record.get("tenant_domain", ""),
+    )
+
+
+def registered_clients() -> list[SentinelClient]:
+    """Every application registered in this directory."""
+    return [_client(c) for c in store.get_all(_OAUTH_CLIENTS_COLLECTION)]
+
+
+def find_client(client_id: str) -> SentinelClient | None:
+    """The registered application with *client_id*, or None.
+
+    Every registration is compared, in constant time, so the answer takes
+    as long for an ID that is registered as for one that is not.
     """
-    for c in store.get_all(_OAUTH_CLIENTS_COLLECTION):
-        if hmac.compare_digest(c.get("client_id", ""), client_id):
-            return c.get("tenant_id", ""), c.get("tenant_domain", "")
-    return "", ""
+    found = None
+    for client in registered_clients():
+        if hmac.compare_digest(client.client_id, client_id):
+            found = client
+    return found
 
 
-def hosted_tenants() -> list[tuple[str, str]]:
-    """The tenants this directory's registered clients belong to.
-
-    Returns:
-        ``(tenant_id, tenant_domain)`` of each registered client.
-    """
-    return [
-        (c.get("tenant_id", ""), c.get("tenant_domain", ""))
-        for c in store.get_all(_OAUTH_CLIENTS_COLLECTION)
-    ]
-
-
-def token_exchange(client_id: str, client_secret: str, scope: str) -> dict | None:
-    """Exchange client credentials for an access token.
-
-    Args:
-        client_id:     Azure AD application client ID.
-        client_secret: Client secret.
-        scope:         The resource the token is for; the token keeps it.
-
-    Returns:
-        Token response dict, or None if credentials are invalid.
-    """
-    clients = store.get_all(_OAUTH_CLIENTS_COLLECTION)
-    for c in clients:
-        stored_id = c.get("client_id", "")
-        stored_secret = c.get("client_secret", "")
-        id_ok = hmac.compare_digest(stored_id, client_id)
-        secret_ok = hmac.compare_digest(stored_secret, client_secret)
-        if id_ok and secret_ok:
-            return create_sentinel_token(client_id, scope)
-    return None
+def mint_token(client: Any, client_id: str, scope: str) -> dict:  # noqa: ANN401 - registered client
+    """Issue a token for the resource *scope* names; see :func:`create_sentinel_token`."""
+    return create_sentinel_token(client_id, scope)

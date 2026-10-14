@@ -31,6 +31,14 @@ The tenant segment takes the mock tenant's GUID
 [Graph integration guide](graph-integration-guide.md) for the validation rules
 and `MOCKDR_STRICT_TENANT`.
 
+The secret goes in the form body (`client_secret_post`) or in an
+`Authorization: Basic` header (`client_secret_basic`), and the refusals are
+Entra's, as on `/graph` and `/mde`: an unknown client ID is `400
+unauthorized_client` (AADSTS700016), a wrong secret `401 invalid_client`
+(AADSTS7000215). Unlike those two mounts, any scope is issued for: the token
+remembers the resource its scope named, and each API refuses a token for
+another (see below).
+
 ## api-version
 
 Every management-plane request needs `?api-version=`, as Azure Resource Manager

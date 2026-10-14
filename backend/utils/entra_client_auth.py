@@ -1,7 +1,9 @@
 """How a client-credentials request identifies the client, and what it asks for.
 
-Shared by the Graph and Defender token endpoints, which stand in for
-``login.microsoftonline.com``.
+Shared by the Graph, Defender and Sentinel token endpoints
+(:mod:`api.entra_authority`), which stand in for ``login.microsoftonline.com``.
+The scope rule below is Graph's and Defender's; Sentinel issues for any
+resource and lets each of its APIs refuse a token for another.
 
 Client authentication. Entra takes the secret in the form body
 (``client_secret_post``) or in the ``Authorization`` header: "The Basic auth

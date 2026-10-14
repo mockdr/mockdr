@@ -9,6 +9,7 @@ issues for, and the token it mints.
 
 The checks, in order:
 
+0. ``grant_type`` is required (AADSTS900144).
 1. The client is identified from the form body or from HTTP Basic
    (``client_secret_basic``) -- see :func:`utils.entra_client_auth.resolve_client_credentials`.
 2. ``scope`` is required on this grant (AADSTS900144).
@@ -69,6 +70,23 @@ class EntraDirectory:
 
 def _refuse(status: int, error: str, description: str, code: int) -> HTTPException:
     return HTTPException(status_code=status, detail=build_token_error(error, description, code))
+
+
+def _require_grant_type(grant_type: str) -> None:
+    """Refuse a request that names no grant, before anything else is read.
+
+    Entra answers it as it answers every absent parameter, ``400
+    invalid_request`` AADSTS900144 naming the field. Graph and Defender
+    declared the field required and answered FastAPI's own wording
+    ("grant_type: Field required"); Sentinel answered Entra's.
+    """
+    if not grant_type:
+        raise _refuse(
+            400, "invalid_request",
+            "AADSTS900144: The request body must contain the following parameter: "
+            "'grant_type'.",
+            AADSTS_MISSING_PARAMETER,
+        )
 
 
 def issue_token(
@@ -136,7 +154,7 @@ def entra_authority_router(directory: EntraDirectory, tag: str) -> APIRouter:
         request: Request,
         client_id: str = Form(default=""),
         client_secret: str = Form(default=""),
-        grant_type: str = Form(...),
+        grant_type: str = Form(default=""),
         scope: str = Form(default=""),
     ) -> dict:
         """Exchange client credentials for an access token.
@@ -145,6 +163,7 @@ def entra_authority_router(directory: EntraDirectory, tag: str) -> APIRouter:
         an ``Authorization: Basic`` header (``client_secret_basic``); Entra
         requires ``scope`` on this grant.
         """
+        _require_grant_type(grant_type)
         client_id, client_secret = resolve_client_credentials(
             request.headers.get("authorization"), client_id, client_secret)
         return issue_token(directory, None, client_id, client_secret, grant_type, scope)
@@ -155,7 +174,7 @@ def entra_authority_router(directory: EntraDirectory, tag: str) -> APIRouter:
         request: Request,
         client_id: str = Form(default=""),
         client_secret: str = Form(default=""),
-        grant_type: str = Form(...),
+        grant_type: str = Form(default=""),
         scope: str = Form(default=""),
     ) -> dict:
         """Exchange client credentials on the tenant-scoped URL real Entra uses.
@@ -163,6 +182,7 @@ def entra_authority_router(directory: EntraDirectory, tag: str) -> APIRouter:
         The tenant (GUID or verified domain) must address the credential's
         tenant unless ``MOCKDR_STRICT_TENANT=false``.
         """
+        _require_grant_type(grant_type)
         client_id, client_secret = resolve_client_credentials(
             request.headers.get("authorization"), client_id, client_secret)
         return issue_token(directory, tenant_id, client_id, client_secret, grant_type, scope)
