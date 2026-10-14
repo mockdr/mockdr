@@ -137,7 +137,10 @@ def _media_type_refusal(cause: str) -> JSONResponse:
     """
     reason = "Invalid media-type value on headers [Content-Type, Accept]"
     outer = {"type": "media_type_header_exception", "reason": reason}
-    return JSONResponse(status_code=400, content={
+    # This middleware answers outside ElasticHeadersMiddleware, so the refusal
+    # names the product itself: 8.15 sends `X-Elastic-Product` on this 400 as
+    # on any other (conformance probe es-compatible-with-nine).
+    return JSONResponse(status_code=400, headers={"X-Elastic-Product": "Elasticsearch"}, content={
         "error": {
             "root_cause": [dict(outer)],
             **outer,

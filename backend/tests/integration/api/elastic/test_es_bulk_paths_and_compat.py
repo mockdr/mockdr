@@ -162,6 +162,9 @@ class TestTheCompatibilityVersionIsRead:
         accept = "application/vnd.elasticsearch+json; compatible-with=9"
         resp = client.get("/elastic/_cluster/health", headers={**AUTH, "Accept": accept})
         assert resp.status_code == 400
+        # Measured on 8.15 (probe es-compatible-with-nine): the refusal names
+        # the product like every other answer does.
+        assert resp.headers["x-elastic-product"] == "Elasticsearch"
         assert resp.json() == {
             "error": {
                 "root_cause": [{
