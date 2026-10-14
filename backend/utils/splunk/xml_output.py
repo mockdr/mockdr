@@ -43,6 +43,8 @@ def render_splunk_xml(payload: object) -> str:
             return _render_results(payload)
         if "messages" in payload:
             return _render_messages(payload["messages"])
+        if set(payload) == {"sid"}:
+            return _render_sid(str(payload["sid"]))
     return _HEADER + f"<response>{_render_value(payload)}</response>"
 
 
@@ -53,6 +55,19 @@ def render_splunk_xml(payload: object) -> str:
 def _render_session_key(session_key: str) -> str:
     """Render the ``/services/auth/login`` response."""
     return _HEADER + f"<response>\n  <sessionKey>{escape(session_key)}</sessionKey>\n</response>"
+
+
+def _render_sid(sid: str) -> str:
+    """Render a dispatched job's ``<response><sid>`` document.
+
+    splunkd answers ``POST /services/search/jobs`` with ``<response><sid>…
+    </sid></response>``, and splunklib's ``Jobs.create`` reads it as
+    ``_load_sid(response)`` -> ``_load_atom(response).response.sid``. The
+    generic renderer wrapped the sid in ``<s:dict>`` -- under a prefix the
+    document never declares, so the answer was not even well-formed XML and
+    every ``jobs.create()`` died in the parser.
+    """
+    return _HEADER + f"<response>\n  <sid>{escape(sid)}</sid>\n</response>"
 
 
 def _render_messages(messages: object) -> str:
