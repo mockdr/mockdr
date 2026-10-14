@@ -27,7 +27,7 @@ _STATES = ("open", "closed", "acknowledged", "in-progress")
 
 
 def _by_status(status: str) -> dict:
-    return {"bool": {"filter": [{"term": {"signal.status": status}}]}}
+    return {"bool": {"filter": [{"term": {"kibana.alert.workflow_status": status}}]}}
 
 
 def _total(client: TestClient, query: dict) -> int:

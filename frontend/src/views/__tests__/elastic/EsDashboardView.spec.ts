@@ -46,9 +46,9 @@ vi.mock('../../../api/elastic', () => ({
             // ECS, as `signals/search` answers — not the flat shape.
             _source: {
               '@timestamp': '2025-01-01T00:00:00Z',
-              signal: { status: 'open',
-                        rule: { id: 'rule-1', rule_id: 'rule-1', name: 'Brute Force',
-                                severity: 'high', risk_score: 75 } },
+              kibana: { alert: { workflow_status: 'open', severity: 'high', risk_score: 75,
+                                 rule: { uuid: 'rule-1', rule_id: 'rule-1',
+                                         name: 'Brute Force' } } },
               host: { name: 'WKSTN-001' },
             },
           },
@@ -57,9 +57,9 @@ vi.mock('../../../api/elastic', () => ({
             _index: '.alerts-security',
             _source: {
               '@timestamp': '2025-01-02T00:00:00Z',
-              signal: { status: 'closed',
-                        rule: { id: 'rule-2', rule_id: 'rule-2', name: 'Malware Exec',
-                                severity: 'critical', risk_score: 95 } },
+              kibana: { alert: { workflow_status: 'closed', severity: 'critical', risk_score: 95,
+                                 rule: { uuid: 'rule-2', rule_id: 'rule-2',
+                                         name: 'Malware Exec' } } },
               host: { name: 'SERVER-001' },
             },
           },

@@ -11,6 +11,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from api.es_auth import require_es_auth, require_es_write, require_kbn_xsrf
 from application.es_alerts import commands as alert_commands
 from application.es_alerts import queries as alert_queries
+from utils.es_aggs import ESAggregationError
+from utils.es_query import ESQueryError
 from utils.es_response import build_kbn_error_response
 
 router = APIRouter(tags=["Elastic Alerts"])
@@ -23,14 +25,32 @@ router = APIRouter(tags=["Elastic Alerts"])
 def search_alerts(
     body: dict = Body(...),
     _: dict = Depends(require_es_auth),
+    # After authentication, as Kibana's xsrf check is a post-auth handler
+    # (core-http-server-internal lifecycle_handlers.ts, v8.15.0). The route
+    # sets no `xsrfRequired: false` and the default allowlist is empty, so
+    # it needs the header like any other POST; mockdr served it without.
+    __: None = Depends(require_kbn_xsrf),
 ) -> dict:
     """Search alerts using Elasticsearch query DSL."""
-    if not body:
-        # Joi's wording, verbatim (measured on 8.15).
+    if all(body.get(key) is None for key in alert_queries.REQUIRED_ONE_OF):
+        # Joi's wording, verbatim (measured on 8.15). The route checks the
+        # members it passes on, so a body of only `from` — which it drops —
+        # is as empty as `{}`.
         raise HTTPException(status_code=400, detail={
             "message": '"value" must have at least 1 children', "status_code": 400,
         })
-    return alert_queries.search_alerts(body)
+    try:
+        return alert_queries.search_alerts(body)
+    except (ESQueryError, ESAggregationError) as exc:
+        # `transformError` relays an Elasticsearch refusal as
+        # `<type>: <reason>` in the Security Solution envelope.
+        if isinstance(exc, ESQueryError) and exc.shard_failure:
+            message = "search_phase_execution_exception: all shards failed"
+        else:
+            message = f"{exc.es_type}: {exc}"
+        raise HTTPException(status_code=400, detail={
+            "message": message, "status_code": 400,
+        }) from exc
 
 
 # ── Status ───────────────────────────────────────────────────────────────────

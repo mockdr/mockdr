@@ -1581,7 +1581,7 @@ class TestThreeRoutesThatAnsweredAnotherDialect:
         """mockdr read them as the `{"uid": …}` objects it stores, so an
         assignment written the way 8.15 takes it raised out of the handler."""
         alert = client.post(
-            "/kibana/api/detection_engine/signals/search", headers=ES_AUTH,
+            "/kibana/api/detection_engine/signals/search", headers={**ES_AUTH, "kbn-xsrf": "true"},
             json={"query": {"match_all": {}}, "size": 1},
         ).json()["hits"]["hits"][0]["_id"]
 
@@ -1599,7 +1599,7 @@ class TestThreeRoutesThatAnsweredAnotherDialect:
         """mockdr read `assignees_to_add`, so an assignment written the way
         8.15 takes it was read as none at all and answered success."""
         alert = client.post(
-            "/kibana/api/detection_engine/signals/search", headers=ES_AUTH,
+            "/kibana/api/detection_engine/signals/search", headers={**ES_AUTH, "kbn-xsrf": "true"},
             json={"query": {"match_all": {}}, "size": 1},
         ).json()["hits"]["hits"][0]["_id"]
 

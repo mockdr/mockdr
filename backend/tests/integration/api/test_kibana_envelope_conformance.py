@@ -102,7 +102,7 @@ class TestSignalStatusEnvelope:
     def _alert_ids(self, client: TestClient, count: int = 1) -> list[str]:
         hits = client.post(
             "/kibana/api/detection_engine/signals/search",
-            headers=ES_AUTH, json={"size": count},
+            headers={**ES_AUTH, "kbn-xsrf": "true"}, json={"size": count},
         ).json()["hits"]["hits"]
         return [h["_id"] for h in hits]
 

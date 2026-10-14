@@ -51,38 +51,43 @@ async function fetchAlerts(direction: 'next' | 'prev' | 'reset' = 'reset'): Prom
       from.value = 0
     }
 
-    // The signal document is ECS, not flat: severity lives at
-    // `signal.rule.severity` and the workflow state at `signal.status`.
-    // Queried as `severity` and `status` these matched nothing, so every
-    // option in both dropdowns emptied the table.
+    // The alert document is ECS, not flat: severity lives at
+    // `kibana.alert.severity` and the workflow state at
+    // `kibana.alert.workflow_status`. Queried as `severity` and `status`
+    // these matched nothing, so every option in both dropdowns emptied the
+    // table.
     const musts: Record<string, unknown>[] = []
     if (filterSeverity.value) {
-      musts.push({ match: { 'signal.rule.severity': filterSeverity.value } })
+      musts.push({ match: { 'kibana.alert.severity': filterSeverity.value } })
     }
-    if (filterStatus.value) musts.push({ match: { 'signal.status': filterStatus.value } })
+    if (filterStatus.value) {
+      musts.push({ match: { 'kibana.alert.workflow_status': filterStatus.value } })
+    }
 
+    // `signals/search` passes no `from` to Elasticsearch, so a page is the
+    // first `from + size` hits with the earlier ones cut off here.
     const body: Record<string, unknown> = {
-      from: from.value,
-      size,
+      size: from.value + size,
       query: musts.length > 0 ? { bool: { must: musts } } : { match_all: {} },
       sort: [{ '@timestamp': { order: 'desc' } }],
     }
 
     const res = await esAlertsApi.search(body)
-    const hits = res.hits?.hits ?? []
+    const hits = (res.hits?.hits ?? []).slice(from.value)
     // Flattened here rather than in the template: the table read
     // `alert.rule_name`, `alert.severity`, `alert.status`,
     // `alert.host_name` and `alert.timestamp`, none of which a signal
     // document has, so it drew twenty-five rows with every cell blank.
     alerts.value = hits.map((h) => {
       const s = (h._source ?? {}) as EsSignalSource
+      const alert = s.kibana?.alert
       return {
         id: h._id,
-        rule_id: s.signal?.rule?.rule_id ?? '',
-        rule_name: s.signal?.rule?.name ?? '',
-        severity: s.signal?.rule?.severity ?? '',
-        risk_score: s.signal?.rule?.risk_score ?? 0,
-        status: s.signal?.status ?? '',
+        rule_id: alert?.rule?.rule_id ?? alert?.rule?.uuid ?? '',
+        rule_name: alert?.rule?.name ?? '',
+        severity: alert?.severity ?? '',
+        risk_score: alert?.risk_score ?? 0,
+        status: alert?.workflow_status ?? '',
         host_name: s.host?.name ?? '',
         timestamp: s['@timestamp'] ?? '',
       }

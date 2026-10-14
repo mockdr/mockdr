@@ -18,13 +18,11 @@ vi.mock('../../../api/elastic', () => ({
             _index: '.alerts-security',
             _source: {
               '@timestamp': '2025-01-01T00:00:00Z',
-              signal: {
-                status: 'open',
-                rule: {
-                  id: 'rule-1', rule_id: 'rule-1',
-                  name: 'Brute Force Detected', severity: 'high', risk_score: 70,
-                },
-              },
+              // `kibana.alert.*`, the alerts-as-data schema 8.15 searches.
+              kibana: { alert: {
+                workflow_status: 'open', severity: 'high', risk_score: 70,
+                rule: { uuid: 'rule-1', rule_id: 'rule-1', name: 'Brute Force Detected' },
+              } },
               host: { name: 'WKSTN-001' },
             },
           },
@@ -33,13 +31,10 @@ vi.mock('../../../api/elastic', () => ({
             _index: '.alerts-security',
             _source: {
               '@timestamp': '2025-01-02T00:00:00Z',
-              signal: {
-                status: 'acknowledged',
-                rule: {
-                  id: 'rule-2', rule_id: 'rule-2',
-                  name: 'Malware Execution', severity: 'critical', risk_score: 95,
-                },
-              },
+              kibana: { alert: {
+                workflow_status: 'acknowledged', severity: 'critical', risk_score: 95,
+                rule: { uuid: 'rule-2', rule_id: 'rule-2', name: 'Malware Execution' },
+              } },
               host: { name: 'SERVER-001' },
             },
           },
@@ -214,6 +209,36 @@ describe('EsAlertsView', () => {
     await vm.fetchAlerts('prev')
     await flushPromises()
     expect(vm.from).toBe(0)
+  })
+
+  // signals/search hands no `from` to Elasticsearch (query_signals_route.ts,
+  // kibana v8.15.0): the second page asked for `from: 25` and got the first.
+  it('fetchAlerts pages without from, by widening size', async () => {
+    const wrapper = mount(EsAlertsView, { global: { plugins: [router], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.total = 100
+    vi.mocked(esAlertsApi.search).mockClear()
+    await vm.fetchAlerts('next')
+    await flushPromises()
+    const body = vi.mocked(esAlertsApi.search).mock.calls[0][0] as Record<string, unknown>
+    expect(body).not.toHaveProperty('from')
+    expect(body.size).toBe(50)
+  })
+
+  it('fetchAlerts filters on the kibana.alert fields', async () => {
+    const wrapper = mount(EsAlertsView, { global: { plugins: [router], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.filterSeverity = 'high'
+    vm.filterStatus = 'open'
+    vi.mocked(esAlertsApi.search).mockClear()
+    await vm.fetchAlerts()
+    await flushPromises()
+    const body = JSON.stringify(vi.mocked(esAlertsApi.search).mock.calls[0][0])
+    expect(body).toContain('kibana.alert.severity')
+    expect(body).toContain('kibana.alert.workflow_status')
+    expect(body).not.toContain('signal.')
   })
 
   // fetchAlerts applies severity filter

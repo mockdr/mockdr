@@ -115,9 +115,19 @@ export interface EsAlert {
  */
 export interface EsSignalSource {
   '@timestamp'?: string
-  signal?: {
-    status?: string
-    rule?: { id?: string; rule_id?: string; name?: string; severity?: string; risk_score?: number }
+  /**
+   * The alerts-as-data schema of `.alerts-security.alerts-<space>`, which is
+   * what 8.15's `signals/search` searches — not the legacy `signal.*` one.
+   */
+  kibana?: {
+    alert?: {
+      uuid?: string
+      status?: string
+      workflow_status?: string
+      severity?: string
+      risk_score?: number
+      rule?: { uuid?: string; rule_id?: string; name?: string }
+    }
   }
   host?: { name?: string; ip?: string; os?: { name?: string } }
   user?: { name?: string }

@@ -42,7 +42,11 @@ def update_alert_status_by_query(query: dict, status: str) -> dict:
     query matching 45 alerts, and nothing changed.  A bulk status change
     that silently does nothing is the worst kind: the operator moves on.
     """
-    index = ".siem-signals-default"
+    # The same index `signals/search` reads: `${DEFAULT_ALERTS_INDEX}-${spaceId}`
+    # (open_close_signals_route.ts, kibana v8.15.0), so the query is written
+    # against `kibana.alert.*` — `kibana.alert.workflow_status`, not
+    # `signal.status`.
+    index = ".alerts-security.alerts-default"
     alerts = list(es_alert_repo.list_all())
     documents = [to_ecs_document(record_dict(a), index) for a in alerts]
     # `apply_es_query` returns the same dict objects it was given, so the
