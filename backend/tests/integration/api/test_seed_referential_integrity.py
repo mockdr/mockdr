@@ -188,6 +188,84 @@ class TestTimestampOrdering:
             seed.generate_all()
 
 
+def _instant(value: object) -> float | None:
+    """A timestamp as epoch seconds, whether ISO text or epoch milliseconds."""
+    from datetime import datetime
+
+    if isinstance(value, bool) or value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return value / 1000 if value > 1e11 else float(value)
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+
+
+def _pairs_of(record: object, earlier: str, later: str) -> list[tuple[object, object]]:
+    """``(earlier, later)`` values; a ``list[]`` prefix walks a list of dicts."""
+    from dataclasses import asdict
+
+    data = asdict(record)  # type: ignore[call-overload]
+    if "[]." in earlier:
+        field, earlier = earlier.split("[].")
+        later = later.split("[].")[1]
+        return [(item.get(earlier), item.get(later)) for item in data.get(field) or []]
+    return [(data.get(earlier), data.get(later))]
+
+
+class TestPairedTimestampsAreOrdered:
+    """Pairs the generic sweep above cannot see: other names, other formats.
+
+    Each was two independent draws, and a seed-42 run held 18 records whose
+    later field preceded the earlier one: Defender users first seen after
+    they were last seen, Cortex incidents modified before they were created
+    and endpoints first seen after they were last seen, Falcon detections
+    and quarantined files updated before they existed, S1 agents reaching
+    full mode after they were last active, an Intune device syncing before
+    it enrolled. Each is ordered by construction now, so every draw holds.
+    """
+
+    PAIRS = [
+        ("mde_machines", "loggedOnUsers[].firstSeen", "loggedOnUsers[].lastSeen"),
+        ("xdr_incidents", "creation_time", "modification_time"),
+        ("xdr_endpoints", "first_seen", "last_seen"),
+        ("cs_detections", "created_timestamp", "date_updated"),
+        ("cs_quarantined_files", "date_created", "date_updated"),
+        ("agents", "registeredAt", "firstFullModeTime"),
+        ("agents", "firstFullModeTime", "lastActiveDate"),
+        ("agents", "firstFullModeTime", "scanStartedAt"),
+        ("graph_managed_devices", "enrolledDateTime", "lastSyncDateTime"),
+    ]
+
+    @classmethod
+    def _violations(cls) -> list[str]:
+        from repository.store import store
+
+        found = []
+        for collection, earlier, later in cls.PAIRS:
+            for record in store.get_all(collection):
+                for a, b in _pairs_of(record, earlier, later):
+                    first, second = _instant(a), _instant(b)
+                    if first is not None and second is not None and first > second:
+                        found.append(f"{collection}: {earlier}={a} > {later}={b}")
+        return found
+
+    def test_this_install_holds(self, client: TestClient) -> None:
+        assert not self._violations(), self._violations()[:5]
+
+    def test_other_draws_hold_too(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from infrastructure import seed
+
+        try:
+            for value in (7, 11, 99, 1337, 2024, 31337):
+                monkeypatch.setattr(seed, "SEED", value)
+                seed.generate_all()
+                assert not self._violations(), (value, self._violations()[:5])
+        finally:
+            monkeypatch.undo()
+            seed.generate_all()
+
+
 class TestLicenceCountsMatchAssignments:
     """``consumedUnits`` must describe the users who hold the licence."""
 

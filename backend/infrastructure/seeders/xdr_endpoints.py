@@ -85,7 +85,7 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
         # Group names
         group_names = [agent.groupName] if agent.groupName else []
 
-        xdr_endpoint_repo.save(XdrEndpoint(
+        endpoint = XdrEndpoint(
             endpoint_id=eid,
             endpoint_name=agent.computerName,
             endpoint_type=endpoint_type,
@@ -108,6 +108,11 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
             installation_package=XDR_INSTALL_PACKAGES[
                 index % len(XDR_INSTALL_PACKAGES)],
             public_ip=[fake.ipv4_public()],
-        ))
+        )
+        # `first_seen` and `last_seen` are independent draws, and two
+        # endpoints were first seen after they were last seen. Ordered after
+        # the record is built, so no draw moves.
+        endpoint.first_seen = min(endpoint.first_seen, endpoint.last_seen)
+        xdr_endpoint_repo.save(endpoint)
 
     return endpoint_ids

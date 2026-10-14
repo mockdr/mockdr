@@ -198,7 +198,7 @@ def seed_agents(
             f"-{random.randint(1000, 9999)}"
         )
 
-        agent_repo.save(Agent(
+        record = Agent(
             id=aid,
             uuid=str(new_uuid()),
             computerName=hostname,
@@ -354,7 +354,18 @@ def seed_agents(
             agentLicenseType="y3",
             cpuUsage=random.randint(1, 45),
             memoryUsage=random.randint(512, total_memory),
-        ))
+        )
+        # Full mode is reached after the agent registered and before it was
+        # last active or scanned; `rand_ago(190)` on its own put it after
+        # both on some agents. Placed after the record is built so the draw
+        # stays where it was in the stream.
+        latest = min(
+            t for t in (record.lastActiveDate, record.scanStartedAt) if t
+        )
+        record.firstFullModeTime = min(
+            max(record.firstFullModeTime or registered_at, registered_at), latest,
+        )
+        agent_repo.save(record)
 
         # Keep group agent count in sync
         group.totalAgents += 1

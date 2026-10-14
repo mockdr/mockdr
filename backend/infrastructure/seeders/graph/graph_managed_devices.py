@@ -90,7 +90,9 @@ def seed_graph_managed_devices(fake: Faker) -> None:
             sync_offset = random.randint(7 * 24 * 60, 30 * 24 * 60)  # 7-30 days
 
         sync_dt = datetime.now(UTC) - timedelta(minutes=sync_offset)
-        last_sync = sync_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        # A device cannot have synced before it enrolled (`enrolledDateTime`
+        # is the S1 agent's createdAt); the offset alone said one had.
+        last_sync = max(sync_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z"), agent.createdAt)
 
         # Compliance distribution: 80% compliant, 15% noncompliant, 5% unknown
         compliance_roll = random.random()

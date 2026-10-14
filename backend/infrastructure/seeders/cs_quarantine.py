@@ -61,8 +61,9 @@ def seed_cs_quarantine(
             state=random.choice(["quarantined"] * 8 + ["released", "deleted"]),
             hostname=hostname,
             username=f"ACMECORP\\{fake.user_name()}",
-            date_created=rand_ago(30),
-            date_updated=rand_ago(5),
+            date_created=(created := rand_ago(30)),
+            # Drawn on its own, it preceded `date_created` on some files.
+            date_updated=max(created, rand_ago(5)),
             # A quarantined file is produced *by* a detection, so these have
             # to be real detection ids. Random hex could never match one:
             # CS detection ids are shaped ldt:{cid}:{n}.

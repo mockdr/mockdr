@@ -80,7 +80,8 @@ def seed_xdr_incidents(
             assigned_user_mail=assigned_mail,
             assigned_user_pretty_name=assigned_name,
             creation_time=creation,
-            modification_time=rand_epoch_ms(30),
+            # Drawn on its own, it preceded `creation_time` on some incidents.
+            modification_time=max(creation, rand_epoch_ms(30)),
             detection_time=str(creation),
             low_severity_alert_count=low_alerts,
             med_severity_alert_count=med_alerts,

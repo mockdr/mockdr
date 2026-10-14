@@ -193,7 +193,8 @@ def seed_cs_detections(
             created_timestamp=created_ts,
             first_behavior=first_behavior_ts,
             last_behavior=last_behavior_ts,
-            date_updated=rand_ago(5),
+            # Drawn on its own, it preceded `created_timestamp` on some.
+            date_updated=max(created_ts, rand_ago(5)),
             # A triaged detection is assigned to somebody this tenant has:
             # Falcon names them by their console address and their name, and
             # both used to be invented per detection.

@@ -85,13 +85,17 @@ def seed_mde_machines(fake: Faker) -> list[str]:
         user_count = random.randint(2, 4)
         logged_on_users: list[dict] = []
         for _ in range(user_count):
-            logged_on_users.append({
+            entry = {
                 "accountName": fake.user_name(),
                 "domainName": "ACMECORP",
                 "logonType": random.choice(_LOGON_TYPES),
                 "firstSeen": rand_ago(30),
                 "lastSeen": rand_ago(1),
-            })
+            }
+            # Two independent draws let a user be first seen after they were
+            # last seen. Ordered after drawing, so the stream is unchanged.
+            entry["firstSeen"] = min(entry["firstSeen"], entry["lastSeen"])
+            logged_on_users.append(entry)
 
         # Random machine tags
         tag_count = random.randint(0, 3)
