@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from api.sentinel_auth import require_sentinel_auth
 from application.sentinel.queries.log_analytics import UnknownTableError, query_logs
 from utils.sentinel.kql_parser import UnsupportedKqlError
+from utils.sentinel.response import build_log_analytics_error
 from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Sentinel Log Analytics"])
@@ -30,9 +31,7 @@ async def run_query(
         # Log Analytics refuses a missing or empty query as a bad argument.
         raise HTTPException(
             status_code=400,
-            detail=build_vendor_error(
-                "sentinel", 400, "The request had some invalid properties: query is required",
-            ),
+            detail=build_log_analytics_error("SyntaxError", "query is required"),
         )
     try:
         return query_logs(kql)
@@ -43,15 +42,14 @@ async def run_query(
         # compile with 400, and so does this.
         raise HTTPException(
             status_code=400,
-            detail=build_vendor_error(
-                "sentinel", 400,
-                f"The request had some invalid properties: {exc}"),
+            detail=build_log_analytics_error("SyntaxError", str(exc)),
         ) from exc
     except UnknownTableError as exc:
         # Log Analytics answers a query naming no table it has with a bad
         # argument, not with an empty result set.
+        # Kusto reports a name it cannot resolve as a semantic error, not a
+        # syntax one: the query parsed.
         raise HTTPException(
             status_code=400,
-            detail=build_vendor_error(
-                "sentinel", 400, f"The request had some invalid properties: {exc}"),
+            detail=build_log_analytics_error("SemanticError", str(exc)),
         ) from exc

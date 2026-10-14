@@ -38,6 +38,79 @@ _CUSTOM_TABLES: dict[str, tuple[str, ...]] = {
 }
 
 
+#: The Kusto type of each column whose type the value cannot tell —
+#: timestamps travel as ISO strings but are `datetime` columns, and the
+#: incident number is the `int` the SecurityIncident schema declares. The
+#: response carries one of Kusto's scalar types per column
+#: (learn.microsoft.com, Azure Monitor Logs API "Response format": `bool`,
+#: `datetime`, `dynamic`, `int`, `long`, `real`, `string`, …); the mock
+#: answered `string` for every column, so a client that parses by declared
+#: type read every number and timestamp as text.
+_COLUMN_TYPES: dict[str, str] = {
+    "TimeGenerated": "datetime",
+    "CreatedTime": "datetime",
+    "LastModifiedTime": "datetime",
+    "IncidentNumber": "int",
+    "AlertsCount": "int",
+}
+
+#: The columns each table has, for an answer with no rows — a result set
+#: still declares its schema when nothing matched.
+_INCIDENT_COLUMNS = (
+    "IncidentNumber", "Title", "Description", "Severity", "Status", "Classification",
+    "Owner", "CreatedTime", "LastModifiedTime", "ProviderName", "AlertsCount",
+    "TimeGenerated",
+)
+_ALERT_COLUMNS = (
+    "AlertName", "Description", "Severity", "Status", "ProductName", "ProviderName",
+    "VendorName", "TimeGenerated", "Tactics", "Techniques",
+)
+_CUSTOM_COLUMNS = ("TimeGenerated", "Computer", "SourceSystem")
+
+
+def _kusto_type(value: object) -> str | None:
+    """The Kusto type a Python value is, or None when it says nothing."""
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "long"
+    if isinstance(value, float):
+        return "real"
+    if isinstance(value, (dict, list)):
+        return "dynamic"
+    if isinstance(value, str) and value:
+        return "string"
+    return None
+
+
+def _columns(names: list[str] | tuple[str, ...], rows: list[dict]) -> list[dict[str, str]]:
+    """Each column with its Kusto type: declared, else read off the first value that has one."""
+    columns = []
+    for name in names:
+        kind = _COLUMN_TYPES.get(name)
+        if kind is None:
+            kind = next(
+                (t for t in (_kusto_type(r.get(name)) for r in rows) if t is not None),
+                "string",
+            )
+        columns.append({"name": name, "type": kind})
+    return columns
+
+
+def _schema(tables: list[str]) -> list[str]:
+    """The columns of the tables a query reads, in order, for a result with no rows."""
+    names: list[str] = []
+    for table in tables:
+        lowered = table.lower()
+        cols = (
+            _INCIDENT_COLUMNS if lowered == "securityincident"
+            else _ALERT_COLUMNS if lowered == "securityalert"
+            else _CUSTOM_COLUMNS
+        )
+        names.extend(c for c in cols if c not in names)
+    return names
+
+
 class UnknownTableError(ValueError):
     """A table this workspace does not have, named by a query."""
 
@@ -90,23 +163,24 @@ def query_logs(kql: str) -> dict:
 
     # `| count` is one row with the number that reached it.
     if parsed.count_only:
+        # `count` answers a `long`.
         return build_log_analytics_response(
-            [{"name": "Count", "type": "int"}], [[len(rows)]])
+            [{"name": "Count", "type": "long"}], [[len(rows)]])
 
     # `| distinct a, b` reduces to those columns and drops repeats, keeping
     # the order they were first seen in — it answered the whole table before.
     if parsed.distinct_fields:
         seen: set[tuple[str, ...]] = set()
-        reduced: list[list[str]] = []
+        reduced: list[list[object]] = []
         for row in rows:
             key = tuple(str(row.get(f, "")) for f in parsed.distinct_fields)
             if key not in seen:
                 seen.add(key)
-                reduced.append(list(key))
+                reduced.append([row.get(f, "") for f in parsed.distinct_fields])
         if parsed.take > 0:
             reduced = reduced[:parsed.take]
         return build_log_analytics_response(
-            [{"name": f, "type": "string"} for f in parsed.distinct_fields], reduced,
+            _columns(parsed.distinct_fields, rows), reduced,
         )
 
     # Apply summarize
@@ -129,16 +203,17 @@ def query_logs(kql: str) -> dict:
 
     # Apply project
     if parsed.project_fields:
-        columns = [{"name": f, "type": "string"} for f in parsed.project_fields]
+        columns = _columns(parsed.project_fields, rows)
         result_rows = [[r.get(f, "") for f in parsed.project_fields] for r in rows]
         return build_log_analytics_response(columns, result_rows)
 
-    # Default: return all fields
+    # Default: return all fields. With no rows the table's schema still
+    # answers — an empty result used to carry no columns at all.
     if not rows:
-        return build_log_analytics_response([], [])
+        return build_log_analytics_response(_columns(_schema(parsed.tables), []), [])
 
     all_fields = list(rows[0].keys())
-    columns = [{"name": f, "type": "string"} for f in all_fields]
+    columns = _columns(all_fields, rows)
     result_rows = [[r.get(f, "") for f in all_fields] for r in rows]
     return build_log_analytics_response(columns, result_rows)
 
@@ -295,12 +370,14 @@ def _filter_rows(rows: list[dict], field: str, op: str, value: str) -> list[dict
 def _summarize_count(rows: list[dict], by_field: str) -> dict:
     """Summarize count() by field."""
     counts: dict[str, int] = {}
+    firsts: dict[str, object] = {}
     for r in rows:
         key = str(r.get(by_field, ""))
         counts[key] = counts.get(key, 0) + 1
+        firsts.setdefault(key, r.get(by_field, ""))
 
-    columns = [{"name": by_field, "type": "string"}, {"name": "count_", "type": "long"}]
-    result_rows = [[k, v] for k, v in counts.items()]
+    columns = [*_columns([by_field], rows), {"name": "count_", "type": "long"}]
+    result_rows = [[firsts[k], v] for k, v in counts.items()]
     return build_log_analytics_response(columns, result_rows)
 
 

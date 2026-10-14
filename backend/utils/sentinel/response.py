@@ -227,6 +227,31 @@ def build_arm_error(code: str, message: str) -> dict:
 
 
 
+def build_log_analytics_error(inner_code: str, message: str) -> dict:
+    """A Log Analytics query refusal, in the Logs query API's own envelope.
+
+    Not ARM's `{"error": {"code", "message"}}` alone: the Logs query API
+    answers a query it cannot run with `BadArgumentError` and the reason in
+    an `innererror` (learn.microsoft.com, Azure Monitor "Logs query
+    timeouts and errors": `{"error": {"message": "The request had some
+    invalid properties", "code": "BadArgumentError", "innererror": {"code":
+    "SyntaxError", "message": …}}}`).
+
+    Args:
+        inner_code: ``SyntaxError`` for a query that does not parse (or that
+                    this mock cannot evaluate), ``SemanticError`` for one that
+                    names what the workspace does not have.
+        message:    What was wrong.
+    """
+    return {
+        "error": {
+            "message": "The request had some invalid properties",
+            "code": "BadArgumentError",
+            "innererror": {"code": inner_code, "message": message},
+        },
+    }
+
+
 def build_log_analytics_response(
     columns: list[dict[str, str]],
     rows: list[list],

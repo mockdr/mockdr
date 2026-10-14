@@ -47,7 +47,11 @@ def _rows(client: TestClient, kql: str) -> list[list[object]]:
 def _refusal(client: TestClient, kql: str) -> str:
     resp = client.post(QUERY, json={"query": kql}, headers=_auth(client))
     assert resp.status_code == 400, resp.text
-    return str(resp.json()["error"]["message"])
+    # The Logs query API puts the reason in `innererror`; the top-level
+    # message is the generic "The request had some invalid properties".
+    error = resp.json()["error"]
+    assert error["code"] == "BadArgumentError"
+    return str(error["innererror"]["message"])
 
 
 class TestEveryShippedRuleRuns:

@@ -111,7 +111,10 @@ class TestATableTheWorkspaceDoesNotHave:
             headers=_auth(client),
         )
         assert resp.status_code == 400
-        message = resp.json()["error"]["message"]
+        error = resp.json()["error"]
+        assert error["code"] == "BadArgumentError"
+        assert error["innererror"]["code"] == "SemanticError"
+        message = error["innererror"]["message"]
         assert "MicrosoftDefender_CL" in message
         # The refusal names what this workspace does have.
         assert "SecurityAlert" in message
@@ -140,3 +143,50 @@ class TestATableTheWorkspaceDoesNotHave:
             headers=_auth(client),
         )
         assert resp.status_code == 400
+
+
+class TestTheLogsQueryApiSpeaksItsOwnShapes:
+    """Errors, column types and empty results as the Logs query API answers them.
+
+    learn.microsoft.com, Azure Monitor: "Logs query timeouts and errors"
+    shows a query refusal as `BadArgumentError` with the reason in
+    `innererror` (`SyntaxError`); "Response format" types each column with a
+    Kusto scalar type. The mock answered ARM's bare `BadRequest`, typed every
+    column `string`, and answered an empty result with no columns at all.
+    """
+
+    QUERY = f"{SENTINEL_PREFIX}/v1/workspaces/mockdr-workspace/query"
+
+    def test_a_query_it_cannot_run_is_a_bad_argument(self, client: TestClient) -> None:
+        resp = client.post(self.QUERY, json={"query": "SecurityAlert | frobnicate"},
+                           headers=_auth(client))
+        assert resp.status_code == 400
+        error = resp.json()["error"]
+        assert error["code"] == "BadArgumentError"
+        assert error["message"] == "The request had some invalid properties"
+        assert error["innererror"]["code"] == "SyntaxError"
+
+    def test_columns_carry_kusto_types(self, client: TestClient) -> None:
+        resp = client.post(self.QUERY, json={"query": "SecurityIncident | take 3"},
+                           headers=_auth(client))
+        types = {c["name"]: c["type"] for c in resp.json()["tables"][0]["columns"]}
+        assert types["IncidentNumber"] == "int"
+        assert types["TimeGenerated"] == "datetime"
+        assert types["CreatedTime"] == "datetime"
+        assert types["Title"] == "string"
+
+    def test_count_is_a_long(self, client: TestClient) -> None:
+        resp = client.post(self.QUERY, json={"query": "SecurityAlert | count"},
+                           headers=_auth(client))
+        assert resp.json()["tables"][0]["columns"] == [{"name": "Count", "type": "long"}]
+
+    def test_an_empty_result_still_declares_its_columns(self, client: TestClient) -> None:
+        resp = client.post(
+            self.QUERY,
+            json={"query": "SecurityIncident | where Title == 'no incident is called this'"},
+            headers=_auth(client),
+        )
+        table = resp.json()["tables"][0]
+        assert table["rows"] == []
+        names = [c["name"] for c in table["columns"]]
+        assert "IncidentNumber" in names and "TimeGenerated" in names
