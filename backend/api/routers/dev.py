@@ -25,7 +25,7 @@ GET    /_dev/export/logs             — unified structured log export (SIEM-rea
 GET    /_dev/graph/tokens            — list all Graph OAuth client credentials
 POST   /_dev/graph/plan              — switch active Graph token plan on-the-fly
 """
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from api.dto.playbook import PlaybookCreateBody, PlaybookUpdateBody
 from api.dto.requests import (
@@ -35,6 +35,7 @@ from api.dto.requests import (
     DevScenarioBody,
 )
 from api.middleware.rate_limit import get_config, reset_counters, set_config
+from api.public_mode import refuse_on_public_instance
 from application.dev import commands as dev_commands
 from application.dev import queries as dev_queries
 from application.playbook import commands as playbook_commands
@@ -44,6 +45,9 @@ from application.request_log import queries as request_log_queries
 from application.webhooks import queries as webhook_queries
 
 router = APIRouter(tags=["DEV"])
+
+#: Routes a public instance refuses (see ``api.public_mode``).
+_NOT_ON_PUBLIC = [Depends(refuse_on_public_instance)]
 
 
 @router.post("/_dev/reset")
@@ -104,10 +108,10 @@ def export_state() -> dict:
     Returns:
         Dict mapping each collection name to its list of records.
     """
-    return dev_commands.export_state()
+    return dev_commands.export_state(include_secrets=False)
 
 
-@router.post("/_dev/import")
+@router.post("/_dev/import", dependencies=_NOT_ON_PUBLIC)
 def import_state(body: dict) -> dict:
     """Replace the entire store with the provided snapshot.
 
@@ -117,7 +121,10 @@ def import_state(body: dict) -> dict:
     Returns:
         Dict with ``data.imported`` indicating the total records loaded.
     """
-    return dev_commands.import_state(body)
+    try:
+        return dev_commands.import_state(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ── Rate-Limit Config ─────────────────────────────────────────────────────────
@@ -133,7 +140,7 @@ def get_rate_limit() -> dict:
     return {"enabled": cfg.enabled, "requestsPerMinute": cfg.requests_per_minute}
 
 
-@router.post("/_dev/rate-limit")
+@router.post("/_dev/rate-limit", dependencies=_NOT_ON_PUBLIC)
 def set_rate_limit(body: DevRateLimitBody) -> dict:
     """Update the rate-limit configuration."""
     set_config(enabled=body.enabled, rpm=body.requestsPerMinute)
@@ -236,7 +243,7 @@ def get_fault_injection() -> dict:
     }
 
 
-@router.post("/_dev/fault-injection")
+@router.post("/_dev/fault-injection", dependencies=_NOT_ON_PUBLIC)
 def set_fault_injection(body: DevFaultInjectionBody) -> dict:
     """Update fault injection configuration.
 

@@ -395,8 +395,32 @@ def reset() -> dict:
     return {"data": {"status": "reset complete"}}
 
 
-def export_state() -> dict:
+#: Members of a proxy vendor's ``auth`` that are credentials for the real
+#: tenant behind it.
+_PROXY_SECRET_FIELDS = ("token", "client_secret", "password", "api_key", "key_secret")
+
+
+def _without_proxy_secrets(proxy: dict[str, Any]) -> dict[str, Any]:
+    """The proxy settings with every upstream credential emptied."""
+    vendors = {}
+    for name, vendor in (proxy.get("vendors") or {}).items():
+        auth = dict(vendor.get("auth") or {})
+        for secret in _PROXY_SECRET_FIELDS:
+            if auth.get(secret):
+                auth[secret] = ""
+        vendors[name] = {**vendor, "auth": auth}
+    return {**proxy, "vendors": vendors, "api_token": ""}
+
+
+def export_state(*, include_secrets: bool = True) -> dict:
     """Serialize the entire store to a JSON-safe dict.
+
+    Args:
+        include_secrets: Keep the recording proxy's upstream credentials.
+            Persistence needs them to survive a restart; ``GET /_dev/export``
+            leaves them out, because ``GET /_dev/proxy/config`` masks the
+            same values and the export handed them over in clear text to the
+            holder of a documented token.
 
     Returns:
         Dict mapping each collection name to a list of its records, plus
@@ -429,7 +453,8 @@ def export_state() -> dict:
     # Persist proxy config (vendor connections survive restarts).
     from application.proxy import queries as proxy_queries
     cfg = proxy_queries.get_config_raw()
-    snapshot["_proxy_config"] = record_dict(cfg)
+    proxy = record_dict(cfg)
+    snapshot["_proxy_config"] = proxy if include_secrets else _without_proxy_secrets(proxy)
 
     return snapshot
 
@@ -502,6 +527,18 @@ def import_state(snapshot: dict) -> dict:
     """
     # A running playbook would write the objects it holds into the store
     # being loaded, as it would into a fresh seed (see `generate_all`).
+    # Checked before anything is cleared: a collection that is not a list
+    # used to raise half-way through, after `clear_all()`, leaving every
+    # client of the instance an empty store and a 500.
+    for collection in _TYPED_COLLECTIONS:
+        if not isinstance(snapshot.get(collection, []), list):
+            raise ValueError(f"'{collection}' must be a list of records")
+    activities = snapshot.get("activities") or []
+    if not isinstance(snapshot.get("_activity_order") or [], list) or not all(
+        isinstance(a, dict) for a in activities
+    ):
+        raise ValueError("'activities' and '_activity_order' must be lists")
+
     from application.playbook.executor import stop as stop_playbook
     stop_playbook()
 
@@ -564,16 +601,36 @@ def import_state(snapshot: dict) -> dict:
     if proxy_snapshot and isinstance(proxy_snapshot, dict):
         try:
             from application.proxy import commands as proxy_commands
+            from application.proxy import queries as proxy_queries
             mode = proxy_snapshot.get("mode", "off")
+            current = record_dict(proxy_queries.get_config_raw()).get("vendors", {})
             vendors = []
             for _k, vc in proxy_snapshot.get("vendors", {}).items():
                 if isinstance(vc, dict):
-                    vendors.append(vc)
+                    vendors.append(_keep_current_secrets(vc, current.get(vc.get("vendor"))))
             proxy_commands.set_config(mode=mode, vendors=vendors if vendors else None)
         except Exception:
             logger.warning("Failed to restore proxy config from snapshot", exc_info=True)
 
     return {"data": {"imported": total, "skipped": skipped}}
+
+
+def _keep_current_secrets(vendor: dict, current: dict | None) -> dict:
+    """Fill the credentials an export left out from the running config.
+
+    ``GET /_dev/export`` empties them, so importing it back into the same
+    instance would otherwise sign the proxy out of every upstream.
+    """
+    if not current or current.get("base_url") != vendor.get("base_url"):
+        return vendor
+    auth = dict(vendor.get("auth") or {})
+    current_auth = current.get("auth") or {}
+    if auth.get("type", current_auth.get("type")) != current_auth.get("type"):
+        return vendor
+    for secret in _PROXY_SECRET_FIELDS:
+        if not auth.get(secret) and current_auth.get(secret):
+            auth[secret] = current_auth[secret]
+    return {**vendor, "auth": auth}
 
 
 def _save_agent(agent: Agent) -> None:

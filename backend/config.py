@@ -63,3 +63,15 @@ STRICT_TENANT = os.getenv("MOCKDR_STRICT_TENANT", "true").strip().lower() not in
 # Elasticsearch _bulk bodies fit comfortably; an unbounded body only grows
 # the process.
 MAX_BODY_BYTES = int(os.getenv("MOCKDR_MAX_BODY_BYTES", str(16 * 1024 * 1024)))
+
+# Public-instance posture. Off by default, so a mock started in CI or on a
+# developer's machine keeps every control route the docs describe. Set
+# MOCKDR_PUBLIC=true on an instance anyone can reach (the Render demo sets
+# it): the admin token is a documented constant, so whatever it unlocks
+# beyond the mocked APIs is unlocked for every visitor. Public mode refuses
+# the routes whose effect leaves the mock or outlives one visitor's session —
+# the recording proxy, outbound webhooks, snapshot import, fault injection
+# and the rate-limit switch — and every outbound request the mock would make.
+PUBLIC_MODE = os.getenv("MOCKDR_PUBLIC", "false").strip().lower() in {
+    "1", "true", "yes", "on",
+}

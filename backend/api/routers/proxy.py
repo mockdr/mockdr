@@ -112,14 +112,19 @@ def set_proxy_config(body: ProxyConfigBody, _: dict = Depends(require_admin)) ->
             base_url=body.base_url,
             api_token=body.api_token,
         )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return _serialize_config(masked=True)
 
 
+# Admin only, like the rest of /_dev: a recording is real vendor traffic, and
+# its query string can carry what the upstream was asked with. Both were open
+# to any authenticated role, so a Viewer could read them and wipe them.
 @router.get("/_dev/proxy/recordings")
-def list_recordings() -> dict[str, object]:
+def list_recordings(_: dict = Depends(require_admin)) -> dict[str, object]:
     """Return all stored recordings, newest first."""
     recordings = proxy_queries.list_recordings()
     return {
@@ -142,7 +147,7 @@ def list_recordings() -> dict[str, object]:
 
 
 @router.delete("/_dev/proxy/recordings")
-def clear_recordings() -> dict[str, object]:
+def clear_recordings(_: dict = Depends(require_admin)) -> dict[str, object]:
     """Delete all stored recordings."""
     count = proxy_commands.clear_recordings()
     return {"data": {"cleared": count}}

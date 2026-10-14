@@ -2,11 +2,28 @@
 import hashlib
 import hmac
 import json
+from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from application.webhooks.commands import fire_event, wait_for_deliveries
 from domain.webhook import WebhookSubscription
 from repository.webhook_repo import webhook_repo
+
+
+@pytest.fixture(autouse=True)
+def receiver_resolves() -> Iterator[None]:
+    """The receiver's name resolves, to a documentation address.
+
+    A delivery resolves its target before it sends (``utils.egress``), and
+    ``test-receiver.local`` takes an mDNS timeout to fail — longer than the
+    wait below. ``httpx.post`` is mocked here, so the name never needs to
+    reach anything.
+    """
+    answer = [(2, 1, 6, "", ("192.0.2.10", 443))]
+    with patch("utils.egress.socket.getaddrinfo", return_value=answer):
+        yield
 
 
 class TestWebhookDelivery:

@@ -9,6 +9,7 @@ DELETE /web/api/v2.1/webhooks/{id}     — delete a subscription
 
 from fastapi import APIRouter, Depends, HTTPException
 
+import config
 from api.auth import require_admin
 from api.dto.requests import WebhookCreateBody, WebhookFireBody
 from application.webhooks import commands as webhook_commands
@@ -28,6 +29,13 @@ def list_webhooks() -> dict:
 @router.post("/_dev/webhooks")
 def create_webhook(body: WebhookCreateBody, _: dict = Depends(require_admin)) -> dict:
     """Create a new webhook subscription."""
+    if config.PUBLIC_MODE:
+        # A subscription makes the mock POST to a URL the caller chose, on
+        # every matching event any visitor causes.
+        raise HTTPException(
+            status_code=403,
+            detail="outbound webhooks are disabled on a public instance (MOCKDR_PUBLIC)",
+        )
     try:
         return webhook_commands.create_webhook(body.model_dump())
     except ValueError as exc:

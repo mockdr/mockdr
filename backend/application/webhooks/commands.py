@@ -18,6 +18,7 @@ from application.webhooks.delivery_log import record as record_delivery
 from domain.webhook import ALL_EVENT_TYPES, WebhookSubscription
 from repository.webhook_repo import webhook_repo
 from utils.dt import utc_now
+from utils.egress import EgressRefusedError, check_outbound_url
 from utils.id_gen import new_id
 from utils.internal_fields import AGENT_INTERNAL_FIELDS
 from utils.serde import record_dict
@@ -86,8 +87,10 @@ def create_webhook(body: dict, user_id: str | None = None) -> dict:
         Dict with ``data`` containing the created subscription.
 
     Raises:
-        ValueError: If any provided event type is not a valid event type.
+        ValueError: If any provided event type is not a valid event type, or
+            the URL is not one the mock may deliver to (see ``utils.egress``).
     """
+    check_outbound_url(str(body.get("url", "")), resolve=False)
     event_types: list[str] = body.get("eventTypes", body.get("event_types", []))
     invalid = [et for et in event_types if et not in ALL_EVENT_TYPES]
     if invalid:
@@ -156,6 +159,19 @@ def _deliver_with_retries(
     This function is designed to run in a background thread so retries do
     not block the original request.
     """
+    try:
+        # Resolved again at delivery: the name may point elsewhere by now.
+        check_outbound_url(sub.url)
+    except EgressRefusedError as exc:
+        record_delivery(DeliveryEntry(
+            subscription_id=sub.id,
+            event_type=event_type,
+            status="failure",
+            attempt=1,
+            timestamp=utc_now(),
+            error=f"delivery refused: {exc}",
+        ))
+        return
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = httpx.post(sub.url, content=body_json, headers=headers, timeout=5.0)

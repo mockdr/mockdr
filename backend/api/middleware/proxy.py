@@ -15,8 +15,10 @@ from application.proxy import queries as proxy_queries
 from application.proxy.auth_headers import build_auth_headers
 from application.proxy.token_cache import OAuth2TokenCache
 from application.proxy.vendor_routing import detect_vendor, strip_prefix
-from domain.proxy_recording import ProxyRecording, VendorProxyConfig
+from domain.proxy_recording import AuthOAuth2, ProxyRecording, VendorProxyConfig
+from utils.dev_paths import is_dev_path
 from utils.dt import utc_now
+from utils.egress import EgressRefusedError, check_outbound_url
 from utils.id_gen import new_id
 from utils.vendor_errors import build_vendor_error, vendor_for_path
 
@@ -54,7 +56,7 @@ class RecordingProxyMiddleware:
         path: str = scope.get("path", "")
 
         # Dev endpoints and disabled mode always pass through.
-        if config.mode == "off" or "/_dev/" in path:
+        if config.mode == "off" or is_dev_path(path):
             await self.app(scope, receive, send)
             return
 
@@ -134,6 +136,15 @@ async def _record_and_forward(
     target_url = vendor_cfg.base_url + upstream_path
     if query_str:
         target_url += f"?{query_str}"
+
+    # The target was checked when it was configured; its name is resolved
+    # again here, so one re-pointed at a metadata address since is refused.
+    try:
+        check_outbound_url(target_url)
+        if isinstance(vendor_cfg.auth, AuthOAuth2):
+            check_outbound_url(vendor_cfg.auth.token_url)
+    except EgressRefusedError:
+        return False
 
     # Build vendor-specific auth headers.
     try:
