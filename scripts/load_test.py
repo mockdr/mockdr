@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import random
 import sys
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -290,6 +291,46 @@ def scenario_mixed_workload(base_url: str, token: str) -> ScenarioReport:
     return run_scenario("Mixed Workload (80/20)", task, workers=_workers(30), total_requests=300)
 
 
+def scenario_reset_under_load(base_url: str, token: str) -> ScenarioReport:
+    """Reads while `/_dev/reset` runs every 100 ms — 20 workers, 400 requests.
+
+    A shared or demo instance is reset under traffic, now on a schedule too
+    (`MOCKDR_RESEED_INTERVAL`). Every read must see the old data set or the
+    new one: a 401 (the API tokens momentarily gone), a 404 or an empty
+    agent list is a torn read, counted as an error. Before the reset ran as
+    one critical section, a concurrent reader saw the store cleared.
+    """
+    stop = threading.Event()
+
+    def keep_resetting() -> None:
+        with httpx.Client(headers={"Authorization": f"ApiToken {token}"},
+                          timeout=30.0) as client:
+            while not stop.is_set():
+                client.post(f"{base_url}/_dev/reset")
+                stop.wait(0.1)
+
+    def task(_i: int) -> RequestResult:
+        with httpx.Client(headers={"Authorization": f"ApiToken {token}"},
+                          timeout=30.0) as client:
+            try:
+                start = time.perf_counter()
+                resp = client.get(f"{base_url}/agents?limit=10")
+                elapsed = (time.perf_counter() - start) * 1000
+            except Exception as exc:  # noqa: BLE001 - any failure is a data point
+                return RequestResult(status_code=0, latency_ms=0.0, error=str(exc))
+            torn = resp.status_code == 200 and not resp.json().get("data")
+            return RequestResult(status_code=resp.status_code, latency_ms=elapsed,
+                                 error="empty agent list mid-reset" if torn else None)
+
+    resetter = threading.Thread(target=keep_resetting, daemon=True)
+    resetter.start()
+    try:
+        return run_scenario("Reset Under Load", task, workers=_workers(20), total_requests=400)
+    finally:
+        stop.set()
+        resetter.join(timeout=30)
+
+
 # ── Output formatting ────────────────────────────────────────────────────────
 
 
@@ -408,7 +449,7 @@ def main() -> None:
 
     print("Server is reachable. Starting load tests...\n")
 
-    # Run all three scenarios
+    # Run every scenario
     reports: list[ScenarioReport] = []
 
     wall_start = time.perf_counter()
@@ -424,6 +465,10 @@ def main() -> None:
     r3 = scenario_mixed_workload(base_url, token)
     print_report(r3)
     reports.append(r3)
+
+    r4 = scenario_reset_under_load(base_url, token)
+    print_report(r4)
+    reports.append(r4)
 
     wall_elapsed = time.perf_counter() - wall_start
     print(f"\nTotal wall time: {wall_elapsed:.1f}s")
