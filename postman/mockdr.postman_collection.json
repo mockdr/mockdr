@@ -6695,7 +6695,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{kibana_base_url}}/api/endpoint/action?page=0&pageSize=25",
+                  "raw": "{{kibana_base_url}}/api/endpoint/action?page=1&pageSize=25",
                   "host": [
                     "{{kibana_base_url}}"
                   ],
@@ -6707,7 +6707,7 @@
                   "query": [
                     {
                       "key": "page",
-                      "value": "0"
+                      "value": "1"
                     },
                     {
                       "key": "pageSize",
