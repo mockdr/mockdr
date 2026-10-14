@@ -14,6 +14,53 @@ from utils.mde_serde import to_mde_resource
 from utils.serde import record_dict
 
 
+class InvalidAlertUpdateError(ValueError):
+    """An alert update Defender refuses with ``400``."""
+
+    def __init__(self, code: str, message: str) -> None:
+        """Keep the Defender error code beside the message."""
+        super().__init__(message)
+        self.code = code
+
+
+#: What an update may set, from update-alert and batch-update-alerts on
+#: https://learn.microsoft.com/en-us/defender-endpoint/api/. ``Unknown`` is a
+#: status the alert resource can carry but no update lists. The two pages
+#: name three determinations differently -- ``ConfirmedActivity`` /
+#: ``ConfirmedUserActivity``, ``NotMalicious`` / ``Clean`` -- and both
+#: spellings are taken rather than refuse one the docs print.
+UPDATABLE: dict[str, frozenset[str]] = {
+    "status": frozenset({"New", "InProgress", "Resolved"}),
+    "classification": frozenset({"TruePositive", "InformationalExpectedActivity", "FalsePositive"}),
+    "determination": frozenset({
+        "MultiStagedAttack", "MaliciousUserActivity", "CompromisedUser", "Malware", "Phishing",
+        "UnwantedSoftware", "Other", "SecurityTesting", "LineOfBusinessApplication",
+        "ConfirmedActivity", "ConfirmedUserActivity", "NotMalicious", "Clean",
+        "InsufficientData",
+    }),
+}
+
+
+def validate_alert_update(body: dict) -> None:
+    """Refuse a value the update pages do not list.
+
+    The mock stored ``status``, ``classification`` and ``determination``
+    verbatim, so ``"status": "Closed"`` -- a Sentinel word -- came back as the
+    alert's status with a 200, and every later read carried a value no
+    Defender client can map.
+
+    Raises:
+        InvalidAlertUpdateError: ``InvalidRequestBody``.
+    """
+    for field, allowed in UPDATABLE.items():
+        if field in body and body[field] is not None and body[field] not in allowed:
+            raise InvalidAlertUpdateError(
+                "InvalidRequestBody",
+                f"Invalid request body. {field} '{body[field]}' is not one of "
+                f"{', '.join(sorted(allowed))}.",
+            )
+
+
 def update_alert(alert_id: str, body: dict) -> dict | None:
     """Update an existing alert (PATCH semantics).
 
@@ -26,7 +73,11 @@ def update_alert(alert_id: str, body: dict) -> dict | None:
 
     Returns:
         Updated alert dict, or None if not found.
+
+    Raises:
+        InvalidAlertUpdateError: A value the update page does not list.
     """
+    validate_alert_update(body)
     alert = mde_alert_repo.get(alert_id)
     if not alert:
         return None
@@ -98,20 +149,25 @@ def create_alert_by_reference(body: dict) -> dict:
     return payload
 
 
-def batch_update_alerts(body: dict) -> list[dict]:
+def batch_update_alerts(body: dict) -> None:
     """Batch update multiple alerts at once.
+
+    ``alertIds`` is "Required" (batch-update-alerts); the mock defaulted it to
+    an empty list and answered 200 having changed nothing. The values are
+    checked once, before any alert changes, so a refused batch leaves every
+    alert as it was.
 
     Args:
         body: Dict with ``alertIds`` list and fields to update (``status``,
               ``classification``, ``determination``, ``assignedTo``, ``comment``).
 
-    Returns:
-        List of updated alert dicts.
+    Raises:
+        InvalidAlertUpdateError: ``MissingRequiredParameter`` without
+            ``alertIds``, ``InvalidRequestBody`` for a value not listed.
     """
-    alert_ids: list[str] = body.get("alertIds", [])
-    updated: list[dict] = []
+    alert_ids = body.get("alertIds")
+    if not isinstance(alert_ids, list) or not alert_ids:
+        raise InvalidAlertUpdateError("MissingRequiredParameter", "Parameter alertIds is missing.")
+    validate_alert_update(body)
     for alert_id in alert_ids:
-        result = update_alert(alert_id, body)
-        if result:
-            updated.append(result)
-    return complete_mde(updated, "alert") if isinstance(updated, dict) else updated
+        update_alert(str(alert_id), body)

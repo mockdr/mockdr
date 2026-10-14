@@ -5,13 +5,13 @@ create by reference, and batch update.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 
 from api.mde_auth import require_mde_auth, require_mde_write
 from application.mde_alerts import commands as alert_commands
 from application.mde_alerts import queries as alert_queries
 from utils.mde_filterable import refuse_unfilterable
-from utils.mde_response import build_mde_error_response, build_mde_list_response
+from utils.mde_response import build_mde_error_response
 
 router = APIRouter(tags=["MDE Alerts"])
 
@@ -56,7 +56,12 @@ def update_alert(
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Update an alert (status, classification, determination, assignedTo, comment)."""
-    result = alert_commands.update_alert(alert_id, body)
+    try:
+        result = alert_commands.update_alert(alert_id, body)
+    except alert_commands.InvalidAlertUpdateError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_mde_error_response(exc.code, str(exc)),
+        ) from exc
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -78,7 +83,19 @@ def create_alert_by_reference(
 def batch_update_alerts(
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
-) -> dict:
-    """Batch update multiple alerts at once."""
-    updated = alert_commands.batch_update_alerts(body)
-    return build_mde_list_response(updated)
+) -> Response:
+    """Batch update multiple alerts at once.
+
+    "If successful, this method returns 200 OK, with an empty response body"
+    (https://learn.microsoft.com/en-us/defender-endpoint/api/batch-update-alerts).
+    The mock answered an OData collection of the updated alerts, which a
+    client written against it would go on to read and never find in
+    production.
+    """
+    try:
+        alert_commands.batch_update_alerts(body)
+    except alert_commands.InvalidAlertUpdateError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_mde_error_response(exc.code, str(exc)),
+        ) from exc
+    return Response(status_code=200)

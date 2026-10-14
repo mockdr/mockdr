@@ -178,10 +178,9 @@ class TestBatchUpdateAlerts:
                 "classification": "FalsePositive",
             },
         )
+        # "200 OK, with an empty response body" (batch-update-alerts).
         assert resp.status_code == 200
-        body = resp.json()
-        assert "@odata.context" in body
-        assert "value" in body
+        assert resp.content == b""
 
         # Verify updates persisted
         for aid in alert_ids:

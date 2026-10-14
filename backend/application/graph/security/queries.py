@@ -23,6 +23,7 @@ def list_alerts_v2(
     skip: int = 0,
     orderby: str | None = None,
     select: str | None = None,
+    count: bool = False,
 ) -> dict:
     """Return security alerts v2 with OData query support.
 
@@ -32,6 +33,7 @@ def list_alerts_v2(
         skip:       Number of records to skip (``$skip``).
         orderby:    OData ``$orderby`` expression.
         select:     OData ``$select`` expression.
+        count:      ``$count=true``: report the filtered total.
 
     Returns:
         OData list response dict.
@@ -55,6 +57,7 @@ def list_alerts_v2(
         value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#security/alerts_v2",
         next_link=next_link,
+        count=total if count else None,
     )
 
 
@@ -73,6 +76,48 @@ def get_alert_v2(alert_id: str) -> dict | None:
     return record_dict(alert)
 
 
+#: What a PATCH may set. Status is the update page's list -- `unknown` is a
+#: value an alert can carry but not one the page lets a caller set. For
+#: classification and determination the page and the v1.0 metadata disagree
+#: on four determination names (`compromisedUser`/`compromisedAccount`,
+#: `clean`/`notMalicious`, `insufficientData`/`notEnoughDataToValidate`,
+#: `confirmedUserActivity`/`confirmedActivity`); both spellings are taken.
+#: https://learn.microsoft.com/en-us/graph/api/security-alert-update?view=graph-rest-1.0
+_ALERT_STATUS = frozenset({"new", "inProgress", "resolved", "unknownFutureValue"})
+_ALERT_UPDATE_DETERMINATIONS = frozenset({
+    "unknown", "apt", "malware", "securityPersonnel", "securityTesting", "unwantedSoftware",
+    "other", "multiStagedAttack", "compromisedUser", "phishing", "maliciousUserActivity",
+    "clean", "insufficientData", "confirmedUserActivity", "lineOfBusinessApplication",
+    "unknownFutureValue",
+})
+
+
+class InvalidAlertUpdateError(ValueError):
+    """A PATCH value outside the enum the update page documents."""
+
+
+def _check_alert_update(body: dict) -> None:
+    """Refuse a value the alerts_v2 update page does not list.
+
+    The mock stored any string, so ``"status": "Resolved"`` -- Defender's
+    PascalCase, which Graph's lowerCamel enum does not contain -- was saved
+    and served back to every later read.
+
+    Raises:
+        InvalidAlertUpdateError: The field and the value refused.
+    """
+    enums = graph_enum_order()
+    allowed = {
+        "status": _ALERT_STATUS,
+        "classification": frozenset(enums.get("classification") or ()),
+        "determination": _ALERT_UPDATE_DETERMINATIONS | frozenset(enums.get("determination") or ()),
+    }
+    for field, members in allowed.items():
+        if members and field in body and body[field] is not None and body[field] not in members:
+            msg = f"Invalid value '{body[field]}' for property '{field}'."
+            raise InvalidAlertUpdateError(msg)
+
+
 def update_alert_v2(alert_id: str, body: dict) -> dict | None:
     """Update a security alert v2 (status, assignedTo, classification, determination).
 
@@ -82,7 +127,11 @@ def update_alert_v2(alert_id: str, body: dict) -> dict | None:
 
     Returns:
         Updated alert dict or ``None`` if not found.
+
+    Raises:
+        InvalidAlertUpdateError: A value the update page does not list.
     """
+    _check_alert_update(body)
     alert = graph_security_alert_repo.get(alert_id)
     if alert is None:
         return None
@@ -105,6 +154,7 @@ def list_incidents(
     orderby: str | None = None,
     select: str | None = None,
     expand: str | None = None,
+    count: bool = False,
 ) -> dict:
     """Return security incidents with OData query support.
 
@@ -115,6 +165,7 @@ def list_incidents(
         orderby:    OData ``$orderby`` expression.
         select:     OData ``$select`` expression.
         expand:     OData ``$expand`` expression (supports ``alerts``).
+        count:      ``$count=true``: report the filtered total.
 
     Returns:
         OData list response dict.
@@ -141,6 +192,7 @@ def list_incidents(
         value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#security/incidents",
         next_link=next_link,
+        count=total if count else None,
     )
 
 

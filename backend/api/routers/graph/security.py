@@ -19,12 +19,20 @@ async def list_alerts_v2(
     skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
+    count: bool = Query(False, alias="$count"),
     _: dict = Depends(require_graph_feature("security/alerts_v2")),
 ) -> dict:
-    """List security alerts v2."""
+    """List security alerts v2.
+
+    The list page documents ``$count`` among its query parameters
+    (https://learn.microsoft.com/en-us/graph/api/security-list-alerts_v2?view=graph-rest-1.0);
+    the route did not take it, so ``$count=true`` was dropped and no
+    ``@odata.count`` came back. Alerts are not directory objects, so no
+    ``ConsistencyLevel`` header is involved.
+    """
     return sec_queries.list_alerts_v2(
         filter_str=filter_str, top=top, skip=skip,
-        orderby=orderby, select=select,
+        orderby=orderby, select=select, count=count,
     )
 
 
@@ -53,7 +61,12 @@ async def update_alert_v2(
     _: dict = Depends(require_graph_feature("security/alerts_v2")),
 ) -> dict:
     """Update a security alert v2 (status, assignedTo, classification, determination)."""
-    result = sec_queries.update_alert_v2(alert_id=alert_id, body=body)
+    try:
+        result = sec_queries.update_alert_v2(alert_id=alert_id, body=body)
+    except sec_queries.InvalidAlertUpdateError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_graph_error_response("badRequest", str(exc)),
+        ) from exc
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -75,12 +88,17 @@ async def list_incidents(
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     expand: str = Query(None, alias="$expand"),
+    count: bool = Query(False, alias="$count"),
     _: dict = Depends(require_graph_feature("security/incidents")),
 ) -> dict:
-    """List security incidents."""
+    """List security incidents.
+
+    ``$count`` is documented here too (security-list-incidents: "$count,
+    $filter, $skip, $top, $expand") and was dropped the same way.
+    """
     return sec_queries.list_incidents(
         filter_str=filter_str, top=top, skip=skip,
-        orderby=orderby, select=select, expand=expand,
+        orderby=orderby, select=select, expand=expand, count=count,
     )
 
 
