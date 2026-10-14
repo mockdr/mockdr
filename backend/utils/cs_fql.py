@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatch, fnmatchcase
 from typing import Any
 
+from utils.dt import parse_utc
 from utils.nested import get_nested as _get_nested
 
 # ---------------------------------------------------------------------------
@@ -477,12 +478,7 @@ def _relative_moment(target: str) -> datetime | None:
 
 def _as_datetime(value: Any) -> datetime | None:  # noqa: ANN401 - any record value
     """A record's timestamp as an aware datetime, or None if it is not one."""
-    text = str(value).strip()
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return parse_utc(str(value).strip())
 
 
 def apply_fql(records: list, fql: str) -> list:

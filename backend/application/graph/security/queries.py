@@ -8,6 +8,7 @@ from application.mde_advanced_hunting.queries import run_query as run_hunt
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
 from repository.graph.security_incident_repo import graph_security_incident_repo
+from utils.dt import parse_utc
 from utils.graph_odata import (
     apply_graph_filter,
     apply_odata_orderby,
@@ -256,14 +257,6 @@ def _duration(text: str) -> timedelta | None:
                      minutes=parts.get("m", 0), seconds=parts.get("s", 0))
 
 
-def _instant(text: str) -> datetime | None:
-    try:
-        value = datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return value if value.tzinfo else value.replace(tzinfo=UTC)
-
-
 def hunting_window(timespan: str | None, now: datetime | None = None) -> tuple[datetime, datetime]:
     """The ``(start, end)`` a runHuntingQuery ``Timespan`` selects.
 
@@ -282,7 +275,7 @@ def hunting_window(timespan: str | None, now: datetime | None = None) -> tuple[d
     text = str(timespan).strip()
     if "/" in text:
         left, _, right = text.partition("/")
-        start, end = _instant(left), _instant(right)
+        start, end = parse_utc(left.strip()), parse_utc(right.strip())
         if start and end:
             return start, end
         if end and (back := _duration(left)) is not None:
@@ -291,7 +284,7 @@ def hunting_window(timespan: str | None, now: datetime | None = None) -> tuple[d
             return start, start + ahead
     elif (back := _duration(text)) is not None:
         return now - back, now
-    elif (start := _instant(text)) is not None:
+    elif (start := parse_utc(text.strip())) is not None:
         return start, now
     msg = f"Timespan '{text}' is not a valid ISO 8601 interval, duration or date."
     raise InvalidTimespanError(msg)

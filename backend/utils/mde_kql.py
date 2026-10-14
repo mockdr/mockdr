@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from utils.dt import parse_utc
 from utils.safe_regex import UnsafeRegexError, check_regex
 
 __all__ = ["KqlError", "KqlQuery", "evaluate_kql", "parse_kql"]
@@ -334,12 +335,11 @@ def _timespan(text: str) -> timedelta:
 
 
 def _parse_datetime(text: str) -> datetime:
-    try:
-        value = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
+    value = parse_utc(text)
+    if value is None:
         msg = f"A datetime literal is expected, found '{text}'"
-        raise KqlError(msg) from None
-    return value if value.tzinfo else value.replace(tzinfo=UTC)
+        raise KqlError(msg)
+    return value
 
 
 def _as_datetime(value: Any) -> datetime | None:
