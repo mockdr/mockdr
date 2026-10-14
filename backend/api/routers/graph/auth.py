@@ -27,7 +27,11 @@ from utils.entra_client_auth import (
     require_default_scope,
     resolve_client_credentials,
 )
-from utils.entra_discovery import empty_key_set, openid_configuration
+from utils.entra_discovery import (
+    empty_key_set,
+    openid_configuration,
+    refuse_unhosted_tenant,
+)
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
@@ -213,10 +217,17 @@ async def openid_configuration_document(tenant_id: str, request: Request) -> dic
     See :mod:`utils.entra_discovery`. ``token_endpoint`` is this mount's own
     tenant-scoped token route on the host the client called.
     """
+    refuse_unhosted_tenant(tenant_id, _hosted_tenants())
     return openid_configuration(request, "/graph", tenant_id)
 
 
 @router.get("/{tenant_id}/discovery/v2.0/keys")
 async def signing_keys(tenant_id: str) -> dict:
     """The key set ``jwks_uri`` names -- empty, as Graph mock tokens are opaque."""
+    refuse_unhosted_tenant(tenant_id, _hosted_tenants())
     return empty_key_set()
+
+
+def _hosted_tenants() -> list[tuple[str, str]]:
+    """The tenants this mount's clients belong to, as ``(id, domain)``."""
+    return [(c.tenant_id, c.tenant_domain) for c in graph_oauth_client_repo.list_all()]

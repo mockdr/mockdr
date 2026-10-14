@@ -156,6 +156,26 @@ class TestDiscovery:
         token = issued.json()["access_token"]
         assert client.get(probe, headers={"Authorization": f"Bearer {token}"}).status_code == 200
 
+    @pytest.mark.parametrize("mount", ["/graph", "/mde"])
+    @pytest.mark.parametrize(
+        "route", ["v2.0/.well-known/openid-configuration", "discovery/v2.0/keys"],
+    )
+    def test_a_tenant_the_mount_does_not_host_is_refused(
+        self, client: TestClient, mount: str, route: str,
+    ) -> None:
+        """Entra answers discovery for an unknown tenant ``400 invalid_tenant``.
+
+        Both routes served any tenant segment, and the key set's never read it.
+        The hosted tenant, its verified domain and the multi-tenant aliases
+        still resolve.
+        """
+        unknown = client.get(f"{mount}/00000000-0000-0000-0000-00000000dead/{route}")
+        assert unknown.status_code == 400
+        assert unknown.json()["error"] == "invalid_tenant"
+        assert unknown.json()["error_codes"] == [90002]
+        for tenant in (GRAPH_TENANT_ID, "acmecorp.onmicrosoft.com", "common"):
+            assert client.get(f"{mount}/{tenant}/{route}").status_code == 200
+
     def test_the_common_document_keeps_the_issuer_template(self, client: TestClient) -> None:
         body = client.get("/graph/common/v2.0/.well-known/openid-configuration").json()
         assert body["issuer"].endswith("/graph/{tenantid}/v2.0")

@@ -18,12 +18,46 @@ methods) are those of ``login.microsoftonline.com``'s own document.
 
 Tokens stay opaque: ``jwks_uri`` answers an empty key set, because there is
 no signature for a client to check.
+
+A tenant the mount does not host is refused on both routes the way Entra
+refuses it, ``400 invalid_tenant`` with ``AADSTS90002``; the multi-tenant
+aliases resolve, as they do at ``login.microsoftonline.com``.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
+
+from fastapi import HTTPException
 from starlette.requests import Request
 
-from utils.entra_tenant import ENTRA_TENANT_ALIASES
+from utils.entra_tenant import (
+    ENTRA_TENANT_ALIASES,
+    tenant_rejection_message,
+    tenant_segment_matches,
+)
+from utils.entra_token_errors import AADSTS_TENANT_NOT_FOUND, build_token_error
+
+
+def refuse_unhosted_tenant(tenant: str, hosted: Iterable[tuple[str, str]]) -> None:
+    """Refuse a discovery request for a tenant this mount does not host.
+
+    Args:
+        tenant: The tenant segment from the URL.
+        hosted: ``(tenant_id, tenant_domain)`` of each client the mount holds.
+
+    Raises:
+        HTTPException: 400 ``invalid_tenant`` (AADSTS90002) for an unknown tenant.
+    """
+    if tenant.casefold() in ENTRA_TENANT_ALIASES:
+        return
+    if any(tenant_segment_matches(tenant, tid, domain) for tid, domain in hosted):
+        return
+    raise HTTPException(
+        status_code=400,
+        detail=build_token_error(
+            "invalid_tenant", tenant_rejection_message(tenant), AADSTS_TENANT_NOT_FOUND,
+        ),
+    )
 
 
 def openid_configuration(request: Request, mount: str, tenant: str) -> dict:
