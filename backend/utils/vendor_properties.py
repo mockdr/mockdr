@@ -19,9 +19,8 @@ from __future__ import annotations
 import functools
 import json
 import re
-from pathlib import Path
 
-_SPECS = Path(__file__).resolve().parents[2] / "data" / "vendor-specs"
+from utils.vendor_specs import spec_path
 
 #: Where each reference's routes are mounted in this mock.
 _GRAPH_PREFIX = "/graph"
@@ -38,7 +37,7 @@ def _root(path: str) -> str:
 
 def _graph_properties() -> dict[str, frozenset[str]]:
     """Route -> the properties of the resource it answers, from the v1.0 reference."""
-    path = _SPECS / "graph_v1.0_reduced.json"
+    path = spec_path("graph_v1.0_reduced.json")
     if not path.exists():
         return {}
     routes: dict[str, frozenset[str]] = {}
@@ -56,7 +55,7 @@ def _graph_properties() -> dict[str, frozenset[str]]:
 
 def _mde_properties() -> dict[str, frozenset[str]]:
     """Route -> the properties Defender's docs record for its answer."""
-    path = _SPECS / "mde_docs_reduced.json"
+    path = spec_path("mde_docs_reduced.json")
     if not path.exists():
         return {}
     routes: dict[str, frozenset[str]] = {}

@@ -16,9 +16,8 @@ from __future__ import annotations
 
 import functools
 import json
-from pathlib import Path
 
-_SPECS = Path(__file__).resolve().parents[2] / "data" / "vendor-specs"
+from utils.vendor_specs import spec_path
 
 #: Which enum type each Graph field carries, for the entities the mock
 #: serves. The members themselves come from the metadata.
@@ -35,7 +34,7 @@ _GRAPH_FIELDS: dict[str, str] = {
 @functools.cache
 def graph_enum_order() -> dict[str, tuple[str, ...]]:
     """Graph's alert and incident enums, field name -> declared order."""
-    path = _SPECS / "graph_v1.0_csdl_types.json"
+    path = spec_path("graph_v1.0_csdl_types.json")
     if not path.exists():
         return {}
     types = json.loads(path.read_text())
@@ -54,7 +53,7 @@ def graph_enum_order() -> dict[str, tuple[str, ...]]:
 @functools.cache
 def mde_enum_order(entity: str = "alerts") -> dict[str, tuple[str, ...]]:
     """Defender's enums for one docs entity, field name -> declared order."""
-    path = _SPECS / "mde_docs_reduced.json"
+    path = spec_path("mde_docs_reduced.json")
     if not path.exists():
         return {}
     enums = (json.loads(path.read_text()).get("enums") or {}).get(entity) or {}

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "mockdr"
@@ -16,7 +16,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -24,7 +23,10 @@ classifiers = [
     "Topic :: Software Development :: Testing",
     "Topic :: Software Development :: Testing :: Mocking",
 ]
-readme = "../README.md"
+# The README sits beside backend/, where a build may not read it (setuptools
+# refuses a file outside the project directory), so the long description
+# points at it.
+readme = {text = "Full-fidelity multi-EDR/SIEM mock server. See https://github.com/mockdr/mockdr#readme.", content-type = "text/markdown"}
 dependencies = [
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
@@ -48,6 +50,28 @@ Issues = "https://github.com/mockdr/mockdr/issues"
 
 [project.scripts]
 mockdr = "main:_cli"
+
+# ── Packaging ──────────────────────────────────────────────────────────────────
+# The backend is a flat layout of several top-level packages plus `main` and
+# `config`, and `mockdr.testing` starts the whole app ("main:app"), so an
+# install carries all of it, with the JSON fixtures the routes answer from.
+# The three vendor references the app reads at run time live in
+# ../data/vendor-specs; setup.py copies them in (see utils/vendor_specs.py).
+
+[tool.setuptools]
+py-modules = ["main", "config"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "api*", "application*", "domain*", "infrastructure*", "mockdr*",
+    "repository*", "utils*",
+]
+
+[tool.setuptools.package-data]
+"infrastructure" = ["fixtures/*.json", "fixtures/*/*.json"]
+"utils" = ["_vendor_specs/*.json"]
 
 # ── Pytest ─────────────────────────────────────────────────────────────────────
 

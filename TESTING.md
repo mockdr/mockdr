@@ -647,4 +647,42 @@ You are operating in a production codebase. The following instructions override 
 
 ---
 
+## 9. Using mockdr from Another Test Suite
+
+`mockdr.testing` (ADR-013) gives an external pytest suite a live mock on a
+free port and a typed client for it. It starts the whole app (`main:app`), so
+installing it installs the server: every backend package, the JSON fixtures
+the routes answer from, and the three vendor references the app reads at run
+time (Graph's and Defender's enum order and property lists), which
+`backend/setup.py` copies in from `data/vendor-specs/`.
+
+Install from a checkout, with the `testing` extra (pytest), pinned to the
+versions the mock was measured with:
+
+<!-- doc-examples: skip installs packages into the caller's environment; exercised by hand into a throwaway venv before a release -->
+```bash
+pip install -r backend/requirements.txt "./backend[testing]"
+```
+
+Without `-r backend/requirements.txt` pip resolves the newest FastAPI and
+Starlette, and Starlette 1.8 adds a `Vary: Origin` to every answer, which
+neither splunkd nor Elasticsearch sends.
+
+Then, in the suite's own `conftest.py`:
+
+<!-- doc-examples: skip a pytest conftest for another project; exercised by tests/integration/api/test_public_testing_fixture.py -->
+```python
+from mockdr.testing import MockdrClient, mockdr_server  # noqa: F401 - the fixture
+
+def test_agents(mockdr_server: MockdrClient) -> None:
+    assert mockdr_server.get("/agents")["pagination"]["totalItems"] > 0
+```
+
+`mockdr_server` is session-scoped: call `mockdr_server.reset()` between tests
+that write. The other mounts (`/cs`, `/mde`, `/graph`, `/sentinel`, `/xdr`,
+`/splunk`, `/elastic`, `/kibana`) are on the same host and port. The build
+configuration itself is held by `backend/tests/unit/test_packaging.py`.
+
+---
+
 *Last updated: 2026-03-13 | Owner: mockdr | Next review: on any architectural change to domain boundaries or coverage thresholds*
