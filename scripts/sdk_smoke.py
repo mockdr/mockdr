@@ -793,7 +793,9 @@ def splunk(cfg: Config, step: Steps) -> None:
         check(len(svc.saved_searches.list()) > 0, "saved searches")
         check({"admin"} <= {u.name for u in svc.users.list()}, "users")
         check(len(svc.roles.list()) > 0, "roles")
-    step("collections: indexes, saved searches, users, roles", collections)
+        check(set(svc.inputs.kinds) >= {"http", "monitor", "tcp/raw"}, str(svc.inputs.kinds))
+        svc.inputs.list()
+    step("collections: indexes, saved searches, users, roles, inputs", collections)
 
     def job():
         job = svc.jobs.create("search index=* | head 25", exec_mode="normal")

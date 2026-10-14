@@ -245,6 +245,49 @@ def lookup_files(_user: dict = Depends(require_splunk_auth)) -> dict:
     return _collection([], "data/lookup-table-files", _knowledge_links("data/lookup-table-files"))
 
 
+#: The input kinds this deployment serves, as ``data/inputs`` lists them: a
+#: kind that is a collection of inputs offers ``create``; ``tcp`` is a
+#: namespace over its own kinds and offers none.
+_INPUT_KINDS: dict[str, tuple[str, ...]] = {"": ("http", "monitor", "tcp"), "tcp": ("raw",)}
+_INPUT_NAMESPACES = frozenset({"tcp"})
+
+
+def _input_kinds(parent: str) -> dict:
+    """The ``data/inputs[/parent]`` listing of input kinds.
+
+    splunklib's ``service.inputs`` starts here: ``Inputs.kinds`` reads
+    ``GET data/inputs``, takes each entry whose links include ``create`` as
+    a kind, and descends into the ones that do not (``client.py``,
+    ``Inputs._get_kind_list``); ``inputs.list()`` then reads each kind's
+    collection. The listing was not served, so ``service.inputs.list()``
+    raised ``HTTPError 404`` before it reached the collections that are.
+    """
+    collection = f"data/inputs/{parent}".rstrip("/")
+    entries = []
+    for kind in _INPUT_KINDS[parent]:
+        namespace = not parent and kind in _INPUT_NAMESPACES
+        entry = build_splunk_entry(
+            kind, {}, collection=collection, fields=False,
+            links=("alternate", "list") if namespace else ("alternate", "list", "create"),
+        )
+        if "create" in entry["links"]:
+            entry["links"]["create"] = f"{entry['links']['alternate']}/_new"
+        entries.append(entry)
+    return _collection(entries, collection)
+
+
+@router.get("/services/data/inputs")
+def input_kinds(_user: dict = Depends(require_splunk_auth)) -> dict:
+    """The input kinds -- see :func:`_input_kinds`."""
+    return _input_kinds("")
+
+
+@router.get("/services/data/inputs/tcp")
+def tcp_input_kinds(_user: dict = Depends(require_splunk_auth)) -> dict:
+    """The TCP input kinds -- see :func:`_input_kinds`."""
+    return _input_kinds("tcp")
+
+
 @router.get("/services/data/inputs/monitor")
 def monitor_inputs(_user: dict = Depends(require_splunk_auth)) -> dict:
     """Monitored files, of which this deployment has none."""
