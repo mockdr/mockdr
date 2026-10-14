@@ -142,7 +142,7 @@ def seed_xdr_endpoints(fake: Faker) -> list[str]:
         endpoint.first_seen = _epoch_ms(agent.createdAt) or endpoint.first_seen
         endpoint.last_seen = _epoch_ms(agent.lastActiveDate) or endpoint.last_seen
         endpoint.is_isolated = (
-            "isolated" if agent.networkQuarantineEnabled else "unisolated")
+            AGENT_ISOLATED if agent.networkQuarantineEnabled else AGENT_UNISOLATED)
         if agent.networkQuarantineEnabled:
             endpoint.isolated_date = endpoint.last_seen
         xdr_endpoint_repo.save(endpoint)

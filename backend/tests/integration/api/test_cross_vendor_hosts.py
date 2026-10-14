@@ -108,7 +108,7 @@ class TestEveryVendorReadsTheHostFromS1:
     def test_isolation_is_s1s(self, client: TestClient) -> None:
         agents = {a.id: a for a in _agents()}
         for agent_id, endpoint in _copy("xdr_endpoints", "xdr_endpoint_id").items():
-            expected = "isolated" if agents[agent_id].networkQuarantineEnabled else "unisolated"
+            expected = "AGENT_ISOLATED" if agents[agent_id].networkQuarantineEnabled else "AGENT_UNISOLATED"
             assert endpoint.is_isolated == expected  # type: ignore[attr-defined]
         for agent_id, endpoint in _copy("es_endpoints", "es_agent_id").items():
             expected = "isolated" if agents[agent_id].networkQuarantineEnabled else "normal"
