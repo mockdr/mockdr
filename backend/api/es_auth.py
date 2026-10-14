@@ -157,11 +157,46 @@ def token_user(access_token: str) -> dict | None:
     An expired or invalidated token is no token at all, as on the cluster.
     """
     record = store.get("es_tokens", access_token)
-    if record is None or record.get("invalidated"):
-        return None
-    if float(record.get("expires_at", 0)) <= time.time():
+    if record is None or token_spent(record):
         return None
     return {"user": record["user"], "role": record["role"]}
+
+
+def token_spent(record: dict) -> bool:
+    """Whether an access token the cluster still holds is expired or invalidated."""
+    return bool(record.get("invalidated")) or float(record.get("expires_at", 0)) <= time.time()
+
+
+#: The challenge `TokenService.expiredTokenException()` adds to its 401:
+#: `EXPIRED_TOKEN_WWW_AUTH_VALUE`, Elasticsearch 8.15.
+_EXPIRED_TOKEN_CHALLENGE = (
+    'Bearer realm="security", error="invalid_token", '
+    'error_description="The access token expired"'
+)
+
+
+def _refuse_spent_token(request: Request) -> HTTPException:
+    """The 401 Elasticsearch answers a token it holds but will not honour.
+
+    `TokenService.getAndValidateUserToken` fails an invalidated token, and
+    one past its expiration time, with `expiredTokenException()`: reason
+    "token expired" and the Bearer challenge above, so a client can tell "get
+    a new token" from "these credentials are wrong" (Elasticsearch 8.15
+    source). The mock answered both with the generic "unable to authenticate"
+    and the Basic/ApiKey challenge, which gives a refreshing client nothing
+    to act on. Once the token document is deleted — 24 h after creation,
+    `ExpiredTokenRemover` — the cluster no longer knows it, and the generic
+    refusal is right again.
+    """
+    if request.url.path.startswith("/kibana"):
+        return HTTPException(status_code=401, detail=_auth_error(
+            request, 401, "security_exception", "token expired"))
+    detail = build_es_auth_error(401, "token expired")
+    challenge = {"WWW-Authenticate": [_EXPIRED_TOKEN_CHALLENGE]}
+    detail["error"]["header"] = challenge
+    detail["error"]["root_cause"][0]["header"] = challenge
+    return HTTPException(status_code=401, detail=detail,
+                         headers={"WWW-Authenticate": _EXPIRED_TOKEN_CHALLENGE})
 
 
 # ── Public dependencies ──────────────────────────────────────────────────────
@@ -270,6 +305,9 @@ async def require_es_auth(
         # An access token from `POST /_security/oauth2/token` is presented
         # exactly like this (security-api-get-token.html, 8.15). The endpoint
         # used to issue tokens this check then refused.
+        held = store.get("es_tokens", token_value)
+        if held is not None and token_spent(held):
+            raise _refuse_spent_token(request)
         result = token_user(token_value)
         if result is None and ":" in token_value:
             key_id, api_key = token_value.split(":", 1)

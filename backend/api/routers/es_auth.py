@@ -49,6 +49,12 @@ TOKEN_LIFETIME_SECONDS: int = 1200
 #: pair (`checkMultipleRefreshes`).
 _REFRESH_REUSE_SECONDS = 30
 
+#: A token document's whole life: a refresh token is refused once it is
+#: older (`checkTokenDocumentExpired`, "token document has expired"), and
+#: `ExpiredTokenRemover` deletes the document then
+#: (`MAXIMUM_TOKEN_LIFETIME_HOURS = 24`, Elasticsearch 8.15).
+TOKEN_DOCUMENT_LIFETIME_SECONDS = 24 * 3600
+
 #: `CreateTokenRequest.SUPPORTED_GRANT_TYPES`, in its EnumSet order.
 _GRANT_TYPES = ("password", "_kerberos", "refresh_token", "client_credentials")
 
@@ -83,9 +89,11 @@ def _authentication(username: str, role: str) -> dict:
 def _mint(username: str, role: str, *, with_refresh: bool) -> dict:
     """Store a new access token (and refresh token) and answer with them."""
     access_token = base64.b64encode(secrets.token_bytes(48)).decode()
+    now = time.time()
     record = {
         "user": username, "role": role,
-        "expires_at": time.time() + TOKEN_LIFETIME_SECONDS,
+        "created_at": now,
+        "expires_at": now + TOKEN_LIFETIME_SECONDS,
         "invalidated": False,
     }
     store.save("es_tokens", access_token, record)
@@ -98,7 +106,7 @@ def _mint(username: str, role: str, *, with_refresh: bool) -> dict:
         refresh_token = secrets.token_urlsafe(15)
         store.save("es_refresh_tokens", refresh_token, {
             "user": username, "role": role, "access_token": access_token,
-            "invalidated": False, "refreshed_at": None, "superseded_by": None,
+            "created_at": now, "invalidated": False, "refreshed_at": None, "superseded_by": None,
         })
         response["refresh_token"] = refresh_token
     response["authentication"] = _authentication(username, role)
@@ -181,6 +189,9 @@ def _refresh(refresh_token: str) -> dict | JSONResponse:
         return _oauth_error("invalid_grant", "could not refresh the requested token")
     if record.get("invalidated"):
         return _oauth_error("invalid_grant", "token has been invalidated")
+    created_at = record.get("created_at")
+    if created_at is not None and time.time() > float(created_at) + TOKEN_DOCUMENT_LIFETIME_SECONDS:
+        return _oauth_error("invalid_grant", "token document has expired")
     refreshed_at = record.get("refreshed_at")
     if refreshed_at is not None:
         if time.time() > float(refreshed_at) + _REFRESH_REUSE_SECONDS:
@@ -259,3 +270,23 @@ def _invalidation(invalidated: int, previously: int, *, status: int = 200) -> JS
         "previously_invalidated_tokens": previously,
         "error_count": 0,
     })
+
+
+def reap_tokens(now: float | None = None) -> int:
+    """Delete token documents older than a day, as `ExpiredTokenRemover` does.
+
+    Every token the service minted stayed in the store until a cap of 5,000
+    evicted the oldest, valid or not, so a client that asks for a token per
+    call eventually pushed out one another client still held.
+    """
+    moment = time.time() if now is None else now
+    removed = 0
+    for collection in ("es_tokens", "es_refresh_tokens"):
+        for key, record in store.get_all_with_keys(collection).items():
+            created = record.get("created_at")
+            if created is None and record.get("expires_at") is not None:
+                created = float(record["expires_at"]) - TOKEN_LIFETIME_SECONDS
+            if created is not None and moment > float(created) + TOKEN_DOCUMENT_LIFETIME_SECONDS:
+                store.delete(collection, key)
+                removed += 1
+    return removed
