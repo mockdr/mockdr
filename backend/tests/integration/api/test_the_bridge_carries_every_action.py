@@ -85,5 +85,5 @@ class TestAnActionReachesTheSiem:
                   if getattr(e, "sourcetype", "") == "pan:xdr:endpoint"][-1]
         raw = json.loads(latest.raw) if isinstance(latest.raw, str) else latest.raw
         assert raw["endpoint_id"] == endpoint["endpoint_id"]
-        assert raw["is_isolated"] == "isolated", "the SIEM would report it still free"
+        assert raw["is_isolated"] == "AGENT_PENDING_ISOLATION", "the SIEM would report it still free"
         assert latest.index == "cortex_xdr"

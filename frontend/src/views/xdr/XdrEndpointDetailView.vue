@@ -24,11 +24,14 @@ function statusBadgeClass(status: string): string {
   }
 }
 
+// Cortex spells `is_isolated` as one of four AGENT_* states; the two pending
+// ones last until the agent acknowledges.
 function isolationBadgeClass(isolation: string): string {
-  switch ((isolation ?? '').toLowerCase()) {
-    case 'isolated': return 'bg-red-500/15 text-red-400'
-    case 'unisolated':
-    case 'not_isolated': return 'bg-green-500/15 text-green-400'
+  switch (isolation ?? '') {
+    case 'AGENT_ISOLATED': return 'bg-red-500/15 text-red-400'
+    case 'AGENT_UNISOLATED': return 'bg-green-500/15 text-green-400'
+    case 'AGENT_PENDING_ISOLATION':
+    case 'AGENT_PENDING_ISOLATION_CANCELLATION': return 'bg-yellow-500/15 text-yellow-400'
     default: return 'bg-gray-500/15 text-gray-400'
   }
 }

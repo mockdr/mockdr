@@ -98,19 +98,20 @@ describe('XdrEndpointDetailView', () => {
     expect((wrapper.vm as any).statusBadgeClass('unknown')).toContain('gray')
   })
 
-  it('isolationBadgeClass returns red for isolated', () => {
+  it('isolationBadgeClass returns red for AGENT_ISOLATED', () => {
     const wrapper = mount(XdrEndpointDetailView, { global: { plugins: [router], stubs } })
-    expect((wrapper.vm as any).isolationBadgeClass('isolated')).toContain('red')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_ISOLATED')).toContain('red')
   })
 
-  it('isolationBadgeClass returns green for unisolated', () => {
+  it('isolationBadgeClass returns green for AGENT_UNISOLATED', () => {
     const wrapper = mount(XdrEndpointDetailView, { global: { plugins: [router], stubs } })
-    expect((wrapper.vm as any).isolationBadgeClass('unisolated')).toContain('green')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_UNISOLATED')).toContain('green')
   })
 
-  it('isolationBadgeClass returns green for not_isolated', () => {
+  it('isolationBadgeClass returns yellow for a pending isolation', () => {
     const wrapper = mount(XdrEndpointDetailView, { global: { plugins: [router], stubs } })
-    expect((wrapper.vm as any).isolationBadgeClass('not_isolated')).toContain('green')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_PENDING_ISOLATION')).toContain('yellow')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_PENDING_ISOLATION_CANCELLATION')).toContain('yellow')
   })
 
   it('performAction isolate calls xdrEndpointsApi.isolate', async () => {

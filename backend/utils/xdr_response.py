@@ -156,6 +156,7 @@ def serialise_endpoint(record: dict) -> dict:
     same record.
     """
     rendered = dict(record)
+    rendered.pop("isolation_requested_at", None)  # mockdr's own bookkeeping
     tags = rendered.pop("endpoint_tags", []) or []
     rendered["endpointTags"] = ",".join(tags) if isinstance(tags, list) else str(tags)
     return rendered

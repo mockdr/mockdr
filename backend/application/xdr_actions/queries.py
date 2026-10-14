@@ -40,6 +40,16 @@ def get_action_status(action_id: str) -> dict | None:
     if action.status == "pending":
         action.status = "completed"
         xdr_action_repo.save(action)
+        if action.action_type in ("isolate", "unisolate"):
+            # An isolation reported complete is one the agent has applied:
+            # the endpoint must not still read pending.
+            from application.xdr_endpoints.queries import settle_isolation  # noqa: PLC0415
+            from repository.xdr_endpoint_repo import xdr_endpoint_repo  # noqa: PLC0415
+
+            for endpoint_id in action.endpoint_ids or [action.endpoint_id]:
+                endpoint = xdr_endpoint_repo.get(endpoint_id)
+                if endpoint:
+                    settle_isolation(endpoint, now=True)
 
     status = _WIRE_STATUS.get(action.status, "COMPLETED_SUCCESSFULLY")
     # Every endpoint the action covers, not just the first: an action created

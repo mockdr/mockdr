@@ -1,6 +1,15 @@
 """Cortex XDR Endpoint query handlers (read-only)."""
 from __future__ import annotations
 
+import time
+
+from application import bridge
+from domain.xdr_endpoint import (
+    AGENT_ISOLATED,
+    AGENT_PENDING_ISOLATION,
+    AGENT_PENDING_ISOLATION_CANCELLATION,
+    AGENT_UNISOLATED,
+)
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
 from utils.nested import get_nested
 from utils.serde import record_dict
@@ -31,6 +40,68 @@ _ENDPOINT_FILTER_FIELDS: dict[str, str] = {
 }
 
 
+#: What a pending isolation state settles into once the agent acknowledges.
+#: The endpoint flipped at once before, and spelled its state `isolated` —
+#: so a playbook that isolates and polls `is_isolated` for `AGENT_ISOLATED`
+#: (XSOAR CortexXDRIR, `xdr-endpoint-isolate`) never saw it arrive, and the
+#: pending branches CoreIRApiModule has for both directions never ran.
+_SETTLES_INTO = {
+    AGENT_PENDING_ISOLATION: AGENT_ISOLATED,
+    AGENT_PENDING_ISOLATION_CANCELLATION: AGENT_UNISOLATED,
+}
+
+#: How long the agent takes to acknowledge, so a client that polls twice sees
+#: the state move rather than finding it already done — the Falcon mount's
+#: containment waits the same.
+_SETTLE_SECONDS = 1.0
+
+#: The `isolate` filter takes the lower-case words (CoreIRApiModule sends
+#: `{"field": "isolate", "operator": "in", "value": ["isolated"]}`), while
+#: the endpoint serves the `AGENT_*` state.
+_ISOLATE_FILTER_VALUES = {"isolated": AGENT_ISOLATED, "unisolated": AGENT_UNISOLATED}
+
+
+def settle_isolation(endpoint: object, *, now: bool = False) -> object:
+    """Move an endpoint out of a pending isolation state once its agent has answered.
+
+    Args:
+        endpoint: The endpoint record.
+        now:      Settle regardless of the wait — the isolation action was
+                  reported complete, so the endpoint must agree.
+
+    Returns:
+        The endpoint, settled or not.
+    """
+    settled = _SETTLES_INTO.get(str(getattr(endpoint, "is_isolated", "")))
+    if settled is None:
+        return endpoint
+    requested = getattr(endpoint, "isolation_requested_at", None) or 0
+    if not now and time.time() * 1000 - requested <= _SETTLE_SECONDS * 1000:
+        return endpoint
+    endpoint.is_isolated = settled  # type: ignore[attr-defined]
+    endpoint.isolation_requested_at = None  # type: ignore[attr-defined]
+    if settled == AGENT_UNISOLATED:
+        endpoint.isolated_date = None  # type: ignore[attr-defined]
+    xdr_endpoint_repo.save(endpoint)  # type: ignore[arg-type]
+    bridge.xdr_endpoint_changed(endpoint)
+    return endpoint
+
+
+def _translated_filters(filters: object) -> object:
+    """The request's filters, with `isolate` values spelled as the record holds them."""
+    if not isinstance(filters, list):
+        return filters
+    out = []
+    for entry in filters:
+        if isinstance(entry, dict) and entry.get("field") == "isolate":
+            value = entry.get("value")
+            values = value if isinstance(value, list) else [value]
+            mapped = [_ISOLATE_FILTER_VALUES.get(str(v).lower(), v) for v in values]
+            entry = {**entry, "value": mapped if isinstance(value, list) else mapped[0]}
+        out.append(entry)
+    return out
+
+
 def select_endpoints(request_data: dict) -> list:
     """The endpoints a request's ``filters`` block selects.
 
@@ -48,7 +119,8 @@ def select_endpoints(request_data: dict) -> list:
         XdrFilterError: On an unsupported filter field or operator.
     """
     matched = apply_xdr_filters(
-        xdr_endpoint_repo.list_all(), request_data.get("filters"),
+        [settle_isolation(e) for e in xdr_endpoint_repo.list_all()],
+        _translated_filters(request_data.get("filters")),  # type: ignore[arg-type]
         _ENDPOINT_FILTER_FIELDS,
     )
     # `endpoint_id_list` is also accepted beside `filters`, which is how the

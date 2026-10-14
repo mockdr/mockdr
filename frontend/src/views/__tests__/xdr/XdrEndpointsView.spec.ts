@@ -17,7 +17,7 @@ vi.mock('../../../api/cortex', () => ({
             ip: ['10.0.0.1'],
             domain: 'corp.local',
             last_seen: 1700000000000,
-            is_isolated: 'unisolated',
+            is_isolated: 'AGENT_UNISOLATED',
             users: ['alice'],
             alias: '',
             content_version: '1.0',
@@ -32,7 +32,7 @@ vi.mock('../../../api/cortex', () => ({
             ip: '192.168.1.10',
             domain: 'corp.local',
             last_seen: 1699000000000,
-            is_isolated: 'isolated',
+            is_isolated: 'AGENT_ISOLATED',
             users: ['root'],
             alias: '',
             content_version: '1.0',
@@ -47,7 +47,7 @@ vi.mock('../../../api/cortex', () => ({
             ip: [],
             domain: '',
             last_seen: 0,
-            is_isolated: 'not_isolated',
+            is_isolated: 'AGENT_PENDING_ISOLATION',
             users: [],
             alias: '',
             content_version: '1.0',
@@ -157,22 +157,22 @@ describe('XdrEndpointsView', () => {
     expect((wrapper.vm as any).statusBadgeClass(null)).toBe('bg-gray-500/15 text-gray-400')
   })
 
-  it('isolationBadgeClass returns correct class for isolated', async () => {
+  it('isolationBadgeClass returns correct class for AGENT_ISOLATED', async () => {
     const wrapper = mountView()
     await flushPromises()
-    expect((wrapper.vm as any).isolationBadgeClass('isolated')).toBe('bg-red-500/15 text-red-400')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_ISOLATED')).toBe('bg-red-500/15 text-red-400')
   })
 
-  it('isolationBadgeClass returns correct class for unisolated', async () => {
+  it('isolationBadgeClass returns correct class for AGENT_UNISOLATED', async () => {
     const wrapper = mountView()
     await flushPromises()
-    expect((wrapper.vm as any).isolationBadgeClass('unisolated')).toBe('bg-green-500/15 text-green-400')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_UNISOLATED')).toBe('bg-green-500/15 text-green-400')
   })
 
-  it('isolationBadgeClass returns correct class for not_isolated', async () => {
+  it('isolationBadgeClass returns correct class for a pending isolation', async () => {
     const wrapper = mountView()
     await flushPromises()
-    expect((wrapper.vm as any).isolationBadgeClass('not_isolated')).toBe('bg-green-500/15 text-green-400')
+    expect((wrapper.vm as any).isolationBadgeClass('AGENT_PENDING_ISOLATION')).toBe('bg-yellow-500/15 text-yellow-400')
   })
 
   it('isolationBadgeClass returns default class for unknown', async () => {

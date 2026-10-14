@@ -7,6 +7,7 @@ import hashlib
 import secrets
 import time
 
+import pytest
 from fastapi.testclient import TestClient
 
 XDR_PREFIX = "/xdr/public_api/v1"
@@ -143,7 +144,8 @@ class TestIsolateEndpoint:
             headers=_xdr_headers(),
         )
         ep = get_resp.json()["reply"]["endpoints"][0]
-        assert ep["is_isolated"] == "isolated"
+        # Pending until the agent acknowledges (see TestIsolationSettles).
+        assert ep["is_isolated"] == "AGENT_PENDING_ISOLATION"
 
     def test_unisolate_endpoint(self, client: TestClient) -> None:
         endpoint_id = _get_first_endpoint_id(client)
@@ -171,7 +173,7 @@ class TestIsolateEndpoint:
             headers=_xdr_headers(),
         )
         ep = get_resp.json()["reply"]["endpoints"][0]
-        assert ep["is_isolated"] == "unisolated"
+        assert ep["is_isolated"] == "AGENT_PENDING_ISOLATION_CANCELLATION"
 
     def test_isolate_nonexistent_returns_500(self, client: TestClient) -> None:
         resp = client.post(
@@ -180,6 +182,101 @@ class TestIsolateEndpoint:
             headers=_xdr_headers(),
         )
         assert resp.status_code == 500
+
+
+def _endpoint(client: TestClient, endpoint_id: str) -> dict:
+    resp = client.post(
+        f"{XDR_PREFIX}/endpoints/get_endpoint/",
+        json={"request_data": {"endpoint_id_list": [endpoint_id]}},
+        headers=_xdr_headers(),
+    )
+    return resp.json()["reply"]["endpoints"][0]
+
+
+class TestIsolationSettles:
+    """`is_isolated` speaks Cortex's `AGENT_*` words, and isolation is asynchronous.
+
+    The mock stored `isolated`/`unisolated` and flipped at once. Cortex serves
+    `AGENT_ISOLATED`, `AGENT_UNISOLATED`, `AGENT_PENDING_ISOLATION` and
+    `AGENT_PENDING_ISOLATION_CANCELLATION` (XSOAR CortexXDR test_data
+    get_endpoints.json; CoreIRApiModule `isolate_endpoint_command` and
+    `unisolate_endpoint_command` branch on all four), and the XSOAR
+    `xdr-endpoint-isolate` command polls `is_isolated` until it reads
+    `AGENT_ISOLATED` — which against the mock it never did.
+    """
+
+    def _unisolated_id(self, client: TestClient) -> str:
+        resp = client.post(
+            f"{XDR_PREFIX}/endpoints/get_endpoint/",
+            json={"request_data": {"filters": [
+                {"field": "isolate", "operator": "in", "value": ["unisolated"]},
+            ]}},
+            headers=_xdr_headers(),
+        )
+        endpoints = resp.json()["reply"]["endpoints"]
+        assert endpoints and all(e["is_isolated"] == "AGENT_UNISOLATED" for e in endpoints)
+        return endpoints[0]["endpoint_id"]
+
+    def test_the_seeded_fleet_uses_the_wire_words(self, client: TestClient) -> None:
+        resp = client.post(
+            f"{XDR_PREFIX}/endpoints/get_endpoint/",
+            json={"request_data": {}}, headers=_xdr_headers(),
+        )
+        states = {e["is_isolated"] for e in resp.json()["reply"]["endpoints"]}
+        assert states == {"AGENT_ISOLATED", "AGENT_UNISOLATED"}
+
+    def test_isolate_is_pending_then_isolated(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        settle = "application.xdr_endpoints.queries._SETTLE_SECONDS"
+        endpoint_id = self._unisolated_id(client)
+        client.post(
+            f"{XDR_PREFIX}/endpoints/isolate",
+            json={"request_data": {"endpoint_id": endpoint_id}}, headers=_xdr_headers(),
+        )
+        assert _endpoint(client, endpoint_id)["is_isolated"] == "AGENT_PENDING_ISOLATION"
+
+        monkeypatch.setattr(settle, -1.0)
+        assert _endpoint(client, endpoint_id)["is_isolated"] == "AGENT_ISOLATED"
+
+        client.post(
+            f"{XDR_PREFIX}/endpoints/unisolate",
+            json={"request_data": {"endpoint_id": endpoint_id}}, headers=_xdr_headers(),
+        )
+        monkeypatch.setattr(settle, 60.0)
+        ep = _endpoint(client, endpoint_id)
+        assert ep["is_isolated"] == "AGENT_PENDING_ISOLATION_CANCELLATION"
+        assert "isolation_requested_at" not in ep, "mockdr's bookkeeping leaked"
+        monkeypatch.setattr(settle, -1.0)
+        assert _endpoint(client, endpoint_id)["is_isolated"] == "AGENT_UNISOLATED"
+
+    def test_a_completed_action_means_the_endpoint_is_isolated(
+        self, client: TestClient,
+    ) -> None:
+        endpoint_id = self._unisolated_id(client)
+        action_id = client.post(
+            f"{XDR_PREFIX}/endpoints/isolate",
+            json={"request_data": {"endpoint_id": endpoint_id}}, headers=_xdr_headers(),
+        ).json()["reply"]["action_id"]
+        status = client.post(
+            f"{XDR_PREFIX}/actions/get_action_status/",
+            json={"request_data": {"group_action_id": action_id}}, headers=_xdr_headers(),
+        ).json()["reply"]["data"]
+        assert status[endpoint_id] == "COMPLETED_SUCCESSFULLY"
+        assert _endpoint(client, endpoint_id)["is_isolated"] == "AGENT_ISOLATED"
+
+    def test_the_isolate_filter_still_takes_the_lower_case_words(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.post(
+            f"{XDR_PREFIX}/endpoints/get_endpoint/",
+            json={"request_data": {"filters": [
+                {"field": "isolate", "operator": "in", "value": ["isolated"]},
+            ]}},
+            headers=_xdr_headers(),
+        )
+        endpoints = resp.json()["reply"]["endpoints"]
+        assert endpoints and {e["is_isolated"] for e in endpoints} == {"AGENT_ISOLATED"}
 
 
 class TestScanEndpoint:

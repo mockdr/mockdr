@@ -6,6 +6,12 @@ from datetime import UTC, datetime
 
 from application import bridge
 from domain.xdr_action import XdrAction
+from domain.xdr_endpoint import (
+    AGENT_ISOLATED,
+    AGENT_PENDING_ISOLATION,
+    AGENT_PENDING_ISOLATION_CANCELLATION,
+    AGENT_UNISOLATED,
+)
 from repository.xdr_action_repo import xdr_action_repo
 from repository.xdr_endpoint_repo import xdr_endpoint_repo
 from utils.xdr_response import build_xdr_reply
@@ -110,9 +116,15 @@ def isolate_endpoint(endpoint_ids: list[str]) -> dict | None:
     if not endpoints:
         return None
 
+    # Isolation is asynchronous: the endpoint is pending until its agent
+    # acknowledges, which `xdr_endpoints.queries.settle_isolation` plays out.
+    # One already isolated, or already on its way, stays where it is.
     for endpoint in endpoints:
-        endpoint.is_isolated = "isolated"
-        endpoint.isolated_date = _epoch_ms()
+        if endpoint.is_isolated in (AGENT_ISOLATED, AGENT_PENDING_ISOLATION):
+            continue
+        endpoint.is_isolated = AGENT_PENDING_ISOLATION
+        endpoint.isolation_requested_at = _epoch_ms()
+        endpoint.isolated_date = endpoint.isolation_requested_at
         xdr_endpoint_repo.save(endpoint)
         bridge.xdr_endpoint_changed(endpoint)
 
@@ -136,8 +148,10 @@ def unisolate_endpoint(endpoint_ids: list[str]) -> dict | None:
         return None
 
     for endpoint in endpoints:
-        endpoint.is_isolated = "unisolated"
-        endpoint.isolated_date = None
+        if endpoint.is_isolated in (AGENT_UNISOLATED, AGENT_PENDING_ISOLATION_CANCELLATION):
+            continue
+        endpoint.is_isolated = AGENT_PENDING_ISOLATION_CANCELLATION
+        endpoint.isolation_requested_at = _epoch_ms()
         xdr_endpoint_repo.save(endpoint)
         bridge.xdr_endpoint_changed(endpoint)
 

@@ -5,7 +5,7 @@ import random
 
 from faker import Faker
 
-from domain.xdr_endpoint import XdrEndpoint
+from domain.xdr_endpoint import AGENT_ISOLATED, AGENT_UNISOLATED, XdrEndpoint
 from infrastructure.seeders.xdr_shared import (
     XDR_AGENT_VERSIONS,
     XDR_CONTENT_VERSIONS,
@@ -34,7 +34,9 @@ _ENDPOINT_TYPE_MAP: dict[str, str] = {
 #: The values Cortex XDR documents for these columns. A fleet where every
 #: endpoint is unisolated and never scanned cannot exercise the filters the
 #: API declares over them.
-XDR_ISOLATION: list[str] = ["unisolated", "unisolated", "unisolated", "isolated"]
+XDR_ISOLATION: list[str] = [
+    AGENT_UNISOLATED, AGENT_UNISOLATED, AGENT_UNISOLATED, AGENT_ISOLATED,
+]
 XDR_SCAN_STATES: list[str] = ["none", "success", "success", "in_progress", "canceled"]
 XDR_OPERATIONAL: list[str] = [
     "protected", "protected", "protected", "partially_protected", "unprotected",

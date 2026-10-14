@@ -1,6 +1,16 @@
 """Domain dataclass for Palo Alto Cortex XDR Endpoint entity."""
 from dataclasses import dataclass, field
 
+#: How Cortex spells an endpoint's isolation state in ``is_isolated``
+#: (XSOAR CortexXDR test_data get_endpoints.json carries
+#: ``AGENT_UNISOLATED``; CoreIRApiModule's isolate/unisolate commands branch
+#: on all four). Isolation is asynchronous: an endpoint is pending until its
+#: agent acknowledges the request.
+AGENT_ISOLATED = "AGENT_ISOLATED"
+AGENT_UNISOLATED = "AGENT_UNISOLATED"
+AGENT_PENDING_ISOLATION = "AGENT_PENDING_ISOLATION"
+AGENT_PENDING_ISOLATION_CANCELLATION = "AGENT_PENDING_ISOLATION_CANCELLATION"
+
 
 @dataclass
 class XdrEndpoint:
@@ -26,8 +36,11 @@ class XdrEndpoint:
     content_version: str = ""
     endpoint_version: str = ""
 
-    is_isolated: str = "unisolated"  # isolated / unisolated
+    is_isolated: str = AGENT_UNISOLATED  # one of the AGENT_* states above
     isolated_date: int | None = None
+    #: When the pending isolation state was entered (epoch ms) — mockdr's own
+    #: bookkeeping for settling it, never served.
+    isolation_requested_at: int | None = None
 
     group_name: list[str] = field(default_factory=list)
     operational_status: str = "fully_protected"
