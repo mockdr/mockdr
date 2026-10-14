@@ -90,6 +90,59 @@ def _as_incident_status(params: dict) -> dict:
     return rest
 
 
+class UnselectableFilterError(ValueError):
+    """A threat action's filter names a member this mock cannot select on."""
+
+
+#: Members of a threat action's filter that select nothing by design: the
+#: list route declares `tenant` and answers the same set with it (mockdr
+#: seeds one tenant), so an action does too.
+_NO_OP_FILTER_MEMBERS = frozenset({"tenant"})
+
+
+def resolve_threat_ids(filter_obj: dict | None, *, empty_selects_all: bool) -> list[str]:
+    """The threats a bulk action's ``filter`` selects — all of it, not just ``ids``.
+
+    The swagger's request schemas for the threat actions
+    (``threats.schemas_ThreatsMitigateRequestSchema``,
+    ``ThreatsAnalystVerdictSchema``, ``ThreatsIncidentSchema``, …) declare
+    the same ninety-nine filter members as ``GET /threats`` — ``agentIds``,
+    ``siteIds``, ``resolved``, ``contentHashes`` among them. The actions read
+    ``filter.ids`` and nothing else, so a mitigation scoped to one agent's
+    threats matched nothing and answered ``{"affected": 0}`` with a 200. The
+    filter now goes through the engine the list route uses, so an action
+    selects exactly what a GET with those parameters lists.
+
+    A member this mock has no filter for is refused, as the agent actions
+    refuse it: ignoring it would widen the selection to everything the other
+    members match. An empty filter selects every threat where the swagger
+    says so ("You can also leave this field empty to apply to all available
+    threats" — mitigate, add-to-blacklist, fetch-file) and nothing
+    elsewhere, which is what the mock always did and nothing documents
+    otherwise.
+
+    Raises:
+        UnselectableFilterError: The filter names a member the mock cannot
+            select on.
+    """
+    params = {k: v for k, v in (filter_obj or {}).items() if v is not None}
+    if not params:
+        return [t.id for t in threat_repo.list_all()] if empty_selects_all else []
+    specs = FILTER_SPECS + DOCUMENTED_FILTERS.get("/threats", [])
+    known = {spec.param for spec in specs} | {"resolved"} | _NO_OP_FILTER_MEMBERS
+    unknown = sorted(set(params) - known)
+    if unknown:
+        msg = (
+            f"The filter names {'members' if len(unknown) > 1 else 'a member'} "
+            f"this endpoint cannot select on: {', '.join(unknown)}."
+        )
+        raise UnselectableFilterError(msg)
+    params = _as_incident_status(
+        {k: v for k, v in params.items() if k not in _NO_OP_FILTER_MEMBERS})
+    matched = apply_filters(threat_repo.list_all(), params, specs)
+    return [str(t.id) for t in matched]
+
+
 def list_threats(params: dict, cursor: str | None, limit: int) -> dict:
     """Return a filtered, paginated list of threats sorted by creation date."""
     params = _as_incident_status(params)

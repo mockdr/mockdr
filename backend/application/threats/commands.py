@@ -4,6 +4,7 @@ Keeps the router import path (``application.threats.commands``) stable
 while each concern lives in its own module.
 """
 from application.threats.mitigation import (
+    MITIGATION_ACTIONS,
     add_to_blacklist,
     disable_engines,
     dv_add_to_blacklist,
@@ -18,6 +19,7 @@ from application.threats.verdict import (
 )
 
 __all__ = [
+    "MITIGATION_ACTIONS",
     "add_note",
     "add_to_blacklist",
     "bulk_add_notes",

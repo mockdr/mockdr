@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response
 from pydantic import BaseModel
 from starlette.requests import Request
@@ -11,6 +12,38 @@ from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Threats"])
+
+#: data.analystVerdict and data.incidentStatus, as
+#: threats.schemas_ThreatsAnalystVerdictSchema and ThreatsIncidentSchema
+#: enumerate them. Any string was stored, so `analystVerdict: "bogus"`
+#: answered 200 and every later read carried a value outside the enum.
+_ANALYST_VERDICTS = ("undefined", "true_positive", "false_positive", "suspicious")
+_INCIDENT_STATUSES = ("unresolved", "in_progress", "resolved")
+
+
+def _enum_member(name: str, value: object, allowed: tuple[str, ...]) -> str:
+    """*value* if the swagger's enum for ``data.<name>`` holds it, else a 400.
+
+    Raised as a validation error so the envelope is the one the mount's
+    validation handler builds for every other refused value.
+    """
+    if value in allowed:
+        return str(value)
+    raise RequestValidationError([{
+        "type": "enum",
+        "loc": ("body", "data", name),
+        "msg": "Input should be " + ", ".join(f"'{a}'" for a in allowed),
+        "input": value,
+    }])
+
+
+def _selected(body: FilterBody, *, empty_selects_all: bool = False) -> list[str]:
+    """The threat ids a bulk action's filter selects, or a 400."""
+    try:
+        return threat_queries.resolve_threat_ids(
+            body.filter, empty_selects_all=empty_selects_all)
+    except threat_queries.UnselectableFilterError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 class NoteBody(BaseModel):
@@ -119,33 +152,58 @@ def download_fetched_file(threat_id: str, _: dict = Depends(require_auth)) -> Re
 
 @router.post("/threats/analyst-verdict")
 def set_analyst_verdict(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Set the analyst verdict on the specified threats."""
-    ids = body.filter.get("ids", [])
-    verdict = body.data.get("analystVerdict", "undefined")
-    return threat_commands.set_analyst_verdict(verdict, ids, current_user.get("userId"))
+    """Set the analyst verdict on the threats the filter selects."""
+    verdict = _enum_member(
+        "analystVerdict", body.data.get("analystVerdict", "undefined"), _ANALYST_VERDICTS)
+    return threat_commands.set_analyst_verdict(
+        verdict, _selected(body), current_user.get("userId"))
 
 
 @router.post("/threats/incident")
 def set_incident_status(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Set the incident status on the specified threats."""
-    ids = body.filter.get("ids", [])
-    status = body.data.get("incidentStatus", "unresolved")
-    return threat_commands.set_incident_status(status, ids, current_user.get("userId"))
+    """Set the incident status on the threats the filter selects.
+
+    ``ThreatsIncidentSchema`` also takes an optional ``data.analystVerdict``
+    ("The analyst verdict to set for the Threats"), which was dropped; it is
+    set alongside the status now.
+    """
+    status = _enum_member(
+        "incidentStatus", body.data.get("incidentStatus", "unresolved"), _INCIDENT_STATUSES)
+    verdict = body.data.get("analystVerdict")
+    if verdict is not None:
+        verdict = _enum_member("analystVerdict", verdict, _ANALYST_VERDICTS)
+    ids = _selected(body)
+    result = threat_commands.set_incident_status(status, ids, current_user.get("userId"))
+    if verdict is not None:
+        threat_commands.set_analyst_verdict(verdict, ids, current_user.get("userId"))
+    return result
 
 
 @router.post("/threats/mitigate/{action}")
 def mitigate_threat(
     action: str, body: FilterBody, current_user: dict = Depends(require_write)
 ) -> dict:
-    """Apply a mitigation action to the specified threats."""
-    ids = body.filter.get("ids", [])
+    """Apply a mitigation action to the threats the filter selects.
+
+    An empty filter is every threat: "You can also leave this field empty to
+    apply to all available threats" (ThreatsMitigateRequestSchema).
+    """
+    if action not in threat_commands.MITIGATION_ACTIONS:
+        # Refused before the filter is read, so an unknown action never
+        # resolves "every threat" on the way to its 400.
+        return threat_commands.mitigate(action, [], current_user.get("userId"))
+    ids = _selected(body, empty_selects_all=True)
     return threat_commands.mitigate(action, ids, current_user.get("userId"))
 
 
 @router.post("/threats/add-to-blacklist")
 def add_to_blacklist(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Add the hashes of the specified threats to the blocklist."""
-    ids = body.filter.get("ids", [])
+    """Add the hashes of the threats the filter selects to the blocklist.
+
+    An empty filter is every threat, as ThreatsAddToRestrictionsWithTargetSchema
+    says.
+    """
+    ids = _selected(body, empty_selects_all=True)
     return threat_commands.add_to_blacklist(ids, body.data, current_user.get("userId"))
 
 
@@ -164,9 +222,8 @@ def bulk_add_notes(body: FilterBody, current_user: dict = Depends(require_write)
 
     Body: ``{"data": {"text": "..."}, "filter": {"ids": [...]}}``.
     """
-    ids = body.filter.get("ids", [])
     text = body.data.get("text", "")
-    return threat_commands.bulk_add_notes(ids, text, current_user.get("userId"))
+    return threat_commands.bulk_add_notes(_selected(body), text, current_user.get("userId"))
 
 
 @router.post("/threats/{threat_id}/notes")
@@ -184,8 +241,18 @@ def add_note(
 
 @router.post("/threats/fetch-file")
 def fetch_file(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Queue a file fetch from the agent for the specified threats."""
-    ids = body.filter.get("ids", [])
+    """Queue a file fetch from the agent for the one threat the filter selects.
+
+    ThreatsFetchFileRequestSchema: "Filter must match exactly one threat. Bulk
+    operations are not supported." A filter matching several fetched them
+    all; one matching none answered 200 with nothing fetched.
+    """
+    ids = _selected(body, empty_selects_all=True)
+    if len(ids) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Filter must match exactly one threat; it matches {len(ids)}.",
+        )
     return threat_commands.fetch_file(ids, current_user.get("userId"))
 
 

@@ -41,6 +41,10 @@ _MITIGATION_MAP: dict[str, tuple[str, str]] = {
 }
 
 
+#: The action names ``POST /threats/mitigate/{action}`` accepts.
+MITIGATION_ACTIONS = frozenset(_MITIGATION_MAP)
+
+
 def _status_description(status: str) -> str:
     """``mitigationStatusDescription`` the way the seeded threats spell it."""
     return status.replace("_", " ").title()
