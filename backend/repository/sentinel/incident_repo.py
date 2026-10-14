@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from domain.sentinel.incident import SentinelIncident
-from repository.base import Repository
+from repository.sentinel.arm_names import CaseInsensitiveRepository
 
 
-class SentinelIncidentRepository(Repository[SentinelIncident]):
+class SentinelIncidentRepository(CaseInsensitiveRepository[SentinelIncident]):
     """In-memory repository for ``SentinelIncident`` domain objects."""
 
     def __init__(self) -> None:

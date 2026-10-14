@@ -199,7 +199,7 @@ def get_incident_comment(
     result = incident_queries.get_incident_comments(incident_id)
     comments = result.get("value", [])
     for c in comments:
-        if c.get("name") == comment_id or c.get("id", "").endswith(f"/{comment_id}"):
+        if str(c.get("name", "")).casefold() == comment_id.casefold():
             return cast(dict[str, Any], c)
     raise HTTPException(
         status_code=404,
@@ -227,13 +227,16 @@ async def create_or_update_comment(
             status_code=400,
             detail=build_vendor_error("sentinel", 400, "Request body must be a JSON object"),
         )
-    if sentinel_incident_repo.get(incident_id) is None:
+    parent = sentinel_incident_repo.get(incident_id)
+    if parent is None:
         # A comment is a child of its incident; there is nothing to attach
         # it to. It used to be stored anyway, orphaned.
         raise HTTPException(
             status_code=404,
             detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
         )
+    # The incident's own name, whatever case the path spelled it in.
+    incident_id = parent.incident_id
     known = sentinel_incident_comment_repo.get(comment_key(incident_id, comment_id))
     if known is not None:
         check_if_match(request.headers.get("if-match"), known.etag)
@@ -261,12 +264,13 @@ def delete_incident_comment(
     _auth: dict = Depends(require_sentinel_auth),
 ) -> Response:
     """Delete a comment."""
-    if sentinel_incident_repo.get(incident_id) is None:
+    parent = sentinel_incident_repo.get(incident_id)
+    if parent is None:
         raise HTTPException(
             status_code=404,
             detail=build_arm_error("ResourceNotFound", f"Incident '{incident_id}' not found"),
         )
-    return arm_deleted(comment_cmds.delete_comment(incident_id, comment_id))
+    return arm_deleted(comment_cmds.delete_comment(parent.incident_id, comment_id))
 
 
 # ── Relations ─────────────────────────────────────────────────────────────

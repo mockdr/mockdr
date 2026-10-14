@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from domain.sentinel.bookmark import SentinelBookmark
-from repository.base import Repository
+from repository.sentinel.arm_names import CaseInsensitiveRepository
 
 
-class SentinelBookmarkRepository(Repository[SentinelBookmark]):
+class SentinelBookmarkRepository(CaseInsensitiveRepository[SentinelBookmark]):
     """In-memory repository for ``SentinelBookmark`` domain objects."""
 
     def __init__(self) -> None:
@@ -14,7 +14,7 @@ class SentinelBookmarkRepository(Repository[SentinelBookmark]):
 
     def get_by_incident_id(self, incident_id: str) -> list[SentinelBookmark]:
         """Return all bookmarks associated with the given incident."""
-        return [b for b in self.list_all() if b.incident_id == incident_id]
+        return [b for b in self.list_all() if b.incident_id.casefold() == incident_id.casefold()]
 
 
 

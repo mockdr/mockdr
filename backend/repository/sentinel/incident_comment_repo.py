@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from domain.sentinel.incident_comment import SentinelIncidentComment
-from repository.base import Repository
+from repository.sentinel.arm_names import CaseInsensitiveRepository
 
 
-class SentinelIncidentCommentRepository(Repository[SentinelIncidentComment]):
+class SentinelIncidentCommentRepository(CaseInsensitiveRepository[SentinelIncidentComment]):
     """In-memory repository for ``SentinelIncidentComment`` domain objects."""
 
     def __init__(self) -> None:
@@ -14,7 +14,7 @@ class SentinelIncidentCommentRepository(Repository[SentinelIncidentComment]):
 
     def get_by_incident_id(self, incident_id: str) -> list[SentinelIncidentComment]:
         """Return all comments for the given incident."""
-        return [c for c in self.list_all() if c.incident_id == incident_id]
+        return [c for c in self.list_all() if c.incident_id.casefold() == incident_id.casefold()]
 
 
 

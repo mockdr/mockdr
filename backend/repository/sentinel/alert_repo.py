@@ -14,7 +14,7 @@ class SentinelAlertRepository(Repository[SentinelAlert]):
 
     def get_by_incident_id(self, incident_id: str) -> list[SentinelAlert]:
         """Return all alerts associated with the given incident."""
-        return [a for a in self.list_all() if a.incident_id == incident_id]
+        return [a for a in self.list_all() if a.incident_id.casefold() == incident_id.casefold()]
 
 
 

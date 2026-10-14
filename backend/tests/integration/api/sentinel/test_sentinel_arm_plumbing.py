@@ -56,3 +56,72 @@ class TestEveryAnswerCarriesItsRequestIds:
         """The token endpoint is Entra's, not ARM's."""
         resp = client.post(f"{SENTINEL_PREFIX}/oauth2/v2.0/token", data={})
         assert "x-ms-correlation-request-id" not in resp.headers
+
+
+class TestANameIsMatchedWithoutRegardToCase:
+    """ARM resource names are case-insensitive; the mock matched them exactly.
+
+    The reference pages say it of the resource group ("The name is case
+    insensitive") and it is ARM's rule for every name in the path. A client
+    that wrote an incident back under a differently cased name got a 404 on
+    read and a second incident on write.
+    """
+
+    def test_an_incident_answers_to_any_case(self, client: TestClient) -> None:
+        headers = _auth(client)
+        name = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents",
+                          headers=headers).json()["value"][0]["name"]
+        shouted = name.upper() if name != name.upper() else name.lower()
+        got = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents/{shouted}", headers=headers)
+        assert got.status_code == 200
+        assert got.json()["name"] == name
+
+    def test_a_put_in_another_case_replaces_rather_than_adds(
+        self, client: TestClient,
+    ) -> None:
+        headers = _auth(client)
+        body = {"properties": {"title": "t", "severity": "Low", "status": "New"}}
+        first = client.put(f"{SENTINEL_PREFIX}{_WS}/incidents/Case-Test", json=body,
+                           headers=headers)
+        assert first.status_code == 201
+        before = len(client.get(f"{SENTINEL_PREFIX}{_WS}/incidents",
+                                params={"$top": 1000}, headers=headers).json()["value"])
+        again = client.put(f"{SENTINEL_PREFIX}{_WS}/incidents/case-test", json=body,
+                           headers=headers)
+        assert again.status_code == 200
+        assert again.json()["name"] == "Case-Test"
+        after = len(client.get(f"{SENTINEL_PREFIX}{_WS}/incidents",
+                               params={"$top": 1000}, headers=headers).json()["value"])
+        assert after == before
+
+    def test_a_comment_under_a_differently_cased_incident(self, client: TestClient) -> None:
+        headers = _auth(client)
+        name = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents",
+                          headers=headers).json()["value"][0]["name"]
+        resp = client.put(
+            f"{SENTINEL_PREFIX}{_WS}/incidents/{name.upper()}/comments/Note-1",
+            json={"properties": {"message": "m"}}, headers=headers,
+        )
+        assert resp.status_code == 201
+        listed = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents/{name}/comments",
+                            headers=headers).json()["value"]
+        assert [c["name"] for c in listed].count("Note-1") == 1
+        got = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents/{name}/comments/note-1",
+                         headers=headers)
+        assert got.status_code == 200
+
+    def test_an_alert_rule_deletes_in_any_case(self, client: TestClient) -> None:
+        headers = _auth(client)
+        client.put(
+            f"{SENTINEL_PREFIX}{_WS}/alertRules/Rule-Case",
+            json={"kind": "Scheduled", "properties": {
+                "displayName": "r", "severity": "Low", "query": "SecurityAlert",
+                "enabled": True}},
+            headers=headers,
+        )
+        assert client.get(f"{SENTINEL_PREFIX}{_WS}/alertRules/RULE-CASE",
+                          headers=headers).status_code == 200
+        assert client.delete(f"{SENTINEL_PREFIX}{_WS}/alertRules/rule-case",
+                             headers=headers).status_code == 200
+        assert client.get(f"{SENTINEL_PREFIX}{_WS}/alertRules/Rule-Case",
+                          headers=headers).status_code == 404
