@@ -5086,3 +5086,207 @@ probes:
       path: /api/detection_engine/signals/assignees
       json: {ids: ["probe-alert"], assignees: {add: "analyst", remove: []}}
       auth: basic
+
+  # ── Bulk as the 8.x clients send it ─────────────────────────────────────
+  - id: es-bulk-under-an-index-with-the-vendor-ndjson-type
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      What elasticsearch-py 8.x sends: the vendor ndjson type with
+      `compatible-with=8` on both headers, to `/{index}/_bulk`, whose path
+      names the index for an action without one. mockdr refused the type
+      with a 406, had no route for the path, and called a delete of nothing
+      an error. Only deletes of absent ids, so the seeded index is untouched.
+    request:
+      method: POST
+      path: /${seed_index}/_bulk
+      content: |
+        {"delete":{"_id":"zzz-never-there-1"}}
+        {"delete":{"_index":"${seed_index}","_id":"zzz-never-there-2"}}
+      headers:
+        Content-Type: "application/vnd.elasticsearch+x-ndjson; compatible-with=8"
+        Accept: "application/vnd.elasticsearch+json; compatible-with=8"
+      auth: basic
+    ignore_paths:
+      - $.took
+
+  - id: es-bulk-with-no-index-anywhere
+    endpoint: search
+    why: >
+      An action that names no index on a path that names none either:
+      `BulkRequest.validate()` refuses the whole request, one line per action.
+    request:
+      method: POST
+      path: /_bulk
+      content: |
+        {"delete":{"_id":"zzz-a"}}
+        {"delete":{}}
+      headers: {Content-Type: application/x-ndjson}
+      auth: basic
+
+  - id: es-compatible-with-nine
+    endpoint: search
+    why: >
+      A 9.x client against an 8.x cluster. RestCompatibleVersionHelper serves
+      7 and 8 only; mockdr never read the parameter. The outer reason lists
+      the two headers from a `Set.of`, whose order the JVM does not fix, so
+      only the cause underneath is compared.
+    request:
+      method: GET
+      path: /_cluster/health
+      headers: {Accept: "application/vnd.elasticsearch+json; compatible-with=9"}
+      auth: basic
+    ignore_paths:
+      - $.error.reason
+      - $.error.root_cause[*].reason
+
+  # ── Query DSL over the keyword array, and the bool forms ────────────────
+  - id: es-seeded-term-on-an-array
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `tags` is a keyword array; a term matches when any element does. mockdr
+      compared the whole list and matched nothing.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"term": {"tags": "linux"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-terms-on-an-array
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: The same for `terms`.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"terms": {"tags": ["edr"]}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-bool-object-arms-and-string-minimum
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      An arm written as one object, and `minimum_should_match` as a string:
+      the first was refused and the second was a 500.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"bool": {"filter": {"exists": {"field": "host"}}, "should": [{"term": {"host": "srv-1"}}, {"term": {"tags": "linux"}}, {"term": {"tags": "auth"}}], "minimum_should_match": "2"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-bool-conditional-minimum
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: The conditional form `2<-25%`, Lucene's calculateMinShouldMatch.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"bool": {"should": [{"term": {"host": "srv-1"}}, {"term": {"tags": "linux"}}, {"term": {"tags": "auth"}}], "minimum_should_match": "2<-25%"}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-terms-count-ascending
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `order` on a terms aggregation was ignored; every answer was
+      `_count desc`.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"by_host": {"terms": {"field": "host", "order": {"_count": "asc"}}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-terms-key-descending
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: Ordered by key.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"by_host": {"terms": {"field": "host", "order": {"_key": "desc"}}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-terms-by-a-metric
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: Ordered by a metric sub-aggregation.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"by_host": {"terms": {"field": "host", "order": {"top": "desc"}}, "aggs": {"top": {"max": {"field": "sev"}}}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: es-seeded-agg-counts-over-an-array
+    endpoint: search
+    needs_seed: true
+    compare: values
+    why: >
+      `value_count` counts values and `cardinality` distinct values; an
+      array was one value to both.
+    request:
+      method: POST
+      path: /${seed_index}/_search
+      content: '{"size": 0, "aggs": {"n": {"value_count": {"field": "tags"}}, "d": {"cardinality": {"field": "tags"}}}}'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  # ── Kibana: xsrf, the space prefix, kbn-version ─────────────────────────
+  - id: kbn-signals-search-without-xsrf
+    endpoint: kibana
+    why: >
+      signals/search does not opt out of the xsrf check; mockdr served it
+      without the header.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/search
+      json: {size: 1}
+      auth: basic
+
+  - id: kbn-signals-search-only-dropped-members
+    endpoint: kibana
+    why: >
+      `from` is not among the members the route passes on, so a body of
+      only `from` is as empty as `{}`.
+    request:
+      method: POST
+      path: /api/detection_engine/signals/search
+      json: {from: 5}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-default-space-prefix
+    endpoint: kibana
+    why: >
+      Every API is served under `/s/{space}/` too, the default space
+      included. mockdr answered 404.
+    request:
+      method: GET
+      path: /s/default/api/spaces/space/default
+      auth: basic
+
+  - id: kbn-version-that-is-not-this-kibanas
+    endpoint: kibana
+    why: >
+      A stale browser build's `kbn-version` is refused on every verb, with
+      the expected and received versions as attributes. mockdr took any value.
+    request:
+      method: GET
+      path: /api/spaces/space
+      headers: {kbn-version: "8.0.0"}
+      auth: basic
