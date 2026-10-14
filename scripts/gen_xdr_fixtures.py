@@ -24,6 +24,14 @@ from xsoar_samples_spec import CORE, SAMPLES, XDR, split_route, unwrap, wrap  # 
 
 OUT = ROOT / "backend" / "infrastructure" / "fixtures" / "xdr"
 
+#: Routes whose ``reply`` is a bare scalar, which a transcription that only
+#: lists ``reply`` cannot say. ``start_xql_query`` answers the execution id as
+#: a string (Palo Alto "Run XQL query APIs": ``{"reply": "<execution_id>"}``;
+#: XSOAR CoreXQLApiModule: ``execution_id = res.get("reply", "")``).
+SCALAR_REPLIES = {
+    "POST /public_api/v1/xql/start_xql_query": "",
+}
+
 
 def defaults(value):
     if isinstance(value, dict):
@@ -116,11 +124,13 @@ def main() -> int:
                     if not shape:
                         shape.append({})
                     _insert(shape[0], path[len("reply[*].") :])
+    by_route.update(SCALAR_REPLIES)
     for route, shape in sorted(by_route.items()):
         (OUT / f"{slug(route)}.json").write_text(
             json.dumps({"route": route, "reply": shape}, indent=1) + "\n"
         )
-        print(f"  {slug(route):40} {len(shape):3} top-level keys")
+        keys = len(shape) if isinstance(shape, (dict, list)) else 0
+        print(f"  {slug(route):40} {keys:3} top-level keys")
     print(f"{len(by_route)} fixtures → {OUT.relative_to(ROOT)}")
     return 0
 

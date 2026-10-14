@@ -459,11 +459,15 @@ def _action_ids(client: TestClient, headers: dict, endpoints: list, scripts: lis
         {"script_uid": scripts[0]["script_uid"] if scripts else "", "timeout": 600,
          "filters": selects},
     )
-    query = reply("/xql/start_xql_query/", {"query": "dataset = xdr_data | limit 5"})
+    # `start_xql_query` answers the execution id itself as `reply`, a string.
+    query = client.post(
+        "/xdr/public_api/v1/xql/start_xql_query/", headers=headers,
+        json={"request_data": {"query": "dataset = xdr_data | limit 5"}},
+    ).json().get("reply")
     return {
         "retrieval_action_id": str(retrieval.get("action_id", "x")),
         "script_action_id": str(run.get("action_id", "x")),
-        "xql_query_id": str(query.get("query_id", "x")),
+        "xql_query_id": query if isinstance(query, str) and query else "x",
     }
 
 
@@ -693,8 +697,12 @@ PLATFORMS = {
             "POST /public_api/v1/scripts/get_script_execution_results": {
                 "json": {"request_data": {"action_id": "{script_action_id}"}}
             },
+            "POST /public_api/v1/xql/start_xql_query": {
+                "json": {"request_data": {"query": "dataset = xdr_data | limit 5"}}
+            },
             "POST /public_api/v1/xql/get_query_results": {
-                "json": {"request_data": {"query_id": "{xql_query_id}"}}
+                # waits for the results, rather than answering PENDING
+                "json": {"request_data": {"query_id": "{xql_query_id}", "pending_flag": False}}
             },
             "POST /public_api/v1/scripts/get_script_metadata/": {
                 "json": {"request_data": {"script_uid": "{script_uid}"}}

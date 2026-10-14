@@ -74,7 +74,8 @@ class TestXqlQueries:
         )
         assert resp.status_code == 200
         reply = resp.json()["reply"]
-        assert isinstance(reply, (str, dict))
+        # Cortex answers the execution id itself, a string.
+        assert isinstance(reply, str)
 
     def test_xql_query_lifecycle(self, client: TestClient) -> None:
         """Start a query, then retrieve its results."""
@@ -87,12 +88,7 @@ class TestXqlQueries:
             headers=headers,
         )
         assert start_resp.status_code == 200
-        # Extract query_id from reply (may be string or dict with query_id key)
-        reply = start_resp.json()["reply"]
-        if isinstance(reply, dict):
-            query_id = reply.get("query_id", reply.get("execution_id", ""))
-        else:
-            query_id = str(reply)
+        query_id = start_resp.json()["reply"]
 
         # Get results
         results_resp = client.post(
