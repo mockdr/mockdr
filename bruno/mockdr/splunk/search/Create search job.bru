@@ -5,14 +5,13 @@ meta {
 }
 
 post {
-  url: {{splunk_base_url}}/services/search/jobs
+  url: {{splunk_base_url}}/services/search/jobs?output_mode=json
   body: formUrlEncoded
   auth: none
 }
 
 body:form-urlencoded {
   search: search index=sentinelone | head 100
-  output_mode: json
   earliest_time: -24h
   latest_time: now
 }
@@ -21,6 +20,17 @@ headers {
   Authorization: Splunk {{splunk_session_key}}
 }
 
+params:query {
+  output_mode: json
+}
+
+script:post-response {
+  try {
+    const value = res.body.sid;
+    if (value !== undefined && value !== null) bru.setVar("splunk_sid", String(value));
+  } catch (e) {}
+}
+
 docs {
-  Returns sid — copy to splunk_sid variable.
+  Returns sid — stored in splunk_sid for the requests after it.
 }

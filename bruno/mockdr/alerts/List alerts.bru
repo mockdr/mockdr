@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/cloud-detection/alerts
+  url: {{base_url}}/cloud-detection/alerts?limit=25
   body: none
   auth: none
 }
@@ -19,4 +19,11 @@ params:query {
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].alertInfo.alertId;
+    if (value !== undefined && value !== null) bru.setVar("alert_id", String(value));
+  } catch (e) {}
 }

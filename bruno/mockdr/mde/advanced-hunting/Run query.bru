@@ -17,6 +17,6 @@ headers {
 
 body:json {
   {
-    "Query": "DeviceProcessEvents | where FileName has 'powershell' | top 10 by Timestamp"
+    "Query": "DeviceInfo | where OSPlatform startswith 'Windows' | summarize Devices=count() by OSPlatform | top 10 by Devices"
   }
 }

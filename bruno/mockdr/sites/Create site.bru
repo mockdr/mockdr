@@ -24,3 +24,10 @@ body:json {
     }
   }
 }
+
+script:post-response {
+  try {
+    const value = res.body.data.id;
+    if (value !== undefined && value !== null) bru.setVar("new_site_id", String(value));
+  } catch (e) {}
+}

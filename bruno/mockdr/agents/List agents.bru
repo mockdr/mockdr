@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/agents
+  url: {{base_url}}/agents?limit=25
   body: none
   auth: none
 }
@@ -21,4 +21,15 @@ params:query {
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].id;
+    if (value !== undefined && value !== null) bru.setVar("agent_id", String(value));
+  } catch (e) {}
+  try {
+    const value = res.body.data[0].siteId;
+    if (value !== undefined && value !== null) bru.setVar("site_id", String(value));
+  } catch (e) {}
 }

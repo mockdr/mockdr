@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{splunk_base_url}}/services/auth/login
+  url: {{splunk_base_url}}/services/auth/login?output_mode=json
   body: formUrlEncoded
   auth: none
 }
@@ -13,10 +13,16 @@ post {
 body:form-urlencoded {
   username: admin
   password: mockdr-admin
-  output_mode: json
+}
+
+script:post-response {
+  try {
+    const value = res.body.sessionKey;
+    if (value !== undefined && value !== null) bru.setVar("splunk_session_key", String(value));
+  } catch (e) {}
 }
 
 docs {
-  Returns sessionKey — copy to splunk_session_key variable.
+  Returns sessionKey — stored in splunk_session_key for the requests after it.
   Users: admin/mockdr-admin, analyst/mockdr-analyst, viewer/mockdr-viewer
 }

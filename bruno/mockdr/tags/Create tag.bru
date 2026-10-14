@@ -18,11 +18,21 @@ headers {
 body:json {
   {
     "data": {
+      "type": "agents",
       "key": "env",
       "value": "production"
     },
     "filter": {
-      "ids": ["{{agent_id}}"]
+      "siteIds": [
+        "{{site_id}}"
+      ]
     }
   }
+}
+
+script:post-response {
+  try {
+    const value = (res.body.data[0] || res.body.data).id;
+    if (value !== undefined && value !== null) bru.setVar("tag_id", String(value));
+  } catch (e) {}
 }

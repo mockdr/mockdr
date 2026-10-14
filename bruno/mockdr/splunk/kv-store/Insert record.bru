@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{splunk_base_url}}/servicesNS/nobody/search/storage/collections/data/ioc_cache
+  url: {{splunk_base_url}}/servicesNS/nobody/search/storage/collections/data/splunk_xsoar_users
   body: json
   auth: none
 }
@@ -17,8 +17,7 @@ headers {
 
 body:json {
   {
-    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "type": "sha256",
-    "verdict": "malicious"
+    "xsoar_user": "analyst@company.com",
+    "splunk_user": "analyst"
   }
 }

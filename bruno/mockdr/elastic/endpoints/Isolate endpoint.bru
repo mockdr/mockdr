@@ -18,7 +18,9 @@ headers {
 
 body:json {
   {
-    "endpoint_ids": ["{{agent_id}}"],
+    "endpoint_ids": [
+      "{{es_endpoint_id}}"
+    ],
     "comment": "Isolating for investigation"
   }
 }

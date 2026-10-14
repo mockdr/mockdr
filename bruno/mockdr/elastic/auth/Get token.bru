@@ -11,8 +11,8 @@ post {
 }
 
 headers {
-  Authorization: ApiKey mock-es-admin-api-key
   Content-Type: application/json
+  Authorization: ApiKey {{es_token}}
 }
 
 body:json {

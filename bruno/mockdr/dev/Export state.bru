@@ -13,3 +13,10 @@ get {
 headers {
   Authorization: ApiToken {{token}}
 }
+
+script:post-response {
+  try {
+    const value = JSON.stringify(res.body);
+    if (value !== undefined && value !== null) bru.setVar("snapshot", String(value));
+  } catch (e) {}
+}

@@ -20,7 +20,15 @@ body:json {
     "data": {
       "name": "New Group",
       "siteId": "{{site_id}}",
-      "type": "static"
+      "type": "static",
+      "inherits": true
     }
   }
+}
+
+script:post-response {
+  try {
+    const value = res.body.data.id;
+    if (value !== undefined && value !== null) bru.setVar("new_group_id", String(value));
+  } catch (e) {}
 }

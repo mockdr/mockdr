@@ -13,3 +13,8 @@ post {
 headers {
   Authorization: ApiToken {{token}}
 }
+
+script:post-response {
+  bru.setVar("token", "admin-token-0000-0000-000000000001");
+  bru.setVar("s1_token", "admin-token-0000-0000-000000000001");
+}

@@ -5,14 +5,9 @@ meta {
 }
 
 get {
-  url: {{base_url}}/policies
+  url: {{base_url}}/sites/{{site_id}}/policy
   body: none
   auth: none
-}
-
-params:query {
-  siteId: "{{site_id}}"
-  ~groupId: "{{group_id}}"
 }
 
 headers {

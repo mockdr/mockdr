@@ -17,7 +17,14 @@ body:form-urlencoded {
   scope: https://api.loganalytics.io/.default
 }
 
+script:post-response {
+  try {
+    const value = res.body.access_token;
+    if (value !== undefined && value !== null) bru.setVar("sentinel_la_token", String(value));
+  } catch (e) {}
+}
+
 docs {
-  Returns a Logs query API access_token — copy to sentinel_la_token. ARM
+  Returns a Logs query API access_token — stored in sentinel_la_token for the requests after it. ARM
   refuses it, and the query refuses an ARM token.
 }

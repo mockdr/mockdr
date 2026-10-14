@@ -5,13 +5,13 @@ meta {
 }
 
 get {
-  url: {{base_url}}/dv/events
+  url: {{base_url}}/dv/events?queryId={{dv_query_id}}&limit=50
   body: none
   auth: none
 }
 
 params:query {
-  queryId: replace-with-query-id-from-init
+  queryId: {{dv_query_id}}
   limit: 50
 }
 

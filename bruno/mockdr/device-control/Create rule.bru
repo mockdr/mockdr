@@ -18,11 +18,24 @@ headers {
 body:json {
   {
     "data": {
-      "ruleGroupName": "Block USB Storage",
+      "ruleName": "Block USB Storage",
       "action": "Block",
-      "deviceClass": "Mass Storage",
-      "status": "Enabled",
-      "osType": "windows"
+      "interface": "USB",
+      "ruleType": "class",
+      "deviceClass": "08h",
+      "status": "Enabled"
+    },
+    "filter": {
+      "siteIds": [
+        "{{site_id}}"
+      ]
     }
   }
+}
+
+script:post-response {
+  try {
+    const value = (res.body.data[0] || res.body.data).id;
+    if (value !== undefined && value !== null) bru.setVar("dc_rule_id", String(value));
+  } catch (e) {}
 }

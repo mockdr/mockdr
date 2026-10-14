@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/groups
+  url: {{base_url}}/groups?limit=50
   body: none
   auth: none
 }
@@ -18,4 +18,11 @@ params:query {
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].id;
+    if (value !== undefined && value !== null) bru.setVar("group_id", String(value));
+  } catch (e) {}
 }

@@ -24,12 +24,21 @@ body:json {
       "filters": [
         {
           "field": "endpoint_status",
-          "operator": "eq",
-          "value": "CONNECTED"
+          "operator": "in",
+          "value": [
+            "connected"
+          ]
         }
       ],
       "search_from": 0,
       "search_to": 25
     }
   }
+}
+
+script:post-response {
+  try {
+    const value = res.body.reply.endpoints[0].endpoint_id;
+    if (value !== undefined && value !== null) bru.setVar("xdr_endpoint_id", String(value));
+  } catch (e) {}
 }

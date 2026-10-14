@@ -1,0 +1,22 @@
+meta {
+  name: Turn rate limit off
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{base_url}}/_dev/rate-limit
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "enabled": false
+  }
+}

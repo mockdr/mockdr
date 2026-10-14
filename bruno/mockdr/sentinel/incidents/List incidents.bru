@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/incidents
+  url: {{sentinel_base_url}}/subscriptions/{{sentinel_subscription_id}}/resourceGroups/{{sentinel_resource_group}}/providers/Microsoft.OperationalInsights/workspaces/{{sentinel_workspace}}/providers/Microsoft.SecurityInsights/incidents?api-version=2024-03-01
   body: none
   auth: none
 }
@@ -16,4 +16,11 @@ params:query {
 
 headers {
   Authorization: Bearer {{sentinel_token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.value[0].name;
+    if (value !== undefined && value !== null) bru.setVar("sentinel_incident_id", String(value));
+  } catch (e) {}
 }

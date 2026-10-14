@@ -5,13 +5,13 @@ meta {
 }
 
 get {
-  url: {{base_url}}/agents/{{agent_id}}/applications
+  url: {{base_url}}/agents/applications?ids={{agent_id}}
   body: none
   auth: none
 }
 
 params:query {
-  limit: 50
+  ids: {{agent_id}}
 }
 
 headers {

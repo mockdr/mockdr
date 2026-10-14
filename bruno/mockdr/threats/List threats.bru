@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/threats
+  url: {{base_url}}/threats?limit=25
   body: none
   auth: none
 }
@@ -21,4 +21,11 @@ params:query {
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].id;
+    if (value !== undefined && value !== null) bru.setVar("threat_id", String(value));
+  } catch (e) {}
 }

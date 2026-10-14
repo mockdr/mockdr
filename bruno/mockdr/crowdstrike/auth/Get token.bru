@@ -15,8 +15,15 @@ body:form-urlencoded {
   client_secret: cs-mock-admin-secret
 }
 
+script:post-response {
+  try {
+    const value = res.body.access_token;
+    if (value !== undefined && value !== null) bru.setVar("cs_token", String(value));
+  } catch (e) {}
+}
+
 docs {
-  Returns access_token — copy to cs_token variable.
+  Returns access_token — stored in cs_token for the requests after it.
   Roles: admin=cs-mock-admin-client/cs-mock-admin-secret,
          viewer=cs-mock-viewer-client/cs-mock-viewer-secret
 }

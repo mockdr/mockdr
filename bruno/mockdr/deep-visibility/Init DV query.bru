@@ -23,3 +23,10 @@ body:json {
     "limit": 100
   }
 }
+
+script:post-response {
+  try {
+    const value = res.body.data.queryId;
+    if (value !== undefined && value !== null) bru.setVar("dv_query_id", String(value));
+  } catch (e) {}
+}

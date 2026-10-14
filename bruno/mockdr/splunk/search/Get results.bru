@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{splunk_base_url}}/services/search/v2/jobs/{{splunk_sid}}/results
+  url: {{splunk_base_url}}/services/search/v2/jobs/{{splunk_sid}}/results?output_mode=json&count=25
   body: none
   auth: none
 }

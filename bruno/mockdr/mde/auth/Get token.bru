@@ -14,11 +14,18 @@ body:form-urlencoded {
   client_id: mde-mock-admin-client
   client_secret: mde-mock-admin-secret
   grant_type: client_credentials
-  tenant_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  scope: https://api.securitycenter.microsoft.com/.default
+}
+
+script:post-response {
+  try {
+    const value = res.body.access_token;
+    if (value !== undefined && value !== null) bru.setVar("mde_token", String(value));
+  } catch (e) {}
 }
 
 docs {
-  Returns access_token — copy to mde_token variable.
+  Returns access_token — stored in mde_token for the requests after it.
   Tenant: a1b2c3d4-e5f6-7890-abcd-ef1234567890
   Roles: admin=mde-mock-admin-client/mde-mock-admin-secret
          analyst=mde-mock-analyst-client/mde-mock-analyst-secret

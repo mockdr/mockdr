@@ -5,11 +5,15 @@ meta {
 }
 
 get {
-  url: {{base_url}}/agents/{{agent_id}}/processes
+  url: {{base_url}}/agents/processes?ids={{agent_id}}
   body: none
   auth: none
 }
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+params:query {
+  ids: {{agent_id}}
 }

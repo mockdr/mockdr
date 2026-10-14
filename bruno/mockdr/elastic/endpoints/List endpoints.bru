@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{kibana_base_url}}/api/endpoint/metadata
+  url: {{kibana_base_url}}/api/endpoint/metadata?page=0&pageSize=25
   body: none
   auth: none
 }
@@ -18,4 +18,11 @@ params:query {
 headers {
   Authorization: ApiKey {{es_token}}
   kbn-xsrf: true
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].metadata.agent.id;
+    if (value !== undefined && value !== null) bru.setVar("es_endpoint_id", String(value));
+  } catch (e) {}
 }

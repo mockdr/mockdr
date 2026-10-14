@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{s1_base_url}}/accounts
+  url: {{s1_base_url}}/accounts?limit=50
   body: none
   auth: none
 }
@@ -16,4 +16,11 @@ params:query {
 
 headers {
   Authorization: ApiToken {{s1_token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].id;
+    if (value !== undefined && value !== null) bru.setVar("account_id", String(value));
+  } catch (e) {}
 }

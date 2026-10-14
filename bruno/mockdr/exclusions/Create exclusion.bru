@@ -30,3 +30,10 @@ body:json {
     }
   }
 }
+
+script:post-response {
+  try {
+    const value = (res.body.data[0] || res.body.data).id;
+    if (value !== undefined && value !== null) bru.setVar("exclusion_id", String(value));
+  } catch (e) {}
+}

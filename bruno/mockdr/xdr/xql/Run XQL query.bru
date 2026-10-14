@@ -28,3 +28,10 @@ body:json {
     }
   }
 }
+
+script:post-response {
+  try {
+    const value = res.body.reply;
+    if (value !== undefined && value !== null) bru.setVar("xdr_query_id", String(value));
+  } catch (e) {}
+}

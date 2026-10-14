@@ -16,9 +16,16 @@ headers {
 }
 
 body:json {
-  {
-    "filter": {
-      "ids": ["replace-with-user-id"]
-    }
-  }
+  {}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data.token;
+    if (value !== undefined && value !== null) bru.setVar("s1_token", String(value));
+  } catch (e) {}
+  try {
+    const value = res.body.data.token;
+    if (value !== undefined && value !== null) bru.setVar("token", String(value));
+  } catch (e) {}
 }

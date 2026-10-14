@@ -37,3 +37,10 @@ body:json {
     }
   }
 }
+
+script:post-response {
+  try {
+    const value = res.body.reply.incidents[0].incident_id;
+    if (value !== undefined && value !== null) bru.setVar("xdr_incident_id", String(value));
+  } catch (e) {}
+}

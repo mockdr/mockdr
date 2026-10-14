@@ -17,8 +17,13 @@ headers {
 
 body:json {
   {
+    "data": {
+      "targetScope": "site"
+    },
     "filter": {
-      "ids": ["{{threat_id}}"]
+      "ids": [
+        "{{threat_id}}"
+      ]
     }
   }
 }

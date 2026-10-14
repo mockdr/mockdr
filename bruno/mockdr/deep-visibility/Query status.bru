@@ -5,13 +5,13 @@ meta {
 }
 
 get {
-  url: {{s1_base_url}}/dv/query-status
+  url: {{s1_base_url}}/dv/query-status?queryId={{dv_query_id}}
   body: none
   auth: none
 }
 
 params:query {
-  queryId: replace-with-query-id
+  queryId: {{dv_query_id}}
 }
 
 headers {

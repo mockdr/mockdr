@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{kibana_base_url}}/api/detection_engine/rules/_find
+  url: {{kibana_base_url}}/api/detection_engine/rules/_find?per_page=25
   body: none
   auth: none
 }
@@ -17,4 +17,11 @@ params:query {
 headers {
   Authorization: ApiKey {{es_token}}
   kbn-xsrf: true
+}
+
+script:post-response {
+  try {
+    const value = res.body.data[0].id;
+    if (value !== undefined && value !== null) bru.setVar("es_rule_id", String(value));
+  } catch (e) {}
 }

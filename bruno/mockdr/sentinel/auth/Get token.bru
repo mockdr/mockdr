@@ -17,8 +17,15 @@ body:form-urlencoded {
   scope: https://management.azure.com/.default
 }
 
+script:post-response {
+  try {
+    const value = res.body.access_token;
+    if (value !== undefined && value !== null) bru.setVar("sentinel_token", String(value));
+  } catch (e) {}
+}
+
 docs {
-  Returns an Azure Resource Manager access_token — copy to sentinel_token.
+  Returns an Azure Resource Manager access_token — stored in sentinel_token for the requests after it.
   A token is for one resource: the Log Analytics query needs its own,
   from "Get Log Analytics token".
 }

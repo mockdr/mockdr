@@ -17,8 +17,15 @@ body:form-urlencoded {
   scope: https://graph.microsoft.com/.default
 }
 
+script:post-response {
+  try {
+    const value = res.body.access_token;
+    if (value !== undefined && value !== null) bru.setVar("graphToken", String(value));
+  } catch (e) {}
+}
+
 docs {
-  Returns access_token — copy to graphToken variable.
+  Returns access_token — stored in graphToken for the requests after it.
   Tenant: a1b2c3d4-e5f6-7890-abcd-ef1234567890
   Roles: admin=graph-mock-admin-client/graph-mock-admin-secret
          security=graph-mock-security-client/graph-mock-security-secret

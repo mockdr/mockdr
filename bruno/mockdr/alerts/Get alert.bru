@@ -5,11 +5,15 @@ meta {
 }
 
 get {
-  url: {{base_url}}/cloud-detection/alerts/{{alert_id}}
+  url: {{base_url}}/cloud-detection/alerts?ids={{alert_id}}
   body: none
   auth: none
 }
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+params:query {
+  ids: {{alert_id}}
 }

@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: {{s1_base_url}}/users/replace-with-user-id
+  url: {{s1_base_url}}/users/{{new_user_id}}
   body: json
   auth: none
 }
@@ -18,7 +18,8 @@ headers {
 body:json {
   {
     "data": {
-      "fullName": "Updated Name"
+      "fullName": "Updated Name",
+      "scope": "tenant"
     }
   }
 }

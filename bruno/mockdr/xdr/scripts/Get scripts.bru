@@ -1,7 +1,7 @@
 meta {
   name: Get scripts
   type: http
-  seq: 2
+  seq: 1
 }
 
 post {
@@ -22,4 +22,11 @@ body:json {
   {
     "request_data": {}
   }
+}
+
+script:post-response {
+  try {
+    const value = res.body.reply.scripts[0].script_uid;
+    if (value !== undefined && value !== null) bru.setVar("xdr_script_uid", String(value));
+  } catch (e) {}
 }

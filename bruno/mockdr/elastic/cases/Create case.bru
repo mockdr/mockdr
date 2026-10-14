@@ -20,7 +20,10 @@ body:json {
   {
     "title": "Ransomware Investigation",
     "description": "Potential ransomware activity detected on WORKSTATION-01",
-    "tags": ["ransomware", "p1"],
+    "tags": [
+      "ransomware",
+      "p1"
+    ],
     "connector": {
       "id": "none",
       "name": "none",
@@ -29,6 +32,14 @@ body:json {
     },
     "settings": {
       "syncAlerts": true
-    }
+    },
+    "owner": "securitySolution"
   }
+}
+
+script:post-response {
+  try {
+    const value = res.body.id;
+    if (value !== undefined && value !== null) bru.setVar("es_case_id", String(value));
+  } catch (e) {}
 }

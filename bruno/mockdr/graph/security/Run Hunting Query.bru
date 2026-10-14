@@ -17,6 +17,6 @@ headers {
 
 body:json {
   {
-    "Query": "DeviceProcessEvents | where FileName == 'powershell.exe' | take 10"
+    "Query": "DeviceInfo | where OSPlatform startswith 'Windows' | take 10"
   }
 }

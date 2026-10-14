@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{mde_base_url}}/api/machines
+  url: {{mde_base_url}}/api/machines?$top=25
   body: none
   auth: none
 }
@@ -17,4 +17,11 @@ params:query {
 
 headers {
   Authorization: Bearer {{mde_token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.value[0].id;
+    if (value !== undefined && value !== null) bru.setVar("mde_machine_id", String(value));
+  } catch (e) {}
 }

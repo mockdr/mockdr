@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/sites
+  url: {{base_url}}/sites?limit=50
   body: none
   auth: none
 }
@@ -17,4 +17,11 @@ params:query {
 
 headers {
   Authorization: ApiToken {{token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.data.sites[0].id;
+    if (value !== undefined && value !== null) bru.setVar("site_id", String(value));
+  } catch (e) {}
 }

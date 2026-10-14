@@ -18,11 +18,17 @@ headers {
 body:json {
   {
     "data": {
-      "username": "newuser@company.com",
-      "password": "MockPass123!",
-      "fullName": "New User",
       "email": "newuser@company.com",
-      "role": "viewer"
+      "fullName": "New User",
+      "scope": "tenant",
+      "role": "Viewer"
     }
   }
+}
+
+script:post-response {
+  try {
+    const value = res.body.data.id;
+    if (value !== undefined && value !== null) bru.setVar("new_user_id", String(value));
+  } catch (e) {}
 }

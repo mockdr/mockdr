@@ -1,0 +1,25 @@
+meta {
+  name: Restore seeded tokens
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/_dev/reset
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: ApiToken {{token}}
+}
+
+script:post-response {
+  bru.setVar("token", "admin-token-0000-0000-000000000001");
+  bru.setVar("s1_token", "admin-token-0000-0000-000000000001");
+}
+
+docs {
+  Generating an API token revoked the one that called it, as on SentinelOne.
+  A reset restores the seeded tokens, so the run leaves the mock as it found it.
+}

@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{cs_base_url}}/devices/queries/devices/v1
+  url: {{cs_base_url}}/devices/queries/devices/v1?limit=25
   body: none
   auth: none
 }
@@ -17,4 +17,11 @@ params:query {
 
 headers {
   Authorization: Bearer {{cs_token}}
+}
+
+script:post-response {
+  try {
+    const value = res.body.resources[0];
+    if (value !== undefined && value !== null) bru.setVar("cs_host_id", String(value));
+  } catch (e) {}
 }

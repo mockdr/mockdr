@@ -19,10 +19,13 @@ body:json {
   {
     "data": {
       "scriptId": "script-001",
-      "outputDestination": "SentinelCloud"
+      "outputDestination": "SentinelCloud",
+      "taskDescription": "Collect process list"
     },
     "filter": {
-      "ids": ["{{agent_id}}"]
+      "ids": [
+        "{{agent_id}}"
+      ]
     }
   }
 }

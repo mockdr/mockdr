@@ -1,7 +1,7 @@
 meta {
   name: Run script
   type: http
-  seq: 1
+  seq: 2
 }
 
 post {
@@ -21,9 +21,18 @@ headers {
 body:json {
   {
     "request_data": {
-      "script_name": "process_list",
-      "endpoint_id_list": ["{{xdr_endpoint_id}}"],
-      "parameters_values": {}
+      "script_uid": "{{xdr_script_uid}}",
+      "filters": [
+        {
+          "field": "endpoint_id_list",
+          "operator": "in",
+          "value": [
+            "{{xdr_endpoint_id}}"
+          ]
+        }
+      ],
+      "parameters_values": {},
+      "timeout": 600
     }
   }
 }

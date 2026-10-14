@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{base_url}}/webhooks
+  url: {{base_url}}/_dev/webhooks
   body: json
   auth: none
 }
@@ -17,10 +17,21 @@ headers {
 
 body:json {
   {
-    "url": "https://webhook.site/your-unique-id",
+    "url": "{{base_url}}/_dev/webhook-sink",
     "description": "SOAR integration test",
     "secret": "my-signing-secret-change-me",
-    "event_types": ["threat.created", "threat.updated", "agent.offline"],
+    "event_types": [
+      "threat.created",
+      "threat.updated",
+      "agent.offline"
+    ],
     "active": true
   }
+}
+
+script:post-response {
+  try {
+    const value = (res.body.data || res.body).id;
+    if (value !== undefined && value !== null) bru.setVar("webhook_id", String(value));
+  } catch (e) {}
 }
