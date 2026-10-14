@@ -58,11 +58,32 @@ function entityKindBadgeClass(kind: string): string {
   }
 }
 
+// The client-settable properties of an incident, as a full PUT body. ARM's
+// PUT replaces: a body carrying only `status` is refused for lacking the
+// required `title` and `severity`, and anything left out — owner, labels,
+// classification — would be reset. So the incident as read goes back, with
+// the one change applied.
+const SETTABLE = [
+  'title', 'description', 'severity', 'status', 'classification',
+  'classificationReason', 'classificationComment', 'owner', 'labels',
+  'firstActivityTimeUtc', 'lastActivityTimeUtc',
+] as const
+
+function replacementBody(current: SentinelIncidentProps, status: string): Record<string, unknown> {
+  const props = current as unknown as Record<string, unknown>
+  const body: Record<string, unknown> = {}
+  for (const key of SETTABLE) {
+    if (props[key] !== undefined && props[key] !== null) body[key] = props[key]
+  }
+  body['status'] = status
+  return body
+}
+
 async function updateStatus(newStatus: string): Promise<void> {
   if (!incident.value) return
   actionLoading.value = true
   try {
-    const res = await sentinelIncidentApi.update(id, { status: newStatus })
+    const res = await sentinelIncidentApi.update(id, replacementBody(incident.value.properties, newStatus))
     incident.value = res
   } finally {
     actionLoading.value = false

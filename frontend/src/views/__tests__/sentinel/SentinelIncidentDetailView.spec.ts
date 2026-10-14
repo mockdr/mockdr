@@ -336,7 +336,12 @@ describe('SentinelIncidentDetailView', () => {
     await wrapper.vm.$nextTick()
     await (wrapper.vm as any).updateStatus('Closed')
     await flushPromises()
-    expect(sentinelIncidentApi.update).toHaveBeenCalledWith('test-incident-id', { status: 'Closed' })
+    // A PUT replaces, so the whole incident goes back with the new status —
+    // the required title and severity, and the owner it must not lose.
+    const [incidentId, body] = vi.mocked(sentinelIncidentApi.update).mock.calls.at(-1)!
+    expect(incidentId).toBe('test-incident-id')
+    expect(body).toMatchObject({ status: 'Closed', severity: expect.any(String), title: expect.any(String) })
+    expect((body as Record<string, unknown>)['owner']).toMatchObject({ assignedTo: 'analyst@corp.com' })
   })
 
   it('updateStatus does nothing when incident is null', async () => {
