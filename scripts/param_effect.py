@@ -85,8 +85,14 @@ AUTH = {
     "cs": oauth("/cs/oauth2/token", "cs-mock-admin-client", "cs-mock-admin-secret"),
     "mde": oauth("/mde/oauth2/v2.0/token", "mde-mock-admin-client", "mde-mock-admin-secret",
                  {"scope": "https://api.securitycenter.microsoft.com/.default"}),
-    "graph": oauth("/graph/oauth2/v2.0/token", "graph-mock-admin-client",
-                   "graph-mock-admin-secret", {"scope": "https://graph.microsoft.com/.default"}),
+    # Graph answers `$count` and `$search` on directory objects only to a
+    # client that asks for advanced queries; without the header `$count` is
+    # silently ignored, as documented, and would read as a parameter with no
+    # effect. A real client sends it for exactly these parameters.
+    "graph": {**oauth("/graph/oauth2/v2.0/token", "graph-mock-admin-client",
+                      "graph-mock-admin-secret",
+                      {"scope": "https://graph.microsoft.com/.default"}),
+              "ConsistencyLevel": "eventual"},
     "sentinel": oauth("/sentinel/oauth2/v2.0/token", "sentinel-mock-client-id",
                       "sentinel-mock-client-secret",
                       {"scope": "https://management.azure.com/.default"}),
