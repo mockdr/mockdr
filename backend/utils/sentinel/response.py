@@ -134,6 +134,11 @@ def _blank(default: object) -> object:
     return default
 
 
+def arm_id(resource_type: str, name: str) -> str:
+    """The fully qualified ARM id of a workspace resource."""
+    return f"{_BASE}/{resource_type}/{name}"
+
+
 def build_arm_resource(
     resource_type: str,
     name: str,
@@ -158,7 +163,7 @@ def build_arm_resource(
     fixture = _fixture_for(resource_type, kind)
     defaults = {k: v for k, v in fixture.items() if k not in ("id", "name", "type", "etag", "kind")}
     result: dict = {
-        "id": f"{_BASE}/{resource_type}/{name}",
+        "id": arm_id(resource_type, name),
         "name": name,
         "type": f"Microsoft.SecurityInsights/{resource_type}",
     }

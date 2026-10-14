@@ -65,7 +65,7 @@ export const sentinelIncidentApi = {
     sentinelClient.put(`${WS_PREFIX}/incidents/${id}`, { properties: props }),
   getAlerts: (id: string): Promise<ArmList<SentinelAlertProps>> =>
     sentinelClient.post(`${WS_PREFIX}/incidents/${id}/alerts`),
-  getEntities: (id: string): Promise<{ entities: unknown[]; metaData: { count: number } }> =>
+  getEntities: (id: string): Promise<{ entities: unknown[]; metaData: { entityKind: string; count: number }[] }> =>
     sentinelClient.post(`${WS_PREFIX}/incidents/${id}/entities`),
   getComments: (id: string): Promise<ArmList> =>
     sentinelClient.get(`${WS_PREFIX}/incidents/${id}/comments`),

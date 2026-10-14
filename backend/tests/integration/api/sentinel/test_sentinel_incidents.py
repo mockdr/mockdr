@@ -178,6 +178,34 @@ class TestIncidentSubResources:
         assert "entities" in body
         assert "metaData" in body
 
+    def test_entities_answer_in_the_documented_shape(self, client: TestClient) -> None:
+        """`metaData` is an array of `{entityKind, count}`; an entity's id is its ARM id.
+
+        Incidents - List Entities (learn.microsoft.com, 2024-03-01) answers
+        `metaData: [{"entityKind": "Account", "count": 1}]` and ids like
+        `/subscriptions/…/providers/Microsoft.SecurityInsights/Entities/<guid>`.
+        The mock answered `metaData: {"count": N}` and `entities/<guid>`.
+        """
+        headers = _auth(client)
+        incidents = client.get(f"{SENTINEL_PREFIX}{_WS}/incidents", headers=headers).json()
+        body = {}
+        for incident in incidents["value"]:
+            body = client.post(
+                f"{SENTINEL_PREFIX}{_WS}/incidents/{incident['name']}/entities",
+                headers=headers,
+            ).json()
+            if body["entities"]:
+                break
+        assert body["entities"], "no seeded incident has entities"
+        assert isinstance(body["metaData"], list)
+        kinds = [e["kind"] for e in body["entities"]]
+        assert {m["entityKind"]: m["count"] for m in body["metaData"]} == {
+            k: kinds.count(k) for k in set(kinds)
+        }
+        for entity in body["entities"]:
+            assert entity["id"] == f"{_WS}/Entities/{entity['name']}"
+            assert entity["type"] == "Microsoft.SecurityInsights/Entities"
+
     def test_add_and_list_comments(self, client: TestClient) -> None:
         headers = _auth(client)
         inc_id = self._get_first_incident_id(client, headers)

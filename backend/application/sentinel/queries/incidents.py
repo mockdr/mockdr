@@ -11,7 +11,7 @@ from repository.sentinel.incident_comment_repo import sentinel_incident_comment_
 from repository.sentinel.incident_repo import sentinel_incident_repo
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
 from utils.sentinel.pagination import build_next_link, parse_skip_token
-from utils.sentinel.response import build_arm_list, build_arm_resource
+from utils.sentinel.response import arm_id, build_arm_list, build_arm_resource
 
 
 def _label(label: object) -> dict:
@@ -154,18 +154,29 @@ def get_incident_entities(incident_id: str) -> dict:
     if not inc:
         return build_arm_list([])
 
+    # As Incidents - List Entities answers (learn.microsoft.com, 2024-03-01):
+    # each entity's `id` is its full ARM id under `.../Entities/{guid}` and
+    # its `type` `Microsoft.SecurityInsights/Entities`; `metaData` is an
+    # array with one `{entityKind, count}` per kind. The mock answered a bare
+    # `entities/{guid}` and `metaData: {"count": N}`, an object no client
+    # iterating the documented array could read.
     entities = []
+    counts: dict[str, int] = {}
     for eid in inc.entity_ids:
         entity = sentinel_entity_repo.get(eid)
         if entity:
             entities.append({
-                "id": f"entities/{entity.entity_id}",
+                "id": arm_id("Entities", entity.entity_id),
                 "name": entity.entity_id,
-                "type": "Microsoft.SecurityInsights/entities",
+                "type": "Microsoft.SecurityInsights/Entities",
                 "kind": entity.kind,
                 "properties": entity.properties,
             })
-    return {"entities": entities, "metaData": {"count": len(entities)}}
+            counts[entity.kind] = counts.get(entity.kind, 0) + 1
+    return {
+        "entities": entities,
+        "metaData": [{"entityKind": kind, "count": n} for kind, n in counts.items()],
+    }
 
 
 def get_incident_comments(incident_id: str) -> dict:
