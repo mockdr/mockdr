@@ -39,7 +39,7 @@ class TestScenarioTargetsDoNotDependOnHistory:
         client.post(f"{_DEV}/reset", headers=ADMIN)
         # Whatever else drew from the shared stream in between.
         for _ in range(5):
-            random.random()
+            random.random()  # noqa: S311 - simulating unrelated draws
         second = _infected_by(client, "mass_infection")
 
         assert first and first == second
