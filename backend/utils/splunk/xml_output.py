@@ -22,11 +22,13 @@ _ATOM_NS = (
 _HEADER = '<?xml version="1.0" encoding="UTF-8"?>\n'
 
 
-def render_splunk_xml(payload: object) -> str:
+def render_splunk_xml(payload: object, *, bare_entry: bool = False) -> str:
     """Render a Splunk JSON response body as the XML splunkd would return.
 
     Args:
-        payload: Decoded JSON body produced by a Splunk router.
+        payload:    Decoded JSON body produced by a Splunk router.
+        bare_entry: Render a one-entry feed as the ``<entry>`` document
+                    splunkd answers a single search job with.
 
     Returns:
         XML document string.
@@ -34,6 +36,9 @@ def render_splunk_xml(payload: object) -> str:
     if isinstance(payload, dict):
         if "sessionKey" in payload:
             return _render_session_key(str(payload["sessionKey"]))
+        entries = payload.get("entry")
+        if bare_entry and isinstance(entries, list) and len(entries) == 1:
+            return _render_bare_entry(entries[0])
         if "entry" in payload:
             return _render_feed(payload)
         # The results envelope always carries a `messages` key, so testing for
@@ -110,6 +115,24 @@ def _render_feed(payload: dict) -> str:
         parts.append(_render_entry(entry))
     parts.append("</feed>")
     return "".join(parts)
+
+
+def _render_bare_entry(entry: object) -> str:
+    """Render one entry as a document of its own, the root ``<entry>``.
+
+    That is how splunkd answers ``GET /services/search/jobs/{sid}`` in XML,
+    and splunklib's ``Job`` depends on it: it overrides
+    ``_load_atom_entry`` with ``_load_atom(response).entry``, which reads the
+    *root* element's name, where every other entity searches a feed for its
+    entries (``splunklib/client.py``, ``Job._load_atom_entry``). Served as a
+    feed, every ``job.is_done()`` raised ``AttributeError: entry`` -- a job
+    could be dispatched and never polled.
+    """
+    body = _render_entry(entry)
+    if not body:
+        return _HEADER + "<entry/>"
+    inner = body.removeprefix("  <entry>\n").removesuffix("  </entry>\n")
+    return _HEADER + f"<entry {_ATOM_NS}>\n" + inner + "</entry>"
 
 
 def _render_entry(entry: object) -> str:

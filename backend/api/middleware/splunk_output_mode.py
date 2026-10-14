@@ -14,6 +14,7 @@ path, and a Splunk request that asked for JSON is passed straight through.
 
 from __future__ import annotations
 
+import re
 from urllib.parse import parse_qs
 from xml.sax.saxutils import escape
 
@@ -63,6 +64,10 @@ _CSV_COLLECTION = "/splunk/services/search/jobs"
 #: answers a search bar, and a search bar reads rows. An empty answer there
 #: is `204 No Content` with no body and no content type at all (measured).
 _CSV_DEFAULT_PATH = "/splunk/services/search/typeahead"
+
+#: One search job, as distinct from its collection and its sub-resources:
+#: splunkd answers it with a bare ``<entry>`` rather than a feed.
+_JOB_ENTITY = re.compile(r"^/splunk/services/search/(?:v2/)?jobs/(?!export/?$)[^/]+/?$")
 
 #: The `events` endpoint sorts its columns by name; `results` keeps the order
 #: the search produced, and a job entry keeps splunkd's own key order — which
@@ -357,7 +362,7 @@ def _xml_body(payload: object, path: str) -> str:
     A job's results carry a blank line under the declaration; the same
     document served anywhere else does not (both measured).
     """
-    document = render_splunk_xml(payload)
+    document = render_splunk_xml(payload, bare_entry=bool(_JOB_ENTITY.match(path)))
     if not path.rstrip("/").startswith(_CSV_COLLECTION):
         return document.replace("?>\n\n", "?>\n", 1)
     return document

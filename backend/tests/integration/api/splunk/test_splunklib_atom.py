@@ -104,3 +104,35 @@ class TestCollectionEntriesCarryTheirLinks:
         entry = body["entry"][0]
         assert entry["acl"]["owner"]
         assert entry["content"].get("eai:acl") is None
+
+
+class TestAJobIsABareEntry:
+    """``Job.refresh()`` reads the document's *root* element as ``entry``.
+
+    splunklib's ``Job`` overrides ``_load_atom_entry`` with
+    ``_load_atom(response).entry`` -- the root element's name -- where every
+    other entity searches a feed for its entries; splunkd answers ``GET
+    search/jobs/{sid}`` with a document whose root is the ``<entry>``. The
+    mock answered a feed, so ``job.is_done()`` raised ``AttributeError:
+    entry`` and a dispatched job could never be polled.
+    """
+
+    @pytest.mark.parametrize("prefix", [
+        "/splunk/services/search/jobs", "/splunk/services/search/v2/jobs",
+        "/splunk/servicesNS/nobody/search/search/v2/jobs",
+    ])
+    def test_the_job_is_the_root(self, raw: TestClient, auth: dict[str, str], prefix: str) -> None:
+        sid = _dispatch(raw, auth)
+        response = raw.get(f"{prefix}/{sid}", headers=auth)
+        assert response.status_code == 200, response.text
+        root = ElementTree.fromstring(response.text)
+        assert root.tag == f"{ATOM}entry"
+        keys = {k.get("name"): k.text for k in root.findall(f"{ATOM}content/{REST}dict/{REST}key")}
+        assert keys["sid"] == sid
+        assert keys["isDone"] in {"0", "1"}
+        assert root.find(f"{ATOM}link").get("rel") == "alternate"
+
+    def test_the_job_list_is_still_a_feed(self, raw: TestClient, auth: dict[str, str]) -> None:
+        _dispatch(raw, auth)
+        response = raw.get("/splunk/services/search/jobs", headers=auth)
+        assert ElementTree.fromstring(response.text).tag == f"{ATOM}feed"
