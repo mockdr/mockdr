@@ -4,6 +4,91 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.5.0] - 2026-10-14
+
+### Added
+
+**`DeviceNetworkEvents` is an Advanced Hunting table.** Naming it answered
+`400 badRequest` — "a recognized table name is expected" — on both
+`POST /mde/api/advancedqueries/run` and Graph's
+`POST /security/runHuntingQuery`, and it is the table a connector watching
+device-to-provider traffic is built around (#51). Nothing in the store held
+network connections, so this is a new collection, `mde_network_events`, with
+its own seeder rather than a projection of an existing one.
+
+About 360 connections over the seven days before each device's last check-in.
+Every row's `DeviceId` and `DeviceName` join `DeviceInfo`; only onboarded
+devices report, as in Defender. The initiating processes fit the platform
+(`chrome.exe`, `ms-teams.exe`, `mssense.exe` on Windows; `python3`, `curl`,
+`wdavdaemon` on macOS and Linux), and user processes run as an account logged
+on to that device, with one directory object id per user across the estate.
+System processes carry no UPN, and `InitiatingProcessVersionInfoCompanyName`
+is empty off Windows, because both are what Defender reports. The same host
+resolves to the same `RemoteIP` everywhere — an address from the RFC 5737
+documentation ranges, so no row claims a real service lives at somebody
+else's real address; connections to the device's own subnet are `Private`
+and carry no `RemoteUrl`. Destinations include the
+office suite, developer tooling and the LLM providers (`api.openai.com`,
+`api.anthropic.com`, `generativelanguage.googleapis.com`).
+
+21 columns: the 11 the issue named — `Timestamp`, `DeviceId`, `DeviceName`,
+`InitiatingProcessFileName`, `InitiatingProcessFolderPath`,
+`InitiatingProcessVersionInfoCompanyName`, `InitiatingProcessAccountUpn`,
+`InitiatingProcessAccountObjectId`, `RemoteUrl`, `RemoteIP`, `RemotePort` —
+and `ActionType`, `LocalIP`, `LocalPort`, `Protocol`, `RemoteIPType`,
+`InitiatingProcessCommandLine`, `InitiatingProcessId`,
+`InitiatingProcessAccountDomain`, `InitiatingProcessAccountName`, `ReportId`.
+
+The seeder draws from its own RNG. Inserted into `generate_all` on the shared
+stream, it would have shifted every Elastic, Cortex XDR, Splunk, Sentinel and
+Graph record seeded after it. Compared collection by collection against a
+2.4.0 seed, every other collection comes out as it did.
+
+**`ago()`, `now()` and `datetime()` in hunting queries.** Nearly every
+production hunting query opens with `where Timestamp > ago(…)`, and the
+evaluator read `ago` as a column that does not exist — so a connector that got
+past the table name met a 400 on its first line. Timespans take `d`, `h`, `m`,
+`s` and `ms`, decimals included (`ago(1.5h)`). A datetime compares with a
+timestamp column as an instant rather than as text: the seeded `…00.000Z` and
+an ISO literal without milliseconds do not sort the same way as strings.
+`extend Cutoff = ago(1d)` yields a timestamp, typed `DateTime` in the schema.
+A malformed timespan or date is a 400, as before.
+
+### Fixed
+
+**Graph's `runHuntingQuery` answered in Defender's envelope.** It handed back
+`/mde/api/advancedqueries/run`'s body verbatim — `Schema` of `{Name, Type}`,
+`Results`, `Stats` — where Graph answers a
+`microsoft.graph.security.huntingQueryResults`: `@odata.context`, camelCase
+`schema` of `{name, type}`, `results`, and no `Stats`. A Graph SDK client
+deserialised every hunt as empty, and a raw client written against the mock
+read keys production does not send. The rows and the evaluator are shared;
+the MDE route keeps its own, correct, PascalCase shape.
+
+**A hunt demanded a writer.** Graph's least-privileged permission for
+`runHuntingQuery` is `ThreatHunting.Read.All`, and `scripts/authz_audit.py`
+already listed it among the POSTs that only read — but the route required an
+owner or contributor, so a reader on a plan that includes hunting got a 403.
+
+**A freshly built image sent `Vary: Origin` on every answer.** FastAPI accepts
+a range of Starlette versions and `requirements.txt` named none, so a build
+today resolves Starlette 1.8, whose CORS middleware adds the header whether or
+not the request carried an `Origin`. Neither splunkd nor Elasticsearch sends
+it: the conformance harness reported 265 Elasticsearch/Kibana and 8 Splunk
+differences against an image built from the 2.4.0 tree, all of them this one
+header, and 0 once Starlette is pinned to the 1.6.0 that 2.4.0 was measured
+with. A pinned dependency would have kept the published image and the measured
+one the same build.
+
+### Security
+
+`axios` 1.19.0 → 1.20.0 and `vue` 3.5.41 → 3.5.44 in the console, for
+advisories published since 2.4.0 (`npm audit --omit=dev` reported eleven
+against axios, among them GHSA-vh66-26gq-q6x8 and GHSA-r4gj-5m52-g5wh, and
+GHSA-g2v6-rqmx-r4w6 against `@vue/server-renderer`). Lockfile only; both were
+inside their declared ranges. `frontend/package-lock.json` also carried the
+2.3.0 version string through the 2.4.0 release and is back in step.
+
 ## [2.4.0] - 2026-09-03
 
 ### Added
