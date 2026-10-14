@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import unquote
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -388,7 +389,7 @@ async def console_proxy(
     ) as client:
         answer = await client.request(
             method.upper(),
-            f"/elastic/{path.lstrip('/')}",
+            _console_target(path),
             content=body or None,
             headers={
                 "Authorization": request.headers.get("authorization", ""),
@@ -402,6 +403,29 @@ async def console_proxy(
             media_type="application/json; charset=utf-8",
         )
     return Response(content=answer.text, media_type=content_type)
+
+
+def _console_target(path: str) -> str:
+    """The path under this instance's Elasticsearch mount that ``path`` names.
+
+    Kibana hands the path to its Elasticsearch host, where a ``..`` segment
+    can climb no higher than the cluster's root. Here the cluster's root is
+    ``/elastic`` on an app that serves every other vendor too, and httpx
+    resolves dot segments before sending: ``path=../web/api/v2.1/...`` left
+    the mount and reached the SentinelOne API — and a path naming the console
+    proxy itself recursed through it. Dot segments are resolved here, clamped
+    at the mount's root the way the cluster clamps them at its own.
+    """
+    raw_path, sep, query = path.partition("?")
+    segments: list[str] = []
+    for segment in raw_path.split("/"):
+        if unquote(segment) == "..":
+            if segments:
+                segments.pop()
+        elif unquote(segment) != ".":
+            segments.append(segment)
+    resolved = "/".join(segments).lstrip("/")
+    return f"/elastic/{resolved}{sep}{query}"
 
 
 def _console_json(text: str) -> str:
