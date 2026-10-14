@@ -113,16 +113,44 @@ def _render_feed(payload: dict) -> str:
 
 
 def _render_entry(entry: object) -> str:
-    """Render one Atom ``<entry>``."""
+    """Render one Atom ``<entry>``.
+
+    splunkd's entry carries its ``<link>``s, the ``alternate`` first and the
+    ``<author>`` after it, and the entity's ACL inside its content as
+    ``eai:acl`` -- the JSON form lifts that out to ``acl`` and leaves
+    ``eai:acl`` null in the content. This rendered title, id, updated and
+    content alone, and splunklib, which reads Atom unless told otherwise,
+    could not list a single collection: ``Collection.list()`` builds every
+    entity from ``state.links.alternate`` (``splunklib/client.py``,
+    ``_entity_path``) and raised ``AttributeError: alternate`` on the first.
+    """
     if not isinstance(entry, dict):
         return ""
-    content = _render_value(entry.get("content", {}))
+    raw = entry.get("content", {})
+    acl = entry.get("acl")
+    if isinstance(raw, dict) and isinstance(acl, dict) and not raw.get("eai:acl"):
+        raw = {**raw, "eai:acl": acl}
+    content = _render_value(raw)
+    links = entry.get("links")
+    links = links if isinstance(links, dict) else {}
+    ordered = sorted(links.items(), key=lambda item: item[0] != "alternate")
+    rendered_links = [
+        f"    <link href={quoteattr(str(href))} rel={quoteattr(str(rel))}/>\n"
+        for rel, href in ordered
+    ]
+    author = entry.get("author")
+    head = rendered_links[:1] if ordered and ordered[0][0] == "alternate" else []
+    tail = rendered_links[len(head):]
     return (
         "  <entry>\n"
         f"    <title>{escape(str(entry.get('name', '')))}</title>\n"
         f"    <id>{escape(str(entry.get('id', '')))}</id>\n"
         f"    <updated>{escape(str(entry.get('updated', '')))}</updated>\n"
-        f'    <content type="text/xml">{content}</content>\n'
+        + "".join(head)
+        + (f"    <author>\n      <name>{escape(str(author))}</name>\n    </author>\n"
+           if author else "")
+        + "".join(tail)
+        + f'    <content type="text/xml">{content}</content>\n'
         "  </entry>\n"
     )
 

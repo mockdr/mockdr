@@ -60,3 +60,47 @@ class TestJobsCreateAnswersASid:
         assert root.tag == "response"
         assert [child.tag for child in root] == ["sid"]
         assert root.findtext("sid")
+
+
+class TestCollectionEntriesCarryTheirLinks:
+    """``Collection.list()`` builds every entity from ``links.alternate``.
+
+    splunkd's entry carries its ``<link>`` elements -- ``alternate`` first,
+    then ``<author>``, then the rest -- and the entity's ACL inside its
+    content as ``eai:acl``. The mock rendered title, id, updated and content
+    alone, so ``service.indexes.list()``, ``saved_searches``, ``users``,
+    ``apps``, ``kvstore`` -- every collection splunklib reads -- raised
+    ``AttributeError: alternate`` on the first entry.
+    """
+
+    @pytest.mark.parametrize("collection", [
+        "data/indexes", "saved/searches", "authentication/users", "apps/local",
+    ])
+    def test_every_entry_links_its_alternate(
+        self, raw: TestClient, auth: dict[str, str], collection: str,
+    ) -> None:
+        response = raw.get(f"/splunk/services/{collection}", headers=auth)
+        assert response.status_code == 200, response.text
+        entries = ElementTree.fromstring(response.text).findall(f"{ATOM}entry")
+        assert entries
+        for entry in entries:
+            links = entry.findall(f"{ATOM}link")
+            assert links and links[0].get("rel") == "alternate", collection
+            assert links[0].get("href", "").startswith("/services")
+            assert entry.findtext(f"{ATOM}author/{ATOM}name")
+
+    def test_the_acl_is_inside_the_content(self, raw: TestClient, auth: dict[str, str]) -> None:
+        response = raw.get("/splunk/services/data/indexes", headers=auth)
+        entry = ElementTree.fromstring(response.text).find(f"{ATOM}entry")
+        assert entry is not None
+        keys = entry.findall(f"{ATOM}content/{REST}dict/{REST}key")
+        acl = next(k for k in keys if k.get("name") == "eai:acl")
+        names = {k.get("name") for k in acl.findall(f"{REST}dict/{REST}key")}
+        assert {"app", "owner", "sharing", "perms"} <= names
+
+    def test_the_json_form_is_unchanged(self, raw: TestClient, auth: dict[str, str]) -> None:
+        """JSON keeps ``acl`` beside the content and ``eai:acl`` null in it."""
+        body = raw.get("/splunk/services/data/indexes?output_mode=json", headers=auth).json()
+        entry = body["entry"][0]
+        assert entry["acl"]["owner"]
+        assert entry["content"].get("eai:acl") is None
