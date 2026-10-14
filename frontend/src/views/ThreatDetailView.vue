@@ -95,10 +95,19 @@ const VERDICT_OPTIONS = [
   { verdict: 'true_positive',  label: 'True Positive'  },
 ]
 
+// threatInfo.mitigationStatus is only mitigated / not_mitigated /
+// marked_as_benign; which action got it there is in the threat's top-level
+// mitigationStatus list, newest entry last.
+const isQuarantined = computed(() => {
+  const entries = (threat.value?.mitigationStatus ?? []) as { action?: string }[]
+  const last = [...entries].reverse()
+    .find(e => e.action === 'quarantine' || e.action === 'unquarantine')
+  return last?.action === 'quarantine'
+})
+
 const MITIGATION_ACTIONS = computed<MitigationAction[]>(() => {
-  const s = threat.value?.threatInfo.mitigationStatus
   return [
-    s === 'quarantined'
+    isQuarantined.value
       ? { mitigate: 'un-quarantine', label: 'Un-quarantine' }
       : { mitigate: 'quarantine',    label: 'Quarantine'    },
     { mitigate: 'kill',      label: 'Kill'      },

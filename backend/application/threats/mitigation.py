@@ -11,13 +11,74 @@ from repository.threat_repo import threat_repo
 from utils.dt import utc_now
 from utils.id_gen import new_id
 
-_MITIGATION_MAP = {
-    "kill":                 "killed",
-    "quarantine":           "quarantined",
-    "un-quarantine":        "active",
-    "remediate":            "remediated",
-    "rollback-remediation": "rollback",
+#: Each mitigate action the 2.1 swagger enumerates for
+#: ``POST /threats/mitigate/{action}`` — kill, remediate, rollback-remediation,
+#: quarantine, un-quarantine, remove_macros, restore_macros — mapped to what it
+#: leaves behind on the threat: the ``threatInfo.mitigationStatus`` and the
+#: ``action`` of the entry it records in the threat's top-level
+#: ``mitigationStatus`` list.
+#:
+#: The mock wrote "killed", "quarantined", "remediated", "rollback" and
+#: "active" into ``threatInfo.mitigationStatus``, whose swagger enum is
+#: ``not_mitigated``, ``mitigated``, ``marked_as_benign`` — so a client
+#: filtering ``mitigationStatuses=mitigated`` never found a threat it had just
+#: mitigated, and one that switches on the enum fell through every case. The
+#: per-action detail belongs in the list, whose ``action`` enum is kill,
+#: remediate, rollback, quarantine, unquarantine, network_quarantine,
+#: remove_macros, restore_macros. Undoing a quarantine or restoring macros
+#: leaves the threat unmitigated again. ``remove_macros`` and
+#: ``restore_macros`` were refused with a 400 though the swagger lists them.
+#: (The operation's prose also names "network-quarantine", but its enum does
+#: not, so it is not accepted here.)
+_MITIGATION_MAP: dict[str, tuple[str, str]] = {
+    "kill":                 ("mitigated", "kill"),
+    "quarantine":           ("mitigated", "quarantine"),
+    "un-quarantine":        ("not_mitigated", "unquarantine"),
+    "remediate":            ("mitigated", "remediate"),
+    "rollback-remediation": ("mitigated", "rollback"),
+    "remove_macros":        ("mitigated", "remove_macros"),
+    "restore_macros":       ("not_mitigated", "restore_macros"),
 }
+
+
+def _status_description(status: str) -> str:
+    """``mitigationStatusDescription`` the way the seeded threats spell it."""
+    return status.replace("_", " ").title()
+
+
+def record_mitigation(threat: object, action: str, now: str) -> None:
+    """Apply a documented mitigate *action* to *threat* and record it.
+
+    Sets ``threatInfo.mitigationStatus`` (and its description) from the
+    swagger's enum and puts one entry for the action in the threat's
+    ``mitigationStatus`` list, replacing an earlier entry for the same
+    action. Shared with the playbook engine, whose policy auto-mitigation
+    wrote the same past-tense strings.
+    """
+    status, list_action = _MITIGATION_MAP[action]
+    info = threat.threatInfo  # type: ignore[attr-defined]
+    info["mitigationStatus"] = status
+    info["mitigationStatusDescription"] = _status_description(status)
+    info["updatedAt"] = now
+    entries = [
+        e for e in (getattr(threat, "mitigationStatus", None) or [])
+        if not (isinstance(e, dict) and e.get("action") == list_action)
+    ]
+    entries.append({
+        "action": list_action,
+        "status": "success",
+        "actionsCounters": {
+            "total": 1, "success": 1, "failed": 0, "pendingReboot": 0, "notFound": 0,
+        },
+        "agentSupportsReport": True,
+        "groupNotFound": False,
+        "lastUpdate": now,
+        "latestReport": None,
+        "mitigationStartedAt": now,
+        "mitigationEndedAt": now,
+        "reportId": None,
+    })
+    threat.mitigationStatus = entries  # type: ignore[attr-defined]
 
 
 def mitigate(action: str, ids: list[str], actor_user_id: str | None = None) -> dict:
@@ -33,8 +94,7 @@ def mitigate(action: str, ids: list[str], actor_user_id: str | None = None) -> d
     Returns:
         Dict with ``data.affected`` indicating how many threats were updated.
     """
-    new_status = _MITIGATION_MAP.get(action)
-    if new_status is None:
+    if action not in _MITIGATION_MAP:
         raise HTTPException(
             status_code=400,
             detail=f"Unknown mitigation action: {action!r}. "
@@ -45,8 +105,7 @@ def mitigate(action: str, ids: list[str], actor_user_id: str | None = None) -> d
         threat = threat_repo.get(threat_id)
         if not threat:
             continue
-        threat.threatInfo["mitigationStatus"] = new_status
-        threat.threatInfo["updatedAt"] = utc_now()
+        record_mitigation(threat, action, utc_now())
         threat_repo.save(threat)
         bridge.threat_changed(threat)
         site_id = threat.agentDetectionInfo.get("agentSiteId")

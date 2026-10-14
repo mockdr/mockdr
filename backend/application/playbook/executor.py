@@ -12,6 +12,7 @@ from application.playbook._run_state import (
     reset_cancel,
     set_run,
 )
+from application.threats.mitigation import record_mitigation
 from domain.activity import Activity, ActivityType
 from domain.agent import Agent
 from domain.alert import Alert
@@ -92,7 +93,8 @@ def _execute_step(step: dict, agent: Agent, run: PlaybookRun, threat_id_ref: lis
                 "fileName": step.get("fileName", "unknown.exe"),
                 "classification": step.get("classification", "Malware"),
                 "confidenceLevel": step.get("confidenceLevel", "malicious"),
-                "mitigationStatus": "active",
+                "mitigationStatus": "not_mitigated",
+                "mitigationStatusDescription": "Not Mitigated",
                 "incidentStatus": "unresolved",
                 "analystVerdict": "undefined",
                 "resolved": False,
@@ -248,16 +250,13 @@ def _execute_step(step: dict, agent: Agent, run: PlaybookRun, threat_id_ref: lis
                 )
                 activity_repo.append(detect_act)
             else:
-                # Policy is in protect mode — apply auto-mitigation.
-                # mitigationStatus uses the S1 past-tense form (same as /threats/mitigate/{action}).
+                # Policy is in protect mode — apply auto-mitigation, recorded
+                # the way /threats/mitigate/{action} records it: the swagger's
+                # threatInfo.mitigationStatus enum plus an entry in the
+                # threat's mitigationStatus list. It wrote "quarantined" and
+                # "killed", which that enum does not contain.
                 # incidentStatus is NOT changed here — that is analyst territory.
-                _mitigation_map = {
-                    "quarantine": "quarantined",
-                    "kill": "killed",
-                    "remediate": "remediated",
-                    "rollback-remediation": "rollback",
-                }
-                t.threatInfo["mitigationStatus"] = _mitigation_map.get(auto_action, auto_action)  # noqa: E501
+                record_mitigation(t, auto_action, now)
                 t.threatInfo["initiatedBy"] = "agent_policy"
                 t.threatInfo["initiatedByDescription"] = "Agent Policy"
                 t.threatInfo["updatedAt"] = now

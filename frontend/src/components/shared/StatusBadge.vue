@@ -15,6 +15,8 @@ const AGENT_STATUS: StatusMap = {
 
 const THREAT_STATUS: StatusMap = {
   mitigated:                { label: 'Mitigated',        cls: 'bg-s1-success/15 text-s1-success' },
+  not_mitigated:            { label: 'Not Mitigated',    cls: 'bg-s1-danger/15 text-s1-danger' },
+  marked_as_benign:         { label: 'Benign',           cls: 'bg-s1-muted/15 text-s1-muted' },
   mitigated_with_suspicion: { label: 'Mitigated (Susp)', cls: 'bg-s1-warning/15 text-s1-warning' },
   active:                   { label: 'Active',           cls: 'bg-s1-danger/15 text-s1-danger' },
   blocked:                  { label: 'Blocked',          cls: 'bg-s1-primary/15 text-s1-primary' },

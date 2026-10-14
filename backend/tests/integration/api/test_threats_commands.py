@@ -111,7 +111,8 @@ class TestMitigate:
             json={"filter": {"ids": [tid]}},
         )
         threat = client.get(f"{BASE}/threats?ids={tid}", headers=auth_headers).json()["data"][0]
-        assert threat["threatInfo"]["mitigationStatus"] == "quarantined"
+        assert threat["threatInfo"]["mitigationStatus"] == "mitigated"
+        assert [e["action"] for e in threat["mitigationStatus"]] == ["quarantine"]
 
 
 class TestAddToBlacklist:

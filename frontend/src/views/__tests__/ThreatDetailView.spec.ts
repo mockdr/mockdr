@@ -252,13 +252,33 @@ describe('ThreatDetailView', () => {
   })
 
   it('MITIGATION_ACTIONS shows Un-quarantine when quarantined', async () => {
-    const threat = { ...FAKE_THREAT, threatInfo: { ...FAKE_THREAT.threatInfo, mitigationStatus: 'quarantined' } }
+    // The swagger's threatInfo.mitigationStatus says only "mitigated"; the
+    // quarantine itself is an entry in the top-level mitigationStatus list.
+    const threat = {
+      ...FAKE_THREAT,
+      threatInfo: { ...FAKE_THREAT.threatInfo, mitigationStatus: 'mitigated' },
+      mitigationStatus: [{ action: 'kill', status: 'success' }, { action: 'quarantine', status: 'success' }],
+    }
     mockThreatGet.mockResolvedValue({ data: threat })
     const w = mountView()
     await flushPromises()
     const actions = (w.vm as any).MITIGATION_ACTIONS
     const labels = actions.map((a: any) => a.label)
     expect(labels).toContain('Un-quarantine')
+  })
+
+  it('MITIGATION_ACTIONS shows Quarantine again after an un-quarantine', async () => {
+    const threat = {
+      ...FAKE_THREAT,
+      threatInfo: { ...FAKE_THREAT.threatInfo, mitigationStatus: 'not_mitigated' },
+      mitigationStatus: [{ action: 'quarantine', status: 'success' }, { action: 'unquarantine', status: 'success' }],
+    }
+    mockThreatGet.mockResolvedValue({ data: threat })
+    const w = mountView()
+    await flushPromises()
+    const labels = (w.vm as any).MITIGATION_ACTIONS.map((a: any) => a.label)
+    expect(labels).toContain('Quarantine')
+    expect(labels).not.toContain('Un-quarantine')
   })
 
   it('MITIGATION_ACTIONS shows Resolve when not resolved', async () => {

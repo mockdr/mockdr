@@ -38,35 +38,40 @@ class TestMitigate:
         assert result["data"]["affected"] == 1
         threat = threat_repo.get(tid)
         assert threat is not None
-        assert threat.threatInfo["mitigationStatus"] == "quarantined"
+        assert threat.threatInfo["mitigationStatus"] == "mitigated"
+        assert threat.mitigationStatus[-1]["action"] == "quarantine"
 
     def test_kill_sets_status(self) -> None:
         tid = _first_threat_id()
         mitigate("kill", [tid])
         threat = threat_repo.get(tid)
         assert threat is not None
-        assert threat.threatInfo["mitigationStatus"] == "killed"
+        assert threat.threatInfo["mitigationStatus"] == "mitigated"
+        assert threat.mitigationStatus[-1]["action"] == "kill"
 
     def test_remediate_sets_status(self) -> None:
         tid = _first_threat_id()
         mitigate("remediate", [tid])
         threat = threat_repo.get(tid)
         assert threat is not None
-        assert threat.threatInfo["mitigationStatus"] == "remediated"
+        assert threat.threatInfo["mitigationStatus"] == "mitigated"
+        assert threat.mitigationStatus[-1]["action"] == "remediate"
 
     def test_rollback_sets_status(self) -> None:
         tid = _first_threat_id()
         mitigate("rollback-remediation", [tid])
         threat = threat_repo.get(tid)
         assert threat is not None
-        assert threat.threatInfo["mitigationStatus"] == "rollback"
+        assert threat.threatInfo["mitigationStatus"] == "mitigated"
+        assert threat.mitigationStatus[-1]["action"] == "rollback"
 
-    def test_un_quarantine_sets_active(self) -> None:
+    def test_un_quarantine_leaves_it_unmitigated(self) -> None:
         tid = _first_threat_id()
         mitigate("un-quarantine", [tid])
         threat = threat_repo.get(tid)
         assert threat is not None
-        assert threat.threatInfo["mitigationStatus"] == "active"
+        assert threat.threatInfo["mitigationStatus"] == "not_mitigated"
+        assert threat.mitigationStatus[-1]["action"] == "unquarantine"
 
     def test_unknown_action_raises_400(self) -> None:
         from fastapi import HTTPException
@@ -84,7 +89,7 @@ class TestMitigate:
         result = mitigate("kill", ids)
         assert result["data"]["affected"] == len(ids)
         for tid in ids:
-            assert threat_repo.get(tid).threatInfo["mitigationStatus"] == "killed"
+            assert threat_repo.get(tid).threatInfo["mitigationStatus"] == "mitigated"
 
     def test_creates_activity(self) -> None:
         before = len(activity_repo.list_all())

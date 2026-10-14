@@ -259,7 +259,9 @@ class TestMitigateStep:
         step = {"action": "mitigate"}
         _execute_step(step, agent, run, threat_id_ref)
         threat = threat_repo.get(threat_id_ref[0])
-        assert threat.threatInfo["mitigationStatus"] == "quarantined"
+        # The swagger's enum, with the action itself in the mitigationStatus list.
+        assert threat.threatInfo["mitigationStatus"] == "mitigated"
+        assert [e["action"] for e in threat.mitigationStatus] == ["quarantine"]
         assert threat.threatInfo["initiatedBy"] == "agent_policy"
 
     def test_protect_mode_kills_suspicious_threat(self, agent, run) -> None:
@@ -277,7 +279,8 @@ class TestMitigateStep:
         step = {"action": "mitigate"}
         _execute_step(step, agent, run, threat_id_ref)
         threat = threat_repo.get(threat_id_ref[0])
-        assert threat.threatInfo["mitigationStatus"] == "killed"
+        assert threat.threatInfo["mitigationStatus"] == "mitigated"
+        assert [e["action"] for e in threat.mitigationStatus] == ["kill"]
 
     def test_detect_mode_does_not_change_mitigation_status(self, agent, run, detect_policy) -> None:
         """In detect mode, the mitigate step does not quarantine — logs activity instead."""
