@@ -12,7 +12,13 @@ from typing import Any
 #: Collections written per request, and the most records each keeps.
 #: Dicts are insertion-ordered, so eviction is oldest-first.
 CAPS: dict[str, int] = {
-    "splunk_events": 100_000,
+    # Every EDR write bridges into Splunk (ADR-009), and a bridged event holds
+    # its payload twice, as `_raw` and as flattened fields: about 9 kB each,
+    # measured over 600 events from SentinelOne connect/disconnect. At
+    # 100,000 that is ~900 MB — past the 512 MB of the free instance the demo
+    # runs on, reached by a few days of steady action traffic. 20,000 keeps
+    # the worst case near 180 MB and still holds 30 times the seeded backlog.
+    "splunk_events": 20_000,
     "splunk_notables": 20_000,
     "splunk_search_jobs": 5_000,
     "splunk_sessions": 5_000,

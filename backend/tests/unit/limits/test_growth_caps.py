@@ -62,6 +62,34 @@ def test_unmatched_paths_share_one_metrics_series(client: TestClient) -> None:
     assert series[0].endswith(" 5")
 
 
+def test_a_full_splunk_event_store_fits_the_demo_instance(client: TestClient) -> None:
+    """Bridged events at their cap must fit well inside 512 MB (render.yaml's plan).
+
+    Every EDR write lands in Splunk as an event holding its payload twice;
+    at the old cap of 100,000 a few days of action traffic reached ~900 MB.
+    """
+    import gc
+    import tracemalloc
+
+    admin = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+    agents = client.get("/web/api/v2.1/agents?limit=60", headers=admin).json()["data"]
+    before = store.count("splunk_events")
+    gc.collect()
+    tracemalloc.start()
+    try:
+        start = tracemalloc.take_snapshot()
+        for n in range(60):
+            client.post(f"/web/api/v2.1/agents/actions/{'connect' if n % 2 else 'disconnect'}",
+                        headers=admin, json={"filter": {"ids": [agents[n]["id"]]}})
+        gc.collect()
+        grown = sum(s.size_diff for s in tracemalloc.take_snapshot().compare_to(start, "filename"))
+    finally:
+        tracemalloc.stop()
+    per_event = grown / max(1, store.count("splunk_events") - before)
+
+    assert CAPS["splunk_events"] * per_event < 256 * 1024 * 1024, per_event
+
+
 def test_queries_and_actions_a_client_starts_are_capped(
     client: TestClient, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
