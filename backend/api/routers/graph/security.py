@@ -141,7 +141,12 @@ async def run_hunting_query(
     _: dict = Depends(require_graph_feature("security/runHuntingQuery")),
 ) -> dict:
     """Execute an advanced hunting query."""
-    return sec_queries.run_hunting_query(body=body)
+    try:
+        return sec_queries.run_hunting_query(body=body)
+    except sec_queries.InvalidTimespanError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_graph_error_response("badRequest", str(exc)),
+        ) from exc
 
 
 # ── Secure Scores ────────────────────────────────────────────────────────────

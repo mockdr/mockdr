@@ -1,6 +1,9 @@
 """Read-side handlers for Microsoft Graph Security API."""
 from __future__ import annotations
 
+import re
+from datetime import UTC, datetime, timedelta
+
 from application.mde_advanced_hunting.queries import run_query as run_hunt
 from repository.graph.secure_score_repo import graph_secure_score_repo
 from repository.graph.security_alert_repo import graph_security_alert_repo
@@ -233,6 +236,67 @@ def _expand_alerts(alert_ids: list[str]) -> list[dict]:
 
 # ── Advanced Hunting ──────────────────────────────────────────────────────────
 
+class InvalidTimespanError(ValueError):
+    """A ``Timespan`` that is none of the ISO 8601 forms Graph documents."""
+
+
+_DURATION = re.compile(
+    r"^P(?:(?P<w>\d+)W)?(?:(?P<d>\d+)D)?"
+    r"(?:T(?:(?P<h>\d+)H)?(?:(?P<m>\d+)M)?(?:(?P<s>\d+(?:\.\d+)?)S)?)?$",
+)
+
+
+def _duration(text: str) -> timedelta | None:
+    """An ISO 8601 duration in weeks, days, hours, minutes and seconds."""
+    match = _DURATION.match(text.strip().upper())
+    if not match or text.strip().upper() in ("P", "PT"):
+        return None
+    parts = {k: float(v) for k, v in match.groupdict().items() if v}
+    return timedelta(weeks=parts.get("w", 0), days=parts.get("d", 0), hours=parts.get("h", 0),
+                     minutes=parts.get("m", 0), seconds=parts.get("s", 0))
+
+
+def _instant(text: str) -> datetime | None:
+    try:
+        value = datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def hunting_window(timespan: str | None, now: datetime | None = None) -> tuple[datetime, datetime]:
+    """The ``(start, end)`` a runHuntingQuery ``Timespan`` selects.
+
+    "The default value is 30 days, meaning if no startTime is specified, the
+    query looks back 30 days from now", and the documented forms are
+    Date/Date, Duration/endDate, Start/duration, a bare duration (back from
+    now) and a single date (from then to now)
+    (https://learn.microsoft.com/en-us/graph/api/security-security-runhuntingquery?view=graph-rest-1.0).
+
+    Raises:
+        InvalidTimespanError: For anything else.
+    """
+    now = now or datetime.now(UTC)
+    if timespan is None or not str(timespan).strip():
+        return now - timedelta(days=30), now
+    text = str(timespan).strip()
+    if "/" in text:
+        left, _, right = text.partition("/")
+        start, end = _instant(left), _instant(right)
+        if start and end:
+            return start, end
+        if end and (back := _duration(left)) is not None:
+            return end - back, end
+        if start and (ahead := _duration(right)) is not None:
+            return start, start + ahead
+    elif (back := _duration(text)) is not None:
+        return now - back, now
+    elif (start := _instant(text)) is not None:
+        return start, now
+    msg = f"Timespan '{text}' is not a valid ISO 8601 interval, duration or date."
+    raise InvalidTimespanError(msg)
+
+
 def run_hunting_query(body: dict) -> dict:
     """Execute a hunting query against the seeded hunting tables.
 
@@ -250,8 +314,18 @@ def run_hunting_query(body: dict) -> dict:
     this route used to hand back Defender's ``Schema``/``Results`` verbatim,
     which a Graph SDK deserialises as an empty result.
 
+    ``Timespan`` was read by nothing, so every hunt saw every seeded row. It
+    now selects the window the docs describe, 30 days back from now when
+    absent, applied to tables with a ``Timestamp`` column before the query
+    runs -- so a time filter inside the query narrows further and "the
+    shorter time span is applied", as documented. The seeders spread
+    DeviceNetworkEvents up to 31 days back, so the default hides the couple of
+    rows past 30 days on a fresh install (and more as an instance ages), the
+    way Defender's retention would.
+
     Args:
-        body: Request body containing ``Query`` (a KQL string).
+        body: Request body containing ``Query`` (a KQL string) and optionally
+              ``Timespan``.
 
     Returns:
         A ``huntingQueryResults`` with ``@odata.context``, ``schema`` and
@@ -259,8 +333,9 @@ def run_hunting_query(body: dict) -> dict:
 
     Raises:
         KqlError: If the query cannot be parsed or names an unknown table.
+        InvalidTimespanError: If ``Timespan`` is not a documented form.
     """
-    hunt = run_hunt(body)
+    hunt = run_hunt(body, window=hunting_window(body.get("Timespan")))
     return {
         "@odata.context": (
             "https://graph.microsoft.com/v1.0/$metadata"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -21,7 +22,7 @@ _TYPE_NAMES: dict[type, str] = {
 }
 
 
-def run_query(body: dict) -> dict:
+def run_query(body: dict, window: tuple[datetime, datetime] | None = None) -> dict:
     """Execute an Advanced Hunting KQL query against the seeded tables.
 
     The query used to be accepted and never evaluated — every request returned
@@ -30,7 +31,11 @@ def run_query(body: dict) -> dict:
     results and told a detection engineer nothing.
 
     Args:
-        body: Request body containing ``Query`` (a KQL string).
+        body:   Request body containing ``Query`` (a KQL string).
+        window: ``(start, end)`` to keep rows whose ``Timestamp`` falls in,
+                before the query runs -- Graph's ``Timespan``. Tables without
+                a ``Timestamp`` column are not narrowed. ``None`` keeps every
+                row.
 
     Returns:
         Advanced hunting response with ``Schema``, ``Results`` and ``Stats``.
@@ -48,9 +53,11 @@ def run_query(body: dict) -> dict:
         )
         raise KqlError(msg)
 
+    if window is not None:
+        rows = [r for r in rows if _in_window(r, window)]
     results = evaluate_kql(rows, query)
     return {
-        "Schema": _schema_for(results, rows),
+        "Schema": _schema_for(results, query, get_table(query.table) or []),
         "Results": results,
         "Stats": {
             "ExecutionTime": 0.05,
@@ -60,15 +67,36 @@ def run_query(body: dict) -> dict:
     }
 
 
-def _schema_for(results: list[dict], source: list[dict]) -> list[dict[str, str]]:
-    """Describe the columns of *results*, falling back to the source table.
+def _in_window(row: dict, window: tuple[datetime, datetime]) -> bool:
+    """Whether a row's ``Timestamp`` lies in ``window``; rows without one stay."""
+    stamp = row.get("Timestamp")
+    if stamp is None:
+        return True
+    try:
+        when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    start, end = window
+    return start <= when <= end
+
+
+def _schema_for(results: list[dict], query: Any, source: list[dict]) -> list[dict[str, str]]:
+    """Describe the columns of *results*, or of the query's shape when it has none.
 
     A query that filters everything out still has a schema, because the
-    projection is decided by the query rather than by what survived it.
+    projection is decided by the query rather than by what survived it. The
+    fallback used to be the *source table's* columns, so
+    ``DeviceInfo | where false | project DeviceId`` reported every DeviceInfo
+    column for a projection of one. The shape is now found by running the
+    query's operators without its ``where`` clauses over one source row:
+    ``where`` keeps or drops rows but never changes a column.
     """
     sample = results[0] if results else {}
     if not sample and source:
-        sample = source[0]
+        shape = replace(query, operators=[
+            (name, arg) for name, arg in query.operators if name != "where"])
+        shaped = evaluate_kql(source[:1], shape)
+        sample = shaped[0] if shaped else {}
     return [{"Name": name, "Type": _type_name(value)} for name, value in sample.items()]
 
 
