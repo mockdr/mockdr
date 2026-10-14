@@ -88,3 +88,21 @@ def test_every_fixture_the_routes_answer_from_is_package_data() -> None:
                                       for g in globs)
     ]
     assert not missing, missing
+
+
+@pytest.mark.parametrize("package", ["fastapi", "starlette"])
+def test_an_install_resolves_the_web_stack_requirements_pins(package: str) -> None:
+    """`pip install ./backend` reads pyproject, not requirements.txt.
+
+    Starlette 1.8 sends `Vary: Origin` on every answer, which the conformance
+    harness measured neither splunkd nor Elasticsearch sending, so 2.5.0
+    pinned it in requirements.txt. pyproject named no Starlette at all and
+    let FastAPI float: an external suite installing the package got 1.8 back.
+    """
+    declared = CONFIG["project"]["dependencies"]
+    pinned = [
+        line.strip() for line in (BACKEND / "requirements.txt").read_text().splitlines()
+        if line.strip().startswith(f"{package}==")
+    ]
+    assert pinned, f"requirements.txt pins no {package}"
+    assert pinned[0] in declared

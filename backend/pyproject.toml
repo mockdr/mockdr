@@ -28,7 +28,11 @@ classifiers = [
 # points at it.
 readme = {text = "Full-fidelity multi-EDR/SIEM mock server. See https://github.com/mockdr/mockdr#readme.", content-type = "text/markdown"}
 dependencies = [
-    "fastapi>=0.100",
+    # Pinned to what requirements.txt pins and the conformance harness measured:
+    # FastAPI accepts a Starlette range, and Starlette 1.8 sends `Vary: Origin`
+    # on every answer, which neither splunkd nor Elasticsearch does.
+    "fastapi==0.141.1",
+    "starlette==1.6.0",
     "uvicorn[standard]>=0.20",
     "pydantic>=2.0",
     "faker>=18.0",
