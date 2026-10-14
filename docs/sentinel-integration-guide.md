@@ -49,6 +49,45 @@ and takes no api-version.
 | Resource Group | `mockdr-rg` |
 | Workspace | `mockdr-workspace` |
 
+## Azure SDKs (azure-mgmt-securityinsight, azure-monitor-query)
+
+The mount is an Entra authority: `/sentinel/{tenant}/v2.0/.well-known/openid-configuration`
+is served, so azure-identity's `ClientSecretCredential` works against it. The
+Azure SDKs require **https** — azure-identity refuses an http authority and
+azure-core will not send a bearer token over http — so run the mock with TLS
+(README, "TLS, which the Azure SDKs insist on") and trust its certificate
+(`REQUESTS_CA_BUNDLE`).
+
+```python
+from datetime import timedelta
+from azure.identity import ClientSecretCredential
+from azure.mgmt.securityinsight import SecurityInsights
+from azure.monitor.query import LogsQueryClient
+
+MOCK = "https://127.0.0.1:8001/sentinel"
+cred = ClientSecretCredential(
+    "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "sentinel-mock-client-id",
+    "sentinel-mock-client-secret", authority=MOCK, disable_instance_discovery=True)
+
+si = SecurityInsights(cred, "00000000-0000-0000-0000-000000000000", base_url=MOCK,
+                      credential_scopes=["https://management.azure.com/.default"])
+for page in si.incidents.list("mockdr-rg", "mockdr-workspace", top=50).by_page():
+    ...
+
+logs = LogsQueryClient(cred, endpoint=MOCK, audience="https://api.loganalytics.io")
+logs.query_workspace("mockdr-workspace", "SecurityIncident | take 5",
+                     timespan=timedelta(days=1))
+```
+
+- `credential_scopes` and `audience` keep the token's scope the real
+  resource's; the defaults would derive it from the mock's URL, and the token
+  endpoint refuses that scope (`invalid_scope`).
+- Give `LogsQueryClient` the mount, **not** `.../sentinel/v1`: azure-monitor-query
+  treats an endpoint ending in `/v1` as "host plus API version" and drops
+  the whole path, `/sentinel` included.
+- `timespan` is applied, as Log Analytics applies it, on top of the query's
+  own time filters.
+
 ## XSOAR Azure Sentinel Configuration
 
 1. **Azure Cloud**: Custom

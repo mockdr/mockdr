@@ -213,7 +213,7 @@ curl -X POST http://localhost:8001/xdr/public_api/v1/incidents/get_incidents/ \
 
 Supports **Basic Auth**, a **session key** from login (`Authorization: Splunk <key>`, or `Bearer <key>` in the JWT scheme), and **HEC Tokens** (`Authorization: Splunk <token>`) for HTTP Event Collector endpoints.
 
-Like splunkd, responses are Atom XML unless you ask for JSON with `output_mode=json` — the Splunk SDKs always do. HEC is exempt and always answers JSON.
+Like splunkd, responses are Atom XML unless you ask for JSON with `output_mode=json`. splunklib asks for JSON only where you pass it (search results, typically) and reads entities and collections as Atom, so both forms matter. HEC is exempt and always answers JSON.
 
 **Basic Auth users:**
 
@@ -312,6 +312,64 @@ curl -X POST -H "Authorization: Bearer $P1_TOKEN" -H "Content-Type: application/
 | Identity Protection (Risky Users) | ❌ | ✅ | ❌ |
 | Intune Device Management | ❌ | ✅ | ✅ |
 | Attack Simulation | ❌ | ✅ | ❌ |
+
+## Pointing the vendor SDKs at mockdr
+
+Every SDK below is driven end to end against the mock by
+[`scripts/sdk_smoke.py`](scripts/sdk_smoke.py), a release check; the settings
+are the ones it uses. `<mock>` is scheme, host and port, e.g.
+`https://127.0.0.1:8001`.
+
+| SDK | Setting |
+| --- | --- |
+| **falconpy** | `OAuth2(client_id=..., client_secret=..., base_url="<mock>/cs")`, then `Hosts(auth_object=auth)` etc.; `ssl_verify=` takes a CA file. |
+| **msgraph-sdk** | An azure-identity credential (below), `GraphServiceClient(credentials=cred, scopes=["https://graph.microsoft.com/.default"])`, then `client.request_adapter.base_url = "<mock>/graph/v1.0"`. |
+| **azure-identity / MSAL** | `ClientSecretCredential(tenant, id, secret, authority="<mock>/graph", disable_instance_discovery=True)` (or `/mde`, `/sentinel`); MSAL: `authority="<mock>/graph/<tenant>", instance_discovery=False`. **Requires https** — see below. |
+| **azure-mgmt-securityinsight** | `SecurityInsights(cred, subscription, base_url="<mock>/sentinel", credential_scopes=["https://management.azure.com/.default"])`. |
+| **azure-monitor-query** | `LogsQueryClient(cred, endpoint="<mock>/sentinel", audience="https://api.loganalytics.io")`. Not `.../sentinel/v1`: the client strips the whole path from an endpoint ending in `/v1`. |
+| **elasticsearch-py** | `Elasticsearch("<mock>/elastic", basic_auth=(...), ca_certs=...)` — the 8.x client; a 9.x client asks for `compatible-with=9`, which an 8.15 cluster refuses. |
+| **splunklib** | It has no path prefix, so give it a handler that adds `/splunk` (below). |
+| **Kibana** (no SDK) | `requests` with Basic auth and `kbn-xsrf: true` on writes. |
+| **XSOAR SentinelOne v2 / Cortex XDR IR** | Server URL `<mock>` and `<mock>/xdr` respectively. |
+
+```python
+import ssl
+from urllib.parse import urlsplit, urlunsplit
+import splunklib.binding as binding
+import splunklib.client as client
+
+def prefixed(prefix, **kwargs):
+    base = binding.handler(**kwargs)   # e.g. context=ssl.create_default_context(cafile=...)
+    def request(url, message, **kw):
+        parts = urlsplit(url)
+        return base(urlunsplit(parts._replace(path=prefix + parts.path)), message, **kw)
+    return request
+
+service = client.connect(scheme="https", host="127.0.0.1", port=8001,
+                         username="admin", password="mockdr-admin",
+                         handler=prefixed("/splunk", context=ssl.create_default_context(cafile="mock.crt")))
+```
+
+### TLS, which the Azure SDKs insist on
+
+azure-identity refuses an http authority ("The value must be a TLS protected
+(https) URL"), MSAL refuses to build one, and azure-core's bearer-token policy
+will not send a token over http — so Graph, Defender and Sentinel cannot be
+reached through the Microsoft SDKs on a plain-http mock. uvicorn serves TLS
+itself:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=127.0.0.1 \
+  -addext subjectAltName=IP:127.0.0.1,DNS:localhost -keyout mock.key -out mock.crt
+cd backend && .venv/bin/uvicorn main:app --port 8001 --no-server-header \
+  --ssl-keyfile ../mock.key --ssl-certfile ../mock.crt
+```
+
+and the client trusts `mock.crt`: `REQUESTS_CA_BUNDLE` (requests, azure-core)
+and `SSL_CERT_FILE` (httpx — msgraph — and aiohttp — azure-identity's async
+credential) cover all of them, or each SDK's own option (`ca_certs`,
+`ssl_verify`, an `ssl.SSLContext`). Every other vendor works over http or https
+alike.
 
 ## Behaviour that will surprise you
 

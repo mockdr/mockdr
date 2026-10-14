@@ -2,7 +2,7 @@
 
 ## Overview
 
-MockDR includes a full-fidelity Splunk Enterprise REST API mock that runs on the same port as all other vendors, mounted under the `/splunk` path prefix. It is compatible with the Cortex XSOAR SplunkPy integration.
+MockDR includes a full-fidelity Splunk Enterprise REST API mock that runs on the same port as all other vendors, mounted under the `/splunk` path prefix. splunklib reaches it with a one-function handler, and the Cortex XSOAR SplunkPy integration through a reverse proxy (both below).
 
 ## Connection Details
 
@@ -41,17 +41,59 @@ MockDR includes a full-fidelity Splunk Enterprise REST API mock that runs on the
 | `notable` | ES notable events | `stash` |
 | `main` | Default index | (any) |
 
+## splunklib (splunk-sdk for Python)
+
+splunklib builds every URL as `scheme://host:port/services/...` and has no
+setting for a path prefix, so it cannot reach `/splunk/...` on its own. Its
+documented extension point is a custom HTTP handler; one that puts `/splunk`
+in front of the path is all it takes:
+
+```python
+from urllib.parse import urlsplit, urlunsplit
+import splunklib.binding as binding
+import splunklib.client as client
+
+def prefixed(prefix, **kwargs):
+    base = binding.handler(**kwargs)          # context=ssl.SSLContext(...) for https
+    def request(url, message, **kw):
+        parts = urlsplit(url)
+        return base(urlunsplit(parts._replace(path=prefix + parts.path)), message, **kw)
+    return request
+
+service = client.connect(scheme="http", host="localhost", port=8001,
+                         username="admin", password="mockdr-admin",
+                         handler=prefixed("/splunk"))
+job = service.jobs.create("search index=sentinelone | head 10")
+```
+
+With that, everything the SDK does works and is exercised by
+`scripts/sdk_smoke.py`: collections read as Atom, `jobs.create` / `is_done()` /
+`results()` / `preview()` (search API v2, POSTed), `export`, `oneshot`, saved
+searches and `dispatch()`, the KV Store, and the SDK's own exceptions
+(`HTTPError` with the status, `AuthenticationError` on a bad password).
+
 ## XSOAR SplunkPy Configuration
 
-To connect XSOAR SplunkPy to MockDR:
+SplunkPy connects through splunklib with a handler of its own that adds no
+prefix, always over https, so it addresses splunkd at the root of
+`host:port`. It reaches the mock through a TLS reverse proxy that maps `/`
+onto `/splunk/`, for example with nginx:
 
-1. **Host**: `localhost` (or Docker hostname)
-2. **Port**: `8001`
-3. **Username**: `admin`
-4. **Password**: `mockdr-admin`
-5. **Splunk URL prefix**: `/splunk`
-6. **Fetch notable events**: Enabled
-7. **Notable macro**: `` `notable` ``
+```nginx
+server {
+    listen 8089 ssl;
+    ssl_certificate     mock.crt;
+    ssl_certificate_key mock.key;
+    location / { proxy_pass http://127.0.0.1:8001/splunk/; }
+}
+```
+
+1. **Server URL**: the proxy's host (e.g. `localhost`)
+2. **Port**: the proxy's port (`8089` above)
+3. **Username** / **Password**: `admin` / `mockdr-admin`
+4. **Trust any certificate**: checked, unless the proxy's certificate is trusted
+5. **Fetch notable events**: Enabled
+6. **Notable macro**: `` `notable` ``
 
 ## Supported SPL
 

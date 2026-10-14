@@ -62,12 +62,38 @@ same Entra flow against the same tenant.
 - An unknown `client_id` is `400 unauthorized_client` (AADSTS700016); a known
   one with the wrong secret is `401 invalid_client` (AADSTS7000215).
 - `GET /graph/{tenant}/v2.0/.well-known/openid-configuration` (and the same on
-  `/mde`) serves the discovery document MSAL and azure-identity read first; its
-  `token_endpoint` points back at the mount. Use `http(s)://<mock>/graph/<tenant>`
-  as the authority, with instance discovery / authority validation turned off
-  (`instance_discovery=False` in MSAL Python, `disable_instance_discovery=True`
-  in azure-identity), since those ask login.microsoftonline.com about the host.
-  Tokens are opaque, not JWTs.
+  `/mde`, `/sentinel`) serves the discovery document MSAL and azure-identity
+  read first; its `token_endpoint` points back at the mount. Use
+  `https://<mock>/graph/<tenant>` as the authority in MSAL Python
+  (`instance_discovery=False`) and `authority="https://<mock>/graph"` with
+  `disable_instance_discovery=True` in azure-identity, since both otherwise
+  ask login.microsoftonline.com about the host. Tokens are opaque, not JWTs.
+- **The authority must be https.** MSAL Python refuses to build an http one
+  ("should consist of an https url") and azure-identity refuses it ("must be
+  a TLS protected (https) URL"); msgraph-sdk will not send a token over http
+  either, except to localhost. Run the mock with TLS — `uvicorn ...
+  --ssl-keyfile mock.key --ssl-certfile mock.crt`, see the README's "TLS,
+  which the Azure SDKs insist on" — and have the client trust the
+  certificate (`SSL_CERT_FILE` for httpx and aiohttp, `REQUESTS_CA_BUNDLE`
+  for requests).
+
+### msgraph-sdk
+
+```python
+from azure.identity.aio import ClientSecretCredential
+from msgraph import GraphServiceClient
+
+cred = ClientSecretCredential(
+    "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "graph-mock-admin-client",
+    "graph-mock-admin-secret", authority="https://127.0.0.1:8001/graph",
+    disable_instance_discovery=True)
+client = GraphServiceClient(credentials=cred, scopes=["https://graph.microsoft.com/.default"])
+client.request_adapter.base_url = "https://127.0.0.1:8001/graph/v1.0"
+```
+
+`PageIterator` follows the mock's `@odata.nextLink`; `runHuntingQuery` takes
+the SDK's `RunHuntingQueryPostRequestBody(query=..., timespan=...)`; errors
+raise `ODataError` with the status and Graph's error code, as against Graph.
 
 ### $count
 
