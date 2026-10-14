@@ -8,6 +8,7 @@ from application.alerts import commands as alert_commands
 from application.alerts import queries as alert_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
+from utils.filter_selection import UnselectableFilterError
 from utils.pagination import build_list_response, paginate
 from utils.vendor_errors import build_vendor_error
 
@@ -59,18 +60,36 @@ def list_alerts(
     return alert_queries.list_alerts(params, cursor, limit)
 
 
+def _selected(body: FilterBody) -> list[str]:
+    """The alerts a bulk action's ``filter`` selects, as ``GET /cloud-detection/alerts`` would.
+
+    The swagger gives both actions the listing's filter members; only ``ids``
+    was read, so a verdict scoped by ``siteIds`` or ``ruleName__contains``
+    reached no alert and answered ``affected: 0``. An empty filter selects
+    nothing, as before.
+    """
+    if not body.filter:
+        return []
+    try:
+        return alert_queries.select_alert_ids(body.filter)
+    except UnselectableFilterError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
+
+
 @router.post("/cloud-detection/alerts/analyst-verdict")
 def set_analyst_verdict(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Set the analyst verdict on the specified alerts."""
-    ids = body.filter.get("ids", [])
+    """Set the analyst verdict on the alerts the body's ``filter`` selects."""
+    ids = _selected(body)
     verdict = body.data.get("analystVerdict", "UNDEFINED")
     return alert_commands.set_analyst_verdict(verdict, ids, current_user.get("userId"))
 
 
 @router.post("/cloud-detection/alerts/incident")
 def set_incident_status(body: FilterBody, current_user: dict = Depends(require_write)) -> dict:
-    """Set the incident status on the specified alerts."""
-    ids = body.filter.get("ids", [])
+    """Set the incident status on the alerts the body's ``filter`` selects."""
+    ids = _selected(body)
     status = body.data.get("incidentStatus", "UNRESOLVED")
     return alert_commands.set_incident_status(status, ids, current_user.get("userId"))
 

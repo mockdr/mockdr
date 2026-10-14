@@ -143,3 +143,17 @@ class TestABulkWriteSelectsWhatTheGetWould:
                            json={"filter": {"ids": None}})
         assert resp.status_code == 400
         assert len(client.get(f"{BASE}/users", headers=auth_headers).json()["data"]) == before
+
+    def test_an_alert_verdict_by_site(self, client: TestClient, auth_headers: dict) -> None:
+        alert = client.get(f"{BASE}/cloud-detection/alerts", headers=auth_headers,
+                           params={"limit": 1}).json()["data"][0]
+        site_id = alert["agentDetectionInfo"]["siteId"]
+        on_site = client.get(f"{BASE}/cloud-detection/alerts", headers=auth_headers,
+                             params={"siteIds": site_id, "limit": 1000}).json()["data"]
+        resp = client.post(f"{BASE}/cloud-detection/alerts/analyst-verdict",
+                           headers=auth_headers, json={
+                               "data": {"analystVerdict": "FALSE_POSITIVE"},
+                               "filter": {"siteIds": [site_id]},
+                           })
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["affected"] == len(on_site) > 0

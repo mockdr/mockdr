@@ -1,6 +1,7 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
 from repository.alert_repo import alert_repo
+from utils.filter_selection import select_ids
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.nested import get_nested
 from utils.pagination import ALERT_CURSOR, build_list_response, paginate
@@ -74,3 +75,16 @@ def filter_star_rules(params: dict) -> list[dict]:
     )
     # `sortBy`/`sortOrder`/`skip` are documented on this route like any other.
     return apply_query_options(matched, params)
+
+
+def select_alert_ids(raw_filter: dict) -> list[str]:
+    """The ids of the alerts a write's ``filter`` selects, as the listing would.
+
+    Raises:
+        UnselectableFilterError: A member the listing cannot filter on.
+    """
+    return select_ids(
+        alert_repo.list_all(), raw_filter,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/cloud-detection/alerts", []),
+        id_field="alertInfo.alertId",
+    )
