@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+from collections import Counter
 
 from faker import Faker
 
@@ -308,8 +309,15 @@ def seed_graph_security(fake: Faker) -> None:
         incident_number = i + 1
         incident_id = str(incident_number)
         alert_ids = [a.id for a in group]
-        categories = {a.category for a in group if a.category}
-        category_str = next(iter(categories)) if categories else "SuspiciousActivity"
+        # The category the incident is named after is the one most of its
+        # alerts share, ties going to the first alert's. This took
+        # `next(iter(<set>))`, and a set of strings iterates in an order that
+        # depends on the per-process hash salt: the same seed named a third
+        # of the incidents differently on every restart.
+        categories = Counter(a.category for a in group if a.category)
+        category_str = (
+            categories.most_common(1)[0][0] if categories else "SuspiciousActivity"
+        )
 
         status, classification, determination = _incident_state(group)
         incident = GraphSecurityIncident(

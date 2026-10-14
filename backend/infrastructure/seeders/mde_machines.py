@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+import zlib
 
 from faker import Faker
 
@@ -96,8 +97,13 @@ def seed_mde_machines(fake: Faker) -> list[str]:
         tag_count = random.randint(0, 3)
         machine_tags = random.sample(_TAG_POOL, tag_count)
 
-        # RBAC group from agent group
-        rbac_group_id = hash(agent.groupId) % 10000
+        # RBAC group from agent group. This was `hash(agent.groupId)`, and
+        # the builtin `hash` of a str is salted per process (PYTHONHASHSEED),
+        # so every restart gave every machine — and the Graph alert evidence
+        # and Splunk events that copy it — a different rbacGroupId. CRC-32 of
+        # the group id is the same number in every process and draws nothing
+        # from the seeded stream.
+        rbac_group_id = zlib.crc32(agent.groupId.encode()) % 10000
         rbac_group_name = agent.groupName
 
         # Determine last IP address

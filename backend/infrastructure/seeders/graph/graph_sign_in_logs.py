@@ -16,11 +16,20 @@ from repository.graph.user_repo import graph_user_repo
 # Application pools
 # ---------------------------------------------------------------------------
 
+#: Microsoft's own first-party application ids, which are the same in every
+#: tenant — a sign-in to Teams names 1fec8e78-… everywhere, and integrations
+#: allow-list or enrich by exactly these values. They were `graph_uuid()`
+#: calls evaluated at import, before `generate_all` seeds the stream, so
+#: every process start minted new ones (and none of them was Microsoft's).
+#: Removing those draws shifts nothing: `generate_all` re-seeds after import.
+#: Graph Explorer's id is the one Microsoft lists in "Verify first-party
+#: Microsoft applications in sign-in reports"; the others are the ids those
+#: apps carry in every tenant's sign-in log.
 _APP_POOL: list[tuple[str, str]] = [
-    (graph_uuid(), "Microsoft Teams"),
-    (graph_uuid(), "Office 365 Exchange Online"),
-    (graph_uuid(), "Microsoft 365 Portal"),
-    (graph_uuid(), "Microsoft Graph Explorer"),
+    ("1fec8e78-bce4-4aaf-ab1b-5451cc387264", "Microsoft Teams"),
+    ("00000002-0000-0ff1-ce00-000000000000", "Office 365 Exchange Online"),
+    ("00000006-0000-0ff1-ce00-000000000000", "Microsoft 365 Portal"),
+    ("de8bc8b5-d9f9-48b1-a8ad-b748da725064", "Microsoft Graph Explorer"),
 ]
 
 _CLIENT_APPS: list[str] = [
