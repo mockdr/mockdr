@@ -89,6 +89,17 @@ search index=<index> sourcetype=<sourcetype> <field>=<value>
 
 Time modifiers: `earliest=-24h`, `latest=now`, `earliest=-7d@d`
 
+Events replayed from the EDR mounts keep each product's field names,
+flattened with dots (`threatInfo.classification`, `event.Severity`). In a
+search clause they are written as they are; in `eval` and `where`, where `.`
+is concatenation, a name that is not a plain word goes in single quotes, as
+in Splunk:
+
+```spl
+search index=crowdstrike metadata.eventType=EppDetectionSummaryEvent
+  | where 'event.Severity'>=70 | stats count by event.SeverityName
+```
+
 ### eval functions
 
 Around fifty, measured one by one against Splunk 10.4.2: the multivalue

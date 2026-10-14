@@ -258,6 +258,39 @@ class TestRenderedResults:
         assert response.json()["results"][0]["values(index)"] == "sentinelone"
 
 
+class TestSingleQuotesNameAField:
+    """`'name'` in eval and where is a field, as the eval documentation says.
+
+    It is the only way to write a field whose name is not a plain word, and
+    every event this mock replays from JSON has such names
+    (`threatInfo.classification`, `event.Severity`). The quoted form was read
+    as a field literally called `'event.Severity'`: null on every row, so a
+    `where` on it answered nothing and an `eval` assigned nothing.
+    """
+
+    DOTTED = [{"event.Severity": "100", "src ip": "10.0.0.1"},
+              {"event.Severity": "20", "src ip": "10.0.0.2"}]
+
+    def test_where_on_a_dotted_field(self) -> None:
+        rows = rows_of("search * | where 'event.Severity'>=70", self.DOTTED)
+        assert [r["event.Severity"] for r in rows] == ["100"]
+
+    def test_eval_reads_a_dotted_field(self) -> None:
+        rows = rows_of("search * | eval sev='event.Severity'*2", self.DOTTED)
+        assert [r["sev"] for r in rows] == [200, 40]
+
+    def test_a_name_with_a_space(self) -> None:
+        rows = rows_of("search * | eval ip='src ip'", self.DOTTED)
+        assert [r["ip"] for r in rows] == ["10.0.0.1", "10.0.0.2"]
+
+    def test_double_quotes_are_still_a_string(self) -> None:
+        rows = rows_of('search * | eval s="event.Severity"', self.DOTTED)
+        assert [r["s"] for r in rows] == ["event.Severity", "event.Severity"]
+
+    def test_a_plain_field_quoted_is_the_same_field(self) -> None:
+        assert rows_of("search * | where 'sev'>25") == rows_of("search * | where sev>25")
+
+
 def splunk_auth() -> dict[str, str]:
     """Basic credentials for the mock's Splunk mount."""
     return {"Authorization": "Basic " + base64.b64encode(b"admin:mockdr-admin").decode()}

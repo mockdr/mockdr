@@ -92,8 +92,15 @@ _SEARCH_TOKEN_RE = re.compile(
 
 # `where` and `eval` do have arithmetic, so the operators are split out and
 # words stop at them — otherwise `bytes*2` tokenizes as a single name.
+#
+# Single quotes name a field there, as the eval documentation prescribes for
+# a name that is not a plain word: `'event.Severity'`, `'src ip'`. Without
+# them a dotted name cannot be written at all — `.` is concatenation — and
+# the quoted form was read as a field literally called `'event.Severity'`,
+# so every row compared against null and the search answered nothing.
 _EXPR_TOKEN_RE = re.compile(
     _PREFIX + r"""
+  | (?P<fieldname>'(?:[^'\\]|\\.)*')
   | (?P<number>-?\d+\.\d+|-?\d+)
   | (?P<op><=|>=|!=|==|=|<|>|\+|-|\*|/|%|\.|,|\(|\))
   | (?P<word>[^\s()=<>!,+*/%.-]+)
@@ -356,6 +363,9 @@ class _Parser:
 
         if token.kind == "string":
             return Literal(_unquote(token.text))
+
+        if token.kind == "fieldname":
+            return FieldRef(token.text[1:-1].replace("\\'", "'").replace("\\\\", "\\"))
 
         if token.kind == "number":
             text = token.text
