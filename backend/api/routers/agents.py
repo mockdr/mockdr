@@ -142,7 +142,11 @@ def list_installed_applications(
 def list_agent_applications(
     ids: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    # The swagger documents only `ids` here and no pagination block in the
+    # answer, so the product answers every row. This page size is the mock's
+    # own; defaulting it to the list routes' 10 (it was 25) cut the answer
+    # short with no cursor to say so.
+    limit: int = Query(MAX_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return installed applications filtered by agent IDs (global endpoint).
 
@@ -164,7 +168,11 @@ def list_agent_applications(
 def list_agent_processes(
     ids: str = Query(None),
     cursor: str = Query(None),
-    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    # The swagger documents only `ids` here and no pagination block in the
+    # answer, so the product answers every row. This page size is the mock's
+    # own; defaulting it to the list routes' 10 (it was 25) cut the answer
+    # short with no cursor to say so.
+    limit: int = Query(MAX_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
     """Return running processes filtered by agent IDs (global endpoint).
 

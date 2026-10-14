@@ -44,7 +44,8 @@ class TestCreateExclusion:
             json={"type": "path", "value": "/unique/path/abc123.exe", "osType": "linux", "mode": "suppress"},
         )
         new_id = resp.json()["data"][0]["id"]
-        items = client.get(f"{BASE}/exclusions", headers=auth_headers).json()["data"]
+        items = client.get(f"{BASE}/exclusions", headers=auth_headers,
+                           params={"limit": 1000}).json()["data"]
         ids = [e["id"] for e in items]
         assert new_id in ids
 

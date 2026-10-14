@@ -38,10 +38,12 @@ class TestAlertsReferenceRealStarRules:
         rule_ids = {
             r["id"] for r in client.get(
                 f"{PREFIX}/cloud-detection/rules", headers=auth_headers,
+                params={"limit": 1000},
             ).json()["data"]
         }
         alerts = client.get(
             f"{PREFIX}/cloud-detection/alerts", headers=auth_headers,
+            params={"limit": 1000},
         ).json()["data"]
 
         dangling = [

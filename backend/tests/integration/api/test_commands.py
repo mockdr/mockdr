@@ -172,8 +172,8 @@ class TestExclusionCommands:
     ) -> None:
         payload = dict(self._PAYLOAD, value="/tmp/unique-path-xyz")
         client.post("/web/api/v2.1/exclusions", headers=auth_headers, json=payload)
-        exclusions = client.get("/web/api/v2.1/exclusions",
-                                headers=auth_headers).json()["data"]
+        exclusions = client.get("/web/api/v2.1/exclusions", headers=auth_headers,
+                                params={"limit": 1000}).json()["data"]
         values = [e["value"] for e in exclusions]
         assert "/tmp/unique-path-xyz" in values
 

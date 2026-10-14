@@ -11,7 +11,12 @@ import os
 APP_VERSION = "2.5.0"
 
 API_PREFIX = "/web/api/v2.1"
-DEFAULT_PAGE_SIZE = 25
+#: `limit` defaults to 10 on every SentinelOne list route the mock serves —
+#: `default: 10` on all of them in data/swagger_2_1.json (122 GET operations
+#: in all). This was 25, so a client that relies on the default got pages
+#: two and a half times the size the product sends, and a paging test that
+#: passed here walked a different number of pages in production.
+DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 1000
 #: `skip` is documented "(0-1000). To iterate over more than 1000 items, use
 #: `cursor`" with `maximum: 1000` on every list route this mock serves that

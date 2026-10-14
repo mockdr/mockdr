@@ -111,7 +111,8 @@ class TestRulesAreDeletedByFilter:
     def test_only_the_described_rules_go(
         self, client: TestClient, auth_headers: dict,
     ) -> None:
-        rules = client.get(f"{BASE}/cloud-detection/rules", headers=auth_headers).json()["data"]
+        rules = client.get(f"{BASE}/cloud-detection/rules", headers=auth_headers,
+                           params={"limit": 1000}).json()["data"]
         severity = rules[0]["severity"]
         doomed = [r for r in rules if r["severity"] == severity]
 
@@ -122,7 +123,8 @@ class TestRulesAreDeletedByFilter:
         assert resp.status_code == 200
         assert resp.json()["data"]["affected"] == len(doomed)
 
-        left = client.get(f"{BASE}/cloud-detection/rules", headers=auth_headers).json()["data"]
+        left = client.get(f"{BASE}/cloud-detection/rules", headers=auth_headers,
+                          params={"limit": 1000}).json()["data"]
         assert len(left) == len(rules) - len(doomed)
         assert all(r["severity"] != severity for r in left)
 
