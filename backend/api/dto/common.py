@@ -16,14 +16,6 @@ class SingleResponse(BaseModel):
     data: Any
 
 
-class ErrorDetail(BaseModel):
-    """Details of a single API error."""
-
-    code: int
-    detail: str
-    title: str
-
-
 class FilterBody(BaseModel):
     """Request body with filter and data dicts for threat/alert bulk operations."""
 

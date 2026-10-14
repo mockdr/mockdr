@@ -108,21 +108,10 @@ class GroupMoveAgentsBody(BaseModel):
 
 # ── Exclusions & Restrictions ────────────────────────────────────────────────
 
-class ExclusionCreateBody(BaseModel):
-    """POST /exclusions."""
-    data: dict = Field(default_factory=dict)
-    filter: dict = Field(default_factory=dict)
-
 
 class BulkDeleteBody(BaseModel):
     """Generic bulk delete: {"data": {"ids": [...]}}."""
     data: dict = Field(default_factory=dict)
-
-
-class RestrictionCreateBody(BaseModel):
-    """POST /restrictions."""
-    data: dict = Field(default_factory=dict)
-    filter: dict = Field(default_factory=dict)
 
 
 # ── IOC ──────────────────────────────────────────────────────────────────────
@@ -227,11 +216,6 @@ class DvInitQueryBody(BaseModel):
     fromDate: str
     toDate: str
     queryType: list[str] = []
-
-
-class DvCancelQueryBody(BaseModel):
-    """POST /dv/cancel-query."""
-    queryId: str
 
 
 # ── STAR Rules ──────────────────────────────────────────────────────────────
