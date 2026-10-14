@@ -1,0 +1,53 @@
+"""The request-tracking headers Azure Resource Manager puts on every answer.
+
+ARM stamps each response with `x-ms-request-id` — "an opaque value that
+uniquely identifies the request", which the Azure REST API guidelines say a
+service must return — and `x-ms-correlation-request-id`, the id that ties
+together every call one operation makes, echoed when the client sent one.
+Azure support asks for them, and the SDKs read them into their exceptions;
+a client that logs them found nothing here, on success or on error.
+
+Pure ASGI, scoped to the Sentinel ARM routes: the token endpoint belongs to
+Entra and the query API to Log Analytics, and neither is ARM.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+#: The Sentinel mount's ARM paths: the workspace resources and the provider's
+#: operation list.
+_ARM_PREFIXES = ("/sentinel/subscriptions/", "/sentinel/providers/")
+
+
+class ArmRequestHeadersMiddleware:
+    """Stamp ARM's request and correlation ids on every ARM answer."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Add `x-ms-request-id` and `x-ms-correlation-request-id` to ARM responses."""
+        path = scope.get("path", "") if scope["type"] == "http" else ""
+        if not path.startswith(_ARM_PREFIXES):
+            await self.app(scope, receive, send)
+            return
+
+        sent = {
+            k.decode("latin-1").lower(): v.decode("latin-1")
+            for k, v in scope.get("headers", [])
+        }
+        request_id = str(uuid.uuid4())
+        correlation_id = sent.get("x-ms-correlation-request-id") or str(uuid.uuid4())
+
+        async def stamped(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["x-ms-request-id"] = request_id
+                headers["x-ms-correlation-request-id"] = correlation_id
+            await send(message)
+
+        await self.app(scope, receive, stamped)

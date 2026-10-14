@@ -17,6 +17,7 @@ from api import spa
 from api.auth import require_admin, require_auth
 from api.documented_body import require_documented_body
 from api.es_auth import refuse_stale_kbn_version
+from api.middleware.arm_headers import ArmRequestHeadersMiddleware
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.compression import CompressionMiddleware
@@ -443,6 +444,7 @@ app.add_middleware(TokenCacheMiddleware)       # RFC 6749 §5.1 — a token answ
 app.add_middleware(ODataPropertyMiddleware)    # a $select/$filter/$orderby naming nothing is a 400
 app.add_middleware(ElasticShapingMiddleware)   # filter_path, pretty, X-Opaque-Id
 app.add_middleware(ElasticHeadersMiddleware)   # the header every Elasticsearch client checks for
+app.add_middleware(ArmRequestHeadersMiddleware)  # x-ms-request-id on every ARM answer
 app.add_middleware(SplunkHeadersMiddleware)    # Server/Vary/caching, and 304 on a fresh read
 # Inside the namespace rewrite, so a `/servicesNS/...` job is seen by its
 # `/services/...` path; outside the routes, so a 404 or 405 carries it too —
