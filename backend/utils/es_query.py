@@ -27,6 +27,7 @@ import hashlib
 import ipaddress
 import json
 import re
+import struct
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -478,18 +479,60 @@ def _minimum_should_match(spec: Any, total: int) -> int | None:
     """
     if spec is None or total == 0:
         return None
-    text = str(spec).strip()
-    percent = text.endswith("%")
     try:
-        number = float(text.rstrip("%"))
+        needed = calculate_min_should_match(total, spec)
     except ValueError:
         return None
-    if percent:
-        share = total * abs(number) / 100
-        needed = total - int(share) if number < 0 else int(share)
-    else:
-        needed = total + int(number) if number < 0 else int(number)
     return max(0, min(needed, total))
+
+
+def calculate_min_should_match(optional: int, spec: Any) -> int:
+    """Lucene's reading of a ``minimum_should_match`` spec, step for step.
+
+    A port of ``Queries.calculateMinShouldMatch`` (Elasticsearch v8.15.0),
+    covering every form the reference lists
+    (query-dsl-minimum-should-match.html): ``3``, ``-2``, ``75%``, ``-25%``,
+    and the conditional ``3<90%`` or ``2<-25% 9<-3``, where each ``n<spec``
+    applies only once there are more than *n* optional clauses. A
+    percentage rounds toward zero; the result is never below zero, and is
+    *not* capped at the clause count — more than there are matches nothing.
+
+    Raises:
+        ValueError: Where ``Integer.parseInt`` would fail.
+    """
+    text = str(spec).strip()
+    result = optional
+    if "<" in text:
+        text = re.sub(r"(\s+<\s*)|(\s*<\s+)", "<", text)
+        for part in text.split(" "):
+            bound, _, rest = part.partition("<")
+            if optional <= _java_int(bound):
+                return result
+            result = calculate_min_should_match(optional, rest)
+        return result
+    if "%" in text:
+        percent = _java_int(text[:-1])
+        # `(result * percent) * (1 / 100f)` — in float, as Java computes it,
+        # so a share that lands a hair under a whole number truncates alike.
+        calc = _float32(_float32(result * percent) * _float32(1 / 100))
+        result = result + int(calc) if calc < 0 else int(calc)
+    else:
+        calc_int = _java_int(text)
+        result = result + calc_int if calc_int < 0 else calc_int
+    return max(result, 0)
+
+
+def _float32(value: float) -> float:
+    """*value* rounded to the nearest single-precision float."""
+    return float(struct.unpack("f", struct.pack("f", value))[0])
+
+
+def _java_int(text: str) -> int:
+    """``Integer.parseInt``: an optional sign and digits, nothing else."""
+    if not re.fullmatch(r"[+-]?\d+", text):
+        msg = f'For input string: "{text}"'
+        raise ValueError(msg)
+    return int(text)
 
 
 def _build_match_phrase(body: dict) -> Callable[[dict], bool]:
@@ -529,28 +572,39 @@ def _build_term(body: dict) -> Callable[[dict], bool]:
         target = spec
 
     def predicate(rec: dict) -> bool:
-        val = _get_nested(rec, field)
-        if val is None and target is None:
+        values = _field_values(rec, field)
+        if not values and target is None:
             return True
-        if val is None or target is None:
+        if target is None:
             return False
-        # Coerce both to same type for comparison.
-        if isinstance(target, bool):
-            return val is target or val == target
-        if isinstance(target, (int, float)):
-            try:
-                return float(val) == float(target)
-            except (ValueError, TypeError):
-                return False
-        if isinstance(target, str) and "/" in target:
-            # An `ip` field takes a network here: `term: {ip: "10.0.0.0/24"}`
-            # is every address inside it, not a string that never matches.
-            inside = _in_network(val, target)
-            if inside is not None:
-                return inside
-        return str(val) == str(target)
+        # A multi-valued field matches when any one of its values does —
+        # Lucene indexes each element as a term of its own. The list was
+        # compared whole here, so `event.category: ["process", ...]` never
+        # matched a `term` on "process".
+        return any(_term_equals(val, target) for val in values)
 
     return predicate
+
+
+def _term_equals(val: Any, target: Any) -> bool:
+    """Whether one stored value is the term *target*."""
+    if val is None:
+        return False
+    # Coerce both to same type for comparison.
+    if isinstance(target, bool):
+        return val is target or val == target
+    if isinstance(target, (int, float)):
+        try:
+            return float(val) == float(target)
+        except (ValueError, TypeError):
+            return False
+    if isinstance(target, str) and "/" in target:
+        # An `ip` field takes a network here: `term: {ip: "10.0.0.0/24"}`
+        # is every address inside it, not a string that never matches.
+        inside = _in_network(val, target)
+        if inside is not None:
+            return inside
+    return str(val) == str(target)
 
 
 def _in_network(value: Any, network: str) -> bool | None:
@@ -579,10 +633,8 @@ def _build_terms(
     str_values = {str(v) for v in values}
 
     def predicate(rec: dict) -> bool:
-        val = _get_nested(rec, field)
-        if val is None:
-            return False
-        return str(val) in str_values
+        # Any element of a multi-valued field, as with `term`.
+        return any(str(val) in str_values for val in _field_values(rec, field))
 
     return predicate
 
@@ -697,8 +749,7 @@ def _build_range(body: dict) -> Callable[[dict], bool]:
                 ) from exc
         resolved.append((op, target, moment))
 
-    def predicate(rec: dict) -> bool:
-        val = _get_nested(rec, field)
+    def within(val: Any) -> bool:
         for op, target, moment in resolved:
             if moment is not None:
                 if not _compare_moment(val, moment, op):
@@ -706,6 +757,14 @@ def _build_range(body: dict) -> Callable[[dict], bool]:
             elif not _compare_range(val, target, op):
                 return False
         return True
+
+    def predicate(rec: dict) -> bool:
+        if not resolved:
+            return True
+        # A multi-valued field is inside the range when one of its values is
+        # inside every bound: one point-range query over the document's
+        # points. The list itself was compared, as a string, and missed.
+        return any(within(val) for val in _field_values(rec, field))
 
     return predicate
 
@@ -1122,9 +1181,15 @@ def _build_bool(
     mockdr read it as a clause that matches everything, so a `must` a client
     had built from a filter that matched nothing selected the whole index.
     """
+    # Each arm takes one clause as readily as a list of them — the reference
+    # writes `"must": {"match": ...}` in its own first example (query-dsl-
+    # bool-query.html, 8.15). Iterating the object walked its *keys* and
+    # refused the clause name as a query.
+    arms: dict[str, list] = {}
     for arm in ("must", "filter", "should", "must_not"):
-        entries = body.get(arm)
-        if isinstance(entries, list) and any(entry == {} for entry in entries):
+        entries = body.get(arm, [])
+        arms[arm] = entries if isinstance(entries, list) else [entries]
+        if any(entry == {} for entry in arms[arm]):
             raise ESQueryError(
                 f"[bool] failed to parse field [{arm}]",
                 es_type="x_content_parse_exception",
@@ -1132,18 +1197,25 @@ def _build_bool(
                 caused_by={"type": "illegal_argument_exception",
                            "reason": "query malformed, empty clause found at"},
             )
-    must_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("must", [])]
-    filter_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("filter", [])]
-    should_preds = [build_predicate(c, depth, ids, lookup) for c in body.get("should", [])]
-    must_not_preds = [
-        build_predicate(c, depth, ids, lookup) for c in body.get("must_not", [])
-    ]
-    # Per ES: should clauses only carry a match requirement when there is no
-    # must/filter to satisfy. Defaulting to 1 regardless meant adding a
-    # non-matching should — which should affect scoring only — emptied the
-    # result set.
-    _default_min = 1 if (should_preds and not must_preds and not filter_preds) else 0
-    min_should = body.get("minimum_should_match", _default_min)
+    must_preds = [build_predicate(c, depth, ids, lookup) for c in arms["must"]]
+    filter_preds = [build_predicate(c, depth, ids, lookup) for c in arms["filter"]]
+    should_preds = [build_predicate(c, depth, ids, lookup) for c in arms["should"]]
+    must_not_preds = [build_predicate(c, depth, ids, lookup) for c in arms["must_not"]]
+    # A bool with nothing required — no must, no filter — is a disjunction
+    # of its shoulds: one has to match whatever `minimum_should_match` works
+    # out to, zero included (Lucene's BooleanQuery; `applyMinimumShouldMatch`
+    # only sets a value above zero). Beside a must or filter they only score,
+    # unless a minimum says otherwise.
+    floor = 1 if (should_preds and not must_preds and not filter_preds) else 0
+    min_should = floor
+    spec = body.get("minimum_should_match")
+    if spec is not None and should_preds:
+        # Strings were compared against an int and raised TypeError: every
+        # documented form — "2", "-1", "75%", "3<90%" — was a 500.
+        try:
+            min_should = max(floor, calculate_min_should_match(len(should_preds), spec))
+        except ValueError:
+            min_should = floor
 
     def predicate(rec: dict) -> bool:
         # must + filter: all must match.
