@@ -32,6 +32,8 @@ from urllib.parse import parse_qs
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from utils.asgi_headers import request_header
+
 _ES_PREFIX = "/elastic"
 _JSON = "application/json"
 
@@ -59,7 +61,7 @@ class ElasticShapingMiddleware:
         )
         wanted = ",".join(query.get("filter_path", []))
         pretty = _asked_for(query, "pretty")
-        opaque = _request_header(scope, b"x-opaque-id")
+        opaque = request_header(scope, b"x-opaque-id")
         if not (wanted or pretty or opaque):
             await self.app(scope, receive, send)
             return
@@ -96,14 +98,6 @@ def _asked_for(query: dict[str, list[str]], name: str) -> bool:
     if values is None:
         return False
     return values[0].lower() not in ("false", "0", "no")
-
-
-def _request_header(scope: Scope, wanted: bytes) -> str:
-    """One request header, or the empty string."""
-    for name, value in scope.get("headers", []):
-        if name == wanted:
-            return str(bytes(value).decode("latin-1"))
-    return ""
 
 
 async def _send_shaped(

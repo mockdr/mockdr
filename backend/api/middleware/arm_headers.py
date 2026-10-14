@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import uuid
 
-from starlette.datastructures import MutableHeaders
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from utils.asgi_headers import request_header, stamping
 from utils.sentinel.response import address_workspace, release_workspace
 
 #: The Sentinel mount's ARM paths: the workspace resources and the provider's
@@ -42,19 +42,13 @@ class ArmRequestHeadersMiddleware:
             await self.app(scope, receive, send)
             return
 
-        sent = {
-            k.decode("latin-1").lower(): v.decode("latin-1")
-            for k, v in scope.get("headers", [])
-        }
         request_id = str(uuid.uuid4())
-        correlation_id = sent.get("x-ms-correlation-request-id") or str(uuid.uuid4())
-
-        async def stamped(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                headers = MutableHeaders(scope=message)
-                headers["x-ms-request-id"] = request_id
-                headers["x-ms-correlation-request-id"] = correlation_id
-            await send(message)
+        correlation_id = (
+            request_header(scope, b"x-ms-correlation-request-id") or str(uuid.uuid4())
+        )
+        stamped = stamping(send, {
+            "x-ms-request-id": request_id, "x-ms-correlation-request-id": correlation_id,
+        })
 
         # The ids this request's answers build name the workspace it addressed.
         token = address_workspace(path)

@@ -47,6 +47,8 @@ from dataclasses import dataclass
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from utils.asgi_headers import request_header
+
 
 @dataclass(frozen=True)
 class Policy:
@@ -133,11 +135,7 @@ def _chosen_encoding(scope: Scope, policy: Policy) -> str | None:
     gzip — telling a client that said it cannot take gzip that the body is
     gzip.  Nothing downstream recovers from that.
     """
-    raw = ""
-    for name, value in scope.get("headers", []):
-        if name == b"accept-encoding":
-            raw = bytes(value).decode("latin-1")
-            break
+    raw = request_header(scope, b"accept-encoding")
     if not raw:
         return None
 

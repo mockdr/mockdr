@@ -32,9 +32,9 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 
-from starlette.datastructures import MutableHeaders
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from utils.asgi_headers import stamping
 from utils.cs_response import reset_trace_id, set_trace_id
 from utils.dev_paths import is_dev_path
 from utils.vendor_errors import build_vendor_error, vendor_for_path
@@ -205,15 +205,11 @@ class RateLimitMiddleware:
             bucket.append(time.monotonic())
             remaining = str(max(0, limit - len(bucket)))
 
-            async def send_with_budget(message: Message) -> None:
-                if message["type"] == "http.response.start":
-                    headers = MutableHeaders(scope=message)
-                    headers["x-cs-traceid"] = trace_id
-                    headers["x-ratelimit-limit"] = str(limit)
-                    headers["x-ratelimit-remaining"] = remaining
-                await send(message)
-
-            await self.app(scope, receive, send_with_budget)
+            await self.app(scope, receive, stamping(send, {
+                "x-cs-traceid": trace_id,
+                "x-ratelimit-limit": str(limit),
+                "x-ratelimit-remaining": remaining,
+            }))
         finally:
             reset_trace_id(reset)
 

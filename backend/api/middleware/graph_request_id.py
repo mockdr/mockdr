@@ -24,9 +24,9 @@ from __future__ import annotations
 
 import uuid
 
-from starlette.datastructures import MutableHeaders
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from utils.asgi_headers import request_header, stamping
 from utils.graph_response import graph_request_ids
 
 _NOT_GRAPH = ("/oauth2/", "/.well-known/", "/discovery/")
@@ -49,23 +49,11 @@ class GraphRequestIdMiddleware:
             return
 
         request_id = str(uuid.uuid4())
-        sent = ""
-        for name, value in scope.get("headers") or ():
-            if name.lower() == b"client-request-id":
-                sent = value.decode("latin-1").strip()
-                break
-        client_request_id = sent or request_id
+        client_request_id = request_header(scope, b"client-request-id").strip() or request_id
         token = graph_request_ids.set((request_id, client_request_id))
-
-        async def stamped(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                headers = MutableHeaders(scope=message)
-                if "request-id" not in headers:
-                    headers["request-id"] = request_id
-                if "client-request-id" not in headers:
-                    headers["client-request-id"] = client_request_id
-            await send(message)
-
+        stamped = stamping(send, {
+            "request-id": request_id, "client-request-id": client_request_id,
+        }, replace=False)
         try:
             await self.app(scope, receive, stamped)
         finally:

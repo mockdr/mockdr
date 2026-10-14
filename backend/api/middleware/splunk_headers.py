@@ -41,6 +41,8 @@ from email.utils import formatdate
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from utils.asgi_headers import request_header
+
 _SPLUNK_PREFIX = "/splunk"
 _HEC_PREFIX = "/splunk/services/collector"
 
@@ -99,7 +101,7 @@ class SplunkHeadersMiddleware:
         hec = path.startswith(_HEC_PREFIX)
         login = path.startswith(_LOGIN)
         vary = _vary(scope, hec=hec)
-        if_none_match = _header(scope, b"if-none-match")
+        if_none_match = request_header(scope, b"if-none-match")
         start: Message | None = None
         body = b""
         cacheable = False
@@ -159,17 +161,9 @@ def _vary(scope: Scope, *, hec: bool) -> str:
         if by_query or scope.get("method") != "POST":
             return ""
         return "Authorization"
-    if _header(scope, b"authorization").lower().startswith("splunk "):
+    if request_header(scope, b"authorization").lower().startswith("splunk "):
         return "Authorization"
     return "Cookie, Authorization"
-
-
-def _header(scope: Scope, wanted: bytes) -> str:
-    """One request header, or the empty string."""
-    for name, value in scope.get("headers", []):
-        if name == wanted:
-            return str(bytes(value).decode("latin-1"))
-    return ""
 
 
 def _stamp(
