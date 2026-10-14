@@ -54,8 +54,10 @@ async def require_cs_auth(
         The stored token record dict (includes ``client_id``, ``role``, etc.).
 
     Raises:
-        HTTPException: 401 if the token is missing, malformed, or unknown.
-        HTTPException: 403 if the token has expired.
+        HTTPException: 401 if the token is missing, malformed, unknown, or
+                       expired. (This said an expired token was a 403; the
+                       code has always answered 401, which is the status
+                       for a credential that no longer authenticates.)
     """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
@@ -104,10 +106,18 @@ async def require_cs_write(
         HTTPException: 403 if the client role is not permitted to write.
     """
     if current_client.get("role") not in _WRITE_ROLES:
+        # Falcon words a call its client's scopes do not cover as "access
+        # denied, authorization failed" — captured on PerformActionV2
+        # (falconpy issue #1137), on a device-control policy query from a
+        # client without that scope (terraform-provider-crowdstrike #24) and
+        # on a call needing infrastructure-as-code:read (fcs-action #47).
+        # "insufficient privileges" appears in none of them, so a client
+        # matching Falcon's text to tell a scope problem from another 403
+        # never matched the mock's.
         raise HTTPException(
             status_code=403,
             detail=build_cs_error_response(
-                403, "access denied, insufficient privileges",
+                403, "access denied, authorization failed",
             ),
         )
     return current_client

@@ -168,3 +168,21 @@ class TestCsRbac:
             json={"indicators": [{"type": "domain", "value": "evil.com", "action": "detect"}]},
         )
         assert resp.status_code == 403
+
+    def test_the_refusal_is_worded_as_falcon_words_it(self, client: TestClient) -> None:
+        """A call the client's scopes do not cover: "access denied, authorization failed".
+
+        Captured on PerformActionV2 (falconpy issue #1137), on a device-control
+        query from a client without that scope (terraform-provider-crowdstrike
+        #24) and on a call needing infrastructure-as-code:read (fcs-action
+        #47). The mock said "access denied, insufficient privileges", which
+        no Falcon response does, so a client matching the text never matched.
+        """
+        resp = client.post(
+            "/cs/iocs/entities/indicators/v1",
+            headers=_cs_viewer_auth(client),
+            json={"indicators": [{"type": "domain", "value": "evil.com", "action": "detect"}]},
+        )
+        assert resp.json()["errors"] == [
+            {"code": 403, "message": "access denied, authorization failed"},
+        ]
