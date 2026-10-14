@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from utils.dev_paths import is_dev_path
 from utils.vendor_errors import build_vendor_error, vendor_for_path
 
 
@@ -96,7 +97,7 @@ class FaultInjectionMiddleware:
             return
 
         path: str = scope.get("path", "")
-        if "/_dev/" in path:
+        if is_dev_path(path):
             await self.app(scope, receive, send)
             return
 

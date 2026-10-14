@@ -13,6 +13,8 @@ from typing import Any
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from utils.dev_paths import is_dev_path
+
 # ── Histogram bucket boundaries ──────────────────────────────────────────────
 BUCKETS: tuple[float, ...] = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 
@@ -116,7 +118,7 @@ class MetricsMiddleware:
 
         path: str = scope.get("path", "")
 
-        if path == "/metrics" or "/_dev/" in path:
+        if path == "/metrics" or is_dev_path(path):
             await self.app(scope, receive, send)
             return
 

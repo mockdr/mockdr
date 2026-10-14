@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlencode
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from repository.store import store
+from utils.dev_paths import is_dev_path
 
 
 def _confined_sites(record: dict) -> str:
@@ -61,7 +62,7 @@ class TenantScopeMiddleware:
         path: str = scope.get("path", "")
 
         # Dev and CrowdStrike paths are exempt
-        if "/_dev/" in path or path.startswith("/cs"):
+        if is_dev_path(path) or path.startswith("/cs"):
             await self.app(scope, receive, send)
             return
 

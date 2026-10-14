@@ -36,6 +36,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from utils.cs_response import reset_trace_id, set_trace_id
+from utils.dev_paths import is_dev_path
 from utils.vendor_errors import build_vendor_error, vendor_for_path
 
 #: Seconds a client is told to wait. The window is per-minute, so a full minute
@@ -149,7 +150,7 @@ class RateLimitMiddleware:
         path: str = scope.get("path", "")
 
         # Dev paths and status endpoint are always exempt
-        if "/_dev/" in path or path in _UNAUTHENTICATED_EXEMPT_PATHS:
+        if is_dev_path(path) or path in _UNAUTHENTICATED_EXEMPT_PATHS:
             await self.app(scope, receive, send)
             return
 
