@@ -16,17 +16,18 @@ from starlette.types import Scope
 from api import spa
 from api.auth import require_admin, require_auth
 from api.documented_body import require_documented_body
+from api.es_auth import refuse_stale_kbn_version
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.compression import CompressionMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.es_content_type import ElasticContentTypeMiddleware
-from api.middleware.kibana_space import KibanaSpaceMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
 from api.middleware.kibana_api_version import KibanaApiVersionMiddleware
+from api.middleware.kibana_space import KibanaSpaceMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.odata_properties import ODataPropertyMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
@@ -352,7 +353,6 @@ from utils.es_response import (
     build_es_index_not_found,
     build_kbn_error_response,
 )
-from api.es_auth import refuse_stale_kbn_version
 from utils.kibana_content_type import refuse_unreadable_content_type
 from utils.kibana_repeated_query import refuse_repeated_query_members
 from utils.logging import setup_logging

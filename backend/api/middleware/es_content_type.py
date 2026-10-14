@@ -160,7 +160,7 @@ async def _authenticates(scope: Scope) -> bool:
 
     request = Request(scope)
     try:
-        await require_es_auth(request, request.headers.get("authorization"))
+        await require_es_auth(request, request.headers.get("authorization") or "")
     except HTTPException:
         return False
     return True

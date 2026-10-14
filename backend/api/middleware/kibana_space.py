@@ -1,7 +1,7 @@
-"""Kibana serves every API under `/s/{space_id}/` as well as at the root.
+r"""Kibana serves every API under `/s/{space_id}/` as well as at the root.
 
 The spaces plugin's on-request interceptor strips the prefix and remembers
-the space (`getSpaceIdFromPath`, `^/s/([a-z0-9_\\-]+)`; spaces plugin at
+the space (`getSpaceIdFromPath`, `^/s/([a-z0-9_\-]+)`; spaces plugin at
 kibana v8.15.0), so `/s/default/api/cases/_find` is `/api/cases/_find` in
 the default space. mockdr had no such routes: a client configured with a
 space URL — which is how a multi-space deployment is addressed, the

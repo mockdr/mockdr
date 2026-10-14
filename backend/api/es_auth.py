@@ -380,7 +380,7 @@ async def refuse_stale_kbn_version(request: Request) -> None:
     if got is None or got == KIBANA_VERSION:
         return
     try:
-        await require_es_auth(request, request.headers.get("authorization"))
+        await require_es_auth(request, request.headers.get("authorization") or "")
     except HTTPException:
         return
     detail = build_kbn_error_response(

@@ -17,6 +17,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
+from operator import itemgetter
 from typing import Any
 
 from utils.es_datemath import _add_months, _next_unit, _round_down
@@ -367,10 +368,10 @@ def _ordered_buckets(buckets: list[dict], order: Any) -> list[dict]:
     ordered = list(buckets)
     # Stable sorts from the last criterion to the first.
     for path, descending in reversed(criteria):
-        present = [b for b in ordered if _order_value(b, path) is not None]
-        absent = [b for b in ordered if _order_value(b, path) is None]
-        present.sort(key=lambda b, p=path: _order_value(b, p), reverse=descending)
-        ordered = present + absent
+        keyed = [(_order_value(b, path), b) for b in ordered]
+        present = [pair for pair in keyed if pair[0] is not None]
+        present.sort(key=itemgetter(0), reverse=descending)
+        ordered = [b for _, b in present] + [b for value, b in keyed if value is None]
     return ordered
 
 
