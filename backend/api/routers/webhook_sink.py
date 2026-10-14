@@ -24,7 +24,9 @@ async def receive_webhook(request: Request) -> dict:
     from fastapi import HTTPException
 
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > _MAX_BODY_BYTES:
+    # The sink is unauthenticated. A non-numeric Content-Length used to raise
+    # ValueError here and answer 500 to anyone who sent one.
+    if content_length and content_length.isdigit() and int(content_length) > _MAX_BODY_BYTES:
         raise HTTPException(status_code=413, detail="Request body too large (max 1 MiB)")
     raw = await request.body()
     if len(raw) > _MAX_BODY_BYTES:
@@ -33,9 +35,11 @@ async def receive_webhook(request: Request) -> dict:
     try:
         body = json.loads(raw)
     except RecursionError as exc:
-        # The sink is unauthenticated: a body of nested brackets reached
-        # Python's recursion limit and answered 500 to anyone who asked.
+        # A body of nested brackets reached Python's recursion limit and
+        # answered 500 to anyone who asked.
         raise HTTPException(status_code=400, detail="Request body is nested too deeply") from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Request body is not valid JSON") from exc
     event_type = request.headers.get("X-S1-Webhook-Event", "")
     # The sink is public (it receives what the mock's own webhooks send), and
     # its entries are read by admins; a credential a sender attached must not

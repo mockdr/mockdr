@@ -20,6 +20,28 @@ def test_the_public_webhook_sink_refuses_a_too_deep_body(client: TestClient) -> 
     assert resp.status_code == 400
 
 
+def test_the_public_webhook_sink_survives_a_non_numeric_content_length() -> None:
+    """A malformed Content-Length used to raise ValueError and answer 500.
+
+    Driven below the client, which otherwise recomputes the header.
+    """
+    from api.routers.webhook_sink import receive_webhook
+
+    scope = {
+        "type": "http", "method": "POST", "path": "/_dev/webhook-sink",
+        "headers": [(b"content-length", b"not-a-number")],
+    }
+
+    async def receive() -> dict:
+        return {"type": "http.request", "body": b"{}", "more_body": False}
+
+    import anyio
+    from starlette.requests import Request
+
+    result = anyio.run(receive_webhook, Request(scope, receive))
+    assert "data" in result
+
+
 @pytest.mark.parametrize("path", ["/elastic/_bulk", "/elastic/_msearch"])
 def test_ndjson_routes_refuse_a_too_deep_line(client: TestClient, path: str) -> None:
     body = DEEP + b"\n" + b"{}\n"
