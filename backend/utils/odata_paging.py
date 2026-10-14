@@ -27,9 +27,10 @@ from __future__ import annotations
 import base64
 import binascii
 from contextvars import ContextVar
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import HTTPException, Request
+
+from utils.next_link import with_cursor
 
 #: The URL of the request being served on the Graph or Defender mount.
 _request_url: ContextVar[str | None] = ContextVar("odata_request_url", default=None)
@@ -110,17 +111,13 @@ def page_link(
     """
     if next_offset >= total:
         return None
-    url = _request_url.get() or fallback
-    scheme, netloc, path, query, fragment = urlsplit(url)
-    params = [
-        (key, value) for key, value in parse_qsl(query, keep_blank_values=True)
-        if key.lower() not in _CURSORS
-    ]
     value = encode_skiptoken(next_offset) if cursor == SKIPTOKEN else str(next_offset)
-    params.append((cursor, value))
     # `safe="$"` keeps the option names readable (`$top`, not `%24top`), as
     # Graph writes them; both spellings decode to the same request.
-    return urlunsplit((scheme, netloc, path, urlencode(params, safe="$"), fragment))
+    return with_cursor(
+        _request_url.get() or fallback, cursor, value,
+        replaces=lambda key: key.lower() in _CURSORS, safe="$",
+    )
 
 
 def directory_page_offset(request: Request) -> int:

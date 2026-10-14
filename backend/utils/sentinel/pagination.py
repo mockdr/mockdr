@@ -8,10 +8,9 @@ request, and the link it gets back is one it can actually call.
 """
 from __future__ import annotations
 
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
 from fastapi import HTTPException
 
+from utils.next_link import with_cursor
 from utils.sentinel.response import build_arm_error
 
 
@@ -56,7 +55,6 @@ def build_next_link(request_url: str, next_offset: int) -> str:
         Absolute URL with ``$skipToken`` set to ``next_offset``, preserving
         every other query parameter (``api-version``, ``$filter``, ...).
     """
-    scheme, netloc, path, query, fragment = urlsplit(request_url)
-    params = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True) if k != "$skipToken"]
-    params.append(("$skipToken", str(next_offset)))
-    return urlunsplit((scheme, netloc, path, urlencode(params), fragment))
+    return with_cursor(
+        request_url, "$skipToken", str(next_offset), replaces=lambda key: key == "$skipToken",
+    )
