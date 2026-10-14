@@ -33,6 +33,7 @@ from api.middleware.odata_properties import ODataPropertyMiddleware
 from api.middleware.proxy import RecordingProxyMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.middleware.request_logging import RequestLoggingMiddleware
+from api.middleware.s1_count_only import CountOnlyMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
 from api.middleware.splunk_field_filter import SplunkFieldFilterMiddleware
 from api.middleware.splunk_headers import SplunkHeadersMiddleware
@@ -432,6 +433,7 @@ app.add_middleware(SplunkSortMiddleware)       # sort_key/sort_dir, name asc by 
 app.add_middleware(SplunkFieldFilterMiddleware)  # f= on Atom entry content
 app.add_middleware(SplunkPagingMiddleware)     # count/offset on Atom collections
 app.add_middleware(SplunkOutputModeMiddleware)  # renders Splunk XML around the routers
+app.add_middleware(CountOnlyMiddleware)        # S1 countOnly=true: the total, no objects
 # Outside the renderer, so it has the last word: the renderer writes its own
 # content type for the JSON form and would overwrite a charset set beneath it.
 app.add_middleware(JsonCharsetMiddleware)      # each product names the charset its own way
