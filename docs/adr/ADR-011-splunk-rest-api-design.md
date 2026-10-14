@@ -57,6 +57,15 @@ tstats) is out of scope. Unsupported commands return an empty result set
 with an informational message rather than an error, matching Splunk's
 lenient parsing behaviour for unknown commands in saved searches.
 
+> **Amended (2.6.0).** The scope grew and the leniency went. The engine now
+> runs `eval`, `where`, `streamstats`, `timechart` and the rest listed in
+> the [Splunk integration guide](../splunk-integration-guide.md), and a
+> command it does not implement is refused the way splunkd refuses an
+> unknown one — `400` with a `FATAL` message `Unknown search command '…'`,
+> measured against splunkd — because an empty result reads as "nothing
+> matched". A REST search must also open with a command (`search …` or
+> `| …`).
+
 ### Endpoint Coverage
 
 The mock covers the Splunk REST endpoints most commonly used by SOAR
