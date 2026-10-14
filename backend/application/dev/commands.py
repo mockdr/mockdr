@@ -552,8 +552,6 @@ def import_state(snapshot: dict) -> dict:
     Returns:
         Dict with ``data.imported`` containing the total number of records loaded.
     """
-    # A running playbook would write the objects it holds into the store
-    # being loaded, as it would into a fresh seed (see `generate_all`).
     # Checked before anything is cleared: a collection that is not a list
     # used to raise half-way through, after `clear_all()`, leaving every
     # client of the instance an empty store and a 500.
@@ -566,6 +564,8 @@ def import_state(snapshot: dict) -> dict:
     ):
         raise ValueError("'activities' and '_activity_order' must be lists")
 
+    # A running playbook would write the objects it holds into the store
+    # being loaded, as it would into a fresh seed (see `generate_all`).
     # Stopped before the store is locked, as in `reset`.
     from application.playbook.executor import stop as stop_playbook
     stop_playbook()
