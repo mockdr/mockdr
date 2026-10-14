@@ -66,3 +66,58 @@ class TestATypelessBodyIsAForm:
                             headers={"Authorization": "Splunk 33333333-3333-3333-3333-333333333333"},
                             json={"event": "hello"})
         assert response.status_code == 200, response.text
+
+
+class TestJobReadersTakeTheirArgumentsFromTheBody:
+    """Search API v2 reads a job with POST; its paging arrives in the body.
+
+    splunklib's ``Job.results()``, ``Job.preview()`` and ``Job.events()``
+    post ``count``, ``offset``, ``segmentation`` and ``output_mode`` as form
+    fields to ``search/v2/jobs/{sid}/<reader>`` (``self.post("results",
+    **query_params)``), and splunkd reads an argument from the body as from
+    the query string. The routes read only the query string, so the POSTed
+    ``offset`` was ignored: a client paging with the SDK got the first page
+    back for every offset and never reached the end.
+    """
+
+    @staticmethod
+    def _job(raw: TestClient, auth: dict[str, str]) -> str:
+        response = _post(raw, "/splunk/services/search/v2/jobs",
+                         "search=search+index%3D%2A+%7C+head+25&exec_mode=blocking&output_mode=json",
+                         **auth)
+        assert response.status_code == 201, response.text
+        return str(response.json()["sid"])
+
+    @pytest.mark.parametrize("reader", ["results", "results_preview", "events"])
+    def test_offset_and_count_in_the_body_page(self, raw: TestClient, reader: str) -> None:
+        auth = _session(raw)
+        sid = self._job(raw, auth)
+        path = f"/splunk/servicesNS/nobody/search/search/v2/jobs/{sid}/{reader}"
+
+        def page(offset: int) -> list[dict]:
+            response = _post(raw, path,
+                             f"segmentation=none&count=10&offset={offset}&output_mode=json",
+                             **auth)
+            assert response.status_code == 200, response.text
+            return list(response.json()["results"])
+
+        job = raw.get(f"/splunk/services/search/v2/jobs/{sid}?output_mode=json",
+                      headers=auth).json()["entry"][0]["content"]
+        total = int(job["eventCount"] if reader == "events" else job["resultCount"])
+
+        seen: list[dict] = []
+        offset = 0
+        while chunk := page(offset):
+            assert len(chunk) <= 10
+            seen += chunk
+            offset += len(chunk)
+            assert offset <= total, "paging never ended"
+        assert len(seen) == total > 10
+
+    def test_the_query_string_wins_where_both_name_one(self, raw: TestClient) -> None:
+        auth = _session(raw)
+        sid = self._job(raw, auth)
+        response = _post(raw, f"/splunk/services/search/v2/jobs/{sid}/results?count=3",
+                         "count=10&output_mode=json", **auth)
+        assert response.status_code == 200, response.text
+        assert len(response.json()["results"]) == 3

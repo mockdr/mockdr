@@ -20,12 +20,23 @@ request that carries a body and names no type; HEC is left alone (it reads
 its body raw, as JSON or text, whatever the header says), and so is the KV
 Store's data API, whose bodies are JSON -- splunklib sends that one header
 explicitly.
+
+It also lets a job's *readers* take their arguments from the body. Search API
+v2 reads a job's ``results``, ``results_preview`` and ``events`` with POST,
+and splunklib sends ``count``, ``offset`` and the rest as form fields
+(``Job.results`` -> ``self.post("results", **query_params)``); splunkd reads
+an argument from the body exactly as from the query string. The routes read
+only the query string, so a POSTed ``offset`` was ignored and a client paging
+through results with the SDK got page one forever. For those three readers
+the form fields are appended to the query string the route sees (the query
+string's own value wins where both name one).
 """
 from __future__ import annotations
 
 import re
+from urllib.parse import parse_qsl, urlencode
 
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 _FORM = b"application/x-www-form-urlencoded"
 
@@ -35,6 +46,11 @@ _SPLUNK = "/splunk/"
 _NOT_FORMS = re.compile(r"^/splunk/services/collector|/storage/collections/data(?:/|$)")
 
 _BODY_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+#: A job's readers, which v2 of the search API reads with POST.
+_JOB_READER = re.compile(
+    r"^/splunk/services/search/(?:v2/)?jobs/[^/]+/(?:results|results_preview|events)/?$",
+)
 
 
 class SplunkFormBodyMiddleware:
@@ -49,7 +65,54 @@ class SplunkFormBodyMiddleware:
         if scope["type"] == "http" and _applies(scope):
             scope = dict(scope)
             scope["headers"] = [*scope.get("headers", []), (b"content-type", _FORM)]
+        if (
+            scope["type"] == "http"
+            and scope.get("method") == "POST"
+            and _JOB_READER.match(scope.get("path", ""))
+            and _is_form(scope)
+        ):
+            scope, receive = await _body_into_query(scope, receive)
         await self.app(scope, receive, send)
+
+
+def _is_form(scope: Scope) -> bool:
+    for name, value in scope.get("headers", []):
+        if name.lower() == b"content-type":
+            return bool(value.split(b";")[0].strip().lower() == _FORM)
+    return False
+
+
+async def _body_into_query(scope: Scope, receive: Receive) -> tuple[Scope, Receive]:
+    """Append the form body's fields to the query string; replay the body."""
+    chunks: list[bytes] = []
+    more = True
+    while more:
+        message = await receive()
+        if message["type"] == "http.disconnect":
+            break
+        chunks.append(bytes(message.get("body", b"")))
+        more = bool(message.get("more_body"))
+    body = b"".join(chunks)
+
+    query = parse_qsl(scope.get("query_string", b"").decode("latin-1"), keep_blank_values=True)
+    named = {k for k, _ in query}
+    extra = [
+        (k, v) for k, v in parse_qsl(body.decode("latin-1"), keep_blank_values=True)
+        if k not in named
+    ]
+    if extra:
+        scope = {**scope, "query_string": urlencode([*query, *extra]).encode("latin-1")}
+
+    replayed = False
+
+    async def replay() -> Message:
+        nonlocal replayed
+        if replayed:
+            return await receive()
+        replayed = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    return scope, replay
 
 
 def _applies(scope: Scope) -> bool:
