@@ -10,6 +10,8 @@ from collections.abc import Callable
 from typing import Any
 
 from application.dev._scenario_rng import scenario_rng
+from application.dev.migrations import migrate_record
+from config import APP_VERSION
 from domain.account import Account
 from domain.activity import Activity
 from domain.agent import Agent
@@ -564,16 +566,30 @@ def import_state(snapshot: dict) -> dict:
     ):
         raise ValueError("'activities' and '_activity_order' must be lists")
 
+    # Stopped before the store is locked, as in `reset`.
     from application.playbook.executor import stop as stop_playbook
     stop_playbook()
 
+    # One critical section, as `reset` is: a request served during an import
+    # sees the old store or the new one. It saw the store cleared — 16
+    # concurrent clients against one import loop got 401s for half their
+    # requests, the API tokens being gone for the moment — or half loaded.
+    with store._lock:
+        return _import_state_locked(snapshot)
+
+
+def _import_state_locked(snapshot: dict) -> dict:
+    """``import_state``'s body; the caller holds the store lock."""
     store.clear_all()
     total = 0
     skipped = 0
 
+    migrated = 0
     for collection, cls in _TYPED_COLLECTIONS.items():
         records = snapshot.get(collection, [])
         for record in records:
+            # An older release's spelling of the same state, in this one's.
+            migrated += migrate_record(collection, record)
             try:
                 obj = cls(**record)
                 store.save(collection, _store_key(collection, obj), obj)
@@ -637,7 +653,12 @@ def import_state(snapshot: dict) -> dict:
         except Exception:
             logger.warning("Failed to restore proxy config from snapshot", exc_info=True)
 
-    return {"data": {"imported": total, "skipped": skipped}}
+    if migrated:
+        logger.info(
+            "Rewrote %d record(s) from %s's vocabulary to %s's",
+            migrated, snapshot.get("_version") or "an older release", APP_VERSION,
+        )
+    return {"data": {"imported": total, "skipped": skipped, "migrated": migrated}}
 
 
 def _keep_current_secrets(vendor: dict, current: dict | None) -> dict:
