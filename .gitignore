@@ -22,6 +22,8 @@ htmlcov/
 
 # ── Node / npm ────────────────────────────────────────────────────────────────
 frontend/node_modules/
+# A vitest run from the repository root caches here.
+/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
