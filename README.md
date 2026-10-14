@@ -424,7 +424,7 @@ it sees the old data set or the new one, never half of each.
 | Accounts        | List, get, create, update                                                                                                                     |
 | Sites           | List, get, create, update, delete, reactivate, expire-now                                                                                     |
 | Groups          | List, get, create, update, delete, move-agents                                                                                                |
-| Policies        | Get, update (scoped by siteId or groupId)                                                                                                     |
+| Policies        | Get, update — tenant, account, site or group (`/tenant/policy`, `/sites/{id}/policy`, …)                                                       |
 | Exclusions      | List, create, delete (single + bulk)                                                                                                          |
 | Blocklist       | List, create, delete (single + bulk)                                                                                                          |
 | Firewall Rules  | List, create, update, delete                                                                                                                  |
@@ -434,7 +434,7 @@ it sees the old data set or the new one, never half of each.
 | Users           | List, get, create, update, delete (single + bulk), generate-api-token, token-details, login-by-token                                          |
 | Hashes          | Verdict lookup (checks blocklist)                                                                                                             |
 | Activities      | List, types                                                                                                                                   |
-| Webhooks        | List, get, create, delete, test fire                                                                                                          |
+| Webhooks        | List, get, create, delete, test fire — mockdr's own, under `/_dev/webhooks` (the 2.1 API reference has no webhook routes)                  |
 | System          | Status (public), info, configuration                                                                                                          |
 
 ### CrowdStrike Falcon (prefix: `/cs`)

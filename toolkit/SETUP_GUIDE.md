@@ -418,10 +418,10 @@ SEED_COUNT_AGENTS=200 SEED_COUNT_THREATS=100 uvicorn main:app --port 8001
 - **Activities** — list, types
 - **Deep Visibility** — init-query, query-status, events, events-by-type, cancel-query
 - **Accounts** — list, get, create, update
-- **Policies** — get, update
+- **Policies** — get, update (tenant, account, site or group scope)
 - **Tags** — list (via agents/tags), create, update, delete (via tag-manager)
 - **Hashes** — verdict lookup
-- **Webhooks** — list, get, create, delete, fire test event
+- **Webhooks** — list, get, create, delete, fire test event (mockdr's own, under `/_dev/webhooks`)
 - **System** — status (no auth), info, configuration
 
 ### CrowdStrike Falcon (CS)
