@@ -75,11 +75,30 @@ def _extra_data(incident: object, alerts_limit: int | None = None) -> dict:
         "incident": record_dict(incident),
         "alerts": {
             "total_count": len(linked_alerts),
-            "data": [record_dict(a) for a in shown],
+            "data": [_extra_data_alert(record_dict(a)) for a in shown],
         },
         "network_artifacts": {"total_count": len(network_artifacts), "data": network_artifacts},
         "file_artifacts": {"total_count": 0, "data": []},
     }
+
+
+def _extra_data_alert(record: dict) -> dict:
+    """An alert as extra-data lists it: ``host_ip`` one comma-separated string.
+
+    Every recorded extra-data reply spells it that way -- ``"1.1.1.1"``,
+    ``"1.1.1.1, 2.2.2.2"`` for a host with two, null when unknown (XSOAR
+    test_data ``get_incident_extra_data.json``,
+    ``get_incident_extra_data_host_id_array.json``,
+    ``get_multiple_incidents_extra_data.json``) -- and the XSOAR integration
+    depends on it: ``sort_incident_data`` builds ``host_ip_list`` with
+    ``alert.get("host_ip").split(",")``. The mock kept the list it stores, so
+    every ``fetch-incidents`` cycle raised ``AttributeError: 'list' object has
+    no attribute 'split'`` on the first incident with an alert.
+    """
+    ips = record.get("host_ip")
+    if isinstance(ips, list):
+        record = {**record, "host_ip": ", ".join(str(ip) for ip in ips) or None}
+    return record
 
 
 def get_incident_extra_data(incident_id: str) -> dict | None:
