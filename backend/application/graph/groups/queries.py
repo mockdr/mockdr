@@ -12,6 +12,7 @@ from utils.graph_odata import (
     select_fields,
 )
 from utils.graph_response import build_graph_list_response, graph_page
+from utils.odata_paging import SKIPTOKEN, page_link
 from utils.serde import record_dict
 
 
@@ -50,10 +51,9 @@ def list_groups(
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
 
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/groups?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/groups", cursor=SKIPTOKEN,
     )
     return build_graph_list_response(
         value=page,
@@ -106,7 +106,7 @@ def get_group_members(group_id: str, top: int = 100, skip: int = 0) -> dict:
             members.append({"@odata.type": "#microsoft.graph.directoryObject", **member})
 
     page, next_link = graph_page(
-        members, top, skip, resource="groups/{group_id}/members")
+        members, top, skip, resource=f"groups/{group_id}/members", cursor=SKIPTOKEN)
     return build_graph_list_response(
         value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#groups('{group_id}')/members",

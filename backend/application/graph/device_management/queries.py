@@ -12,6 +12,7 @@ from utils.graph_odata import (
     select_fields,
 )
 from utils.graph_response import build_graph_list_response, graph_page
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -48,10 +49,9 @@ def list_managed_devices(
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/deviceManagement/managedDevices?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceManagement/managedDevices",
     )
     return build_graph_list_response(
         value=page,
@@ -101,10 +101,9 @@ def list_detected_apps(
         records = apply_graph_filter(records, filter_str)
     total = len(records)
     page = apply_odata_select(records[skip : skip + top], select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/deviceManagement/detectedApps?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceManagement/detectedApps",
     )
     return build_graph_list_response(
         value=page,

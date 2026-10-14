@@ -7,6 +7,7 @@ from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -76,12 +77,10 @@ def list_software(
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
-    next_link = None
-    if skip + top < total:
-        next_link = (
-            f"https://api.securitycenter.microsoft.com/api/software"
-            f"?$top={top}&$skip={skip + top}"
-        )
+    next_link = page_link(
+        skip + top, total,
+        fallback=f"https://api.security.microsoft.com/api/software?$top={top}",
+    )
     return build_mde_list_response(page, next_link=next_link)
 
 

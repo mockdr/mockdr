@@ -7,6 +7,7 @@ from repository.graph.attack_simulation_repo import graph_attack_simulation_repo
 from repository.graph.threat_assessment_repo import graph_threat_assessment_repo
 from utils.dt import utc_now
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 # ── Attack Simulations ────────────────────────────────────────────────────────
@@ -28,10 +29,9 @@ def list_attack_simulations(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/security/attackSimulation/simulations?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/security/attackSimulation/simulations",
     )
     return build_graph_list_response(
         value=page,
@@ -59,12 +59,9 @@ def list_threat_assessments(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/v1.0/"
-        "informationProtection/"
-        f"threatAssessmentRequests?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/informationProtection/threatAssessmentRequests",
     )
     return build_graph_list_response(
         value=page,

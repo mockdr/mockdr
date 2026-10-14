@@ -8,6 +8,7 @@ from repository.graph.channel_message_repo import graph_channel_message_repo
 from repository.graph.channel_repo import graph_channel_repo
 from repository.graph.team_repo import graph_team_repo
 from utils.graph_response import build_graph_list_response, graph_page
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -111,12 +112,9 @@ def list_channel_messages(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/v1.0/"
-        f"teams/{team_id}/channels/{channel_id}/"
-        f"messages?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback=f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels/{channel_id}/messages",
     )
     return build_graph_list_response(
         value=page,

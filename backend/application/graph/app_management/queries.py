@@ -5,6 +5,7 @@ from repository.graph.app_protection_policy_repo import graph_app_protection_pol
 from repository.graph.mobile_app_repo import graph_mobile_app_repo
 from utils.graph_odata import apply_graph_filter, apply_odata_select
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -31,11 +32,9 @@ def list_app_protection_policies(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/v1.0/"
-        f"deviceAppManagement/managedAppPolicies?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceAppManagement/managedAppPolicies",
     )
     return build_graph_list_response(
         value=page,
@@ -75,10 +74,9 @@ def list_mobile_apps(
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/deviceAppManagement/mobileApps?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceAppManagement/mobileApps",
     )
     return build_graph_list_response(
         value=page,

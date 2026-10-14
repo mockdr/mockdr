@@ -5,6 +5,7 @@ from repository.graph.directory_role_repo import graph_directory_role_repo
 from repository.graph.user_repo import graph_user_repo
 from repository.store import store
 from utils.graph_response import build_graph_list_response, graph_page
+from utils.odata_paging import SKIPTOKEN
 from utils.serde import record_dict
 
 
@@ -19,7 +20,7 @@ def list_directory_roles(top: int = 100, skip: int = 0) -> dict:
         OData list response containing directory role records.
     """
     records = [record_dict(r) for r in graph_directory_role_repo.list_all()]
-    page, next_link = graph_page(records, top, skip, resource="directoryRoles")
+    page, next_link = graph_page(records, top, skip, resource="directoryRoles", cursor=SKIPTOKEN)
     return build_graph_list_response(
         value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#directoryRoles",
@@ -51,7 +52,7 @@ def get_role_members(role_id: str, top: int = 100, skip: int = 0) -> dict:
                 members.append({"@odata.type": "#microsoft.graph.user", **record_dict(user)})
 
     page, next_link = graph_page(
-        members, top, skip, resource="directoryRoles/{role_id}/members")
+        members, top, skip, resource=f"directoryRoles/{role_id}/members", cursor=SKIPTOKEN)
     return build_graph_list_response(
         value=page,
         context=f"https://graph.microsoft.com/v1.0/$metadata#directoryRoles('{role_id}')/members",

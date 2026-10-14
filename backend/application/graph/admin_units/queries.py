@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from repository.graph.administrative_unit_repo import graph_admin_unit_repo
 from utils.graph_response import build_graph_list_response, graph_page
+from utils.odata_paging import SKIPTOKEN
 from utils.serde import record_dict
 
 
@@ -17,7 +18,8 @@ def list_admin_units(top: int = 100, skip: int = 0) -> dict:
         OData list response containing administrative unit records.
     """
     records = [record_dict(au) for au in graph_admin_unit_repo.list_all()]
-    page, next_link = graph_page(records, top, skip, resource="directory/administrativeUnits")
+    page, next_link = graph_page(
+        records, top, skip, resource="directory/administrativeUnits", cursor=SKIPTOKEN)
     return build_graph_list_response(
         value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#directory/administrativeUnits",

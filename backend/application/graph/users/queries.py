@@ -12,6 +12,7 @@ from utils.graph_odata import (
     select_fields,
 )
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import SKIPTOKEN, page_link
 from utils.serde import record_dict
 
 
@@ -54,10 +55,9 @@ def list_users(
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/users?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/users", cursor=SKIPTOKEN,
     )
     return build_graph_list_response(
         value=page,
@@ -99,7 +99,7 @@ def get_user_member_of(
         user_id:    The user's ``id``.
         filter_str: OData ``$filter`` expression.
         top:        Page size (``$top``).
-        skip:       Number of records to skip (``$skip``).
+        skip:       Where the page starts (decoded ``$skiptoken``).
         select:     OData ``$select`` expression.
 
     Returns:
@@ -121,9 +121,16 @@ def get_user_member_of(
         # membership list, or paging one, got the whole list back.
         memberships = apply_graph_filter(memberships, filter_str)
     page = apply_odata_select(memberships[skip : skip + top], select)
+    # It paged and never said so: a member of more groups than one page holds
+    # had no @odata.nextLink to reach the rest by.
     return build_graph_list_response(
         value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#directoryObjects",
+        next_link=page_link(
+            skip + top, len(memberships),
+            fallback=f"https://graph.microsoft.com/v1.0/users/{user_id}/memberOf",
+            cursor=SKIPTOKEN,
+        ),
     )
 
 

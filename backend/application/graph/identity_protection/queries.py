@@ -5,6 +5,7 @@ from repository.graph.risk_detection_repo import graph_risk_detection_repo
 from repository.graph.risky_user_repo import graph_risky_user_repo
 from utils.graph_odata import apply_graph_filter
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -30,10 +31,9 @@ def list_risky_users(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/identityProtection/riskyUsers?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/identityProtection/riskyUsers",
     )
     return build_graph_list_response(
         value=page,
@@ -79,10 +79,9 @@ def list_risk_detections(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/identityProtection/riskDetections?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/identityProtection/riskDetections",
     )
     return build_graph_list_response(
         value=page,

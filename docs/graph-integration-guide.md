@@ -161,7 +161,7 @@ All list endpoints support standard OData query parameters:
 | `$filter` | `?$filter=severity eq 'high'` | Filter by field values |
 | `$select` | `?$select=displayName,id` | Return only specified fields |
 | `$top` | `?$top=10` | Page size (max 999) |
-| `$skip` | `?$skip=20` | Offset pagination |
+| `$skip` | `?$skip=20` | Offset pagination, where the API documents it (security, Intune, mail). Directory objects (users, groups, applications, service principals, directory roles, administrative units, organization) refuse it with `400 Request_BadRequest` and page by `$skiptoken`, as Graph does |
 | `$orderby` | `?$orderby=createdDateTime desc` | Sort results |
 | `$search` | `?$search="displayName:John"` | Full-text search |
 | `$count` | `?$count=true` | Include total count (requires `ConsistencyLevel: eventual` header) |
@@ -174,6 +174,13 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8001/graph/v1.0/deviceManagement/managedDevices?\$count=true&\$top=1"
 # Response includes: "@odata.count": 66
 ```
+
+### Paging
+
+Follow `@odata.nextLink` verbatim. It is an absolute URL on the host and mount
+you called, carrying every query parameter of the original request with only
+the page cursor (`$skip` or `$skiptoken`) advanced -- the same contract as
+https://learn.microsoft.com/en-us/graph/paging.
 
 ## API Coverage
 

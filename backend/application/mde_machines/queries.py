@@ -9,6 +9,7 @@ from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby, apply_odata_select
 from utils.mde_response import build_mde_list_response
 from utils.mde_serde import to_mde_resource
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 #: Fields the store keeps that the docs' machine does not declare. The OS
@@ -73,11 +74,10 @@ def list_machines(
     total = len(records)
     page = [complete_mde(r, "machine") for r in records[skip : skip + top]]
     page = apply_odata_select(page, select)
-    next_link = None
-    if skip + top < total:
-        next_link = (
-            f"https://api.securitycenter.microsoft.com/api/machines?$top={top}&$skip={skip + top}"
-        )
+    next_link = page_link(
+        skip + top, total,
+        fallback=f"https://api.security.microsoft.com/api/machines?$top={top}",
+    )
     return build_mde_list_response(
         page,
         next_link=next_link,
@@ -199,10 +199,10 @@ def get_machine_software(
     machine_apps = [a for a in all_apps if a.get("agentId") == agent_id]
 
     software = [_app_to_mde_software(app) for app in machine_apps]
-    next_link = None
-    if skip + top < len(software):
-        next_link = (f"https://api.securitycenter.microsoft.com/api/machines/"
-                     f"{machine_id}/software?$top={top}&$skip={skip + top}")
+    next_link = page_link(
+        skip + top, len(software),
+        fallback=f"https://api.security.microsoft.com/api/machines/{machine_id}/software?$top={top}",
+    )
     return build_mde_list_response(software[skip : skip + top], next_link=next_link)
 
 

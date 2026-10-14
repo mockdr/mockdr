@@ -8,6 +8,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import SKIPTOKEN, page_link
 from utils.serde import record_dict
 
 
@@ -39,10 +40,9 @@ def list_service_principals(
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/servicePrincipals?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/servicePrincipals", cursor=SKIPTOKEN,
     )
     return build_graph_list_response(
         value=page,

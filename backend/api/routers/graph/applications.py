@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 
 from api.graph_auth import require_graph_auth
 from application.graph.applications import queries as app_queries
+from utils.odata_paging import directory_page_offset
 
 router = APIRouter(tags=["Graph Applications"])
 
@@ -13,7 +14,7 @@ router = APIRouter(tags=["Graph Applications"])
 async def list_applications(
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
+    skip: int = Depends(directory_page_offset),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_auth),
 ) -> dict:

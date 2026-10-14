@@ -5,6 +5,7 @@ from repository.graph.device_category_repo import graph_device_category_repo
 from repository.graph.enrollment_restriction_repo import graph_enrollment_restriction_repo
 from repository.graph.update_ring_repo import graph_update_ring_repo
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -24,11 +25,9 @@ def list_update_rings(
     records = [record_dict(r) for r in graph_update_ring_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/beta/deviceManagement/"
-        f"windowsUpdateForBusinessConfigurations?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/beta/deviceManagement/windowsUpdateForBusinessConfigurations",
     )
     return build_graph_list_response(
         value=page,
@@ -60,11 +59,9 @@ def list_enrollment_restrictions(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/v1.0/deviceManagement/"
-        f"deviceEnrollmentConfigurations?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceManagement/deviceEnrollmentConfigurations",
     )
     return build_graph_list_response(
         value=page,
@@ -89,10 +86,9 @@ def list_device_categories(
     records = [record_dict(c) for c in graph_device_category_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/deviceManagement/deviceCategories?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceManagement/deviceCategories",
     )
     return build_graph_list_response(
         value=page,

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from api.graph_auth import require_graph_auth
 from application.graph.users import queries as user_queries
 from utils.graph_response import build_graph_error_response
+from utils.odata_paging import directory_page_offset
 
 router = APIRouter(tags=["Graph Users"])
 
@@ -36,7 +37,7 @@ async def list_users(
     request: Request,
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
+    skip: int = Depends(directory_page_offset),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     search: str = Query(None, alias="$search"),
@@ -56,7 +57,7 @@ async def list_users_beta(
     request: Request,
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
+    skip: int = Depends(directory_page_offset),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     search: str = Query(None, alias="$search"),
@@ -98,7 +99,7 @@ async def list_user_member_of(
     user_id: str,
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
+    skip: int = Depends(directory_page_offset),
     select: str = Query(None, alias="$select"),
     _: dict = Depends(require_graph_auth),
 ) -> dict:

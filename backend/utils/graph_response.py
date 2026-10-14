@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 
 from utils.dt import utc_now
+from utils.odata_paging import SKIP, page_link
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -41,7 +42,7 @@ def build_graph_list_response(
 
 
 def graph_page(
-    records: list[dict], top: int, skip: int, *, resource: str,
+    records: list[dict], top: int, skip: int, *, resource: str, cursor: str = SKIP,
 ) -> tuple[list[dict], str | None]:
     """One page of a collection, and the ``@odata.nextLink`` that follows it.
 
@@ -51,19 +52,24 @@ def graph_page(
     did nothing at all. The nine now page the same way as the 22, through
     here rather than through nine copies of the same four lines.
 
+    The link is the URL the client called with the cursor advanced (see
+    :mod:`utils.odata_paging`), not a fixed one on graph.microsoft.com.
+
     Args:
         records:  The whole collection, already filtered.
         top:      ``$top`` -- how many to return.
-        skip:     ``$skip`` -- how many to pass over first.
-        resource: The path under ``/v1.0`` that the next link points back at.
+        skip:     Where the page starts (``$skip``, or a decoded ``$skiptoken``).
+        resource: The path under ``/v1.0``, used only outside a request.
+        cursor:   ``$skip``, or ``$skiptoken`` for directory objects.
 
     Returns:
         The page, and the next link, which is None on the last page.
     """
     page = records[skip : skip + top]
-    if skip + top >= len(records):
-        return page, None
-    return page, f"https://graph.microsoft.com/v1.0/{resource}?$skip={skip + top}"
+    return page, page_link(
+        skip + top, len(records),
+        fallback=f"https://graph.microsoft.com/v1.0/{resource}", cursor=cursor,
+    )
 
 
 def build_graph_error_response(code: str, message: str) -> dict:

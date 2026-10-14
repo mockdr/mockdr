@@ -359,6 +359,7 @@ from utils.kibana_repeated_query import refuse_repeated_query_members
 from utils.logging import setup_logging
 from utils.mde_kql import KqlError
 from utils.mde_odata import ODataFilterError
+from utils.odata_paging import remember_request_url
 from utils.vendor_errors import (
     build_vendor_error,
     vendor_for_path,
@@ -1103,7 +1104,8 @@ for _mde_module in [
     mde_file_info_router,
     mde_users_router,
 ]:
-    app.include_router(_mde_module.router, prefix=MDE_PREFIX)
+    app.include_router(_mde_module.router, prefix=MDE_PREFIX,
+                       dependencies=[Depends(remember_request_url)])
 
 
 # Mock export data endpoint (SoftwareInventoryExport; no auth — SAS pre-signed)
@@ -1275,7 +1277,9 @@ for _graph_module in [
     graph_defender_office_router,
     graph_service_health_router,
 ]:
-    app.include_router(_graph_module.router, prefix=GRAPH_PREFIX)
+    # The request URL is what an @odata.nextLink is built from (utils/odata_paging.py).
+    app.include_router(_graph_module.router, prefix=GRAPH_PREFIX,
+                       dependencies=[Depends(remember_request_url)])
 
 # ── Unmatched routes ─────────────────────────────────────────────────────────
 #

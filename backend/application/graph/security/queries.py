@@ -11,6 +11,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 from utils.vendor_enums import graph_enum_order
 
@@ -46,10 +47,9 @@ def list_alerts_v2(
 
     total = len(records)
     page = apply_odata_select(records[skip : skip + top], select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/security/alerts_v2?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/security/alerts_v2",
     )
     return build_graph_list_response(
         value=page,
@@ -133,10 +133,9 @@ def list_incidents(
     records = apply_odata_orderby(records, orderby, graph_enum_order())
     total = len(records)
     page = apply_odata_select(records[skip : skip + top], select)
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/security/incidents?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/security/incidents",
     )
     return build_graph_list_response(
         value=page,
@@ -240,10 +239,9 @@ def list_secure_scores(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/security/secureScores?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/security/secureScores",
     )
     return build_graph_list_response(
         value=page,

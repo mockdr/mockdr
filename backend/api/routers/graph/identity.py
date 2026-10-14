@@ -7,6 +7,7 @@ from api.graph_auth import require_graph_auth
 from application.graph.admin_units import queries as admin_unit_queries
 from application.graph.identity import queries as identity_queries
 from application.graph.named_locations import queries as named_location_queries
+from utils.odata_paging import directory_page_offset
 
 router = APIRouter(tags=["Graph Identity"])
 
@@ -59,7 +60,7 @@ async def list_named_locations(
 @router.get("/v1.0/directory/administrativeUnits")
 async def list_administrative_units(
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
+    skip: int = Depends(directory_page_offset),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List administrative units."""

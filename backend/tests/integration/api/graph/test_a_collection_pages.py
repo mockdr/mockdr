@@ -69,6 +69,7 @@ class TestEveryGraphCollectionPages:
             assert len(page["value"]) == 1, path
             assert page.get("@odata.nextLink"), f"{path} has {total} and said nothing follows"
 
-            second = client.get(path, headers=graph_admin_headers,
-                                params={"$top": 1, "$skip": 1}).json()
+            # Follow the link rather than compose `$skip`: directory objects
+            # page by `$skiptoken` and refuse `$skip`, as Graph does.
+            second = client.get(page["@odata.nextLink"], headers=graph_admin_headers).json()
             assert second["value"] != page["value"], f"{path} gave the same row twice"

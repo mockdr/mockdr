@@ -10,6 +10,7 @@ from utils.graph_odata import (
     apply_odata_select,
 )
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -38,12 +39,9 @@ def list_registration_details(
     records = apply_odata_orderby(records, None)
     total = len(records)
     page = apply_odata_select(records[skip : skip + top], select)
-    next_link = (
-        "https://graph.microsoft.com/v1.0/reports/"
-        "authenticationMethods/"
-        f"userRegistrationDetails?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/reports/authenticationMethods/userRegistrationDetails",
     )
     return build_graph_list_response(
         value=page,

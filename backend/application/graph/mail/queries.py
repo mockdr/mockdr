@@ -7,6 +7,7 @@ from infrastructure.seeders.graph.graph_shared import graph_uuid
 from repository.graph.mail_folder_repo import graph_mail_folder_repo
 from repository.graph.mail_message_repo import graph_mail_message_repo
 from utils.graph_response import build_graph_list_response, graph_page
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -44,10 +45,9 @@ def list_messages(
 
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        f"https://graph.microsoft.com/v1.0/users/{user_id}/messages?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback=f"https://graph.microsoft.com/v1.0/users/{user_id}/messages",
     )
     return build_graph_list_response(
         value=page,

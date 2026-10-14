@@ -4,6 +4,7 @@ from __future__ import annotations
 from repository.graph.autopilot_device_repo import graph_autopilot_device_repo
 from repository.graph.autopilot_profile_repo import graph_autopilot_profile_repo
 from utils.graph_response import build_graph_list_response
+from utils.odata_paging import page_link
 from utils.serde import record_dict
 
 
@@ -23,11 +24,9 @@ def list_autopilot_devices(
     records = [record_dict(d) for d in graph_autopilot_device_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/v1.0/deviceManagement/"
-        f"windowsAutopilotDeviceIdentities?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/v1.0/deviceManagement/windowsAutopilotDeviceIdentities",
     )
     return build_graph_list_response(
         value=page,
@@ -52,11 +51,9 @@ def list_autopilot_profiles(
     records = [record_dict(p) for p in graph_autopilot_profile_repo.list_all()]
     total = len(records)
     page = records[skip : skip + top]
-    next_link = (
-        "https://graph.microsoft.com/beta/deviceManagement/"
-        f"windowsAutopilotDeploymentProfiles?$skip={skip + top}"
-        if skip + top < total
-        else None
+    next_link = page_link(
+        skip + top, total,
+        fallback="https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeploymentProfiles",
     )
     return build_graph_list_response(
         value=page,

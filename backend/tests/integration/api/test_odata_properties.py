@@ -100,8 +100,11 @@ class TestGraphRefusesAnUnknownProperty:
     def test_the_paging_options_are_not_property_names(
         self, client: TestClient, graph: dict,
     ) -> None:
+        # alerts_v2 documents `$skip`; directory objects such as /users refuse
+        # it outright (https://learn.microsoft.com/en-us/graph/query-parameters#skip).
         resp = client.get(
-            "/graph/v1.0/users", headers=graph, params={"$top": "2", "$skip": "1"},
+            "/graph/v1.0/security/alerts_v2", headers=graph,
+            params={"$top": "2", "$skip": "1"},
         )
         assert resp.status_code == 200
 
@@ -154,7 +157,8 @@ class TestSkipIsANonNegativeInteger:
     def test_graph_refuses_a_negative_skip(
         self, client: TestClient, graph: dict,
     ) -> None:
-        resp = client.get("/graph/v1.0/users", headers=graph, params={"$skip": "-5"})
+        resp = client.get("/graph/v1.0/security/alerts_v2", headers=graph,
+                          params={"$skip": "-5"})
         assert resp.status_code == 400
 
     def test_defender_refuses_a_negative_skip(
@@ -166,11 +170,9 @@ class TestSkipIsANonNegativeInteger:
     def test_zero_and_upwards_still_page(
         self, client: TestClient, graph: dict,
     ) -> None:
-        everyone = client.get("/graph/v1.0/users", headers=graph).json()["value"]
-        skipped = client.get(
-            "/graph/v1.0/users", headers=graph, params={"$skip": "1"},
-        ).json()["value"]
+        # A collection that takes `$skip`: /users refuses it, as Graph does.
+        url = "/graph/v1.0/security/alerts_v2"
+        everyone = client.get(url, headers=graph).json()["value"]
+        skipped = client.get(url, headers=graph, params={"$skip": "1"}).json()["value"]
         assert len(skipped) == len(everyone) - 1
-        assert client.get(
-            "/graph/v1.0/users", headers=graph, params={"$skip": "0"},
-        ).status_code == 200
+        assert client.get(url, headers=graph, params={"$skip": "0"}).status_code == 200

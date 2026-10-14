@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 
 from api.graph_auth import require_graph_auth
 from application.graph.organization import queries as org_queries
+from utils.odata_paging import directory_page_offset
 
 router = APIRouter(tags=["Graph Organization"])
 
@@ -12,7 +13,7 @@ router = APIRouter(tags=["Graph Organization"])
 @router.get("/v1.0/organization")
 async def list_organization(
     top: int = Query(100, alias="$top", ge=1, le=999),
-    skip: int = Query(0, alias="$skip", ge=0),
+    skip: int = Depends(directory_page_offset),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """Return the tenant organization record.
