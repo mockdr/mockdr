@@ -18,7 +18,10 @@ router = APIRouter(tags=["MDE Alerts"])
 @router.get("/api/alerts")
 def list_alerts(
     filter_str: str = Query(None, alias="$filter"),
-    top: int = Query(50, alias="$top", ge=1, le=1000),
+    # "$top with max value of 10,000" (get-alerts on learn.microsoft.com/en-us/
+    # defender-endpoint/api/); the cap was 1000. No default page size is
+    # documented, so the default stays 50.
+    top: int = Query(50, alias="$top", ge=1, le=10000),
     skip: int = Query(0, alias="$skip", ge=0),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
