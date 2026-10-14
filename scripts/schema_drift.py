@@ -777,6 +777,12 @@ PLATFORMS = {
                 "json": {"Comment": "drift", "ScanType": "Quick"}
             },
             "POST /api/advancedqueries/run": {"json": {"Query": "DeviceInfo | take 1"}},
+            # `alertIds` is Required (batch-update-alerts); without it the
+            # route answers 400 and the audit recorded a refusal, not the
+            # documented empty 200.
+            "POST /api/alerts/batchUpdate": {
+                "json": {"alertIds": ["drift-probe"], "status": "Resolved"},
+            },
         },
     },
     "sentinelone": {
