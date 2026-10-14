@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from api.middleware.rate_limit import reset_counters, set_config
 from infrastructure.seed import generate_all
 from main import app
+from tests.clock import Clock
+from tests.clock import install as install_clock
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +35,16 @@ def quiet_rate_limiter() -> Iterator[None]:
     yield
     set_config(enabled=False, rpm=60)
     reset_counters()
+
+
+@pytest.fixture()
+def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    """A clock the test moves forward with ``clock.advance(seconds, days=)``.
+
+    For what happens to an instance hours or days after it was seeded —
+    expiries, TTLs, reapers, pending actions nobody read — without sleeping.
+    """
+    return install_clock(monkeypatch)
 
 
 @pytest.fixture()

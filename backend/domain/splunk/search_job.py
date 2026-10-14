@@ -64,3 +64,20 @@ class SearchJob:
     def id(self) -> str:
         """Primary identifier expected by ``Repository[T]``."""
         return self.sid
+
+    def expired(self, now: float, dispatch_seconds: float = 0.0) -> bool:
+        """Whether splunkd's reaper would have removed this job by *now*.
+
+        limits.conf ``[search] ttl`` (default 600): "How long, in seconds,
+        the search artifacts should be stored on disk after the job
+        completes", counted from the job's last modification — which an
+        active viewer keeps updating so the reaper "does not remove the job
+        from underneath". The countdown therefore starts at the later of
+        completion and the last access (``touched_at``). A paused job has
+        not completed, and a ttl of 0 (``default_save_ttl = 0``) waits
+        indefinitely.
+        """
+        if self.ttl <= 0 or (self.is_paused and not self.is_done):
+            return False
+        completed = (self.published_at or 0.0) + max(dispatch_seconds, 0.0)
+        return now > max(completed, self.touched_at or 0.0) + self.ttl
