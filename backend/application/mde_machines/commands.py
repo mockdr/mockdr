@@ -33,6 +33,94 @@ def _publish_machine_updated(machine: MdeMachine) -> None:
     )
 
 
+class MachineActionError(ValueError):
+    """A machine-action request Defender refuses with ``400``.
+
+    Carries the Defender error code alongside the message, because the two
+    refusals here are told apart by code: ``MissingRequiredParameter`` and
+    ``InvalidRequestBody`` are both listed in
+    https://learn.microsoft.com/en-us/defender-endpoint/api/common-errors, as
+    is ``ActiveRequestAlreadyExists``'s status (see :func:`_refuse_if_pending`).
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        """Keep the Defender error code beside the message."""
+        super().__init__(message)
+        self.code = code
+
+
+def _require_comment(body: dict) -> str:
+    """The action's ``Comment``, which every action page marks Required.
+
+    The mock read it with ``body.get("Comment", "")``, so an action without a
+    reason -- or with ``comment`` in the wrong case, which Defender does not
+    recognise ("The submitted body parameters are currently case-sensitive",
+    common-errors) -- was accepted with an empty comment.
+
+    Raises:
+        MachineActionError: ``MissingRequiredParameter`` when absent or empty.
+    """
+    comment = body.get("Comment")
+    if not isinstance(comment, str) or not comment.strip():
+        raise MachineActionError("MissingRequiredParameter", "Parameter Comment is missing.")
+    return comment
+
+
+def _choice(body: dict, key: str, allowed: tuple[str, ...], *, required: bool) -> str | None:
+    """A body member restricted to the values its action page lists.
+
+    Raises:
+        MachineActionError: ``MissingRequiredParameter`` when a required one
+            is absent, ``InvalidRequestBody`` when the value is not listed.
+    """
+    value = body.get(key)
+    if value is None:
+        if required:
+            raise MachineActionError("MissingRequiredParameter", f"Parameter {key} is missing.")
+        return None
+    if value not in allowed:
+        raise MachineActionError(
+            "InvalidRequestBody",
+            f"Invalid request body. {key} must be one of {', '.join(allowed)}.",
+        )
+    return str(value)
+
+
+def _refuse_if_pending(machine_id: str, action_type: str) -> None:
+    """Refuse a second action of a type while the first is still pending.
+
+    Defender documents it for these actions: "If you send multiple API calls
+    to ... for the same device, it returns 'pending machine action' or HTTP
+    400 with the message 'Action is already in progress'" (unisolate,
+    runAntiVirusScan, restrictCodeExecution, unrestrictCodeExecution pages);
+    "If a collection is already running, this returns 400 Bad Request"
+    (collectInvestigationPackage); and for live response "subsequent requests
+    are responded to with HTTP 400 - ActiveRequestAlreadyExists"
+    (run-live-response). The code is the one the live-response page names;
+    the other pages give only the status and the message. The mock queued
+    any number of identical actions.
+
+    Pending is judged the way the action listing judges it: an action is
+    promoted to Succeeded a second after it was created (see
+    ``application/mde_machine_actions/queries.py``).
+
+    Raises:
+        MachineActionError: ``ActiveRequestAlreadyExists``.
+    """
+    from application.mde_machine_actions.queries import _auto_promote  # noqa: PLC0415
+
+    for action in mde_machine_action_repo.list_all():
+        if action.machineId != machine_id or action.type != action_type:
+            continue
+        if _auto_promote(record_dict(action)).get("status") == "Pending":
+            raise MachineActionError("ActiveRequestAlreadyExists", "Action is already in progress")
+
+
+#: The values each action page lists.
+ISOLATION_TYPES = ("Full", "Selective", "UnManagedDevice")
+SCAN_TYPES = ("Quick", "Full")
+
+
 def _create_action(
     machine_id: str,
     action_type: str,
@@ -82,9 +170,10 @@ def isolate_machine(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
+    comment = _require_comment(body)
+    _choice(body, "IsolationType", ISOLATION_TYPES, required=False)
     machine.healthStatus = "ImpairedCommunication"
     _publish_machine_updated(machine)
-    comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "Isolate", comment, requestor)
 
@@ -104,9 +193,10 @@ def unisolate_machine(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
+    comment = _require_comment(body)
+    _refuse_if_pending(machine_id, "Unisolate")
     machine.healthStatus = "Active"
     _publish_machine_updated(machine)
-    comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "Unisolate", comment, requestor)
 
@@ -124,7 +214,9 @@ def run_av_scan(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    comment = body.get("Comment", "")
+    comment = _require_comment(body)
+    _choice(body, "ScanType", SCAN_TYPES, required=True)
+    _refuse_if_pending(machine_id, "RunAntiVirusScan")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "RunAntiVirusScan", comment, requestor)
 
@@ -142,7 +234,8 @@ def restrict_code_execution(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    comment = body.get("Comment", "")
+    comment = _require_comment(body)
+    _refuse_if_pending(machine_id, "RestrictCodeExecution")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "RestrictCodeExecution", comment, requestor)
 
@@ -160,7 +253,8 @@ def unrestrict_code_execution(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    comment = body.get("Comment", "")
+    comment = _require_comment(body)
+    _refuse_if_pending(machine_id, "UnrestrictCodeExecution")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "UnrestrictCodeExecution", comment, requestor)
 
@@ -178,7 +272,8 @@ def collect_investigation_package(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
-    comment = body.get("Comment", "")
+    comment = _require_comment(body)
+    _refuse_if_pending(machine_id, "CollectInvestigationPackage")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(
         machine_id,
@@ -201,9 +296,9 @@ def offboard_machine(machine_id: str, body: dict) -> dict | None:
     machine = mde_machine_repo.get(machine_id)
     if not machine:
         return None
+    comment = _require_comment(body)
     machine.onboardingStatus = "CanBeOnboarded"
     _publish_machine_updated(machine)
-    comment = body.get("Comment", "")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     return _create_action(machine_id, "Offboard", comment, requestor)
 
@@ -222,12 +317,15 @@ def run_live_response(machine_id: str, body: dict) -> dict | None:
     if not machine:
         return None
     comment = body.get("Comment", "")
+    _refuse_if_pending(machine_id, "RunLiveResponse")
     requestor = body.get("Requestor", "analyst@acmecorp.internal")
     action = _create_action(machine_id, "RunLiveResponse", comment, requestor)
     # Attach commands to the action if provided
     commands = body.get("Commands", [])
     if commands:
-        stored = mde_machine_action_repo.get(action["actionId"])
+        # The resource is keyed `id` (to_mde_resource); `actionId` was a
+        # KeyError, so every live response that carried commands answered 500.
+        stored = mde_machine_action_repo.get(action["id"])
         if stored:
             stored.commands = commands
             mde_machine_action_repo.save(stored)

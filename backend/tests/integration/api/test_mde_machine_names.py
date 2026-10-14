@@ -78,5 +78,5 @@ class TestEveryRecordNamesItsMachine:
             f"/mde/api/machines/{machine_id}/isolate", headers=mde_headers,
             json={"Comment": "zzz probe", "IsolationType": "Full"},
         )
-        assert response.status_code == 200, response.text
+        assert response.status_code == 201, response.text
         assert response.json()["computerDnsName"] == machine["computerDnsName"]

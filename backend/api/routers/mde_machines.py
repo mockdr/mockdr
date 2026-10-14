@@ -6,6 +6,8 @@ machine actions (isolate, scan, restrict, etc.).
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from api.mde_auth import require_mde_auth, require_mde_write
@@ -173,16 +175,38 @@ def get_machine_recommendations(
 
 
 # ── Machine Actions ──────────────────────────────────────────────────────────
+#
+# Each action page says "If successful, this method returns 201 - Created
+# response code and Machine Action in the response body" (isolate-machine,
+# unisolate-machine, run-av-scan, restrict-code-execution,
+# unrestrict-code-execution, collect-investigation-package, run-live-response
+# on learn.microsoft.com/en-us/defender-endpoint/api/), and the mock answered
+# 200. Offboard keeps 200: its page reads "returns 200 - Created", which says
+# both, and nothing measured settles which.
 
 
-@router.post("/api/machines/{machine_id}/isolate")
+def _act(
+    command: Callable[[str, dict], dict | None], machine_id: str, body: dict,
+) -> dict | None:
+    """Run an action command, answering a refused request as Defender does."""
+    try:
+        return command(machine_id, body)
+    except machine_commands.MachineActionError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_mde_error_response(exc.code, str(exc)),
+        ) from exc
+
+
+
+@router.post("/api/machines/{machine_id}/isolate", status_code=201)
 def isolate_machine(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Isolate a machine from the network."""
-    result = machine_commands.isolate_machine(machine_id, body)
+    result = _act(machine_commands.isolate_machine, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -191,14 +215,14 @@ def isolate_machine(
     return result
 
 
-@router.post("/api/machines/{machine_id}/unisolate")
+@router.post("/api/machines/{machine_id}/unisolate", status_code=201)
 def unisolate_machine(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Release a machine from network isolation."""
-    result = machine_commands.unisolate_machine(machine_id, body)
+    result = _act(machine_commands.unisolate_machine, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -207,14 +231,14 @@ def unisolate_machine(
     return result
 
 
-@router.post("/api/machines/{machine_id}/runAntiVirusScan")
+@router.post("/api/machines/{machine_id}/runAntiVirusScan", status_code=201)
 def run_av_scan(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Trigger an antivirus scan on a machine."""
-    result = machine_commands.run_av_scan(machine_id, body)
+    result = _act(machine_commands.run_av_scan, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -223,14 +247,14 @@ def run_av_scan(
     return result
 
 
-@router.post("/api/machines/{machine_id}/restrictCodeExecution")
+@router.post("/api/machines/{machine_id}/restrictCodeExecution", status_code=201)
 def restrict_code_execution(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Restrict application execution on a machine."""
-    result = machine_commands.restrict_code_execution(machine_id, body)
+    result = _act(machine_commands.restrict_code_execution, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -239,14 +263,14 @@ def restrict_code_execution(
     return result
 
 
-@router.post("/api/machines/{machine_id}/unrestrictCodeExecution")
+@router.post("/api/machines/{machine_id}/unrestrictCodeExecution", status_code=201)
 def unrestrict_code_execution(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Remove application execution restriction from a machine."""
-    result = machine_commands.unrestrict_code_execution(machine_id, body)
+    result = _act(machine_commands.unrestrict_code_execution, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -255,14 +279,14 @@ def unrestrict_code_execution(
     return result
 
 
-@router.post("/api/machines/{machine_id}/collectInvestigationPackage")
+@router.post("/api/machines/{machine_id}/collectInvestigationPackage", status_code=201)
 def collect_investigation_package(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Collect an investigation package from a machine."""
-    result = machine_commands.collect_investigation_package(machine_id, body)
+    result = _act(machine_commands.collect_investigation_package, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -278,7 +302,7 @@ def offboard_machine(
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Offboard a machine from MDE."""
-    result = machine_commands.offboard_machine(machine_id, body)
+    result = _act(machine_commands.offboard_machine, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,
@@ -287,14 +311,14 @@ def offboard_machine(
     return result
 
 
-@router.post("/api/machines/{machine_id}/runliveresponse")
+@router.post("/api/machines/{machine_id}/runliveresponse", status_code=201)
 def run_live_response(
     machine_id: str,
     body: dict = Body(...),
     _: dict = Depends(require_mde_write),
 ) -> dict:
     """Start a live response session on a machine."""
-    result = machine_commands.run_live_response(machine_id, body)
+    result = _act(machine_commands.run_live_response, machine_id, body)
     if result is None:
         raise HTTPException(
             status_code=404,

@@ -275,7 +275,7 @@ class TestMachineActions:
             headers=headers,
             json={"Comment": "Test isolation", "IsolationType": "Full"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # "returns 201 - Created" (the action's learn.microsoft.com page)
         body = resp.json()
         assert body["type"] == "Isolate"
         assert body["machineId"] == machine_id
@@ -289,7 +289,7 @@ class TestMachineActions:
             headers=headers,
             json={"Comment": "Test release from isolation"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # "returns 201 - Created" (the action's learn.microsoft.com page)
         body = resp.json()
         assert body["type"] == "Unisolate"
 
@@ -301,7 +301,7 @@ class TestMachineActions:
             headers=headers,
             json={"Comment": "Test AV scan", "ScanType": "Quick"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # "returns 201 - Created" (the action's learn.microsoft.com page)
         body = resp.json()
         assert body["type"] == "RunAntiVirusScan"
 
@@ -313,7 +313,7 @@ class TestMachineActions:
             headers=headers,
             json={"Comment": "Test restrict code execution"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # "returns 201 - Created" (the action's learn.microsoft.com page)
         body = resp.json()
         assert body["type"] == "RestrictCodeExecution"
 
@@ -325,7 +325,7 @@ class TestMachineActions:
             headers=headers,
             json={"Comment": "Test unrestrict code execution"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # "returns 201 - Created" (the action's learn.microsoft.com page)
         body = resp.json()
         assert body["type"] == "UnrestrictCodeExecution"
 
@@ -337,7 +337,7 @@ class TestMachineActions:
             headers=headers,
             json={"Comment": "Test collect investigation package"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201  # "returns 201 - Created" (the action's learn.microsoft.com page)
         body = resp.json()
         assert body["type"] == "CollectInvestigationPackage"
 
