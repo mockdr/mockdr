@@ -14,6 +14,8 @@ from infrastructure.seeders._shared import (
     MACHINE_MODELS,
     OS_VARIANTS,
     USER_AD_GROUPS_POOL,
+    fit_hostname_prefix,
+    fit_model,
     passphrase,
     rand_ago,
 )
@@ -40,6 +42,22 @@ _CLOUD_REGIONS: dict[str, list[str]] = {
     "Azure": ["westeurope", "eastus", "uksouth"],
     "GCP": ["europe-west3", "us-central1", "asia-east1"],
 }
+
+
+#: One agent in this many is network-isolated (S1 network quarantine).
+_ISOLATE_EVERY = 12
+
+
+def _machine_type(prefix: str) -> str:
+    """What kind of machine a hostname prefix names."""
+    if prefix in ("SERVER", "RHEL", "SRV", "UBUNTU"):
+        return "server"
+    return "laptop" if prefix == "LAPTOP" else "desktop"
+
+
+def _is_isolated(index: int) -> bool:
+    """Whether the *index*-th seeded agent is isolated — positional, so no draw."""
+    return index % _ISOLATE_EVERY == _ISOLATE_EVERY // 2
 
 
 def seed_agents(
@@ -71,7 +89,7 @@ def seed_agents(
 
     agent_ids: list[str] = []
 
-    for _ in range(SEED_COUNT_AGENTS):
+    for index in range(SEED_COUNT_AGENTS):
         aid = new_id()
         agent_ids.append(aid)
 
@@ -87,13 +105,15 @@ def seed_agents(
             "macos": ["MAC"],
             "linux": ["UBUNTU", "RHEL", "SRV"],
         }
-        prefix = random.choice(prefix_choices[os_type])
-        hostname = f"{prefix}-{fake.lexify('??????').upper()}"
-        machine_type = (
-            "server" if prefix in ("SERVER", "RHEL", "SRV", "UBUNTU")
-            else "laptop" if prefix == "LAPTOP"
-            else "desktop"
-        )
+        drawn_prefix = random.choice(prefix_choices[os_type])
+        suffix = fake.lexify("??????").upper()
+        prefix = fit_hostname_prefix(drawn_prefix, os_name, os_type, suffix)
+        hostname = f"{prefix}-{suffix}"
+        machine_type = _machine_type(prefix)
+        # Whether the cloud-instance draws below are made follows the prefix
+        # as drawn, so fitting the prefix to the OS adds or removes no draw
+        # for any agent; the result is fitted to the real type afterwards.
+        drawn_machine_type = _machine_type(drawn_prefix)
 
         is_active = random.random() > 0.15
         is_infected = random.random() < 0.08
@@ -257,7 +277,11 @@ def seed_agents(
             networkStatus=random.choice(
                 ["connected"] * 7 + ["disconnected"] * 2 + ["disconnecting"]
             ),
-            networkQuarantineEnabled=False,
+            # Every agent was unisolated here while Cortex isolated every
+            # fourth copy of the fleet and Elastic one in twenty at random —
+            # three answers for one host. S1 is where the fleet comes from,
+            # so S1 decides, and the other vendors read it.
+            networkQuarantineEnabled=_is_isolated(index),
             networkInterfaces=network_interfaces,
             locationEnabled=os_type != "linux",
             locationType=(
@@ -333,7 +357,7 @@ def seed_agents(
                         "cloudAccount": new_id()[:12],
                     },
                 }
-                if machine_type == "server" and random.random() > 0.4 else {}
+                if drawn_machine_type == "server" and random.random() > 0.4 else {}
             ),
             hasContainerizedWorkload=(
                 os_type == "linux" and random.random() > 0.5
@@ -355,6 +379,19 @@ def seed_agents(
             cpuUsage=random.randint(1, 45),
             memoryUsage=random.randint(512, total_memory),
         )
+        # Bought for the kind of host it is: the model was one draw over
+        # every model, so servers reported laptops. The draw stays in the
+        # stream; only the value is fitted. A MacBook is a laptop.
+        record.modelName = fit_model(record.modelName or "", os_type, machine_type)
+        if record.modelName.startswith("Apple MacBook"):
+            record.machineType = "laptop"
+        # Only a server runs on a cloud instance.
+        if machine_type != "server":
+            record.cloudProviders = {}
+        # An isolated agent is cut off from the network, which S1 reports
+        # as disconnected whatever status was drawn.
+        if record.networkQuarantineEnabled:
+            record.networkStatus = "disconnected"
         # Full mode is reached after the agent registered and before it was
         # last active or scanned; `rand_ago(190)` on its own put it after
         # both on some agents. Placed after the record is built so the draw

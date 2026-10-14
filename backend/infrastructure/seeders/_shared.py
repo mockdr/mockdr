@@ -5,6 +5,7 @@ seeders can import it without pulling in the full persistence layer.
 """
 import random
 import string
+import zlib
 from datetime import UTC, datetime, timedelta
 
 from domain.policy import Policy
@@ -60,6 +61,75 @@ MACHINE_MODELS: list[str] = [
     "Microsoft Surface Pro 9", "Apple Mac mini M2", "Custom Build",
     "VMware, Inc. - VMware7,1", "VMware, Inc. - VMware6,7",
 ]
+
+#: Which of ``MACHINE_MODELS`` a host of each kind can be. The model was one
+#: draw over all eleven, so a rack server reported a ThinkPad and a Mac mini
+#: ran Windows; the draw is kept (it is part of the seeded stream) and mapped
+#: onto the kind's own models by :func:`fit_model`.
+MODELS_BY_KIND: dict[str, list[str]] = {
+    "server": [
+        "Dell PowerEdge R750", "HP ProLiant DL380",
+        "VMware, Inc. - VMware7,1", "VMware, Inc. - VMware6,7",
+    ],
+    "laptop": ["HP EliteBook 840 G8", "Lenovo ThinkPad T14", "Microsoft Surface Pro 9"],
+    "desktop": [
+        "Dell OptiPlex 7090", "Custom Build",
+        "VMware, Inc. - VMware7,1", "VMware, Inc. - VMware6,7",
+    ],
+    "macos": ["Apple MacBook Pro M3", "Apple Mac mini M2"],
+}
+
+#: Manufacturer and product name for each of ``MACHINE_MODELS``, as SMBIOS
+#: reports them — what Intune's ``manufacturer``/``model`` carry for the
+#: same physical machine S1 calls ``modelName``.
+MACHINE_HARDWARE: dict[str, tuple[str, str]] = {
+    "Dell OptiPlex 7090": ("Dell Inc.", "OptiPlex 7090"),
+    "HP EliteBook 840 G8": ("HP", "HP EliteBook 840 G8 Notebook PC"),
+    "Lenovo ThinkPad T14": ("LENOVO", "ThinkPad T14 Gen 2i"),
+    "Apple MacBook Pro M3": ("Apple Inc.", "MacBook Pro (14-inch, M3, 2023)"),
+    "Dell PowerEdge R750": ("Dell Inc.", "PowerEdge R750"),
+    "HP ProLiant DL380": ("HPE", "ProLiant DL380 Gen10"),
+    "Microsoft Surface Pro 9": ("Microsoft Corporation", "Surface Pro 9"),
+    "Apple Mac mini M2": ("Apple Inc.", "Mac mini (M2, 2023)"),
+    "Custom Build": ("System manufacturer", "System Product Name"),
+    "VMware, Inc. - VMware7,1": ("VMware, Inc.", "VMware7,1"),
+    "VMware, Inc. - VMware6,7": ("VMware, Inc.", "VMware6,7"),
+}
+
+
+def fit_model(drawn: str, os_type: str, machine_type: str) -> str:
+    """The model a host of this kind has, derived from the model drawn for it.
+
+    A drawn model the kind can have is kept; otherwise the draw's position
+    picks one of the kind's own, so the choice stays seeded without a draw.
+    """
+    pool = MODELS_BY_KIND["macos" if os_type == "macos" else machine_type]
+    if drawn in pool:
+        return drawn
+    return pool[MACHINE_MODELS.index(drawn) % len(pool)]
+
+
+def fit_hostname_prefix(drawn: str, os_name: str, os_type: str, suffix: str) -> str:
+    """The hostname prefix this OS can carry, derived from the drawn one.
+
+    The prefix was drawn per OS *family*, so ``RHEL-OSJORU`` ran Ubuntu, an
+    Ubuntu box was named after RHEL and a ``SERVER-`` ran Windows 10. A drawn
+    prefix the OS can carry is kept; otherwise one is derived from the
+    hostname's own suffix, so no draw is added or removed.
+    """
+    pick = zlib.crc32(suffix.encode())
+    if os_type == "windows":
+        if "Server" in os_name:
+            return "SERVER"
+        return drawn if drawn != "SERVER" else ("DESKTOP", "LAPTOP", "WKSTN")[pick % 3]
+    if os_type == "linux":
+        allowed = (
+            ("UBUNTU", "SRV") if "Ubuntu" in os_name
+            else ("RHEL", "SRV") if "Red Hat" in os_name
+            else ("SRV",)
+        )
+        return drawn if drawn in allowed else allowed[pick % len(allowed)]
+    return drawn
 
 CPU_MODELS: list[str] = [
     "Intel(R) Core(TM) i7-1265U CPU @ 1.80GHz",
