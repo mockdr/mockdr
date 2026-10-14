@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 import secrets
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import cast
 
 from fastapi import Header, HTTPException, Query
@@ -105,13 +105,49 @@ def create_sentinel_token(
 def _resolve_token(token: str) -> dict | None:
     """Return the record of a valid token — client and audience — or None."""
     record = store.get(_SENTINEL_TOKEN_COLLECTION, token)
-    if not record:
-        return None
-    created_at = record.get("created_at", 0)
-    if time.time() - created_at > _TOKEN_TTL:
-        store.delete(_SENTINEL_TOKEN_COLLECTION, token)
+    if not record or _expired(record):
         return None
     return cast(dict, record)
+
+
+def _expired(record: dict) -> bool:
+    return time.time() - float(record.get("created_at", 0)) > _TOKEN_TTL
+
+
+def _arm_time(epoch: float) -> str:
+    """A UTC moment the way ARM's .NET message prints it: `1/18/2023 5:10:42 PM`."""
+    moment = datetime.fromtimestamp(epoch, UTC)
+    hour = moment.hour % 12 or 12
+    return f"{moment.month}/{moment.day}/{moment.year} {hour}:{moment:%M:%S %p}"
+
+
+def _refuse_expired_for_arm(request: Request, authorization: str | None) -> None:
+    """Refuse an expired token the way Azure Resource Manager does.
+
+    ARM answers 401 `ExpiredAuthenticationToken`, "The access token expiry
+    UTC time '1/18/2023 5:10:42 PM' is earlier than current UTC time
+    '1/18/2023 5:24:09 PM'." (as captured in Azure/azure-sdk-for-java#33112
+    and terraform-provider-azurerm#21812) — the code an SDK's retry policy
+    keys a token refresh on. The mock deleted the token on its first expired
+    use and answered every later use `AuthenticationFailed` "Invalid or
+    expired token", as if it had never been issued. The housekeeping sweep
+    forgets it a day after expiry.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return
+    record = store.get(_SENTINEL_TOKEN_COLLECTION, authorization[7:])
+    if not record or not _expired(record):
+        return
+    expiry = float(record.get("created_at", 0)) + _TOKEN_TTL
+    message = (
+        f"The access token expiry UTC time '{_arm_time(expiry)}' is earlier than "
+        f"current UTC time '{_arm_time(time.time())}'."
+    )
+    raise HTTPException(
+        status_code=401,
+        detail=build_arm_error("ExpiredAuthenticationToken", message),
+        headers=bearer_challenge(request, _TOKEN_PATH, "The access token has expired"),
+    )
 
 
 #: Where this mount issues the tokens it asks for.
@@ -169,6 +205,7 @@ async def require_sentinel_auth(
     Raises:
         HTTPException: 401 if the token is missing, invalid, or not for ARM.
     """
+    _refuse_expired_for_arm(request, authorization)
     record = _bearer_record(request, authorization)
     audience = str(record.get("audience", ""))
     if audience not in ARM_AUDIENCES:

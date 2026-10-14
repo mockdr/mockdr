@@ -1,5 +1,9 @@
 """Integration tests for Sentinel OAuth2 authentication."""
+import re
+
 from fastapi.testclient import TestClient
+
+from tests.clock import Clock
 
 SENTINEL_PREFIX = "/sentinel"
 
@@ -166,3 +170,45 @@ class TestOAuth2TokenExchange:
             f"{SENTINEL_PREFIX}/providers/Microsoft.SecurityInsights/operations",
         )
         assert resp.status_code == 200
+
+
+class TestAnExpiredTokenSaysSo:
+    """ARM refuses an expired token with `ExpiredAuthenticationToken`.
+
+    "The access token expiry UTC time '1/18/2023 5:10:42 PM' is earlier than
+    current UTC time '1/18/2023 5:24:09 PM'." (Azure/azure-sdk-for-java#33112,
+    terraform-provider-azurerm#21812). The mock deleted the token on its first
+    expired use and answered `AuthenticationFailed` "Invalid or expired
+    token", as if it had never been issued.
+    """
+
+    _INCIDENTS = (
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mockdr-rg"
+        "/providers/Microsoft.OperationalInsights/workspaces/mockdr-workspace"
+        "/providers/Microsoft.SecurityInsights/incidents"
+    )
+    _MESSAGE = re.compile(
+        r"The access token expiry UTC time '\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} [AP]M'"
+        r" is earlier than current UTC time '\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} [AP]M'\.",
+    )
+
+    def test_every_use_after_expiry_names_the_expiry(
+        self, client: TestClient, clock: Clock,
+    ) -> None:
+        headers = _bearer(_get_token(client))
+        url = f"{SENTINEL_PREFIX}{self._INCIDENTS}"
+        assert client.get(url, headers=headers).status_code == 200
+        clock.advance(3601)
+
+        for _ in range(2):
+            resp = client.get(url, headers=headers)
+            assert resp.status_code == 401
+            error = resp.json()["error"]
+            assert error["code"] == "ExpiredAuthenticationToken"
+            assert self._MESSAGE.fullmatch(error["message"]), error["message"]
+            assert 'error="invalid_token"' in resp.headers["www-authenticate"]
+
+    def test_a_token_never_issued_is_still_just_invalid(self, client: TestClient) -> None:
+        resp = client.get(f"{SENTINEL_PREFIX}{self._INCIDENTS}", headers=_bearer("nope"))
+        assert resp.status_code == 401
+        assert resp.json()["error"]["code"] == "AuthenticationFailed"
