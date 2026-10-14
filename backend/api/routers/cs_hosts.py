@@ -124,7 +124,10 @@ def get_hosts(
     return host_queries.get_host_entities(ids)
 
 
-@router.post("/devices/entities/devices-actions/v2")
+# gofalcon perform_action_v2_responses.go: PerformActionV2Accepted (202), and
+# no 200 among its answers — the action is queued for the sensor, which is
+# why containment shows `containment_pending` before it settles.
+@router.post("/devices/entities/devices-actions/v2", status_code=202)
 def device_action(
     action_name: str = Query(...),
     body: dict = Body(...),

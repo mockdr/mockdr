@@ -145,7 +145,7 @@ class TestGetHostGroupEntities:
 class TestCreateHostGroup:
     """Tests for POST /cs/devices/entities/host-groups/v1."""
 
-    def test_create_group_returns_200(self, client: TestClient) -> None:
+    def test_create_group_returns_201(self, client: TestClient) -> None:
         """The documented body is a `resources` collection, not a flat group."""
         headers = _cs_auth(client)
         resp = client.post(
@@ -157,7 +157,7 @@ class TestCreateHostGroup:
                 "group_type": "static",
             }]},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         resources = resp.json()["resources"]
         assert len(resources) == 1
         created = resources[0]

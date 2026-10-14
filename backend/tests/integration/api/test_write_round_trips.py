@@ -56,7 +56,7 @@ class TestFalconHostGroupsTakeACollection:
                 {"name": "zzz-two", "group_type": "static", "description": "second"},
             ],
         })
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         made = resp.json()["resources"]
         assert [g["name"] for g in made] == ["zzz-one", "zzz-two"]
         assert made[1]["description"] == "second"
@@ -1745,11 +1745,11 @@ class TestHidingAHostIsSomethingFalconCanUndo:
                               headers=cs).json()["resources"]
 
         assert visible() == 1
-        assert self._act(client, cs, "hide_host", device).status_code == 200
+        assert self._act(client, cs, "hide_host", device).status_code == 202
         assert visible() == 0
         assert [h["device_id"] for h in hidden()] == [device]
 
-        assert self._act(client, cs, "unhide_host", device).status_code == 200
+        assert self._act(client, cs, "unhide_host", device).status_code == 202
         assert visible() == 1
         assert hidden() == []
 

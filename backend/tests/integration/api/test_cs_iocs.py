@@ -146,7 +146,7 @@ class TestGetIocEntities:
 class TestCreateIoc:
     """Tests for POST /cs/iocs/entities/indicators/v1."""
 
-    def test_create_ioc_returns_200(self, client: TestClient) -> None:
+    def test_create_ioc_returns_201(self, client: TestClient) -> None:
         headers = _cs_auth(client)
         resp = client.post(
             "/cs/iocs/entities/indicators/v1",
@@ -163,7 +163,7 @@ class TestCreateIoc:
                 }],
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         resources = resp.json()["resources"]
         assert len(resources) == 1
         created = resources[0]

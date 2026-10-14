@@ -46,7 +46,8 @@ def get_iocs(
     return ioc_queries.get_ioc_entities(id_list)
 
 
-@router.post("/iocs/entities/indicators/v1")
+# gofalcon indicator_create_v1_responses.go: IndicatorCreateV1Created (201).
+@router.post("/iocs/entities/indicators/v1", status_code=201)
 def create_iocs(
     body: dict = Body(...),
     _: dict = Depends(require_cs_write),

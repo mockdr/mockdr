@@ -237,7 +237,7 @@ class TestDeviceActions:
             params={"action_name": "contain"},
             json={"ids": [host_id]},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
 
         # Verify the host status changed
         entity_resp = client.post(
@@ -279,7 +279,7 @@ class TestDeviceActions:
             params={"action_name": "lift_containment"},
             json={"ids": [host_id]},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
 
         entity_resp = client.post(
             "/cs/devices/entities/devices/v2",
@@ -333,7 +333,7 @@ class TestDeviceActions:
             params={"action_name": "hide_host"},
             json={"ids": [host_id]},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
 
         # Host should no longer appear in entities
         entity_resp = client.post(

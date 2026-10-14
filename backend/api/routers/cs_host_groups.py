@@ -56,7 +56,8 @@ def get_host_groups(
     return group_queries.get_host_group_entities(id_list)
 
 
-@router.post("/devices/entities/host-groups/v1")
+# gofalcon create_host_groups_responses.go: CreateHostGroupsCreated (201).
+@router.post("/devices/entities/host-groups/v1", status_code=201)
 def create_host_groups(
     body: dict = Body(...),
     _: dict = Depends(require_cs_write),
