@@ -1,6 +1,7 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
 from repository.user_repo import user_repo
+from utils.filter_selection import select_ids
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import USER_INTERNAL_FIELDS
 from utils.pagination import USER_CURSOR, build_list_response, paginate
@@ -66,3 +67,15 @@ def get_user_by_token(token: str) -> dict | None:
     if not user:
         return None
     return {"data": strip_fields(record_dict(user), USER_INTERNAL_FIELDS)}
+
+
+def select_user_ids(raw_filter: dict) -> list[str]:
+    """The ids of the users a write's ``filter`` selects, as the listing would.
+
+    Raises:
+        UnselectableFilterError: A member the listing cannot filter on.
+    """
+    return select_ids(
+        user_repo.list_all(), raw_filter,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/users", []),
+    )

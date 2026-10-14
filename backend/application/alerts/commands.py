@@ -1,4 +1,5 @@
 
+from application.scopes import filter_scope
 from application.webhooks import commands as webhook_commands
 from domain.webhook import ALERT_UPDATED
 from repository.alert_repo import alert_repo
@@ -56,6 +57,18 @@ def create_star_rule(body: dict, user_id: str | None) -> dict:
         Dict with ``data`` containing the new rule.
     """
     data = body.get("data") or body
+    scope = filter_scope(body.get("filter"))
+    if scope is not None and not data.get("scopeLevel"):
+        # The rule's scope is the body's `filter` (accountIds, siteIds,
+        # groupIds or tenant), which the DTO dropped: every rule was created
+        # `site`-level with no site, whatever scope was asked for.
+        data = {
+            "scopeLevel": scope.level, "scopeId": scope.scope_id,
+            "siteIds": list(scope.members.get("siteIds") or []),
+            "groupIds": list(scope.members.get("groupIds") or []),
+            "accountIds": [scope.account_id] if scope.account_id else [],
+            "siteId": scope.site_id, "accountId": scope.account_id, **data,
+        }
     rule_id = new_id()
     now = utc_now()
     rule = {
@@ -88,8 +101,10 @@ def create_star_rule(body: dict, user_id: str | None) -> dict:
         "creatorId": user_id or "",
         "updaterId": user_id or "",
         "scope": data.get("scopeLevel", "site"),
-        "siteId": (data.get("siteIds") or [""])[0],
-        "accountId": (data.get("accountIds") or [""])[0],
+        # The scope's own id, as every seeded rule carries it.
+        "scopeId": data.get("scopeId"),
+        "siteId": data.get("siteId") or (data.get("siteIds") or [""])[0],
+        "accountId": data.get("accountId") or (data.get("accountIds") or [""])[0],
         "generatedAlerts": 0,
         "lastAlertTime": None,
     }

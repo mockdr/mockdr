@@ -26,6 +26,8 @@ def create_ioc(body: dict) -> dict:
         source=body.get("source", "user"),
         externalId=body.get("externalId"),
         validUntil=body.get("validUntil"),
+        scope=body.get("scope"),
+        scopeId=body.get("scopeId"),
         creationTime=utc_now(),
         updatedAt=utc_now(),
     )

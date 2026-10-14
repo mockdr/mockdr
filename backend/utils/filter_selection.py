@@ -55,6 +55,11 @@ def select_ids(
         if raw_filter.get(member):
             return list(raw_filter[member])
     params = {k: v for k, v in raw_filter.items() if v is not None}
+    if not params:
+        # `{"ids": null}` is a filter with nothing in it, and apply_filters
+        # answers every record for that: a delete would take the collection.
+        msg = "The filter names no member with a value to select on."
+        raise UnselectableFilterError(msg)
     known = {spec.param for spec in specs} | set(ids_members)
     unknown = sorted(set(params) - known)
     if unknown:

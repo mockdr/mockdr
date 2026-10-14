@@ -6,6 +6,7 @@ from api.dto.requests import BulkDeleteBody
 from application.documented_filters import DOCUMENTED_FILTERS
 from application.exclusions import commands as exclusion_commands
 from application.exclusions import queries as exclusion_queries
+from application.scopes import filter_scope
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from repository.blocklist_repo import blocklist_repo
 from repository.exclusion_repo import exclusion_repo
@@ -203,6 +204,19 @@ def create_blocklist_entry(body: dict, current_user: dict = Depends(require_admi
     Accepts both flat and wrapped (``{"data": {...}}``) payloads per real S1 API.
     """
     data = body.get("data") or body
+    scope = filter_scope(body.get("filter")) if "data" in body else None
+    if scope is not None and not data.get("scope"):
+        # The scope is the body's `filter`, which was not read: every entry
+        # was created with an empty scope, matching no scope filter.
+        members = scope.members
+        data = {
+            "scope": {"siteIds": list(members.get("siteIds") or []),
+                      "groupIds": list(members.get("groupIds") or []),
+                      "accountIds": list(members.get("accountIds") or []),
+                      "tenant": bool(members.get("tenant"))},
+            "scopeName": scope.name, "scopePath": scope.path,
+            "siteId": scope.site_id or None, **data,
+        }
     now = utc_now()
     bid = new_id()
     record = {

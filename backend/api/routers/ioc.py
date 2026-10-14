@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import IocCreateBody, IocDeleteBody
 from application.ioc import commands as ioc_commands
 from application.ioc import queries as ioc_queries
+from application.scopes import filter_scope
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
+from utils.filter_selection import UnselectableFilterError
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Threat Intelligence / IOC"])
 
@@ -51,6 +54,12 @@ def create_ioc(body: dict = Body(...), _: dict = Depends(require_admin)) -> dict
     Accepts flat dict, ``{"data": {...}}``, or ``{"data": [{...}, ...]}``.
     """
     data = body.get("data", body)
+    scope = filter_scope(body.get("filter")) if "data" in body else None
+    if scope is not None:
+        # The indicators' scope is the body's `filter`, which was not read.
+        def scoped(item: dict) -> dict:
+            return {"scope": scope.level, "scopeId": scope.scope_id or None, **item}
+        data = [scoped(i) for i in data] if isinstance(data, list) else scoped(data)
     if isinstance(data, list):
         return ioc_commands.bulk_create_iocs(data)
     return ioc_commands.create_ioc(data)
@@ -74,7 +83,13 @@ def bulk_create_iocs(body: IocCreateBody, _: dict = Depends(require_admin)) -> d
 
 @router.delete("/threat-intelligence/iocs")
 def delete_iocs(body: IocDeleteBody, _: dict = Depends(require_admin)) -> dict:
-    """Delete a list of IOC indicators by uuid."""
-    filt = body.filter
-    ids = filt.get("uuids") or filt.get("ids", [])
+    """Delete the IOC indicators the body's ``filter`` selects, as the GET would."""
+    if not body.filter:
+        return ioc_commands.delete_iocs([])
+    try:
+        ids = ioc_queries.select_ioc_ids(body.filter)
+    except UnselectableFilterError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
     return ioc_commands.delete_iocs(ids)

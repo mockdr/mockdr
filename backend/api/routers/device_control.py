@@ -11,6 +11,8 @@ from application.device_control import commands as dc_commands
 from application.device_control import queries as dc_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
+from utils.filter_selection import UnselectableFilterError
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Device Control"])
 
@@ -19,8 +21,8 @@ router = APIRouter(tags=["Device Control"])
 def create_device_control_rule(
     body: DeviceControlCreateBody, _: dict = Depends(require_admin),
 ) -> dict:
-    """Create a new device control rule."""
-    return dc_commands.create_rule(body.data)
+    """Create a device control rule at the scope the body's ``filter`` names."""
+    return dc_commands.create_rule(body.data, body.filter)
 
 
 @router.put("/device-control/{rule_id}")
@@ -39,10 +41,20 @@ def update_device_control_rule(
 def delete_device_control_rules(
     body: DeviceControlDeleteBody, _: dict = Depends(require_admin),
 ) -> dict:
-    """Delete device control rules matching filter.ids."""
-    ids: list[str] = body.filter.get("ids") or []
-    if not ids:
+    """Delete the device control rules the body's ``filter`` selects.
+
+    ``ids`` names them; every other member selects as it does on the GET
+    (``siteIds``, ``ruleName``, ``interfaces``, ...). Only ``ids`` was read,
+    so a filter without it was refused as if the request named nothing.
+    """
+    if not body.filter:
         raise HTTPException(status_code=400, detail="filter.ids required")
+    try:
+        ids = dc_queries.select_rule_ids(body.filter)
+    except UnselectableFilterError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
     affected = dc_commands.delete_rules(ids)
     return {"data": {"affected": affected}}
 

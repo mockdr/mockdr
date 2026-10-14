@@ -1,6 +1,7 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
 from repository.ioc_repo import ioc_repo
+from utils.filter_selection import select_ids
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.nested import get_nested
 from utils.pagination import IOC_CURSOR, build_list_response, paginate
@@ -34,4 +35,17 @@ def list_iocs(params: dict, cursor: str | None, limit: int) -> dict:
         next_cursor,
         total,
         definition="v2_1.schemas_GetIndicatorSchema_many_200",
+    )
+
+
+def select_ioc_ids(raw_filter: dict) -> list[str]:
+    """The ids of the indicators a write's ``filter`` selects, as the listing would.
+
+    Raises:
+        UnselectableFilterError: A member the listing cannot filter on.
+    """
+    return select_ids(
+        ioc_repo.list_all(), raw_filter,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/threat-intelligence/iocs", []),
+        id_field="uuid", ids_members=("uuids", "ids"),
     )

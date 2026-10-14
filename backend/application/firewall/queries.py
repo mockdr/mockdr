@@ -1,6 +1,7 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
 from repository.firewall_repo import firewall_repo
+from utils.filter_selection import select_ids
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
 from utils.internal_fields import FIREWALL_INTERNAL_FIELDS
 from utils.nested import get_nested
@@ -29,4 +30,16 @@ def list_rules(params: dict, cursor: str | None, limit: int) -> dict:
     stripped = [strip_fields(record_dict(r), FIREWALL_INTERNAL_FIELDS) for r in page]
     return build_list_response(
         stripped, next_cursor, total, definition="firewall_control.schemas_FirewallSchema_many_200"
+    )
+
+
+def select_rule_ids(raw_filter: dict) -> list[str]:
+    """The ids of the firewall rules a write's ``filter`` selects, as the listing would.
+
+    Raises:
+        UnselectableFilterError: A member the listing cannot filter on.
+    """
+    return select_ids(
+        firewall_repo.list_all(), raw_filter,
+        FILTER_SPECS + DOCUMENTED_FILTERS.get("/firewall-control", []),
     )

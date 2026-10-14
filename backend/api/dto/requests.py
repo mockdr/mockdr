@@ -44,8 +44,9 @@ class FirewallDeleteBody(BaseModel):
 # ── Device Control ───────────────────────────────────────────────────────────
 
 class DeviceControlCreateBody(BaseModel):
-    """POST /device-control."""
+    """POST /device-control: the rule, and the scope it is created at."""
     data: dict = Field(default_factory=dict)
+    filter: dict = Field(default_factory=dict)
 
 
 class DeviceControlUpdateBody(BaseModel):
@@ -236,8 +237,9 @@ class DvCancelQueryBody(BaseModel):
 # ── STAR Rules ──────────────────────────────────────────────────────────────
 
 class StarRuleCreateBody(BaseModel):
-    """POST /cloud-detection/rules."""
+    """POST /cloud-detection/rules: the rule, and the scope it is created at."""
     data: dict = Field(default_factory=dict)
+    filter: dict = Field(default_factory=dict)
 
 
 # ── Proxy ───────────────────────────────────────────────────────────────────

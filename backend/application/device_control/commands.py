@@ -1,4 +1,5 @@
 
+from application.scopes import filter_scope
 from domain.device_control_rule import DeviceControlRule
 from repository.activity_repo import activity_repo
 from repository.device_control_repo import device_control_repo
@@ -9,8 +10,15 @@ from utils.serde import record_dict
 from utils.strip import strip_fields
 
 
-def create_rule(data: dict) -> dict:
-    """Create a new device control rule and persist it."""
+def create_rule(data: dict, scope_filter: dict | None = None) -> dict:
+    """Create a new device control rule and persist it.
+
+    The swagger requires a ``filter`` beside ``data`` -- the account, site or
+    group the rule is created at. It was not read, so every rule was created
+    ``global`` whatever scope was asked for; ``data``'s own ``scope`` still
+    wins where a client sends one.
+    """
+    data = _with_filter_scope(data, scope_filter)
     now = utc_now()
     rule = DeviceControlRule(
         id=new_id(),
@@ -95,3 +103,14 @@ def delete_rules(ids: list[str]) -> int:
             )
             affected += 1
     return affected
+
+
+def _with_filter_scope(data: dict, scope_filter: dict | None) -> dict:
+    """*data* with the scope the filter names, where *data* does not name one."""
+    scope = filter_scope(scope_filter)
+    if scope is None or data.get("scope"):
+        return data
+    return {
+        "scope": scope.level, "scopeId": scope.scope_id or None,
+        "scopeName": scope.name, "siteId": scope.site_id, **data,
+    }

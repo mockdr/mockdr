@@ -3,10 +3,13 @@ from starlette.requests import Request
 
 from api.auth import require_admin
 from api.dto.requests import GroupCreateBody, GroupMoveAgentsBody, GroupUpdateBody
+from application.agents.commands import resolve_agent_filter
 from application.groups import commands as group_commands
 from application.groups import queries as group_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
+from utils.filter_selection import UnselectableFilterError
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Groups"])
 
@@ -89,12 +92,22 @@ def move_agents_to_group(
     body: GroupMoveAgentsBody,
     _: dict = Depends(require_admin),
 ) -> dict:
-    """Move agents to the specified group."""
-    agent_ids: list[str] = (
-        body.filter.get("ids")
-        or body.agentIds
-        or []
-    )
+    """Move the agents the body's ``filter`` selects into the group.
+
+    The filter is an agent filter, resolved as the agent actions resolve it;
+    only ``ids`` was read, so ``{"filter": {"siteIds": [...]}}`` moved
+    nobody and answered ``affected: 0``.
+    """
+    try:
+        agent_ids: list[str] = (
+            (resolve_agent_filter(body.filter) if body.filter else [])
+            or body.agentIds
+            or []
+        )
+    except UnselectableFilterError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
     result = group_commands.move_agents_to_group(group_id, agent_ids)
     if result.get("error") == "not_found":
         raise HTTPException(status_code=404, detail="Group not found")

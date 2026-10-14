@@ -7,6 +7,8 @@ from application.users import commands as user_commands
 from application.users import queries as user_queries
 from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
+from utils.filter_selection import UnselectableFilterError
+from utils.vendor_errors import build_vendor_error
 
 router = APIRouter(tags=["Users"])
 
@@ -58,9 +60,16 @@ def create_user(body: UserCreateBody, _: dict = Depends(require_admin)) -> dict:
 def bulk_delete_users(body: UserBulkDeleteBody, _: dict = Depends(require_admin)) -> dict:
     """Bulk-delete users matching the filter.
 
-    Body: ``{"filter": {"ids": [...]}}``
+    Body: ``{"filter": {"ids": [...]}}``, or any member the GET filters on.
     """
-    ids = body.filter.get("ids", [])
+    if not body.filter:
+        return user_commands.bulk_delete_users([])
+    try:
+        ids = user_queries.select_user_ids(body.filter)
+    except UnselectableFilterError as exc:
+        raise HTTPException(
+            status_code=400, detail=build_vendor_error("sentinelone", 400, str(exc)),
+        ) from exc
     return user_commands.bulk_delete_users(ids)
 
 

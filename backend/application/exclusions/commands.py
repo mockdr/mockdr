@@ -1,4 +1,5 @@
 
+from application.scopes import filter_scope
 from domain.exclusion import Exclusion
 from repository.activity_repo import activity_repo
 from repository.exclusion_repo import exclusion_repo
@@ -28,6 +29,12 @@ def create_exclusion(body: dict, user_id: str | None) -> dict:
     if not isinstance(data, dict):
         msg = "data must be an object or a non-empty array of objects"
         raise InvalidExclusionError(msg)
+    scope = filter_scope(body.get("filter")) if "data" in body else None
+    if scope is not None and not data.get("scope"):
+        # The swagger's create body puts the scope in `filter`; it was not
+        # read, so every exclusion was created tenant-wide.
+        data = {"scope": scope.members, "scopeName": scope.name, "scopePath": scope.path,
+                "siteId": scope.site_id, **data}
     eid = new_id()
     exclusion = Exclusion(
         id=eid,
