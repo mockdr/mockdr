@@ -66,6 +66,14 @@ def list_collections(app: str | None = "search") -> dict:
         content: dict = {f"field.{k}": v for k, v in (coll.field_types or {}).items()}
         for k, v in (coll.accelerated_fields or {}).items():
             content[f"accelerated_fields.{k}"] = v if isinstance(v, str) else json.dumps(v)
+        # A collection is defined in an app's collections.conf, and its entry
+        # says so: the ACL names that app, shared app-wide, and the id and
+        # links sit under /servicesNS/nobody/<app>/ -- the namespace its data
+        # is served from. Every entry claimed the system namespace, so a
+        # client that read the app out of the listing (splunklib's
+        # Entity.path does) asked /servicesNS/nobody/system/.../data/<name>
+        # and was answered 404.
+        content["eai:appName"] = coll.app
         entries.append(
             build_splunk_entry(
                 coll.name,
@@ -73,7 +81,10 @@ def list_collections(app: str | None = "search") -> dict:
                 collection="storage/collections/config",
                 links=("_reload", "alternate", "disable", "edit", "list"),
                 fields=False,
-                acl_extra=_KV_ACL,
+                acl_extra={
+                    **_KV_ACL, "app": coll.app, "owner": coll.owner or "nobody",
+                    "sharing": "app",
+                },
             )
         )
     return build_splunk_envelope(entries, links=fixture_top_links("kv_config"))
