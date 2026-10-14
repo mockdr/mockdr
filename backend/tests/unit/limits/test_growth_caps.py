@@ -6,6 +6,7 @@ collections until the process died, and any route read an unbounded body.
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from repository.store import CAPS, store
@@ -59,3 +60,28 @@ def test_unmatched_paths_share_one_metrics_series(client: TestClient) -> None:
     assert len(series) == 1, series
     assert 'path="/{full_path:path}"' in series[0] or 'path="{unmatched}"' in series[0]
     assert series[0].endswith(" 5")
+
+
+def test_queries_and_actions_a_client_starts_are_capped(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deep Visibility queries, XQL queries, Defender and Cortex actions.
+
+    Each grew by one record per request a client made, for the life of the
+    process; a Deep Visibility query carries fifty generated events.
+    """
+    for name in ("dv_queries", "xdr_xql_queries", "mde_machine_actions", "xdr_actions"):
+        assert name in CAPS, name
+    monkeypatch.setitem(CAPS, "dv_queries", 3)
+    admin = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
+    ids = [
+        client.post("/web/api/v2.1/dv/init-query", headers=admin, json={
+            "query": "EventType = 'Process Creation'",
+            "fromDate": "2026-01-01T00:00:00.000Z", "toDate": "2030-01-01T00:00:00.000Z",
+        }).json()["data"]["queryId"]
+        for _ in range(5)
+    ]
+
+    assert store.count("dv_queries") == 3
+    assert store.get("dv_queries", ids[0]) is None
+    assert store.get("dv_queries", ids[-1]) is not None

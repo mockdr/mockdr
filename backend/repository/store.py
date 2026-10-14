@@ -26,6 +26,16 @@ CAPS: dict[str, int] = {
     "sentinel_oauth_tokens": 5_000,
     "es_tokens": 5_000,
     "es_refresh_tokens": 5_000,
+    # One record per query or action a client starts, kept by the products
+    # for their own retention and by nothing here: a soak of 3,600 mixed
+    # requests added about 100 of each, linearly, for the life of the
+    # process. A Deep Visibility query carries its fifty generated events
+    # (~100 kB), so it is capped hardest; a query past the cap answers as
+    # one the console no longer has. None of the four documents a count.
+    "dv_queries": 200,
+    "xdr_xql_queries": 5_000,
+    "mde_machine_actions": 10_000,
+    "xdr_actions": 10_000,
 }
 
 
