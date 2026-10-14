@@ -297,6 +297,20 @@ def hunting_window(timespan: str | None, now: datetime | None = None) -> tuple[d
     raise InvalidTimespanError(msg)
 
 
+def _action_parameters(body: dict) -> dict:
+    """An OData action body keyed by lower-cased parameter name.
+
+    The reference page writes the parameters ``Query`` and ``Timespan``; the
+    CSDL declares them ``query`` and ``timespan``, and the official SDKs,
+    generated from it, send exactly that (msgraph-sdk-python's
+    ``RunHuntingQueryPostRequestBody.serialize`` writes ``"query"`` and
+    ``"timespan"``). Graph binds action parameters without regard to case, so
+    both spellings run. Reading only ``Query`` answered every SDK hunt with
+    ``400 A recognized query is expected``.
+    """
+    return {str(k).lower(): v for k, v in body.items()}
+
+
 def run_hunting_query(body: dict) -> dict:
     """Execute a hunting query against the seeded hunting tables.
 
@@ -335,7 +349,11 @@ def run_hunting_query(body: dict) -> dict:
         KqlError: If the query cannot be parsed or names an unknown table.
         InvalidTimespanError: If ``Timespan`` is not a documented form.
     """
-    hunt = run_hunt(body, window=hunting_window(body.get("Timespan")))
+    params = _action_parameters(body)
+    hunt = run_hunt(
+        {"Query": params.get("query", "")},
+        window=hunting_window(params.get("timespan")),
+    )
     return {
         "@odata.context": (
             "https://graph.microsoft.com/v1.0/$metadata"
