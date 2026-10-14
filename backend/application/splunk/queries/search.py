@@ -300,6 +300,26 @@ def get_results(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     )
 
 
+def get_results_preview(sid: str, count: int = 100, offset: int = 0) -> dict | None:
+    """Return a job's preview results — the results so far.
+
+    "When the job is complete, this gives the same response as
+    /search/jobs/{search_id}/results" (REST API reference, search endpoints,
+    results_preview), so a finished job answers exactly that. The mock
+    computes every row at dispatch, so a job still walking its states in
+    polling mode previews the rows it has, with `preview: true` — which is
+    what splunklib's `JSONResultsReader.is_preview` reads to tell a running
+    job's answer from a final one.
+    """
+    result = get_results(sid, count, offset)
+    if result is None:
+        return None
+    job = search_job_repo.get(sid)
+    if job is not None and not _progress(job)[2]:
+        result = {**result, "preview": True}
+    return result
+
+
 def get_events(sid: str, count: int = 100, offset: int = 0) -> dict | None:
     """Return the events the search matched, before the pipeline reshaped them.
 

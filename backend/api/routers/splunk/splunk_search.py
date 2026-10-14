@@ -28,6 +28,7 @@ from application.splunk.queries.search import (
     get_events,
     get_job,
     get_results,
+    get_results_preview,
     get_summary,
     get_timeline,
     list_jobs,
@@ -386,9 +387,62 @@ def get_job_results(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
     """Get transformed search results."""
-    count = min(count, 10_000) if count > 0 else 0
     try:
-        result = get_results(sid, count, offset)
+        result = get_results(sid, _capped(count), offset)
+    except SearchJobFailedError as exc:
+        raise HTTPException(
+            status_code=400, detail={"messages": exc.messages},
+        ) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail={"messages": [
+            {"type": "FATAL", "text": "Unknown sid."},
+        ]})
+    return result
+
+
+#: `[restapi] maxresultrows` in limits.conf: "Maximum result rows to be
+#: returned by /events or /results getters from REST API. Default: 50000"
+#: (limits.conf spec, help.splunk.com). The mock capped at 10,000 for no
+#: reason it recorded, so a client paging in 50,000s got a fifth of a page.
+MAX_RESULT_ROWS = 50_000
+
+
+def _capped(count: int) -> int:
+    """`count`, held to maxresultrows; 0 ("all available") is held to it too."""
+    return MAX_RESULT_ROWS if count <= 0 else min(count, MAX_RESULT_ROWS)
+
+
+@router.get(
+    "/services/search/v2/jobs/{sid:splunksid}/results_preview",
+    operation_id="splunk_results_preview_v2_get",
+)
+@router.post(
+    "/services/search/v2/jobs/{sid:splunksid}/results_preview",
+    operation_id="splunk_results_preview_v2_post",
+)
+@router.get(
+    "/services/search/jobs/{sid:splunksid}/results_preview",
+    operation_id="splunk_results_preview_v1_get",
+)
+@router.post(
+    "/services/search/jobs/{sid:splunksid}/results_preview",
+    operation_id="splunk_results_preview_v1_post",
+)
+def get_job_results_preview(
+    sid: str,
+    count: int = Query(default=100),
+    offset: int = Query(default=0),
+    output_mode: str = "json",
+    current_user: dict = Depends(require_splunk_auth),
+) -> dict:
+    """Preview a job's results, which splunklib's `Job.preview()` asks for.
+
+    It had no route: v1 answered "Unknown sid." for every job, existing or
+    not, and v2 "Unknown endpoint." — so `Job.preview()` (GET on v1, POST on
+    v2, splunklib/client.py) failed against a job that was there.
+    """
+    try:
+        result = get_results_preview(sid, _capped(count), offset)
     except SearchJobFailedError as exc:
         raise HTTPException(
             status_code=400, detail={"messages": exc.messages},
@@ -415,9 +469,8 @@ def get_job_events(
     current_user: dict = Depends(require_splunk_auth),
 ) -> dict:
     """Get raw events from search job."""
-    count = min(count, 10_000) if count > 0 else 0
     try:
-        result = get_events(sid, count, offset)
+        result = get_events(sid, _capped(count), offset)
     except SearchJobFailedError as exc:
         raise HTTPException(
             status_code=400, detail={"messages": exc.messages},
