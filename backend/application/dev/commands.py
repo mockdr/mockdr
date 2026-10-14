@@ -300,6 +300,32 @@ _RAW_COLLECTIONS = {
     "splunk_fired_alerts",
     "graph_safe_links_policies",
     "graph_safe_attachments_policies",
+    # What a client wrote through the Elasticsearch index API: the indices it
+    # created (with their mappings, aliases and write counters) and the
+    # documents in them, keyed "{index}:{id}". Neither was registered, so
+    # with MOCKDR_PERSIST set — and across /_dev/export → /_dev/import — a
+    # client's own indices and documents were gone while the seeded alerts
+    # beside them survived, and the next search answered 404.
+    "es_indices",
+    "es_documents",
+}
+
+#: Store collections deliberately left out of the snapshot, and why. The
+#: coverage test holds every store collection to being either registered
+#: above or named here, so a new collection cannot be dropped by omission.
+_NOT_PERSISTED: dict[str, str] = {
+    # A scroll id or point in time is a handle on a search the node holds in
+    # memory; Elasticsearch loses them on restart too, and a client whose
+    # context is gone gets the 404 it already handles by searching again.
+    "es_search_contexts": (
+        "search contexts are node memory; a restart ends them in Elasticsearch too"
+    ),
+    # The mock's own traffic log behind GET /_dev/requests: a capped buffer
+    # of what this process served, not state a client created.
+    "request_logs": "the traffic log of this process, capped and diagnostic",
+    # Webhooks captured by POST /_dev/webhook-sink for a test to assert on
+    # while it runs; a capped capture buffer like the request log.
+    "webhook_sink": "a capped capture buffer for a running test",
 }
 
 # Collections whose values are raw bytes. `json.dump(default=str)` rendered

@@ -5,12 +5,15 @@ loading a snapshot skips seeding, that data never comes back — the failure is
 invisible until someone notices a vendor is empty after a restart. The coverage
 test below turns that into a red test the moment a new vendor is added.
 """
+import base64
 import dataclasses
 
 from fastapi.testclient import TestClient
 
 from application.dev.commands import (
+    _BINARY_COLLECTIONS,
     _MAPPING_COLLECTIONS,
+    _NOT_PERSISTED,
     _RAW_COLLECTIONS,
     _TYPED_COLLECTIONS,
     export_state,
@@ -18,23 +21,50 @@ from application.dev.commands import (
 )
 from repository.store import store
 
-_REGISTERED = set(_TYPED_COLLECTIONS) | set(_RAW_COLLECTIONS) | set(_MAPPING_COLLECTIONS)
+_REGISTERED = (
+    set(_TYPED_COLLECTIONS) | set(_RAW_COLLECTIONS)
+    | set(_MAPPING_COLLECTIONS) | set(_BINARY_COLLECTIONS)
+)
 
-# Ephemeral request-scoped collections, deliberately not persisted.
-_NOT_PERSISTED = {"request_log", "webhook_sink", "webhook_deliveries"}
+_ES_AUTH = {
+    "Authorization": "Basic " + base64.b64encode(b"elastic:mock-elastic-password").decode(),
+}
 
 
 class TestSnapshotCoverage:
-    """Every seeded collection must be part of the snapshot."""
+    """Every store collection must be part of the snapshot or excluded by name."""
 
-    def test_no_seeded_collection_is_left_out(self, fresh_seed: None) -> None:
-        seeded = {name for name, records in store._collections.items() if records}
-        missing = seeded - _REGISTERED - _NOT_PERSISTED
+    def test_no_collection_is_left_out(self, fresh_seed: None) -> None:
+        """Registered or explicitly excluded — every collection, seeded or not.
+
+        This looked only at collections the seed fills, so one that starts
+        empty and is written by clients — the Elasticsearch indices and
+        documents a client creates — slipped through, and was lost on every
+        restart with MOCKDR_PERSIST set and on every export → import.
+        """
+        missing = set(store._collections) - _REGISTERED - set(_NOT_PERSISTED)
         assert not missing, (
-            f"These collections are seeded but would be lost on restart with "
-            f"MOCKDR_PERSIST set: {sorted(missing)}. Add them to "
-            f"_TYPED_COLLECTIONS, _RAW_COLLECTIONS or _MAPPING_COLLECTIONS."
+            f"These collections would be lost on restart with MOCKDR_PERSIST "
+            f"set: {sorted(missing)}. Register them in _TYPED_COLLECTIONS, "
+            f"_RAW_COLLECTIONS, _MAPPING_COLLECTIONS or _BINARY_COLLECTIONS, "
+            f"or name them with a reason in _NOT_PERSISTED."
         )
+
+    def test_every_exclusion_names_a_real_collection(self) -> None:
+        """An exclusion for a collection the store does not have hides nothing.
+
+        The list named `request_log` (the store says `request_logs`) and
+        `webhook_deliveries` (not a store collection at all), so the real
+        traffic log was never actually excluded — it simply was not checked.
+        """
+        assert set(_NOT_PERSISTED) <= set(store._collections)
+        assert not set(_NOT_PERSISTED) & _REGISTERED
+        assert all(reason.strip() for reason in _NOT_PERSISTED.values())
+
+    def test_every_registered_name_is_a_real_collection(self) -> None:
+        """A misspelt registration persists nothing and fails silently."""
+        assert _REGISTERED <= set(store._collections), sorted(
+            _REGISTERED - set(store._collections))
 
     def test_typed_collections_hold_dataclasses(self, fresh_seed: None) -> None:
         """A typed entry that is not a dataclass cannot be reconstructed."""
@@ -80,3 +110,43 @@ class TestSnapshotRoundTrip:
             "username": "admin", "password": "mockdr-admin",
         })
         assert splunk.status_code == 200, "Splunk users vanished across a restore"
+
+
+class TestClientWrittenElasticsearchDataSurvives:
+    """An index and a document a client created come back from a snapshot."""
+
+    def test_index_and_document_round_trip_through_export_and_import(
+        self, client: TestClient, auth_headers: dict[str, str],
+    ) -> None:
+        created = client.put(
+            "/elastic/soar-cases",
+            json={"mappings": {"properties": {"title": {"type": "keyword"}}}},
+            headers=_ES_AUTH,
+        )
+        assert created.status_code == 200, created.text
+        written = client.put(
+            "/elastic/soar-cases/_doc/case-1?refresh=true",
+            json={"title": "phishing triage"}, headers=_ES_AUTH,
+        )
+        assert written.status_code in (200, 201), written.text
+
+        snapshot = client.get("/web/api/v2.1/_dev/export", headers=auth_headers)
+        assert snapshot.status_code == 200
+        client.post("/web/api/v2.1/_dev/reset", headers=auth_headers)
+        restored = client.post(
+            "/web/api/v2.1/_dev/import", json=snapshot.json(), headers=auth_headers,
+        )
+        assert restored.status_code == 200
+
+        doc = client.get("/elastic/soar-cases/_doc/case-1", headers=_ES_AUTH)
+        assert doc.status_code == 200, "the client's document was lost"
+        assert doc.json()["_source"] == {"title": "phishing triage"}
+        mapping = client.get("/elastic/soar-cases/_mapping", headers=_ES_AUTH)
+        assert mapping.status_code == 200, "the client's index was lost"
+        assert mapping.json()["soar-cases"]["mappings"]["properties"]["title"] == {
+            "type": "keyword"}
+        hits = client.post(
+            "/elastic/soar-cases/_search", json={"query": {"match_all": {}}},
+            headers=_ES_AUTH,
+        ).json()["hits"]
+        assert hits["total"]["value"] == 1
