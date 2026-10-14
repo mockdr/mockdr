@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import time
 
-from application import bridge
+from application import bridge, settling
 from repository.agent_repo import agent_repo
 from repository.store import store
 from utils.dt import utc_now
@@ -34,11 +34,6 @@ PENDING_FOR = {"connect": "connecting", "disconnect": "disconnecting"}
 
 #: What a transitional state settles into once the agent has acknowledged.
 _SETTLES_INTO = {"connecting": "connected", "disconnecting": "disconnected"}
-
-#: How long the agent takes to acknowledge, so a client that polls twice sees
-#: the state move rather than finding it already done.
-_SETTLE_SECONDS = 1.0
-
 
 #: Each in-flight transition by agent id: when it was asked for (epoch
 #: seconds), and the ``updatedAt`` it stamped on the agent — a record that no
@@ -75,12 +70,12 @@ def settled(agent: object) -> object:
     if target is None or getattr(agent, "updatedAt", None) != stamp:
         store.delete(_REQUESTS, agent_id)
         return agent
-    if time.time() - requested <= _SETTLE_SECONDS:
+    if not settling.has_answered(time.time() - requested):
         return agent
     store.delete(_REQUESTS, agent_id)
     agent.networkStatus = target  # type: ignore[attr-defined]
     agent_repo.save(agent)  # type: ignore[arg-type]
-    bridge.agent_changed(agent, at=requested + _SETTLE_SECONDS)
+    bridge.agent_changed(agent, at=requested + settling.SETTLE_SECONDS)
     return agent
 
 
@@ -93,13 +88,11 @@ def settle_all(agents: list) -> list:
 
 def settle_due() -> int:
     """Settle every transition whose agent has answered; how many settled."""
-    done = 0
+    agents = []
     for agent_id in list(store.get_all_with_keys(_REQUESTS)):
         agent = agent_repo.get(agent_id)
         if agent is None:
             store.delete(_REQUESTS, agent_id)
-            continue
-        before = agent.networkStatus
-        if getattr(settled(agent), "networkStatus", before) != before:
-            done += 1
-    return done
+        else:
+            agents.append(agent)
+    return settling.settle_each(agents, "networkStatus", None, settled)

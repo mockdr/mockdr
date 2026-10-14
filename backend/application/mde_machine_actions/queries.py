@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
+from application import settling
 from repository.mde_machine_action_repo import mde_machine_action_repo
 from utils.mde_fixtures import complete_mde
 from utils.mde_odata import apply_odata_filter, apply_odata_orderby
@@ -18,12 +19,12 @@ def _resource(record: dict) -> dict:
     return complete_mde(to_mde_resource(record, "actionId"), "machineaction")
 
 
-#: How long Defender takes to carry an action out, in the mock.
-_SETTLE_SECONDS = 1.0
+#: The state an action is in until Defender has carried it out.
+_PENDING = "Pending"
 
 
-def _auto_promote(action_dict: dict) -> dict:
-    """Auto-promote Pending actions to Succeeded after 1 second.
+def settled(action: object) -> object:
+    """Complete a Pending action once Defender has had time to carry it out.
 
     MDE actions are async; this simulates completion for test tooling. The
     action completes about a second after it was created whether or not
@@ -32,45 +33,33 @@ def _auto_promote(action_dict: dict) -> dict:
     run time, and its completion moved with whoever looked first.
 
     Args:
-        action_dict: Machine action dict to potentially promote.
+        action: The stored machine action.
 
     Returns:
-        The action dict, possibly with status updated to ``"Succeeded"``.
+        The action, ``Succeeded`` if its time has come.
     """
-    if action_dict.get("status") != "Pending":
-        return action_dict
-    created = action_dict.get("creationDateTimeUtc", "")
-    if not created:
-        return action_dict
+    if getattr(action, "status", None) != _PENDING:
+        return action
+    created = getattr(action, "creationDateTimeUtc", "") or ""
     try:
         created_dt = datetime.strptime(created, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
             tzinfo=UTC,
         )
     except (ValueError, TypeError):
-        return action_dict
-    if (datetime.now(UTC) - created_dt).total_seconds() <= _SETTLE_SECONDS:
-        return action_dict
-    completed = (created_dt + timedelta(seconds=_SETTLE_SECONDS)).isoformat(
-        timespec="milliseconds",
-    ).replace("+00:00", "Z")
-    action_dict["status"] = "Succeeded"
-    action_dict["lastUpdateDateTimeUtc"] = completed
-    # Persist the promotion
-    stored = mde_machine_action_repo.get(action_dict["actionId"])
-    if stored:
-        stored.status = "Succeeded"
-        stored.lastUpdateDateTimeUtc = completed
-        mde_machine_action_repo.save(stored)
-    return action_dict
+        return action
+    if not settling.has_answered((datetime.now(UTC) - created_dt).total_seconds()):
+        return action
+    action.status = "Succeeded"  # type: ignore[attr-defined]
+    action.lastUpdateDateTimeUtc = settling.answered_at(created)  # type: ignore[attr-defined]
+    mde_machine_action_repo.save(action)  # type: ignore[arg-type]
+    return action
 
 
 def settle_due() -> int:
     """Complete every pending action Defender would have finished; how many."""
-    done = 0
-    for action in mde_machine_action_repo.list_all():
-        if action.status == "Pending" and _auto_promote(record_dict(action))["status"] != "Pending":
-            done += 1
-    return done
+    return settling.settle_each(
+        mde_machine_action_repo.list_all(), "status", {_PENDING}, settled,
+    )
 
 
 def list_machine_actions(
@@ -93,7 +82,7 @@ def list_machine_actions(
     Returns:
         OData list response with paginated machine action records.
     """
-    records = [_resource(_auto_promote(record_dict(a))) for a in mde_machine_action_repo.list_all()]
+    records = [_resource(record_dict(settled(a))) for a in mde_machine_action_repo.list_all()]
     if filter_str:
         records = apply_odata_filter(records, filter_str)
     records = apply_odata_orderby(records, orderby)
@@ -119,7 +108,7 @@ def get_machine_action(action_id: str) -> dict | None:
     action = mde_machine_action_repo.get(action_id)
     if not action:
         return None
-    return _resource(_auto_promote(record_dict(action)))
+    return _resource(record_dict(settled(action)))
 
 
 def get_package_uri(action_id: str) -> dict | None:

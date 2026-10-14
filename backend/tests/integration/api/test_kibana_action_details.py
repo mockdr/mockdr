@@ -18,8 +18,6 @@ import base64
 import pytest
 from fastapi.testclient import TestClient
 
-from application.es_endpoints import commands as endpoint_commands
-
 KBN = {"Authorization": "Basic " + base64.b64encode(b"elastic:mock-elastic-password").decode(),
        "kbn-xsrf": "true"}
 
@@ -42,7 +40,7 @@ class TestIsolateThenPoll:
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         agent, hostname = _agent(client)
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         created = client.post("/kibana/api/endpoint/action/isolate", headers=KBN,
                               json={"endpoint_ids": [agent], "comment": "smoke"})
         assert created.status_code == 200, created.text
@@ -59,7 +57,7 @@ class TestIsolateThenPoll:
             "pending", False, False)
         assert data["agentState"][agent]["isCompleted"] is False
 
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 0.0)
         polled = client.get(f"/kibana/api/endpoint/action/{data['id']}", headers=KBN)
         assert polled.status_code == 200, polled.text
         done = polled.json()["data"]

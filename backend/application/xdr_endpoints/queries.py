@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from application import bridge
+from application import bridge, settling
 from domain.xdr_endpoint import (
     AGENT_ISOLATED,
     AGENT_PENDING_ISOLATION,
@@ -56,11 +56,6 @@ _SETTLES_INTO = {
     AGENT_PENDING_ISOLATION_CANCELLATION: AGENT_UNISOLATED,
 }
 
-#: How long the agent takes to acknowledge, so a client that polls twice sees
-#: the state move rather than finding it already done — the Falcon mount's
-#: containment waits the same.
-_SETTLE_SECONDS = 1.0
-
 #: The `isolate` filter takes the lower-case words (CoreIRApiModule sends
 #: `{"field": "isolate", "operator": "in", "value": ["isolated"]}`), while
 #: the endpoint serves the `AGENT_*` state.
@@ -82,7 +77,7 @@ def settle_isolation(endpoint: object, *, now: bool = False) -> object:
     if settled is None:
         return endpoint
     requested = getattr(endpoint, "isolation_requested_at", None) or 0
-    if not now and time.time() * 1000 - requested <= _SETTLE_SECONDS * 1000:
+    if not now and not settling.has_answered(time.time() - requested / 1000):
         return endpoint
     endpoint.is_isolated = settled  # type: ignore[attr-defined]
     endpoint.isolation_requested_at = None  # type: ignore[attr-defined]
@@ -91,7 +86,7 @@ def settle_isolation(endpoint: object, *, now: bool = False) -> object:
     xdr_endpoint_repo.save(endpoint)  # type: ignore[arg-type]
     # The agent answered about a second after it was asked, whoever noticed
     # and whenever: the SIEM gets the change dated then.
-    answered = requested / 1000 + _SETTLE_SECONDS if requested else None
+    answered = requested / 1000 + settling.SETTLE_SECONDS if requested else None
     bridge.xdr_endpoint_changed(
         endpoint, at=min(answered, time.time()) if answered else None,
     )
@@ -100,14 +95,9 @@ def settle_isolation(endpoint: object, *, now: bool = False) -> object:
 
 def settle_due() -> int:
     """Settle every endpoint whose agent has answered; how many settled."""
-    done = 0
-    for endpoint in xdr_endpoint_repo.list_all():
-        before = endpoint.is_isolated
-        if before not in _SETTLES_INTO:
-            continue
-        if getattr(settle_isolation(endpoint), "is_isolated", before) != before:
-            done += 1
-    return done
+    return settling.settle_each(
+        xdr_endpoint_repo.list_all(), "is_isolated", _SETTLES_INTO, settle_isolation,
+    )
 
 
 def _translated_filters(filters: object) -> object:

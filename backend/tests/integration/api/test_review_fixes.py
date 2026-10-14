@@ -13,8 +13,6 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from application.es_endpoints import commands as endpoint_commands
-
 SPLUNK_AUTH = {
     "Authorization": "Basic " + base64.b64encode(b"admin:mockdr-admin").decode(),
 }
@@ -184,7 +182,7 @@ class TestEndpointActions:
         # run can spend that second between the two calls below. This test
         # is about what a pending action is called, not about when it stops
         # being one.
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         agent = self._agent(client)
         client.post(
             # 8.15 serves this only under `/action/` — measured.

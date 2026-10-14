@@ -6,8 +6,6 @@ device actions, and response envelope structure.
 import pytest
 from fastapi.testclient import TestClient
 
-from application.cs_hosts import queries as host_queries
-
 
 def _cs_auth(client: TestClient) -> dict[str, str]:
     """Authenticate and return CS Bearer headers."""
@@ -227,7 +225,7 @@ class TestDeviceActions:
         about what the pending state is called, not about when it ends —
         `test_lift_containment` beside it holds the clock the same way.
         """
-        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         headers = _cs_auth(client)
         host_id = self._get_normal_host_id(client, headers)
 
@@ -260,7 +258,7 @@ class TestDeviceActions:
         # The state settles a second after the action, and a loaded test run
         # can spend that second between the two calls below. This test is
         # about which state it goes through, not about when it leaves it.
-        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         headers = _cs_auth(client)
         host_id = self._get_normal_host_id(client, headers)
 

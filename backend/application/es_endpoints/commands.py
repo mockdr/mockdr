@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
 
+from application import settling
 from domain.es_action_response import EsActionResponse
 from repository.es_action_response_repo import es_action_response_repo
 from repository.es_endpoint_repo import es_endpoint_repo
@@ -125,10 +125,6 @@ def run_action(
     return _create_action(agent_id, command, comment, params)
 
 
-#: How long the endpoint takes to answer, so a client that polls twice sees
-#: the action move rather than finding it already done.
-_SETTLE_SECONDS = 1.0
-
 #: What a pending action settles into. `failed | pending | successful` is the
 #: vocabulary Kibana validates `statuses` against — measured on 8.15, which
 #: refuses anything else and lets these three through.
@@ -145,36 +141,21 @@ def _settled(action: EsActionResponse) -> EsActionResponse:
     """
     if action.status != "pending":
         return action
-    waited = seconds_since(action.started_at)
-    if waited is None or waited <= _SETTLE_SECONDS:
+    if not settling.has_answered(seconds_since(action.started_at)):
         return action
     action.status = _SETTLED_STATUS
     # Done about a second after it started, not whenever someone looked:
     # stamped at the read, an action unread for a day completed a day late.
-    action.completed_at = _plus_seconds(action.started_at, _SETTLE_SECONDS) or utc_now()
+    action.completed_at = settling.answered_at(action.started_at) or utc_now()
     es_action_response_repo.save(action)
     return action
 
 
-def _plus_seconds(timestamp: str, seconds: float) -> str | None:
-    """*timestamp* moved *seconds* later, in the same ISO-8601 form; None if unreadable."""
-    try:
-        moment = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    later = moment + timedelta(seconds=seconds)
-    return later.isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
 def settle_due() -> int:
     """Complete every pending action the endpoint has answered; how many."""
-    done = 0
-    for action in es_action_response_repo.list_all():
-        if action.status == "pending" and _settled(action).status != "pending":
-            done += 1
-    return done
+    return settling.settle_each(
+        es_action_response_repo.list_all(), "status", {"pending"}, _settled,
+    )
 
 
 #: Kibana answers the two oldest actions with the action id at the top level

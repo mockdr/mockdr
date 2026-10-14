@@ -1,6 +1,7 @@
 """CrowdStrike Falcon Host query handlers (read-only)."""
 from __future__ import annotations
 
+from application.settling import has_answered, settle_each
 from repository.cs_host_repo import cs_host_repo
 from utils.cs_fql import apply_fql
 from utils.cs_pagination import decode_page_token, encode_page_token, paginate_cs
@@ -38,18 +39,13 @@ _SETTLES_INTO = {
     "lift_containment_pending": "normal",
 }
 
-#: How long the sensor takes to acknowledge, so a client that polls twice
-#: sees the state move rather than finding it already done.
-_SETTLE_SECONDS = 1.0
-
 
 def _settled(host: object) -> object:
     """Move a host out of a pending containment state once the wait is over."""
     settled = _SETTLES_INTO.get(str(getattr(host, "status", "")))
     if settled is None:
         return host
-    waited = seconds_since(str(getattr(host, "modified_timestamp", "") or ""))
-    if waited is None or waited <= _SETTLE_SECONDS:
+    if not has_answered(seconds_since(str(getattr(host, "modified_timestamp", "") or ""))):
         return host
     host.status = settled  # type: ignore[attr-defined]
     cs_host_repo.save(host)  # type: ignore[arg-type]
@@ -58,12 +54,7 @@ def _settled(host: object) -> object:
 
 def settle_due() -> int:
     """Settle every host whose sensor has acknowledged; how many settled."""
-    done = 0
-    for host in cs_host_repo.list_all():
-        before = host.status
-        if before in _SETTLES_INTO and getattr(_settled(host), "status", before) != before:
-            done += 1
-    return done
+    return settle_each(cs_host_repo.list_all(), "status", _SETTLES_INTO, _settled)
 
 
 def _public(host: object) -> dict:

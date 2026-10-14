@@ -22,9 +22,6 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from application.cs_hosts import queries as host_queries
-from application.es_endpoints import commands as endpoint_commands
-
 SPLUNK_AUTH = {"Authorization": "Basic " + base64.b64encode(b"admin:mockdr-admin").decode()}
 FORM = {"Content-Type": "application/x-www-form-urlencoded", **SPLUNK_AUTH}
 JSON_OUT = {"output_mode": "json"}
@@ -2879,11 +2876,11 @@ class TestAnActionThatSettles:
 
         # Held open, then closed, rather than raced: on a loaded runner the
         # second between the write and the read is not reliably a second.
-        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         self._act(client, headers, host_id, "contain")
         assert self._host_status(client, headers, host_id) == "containment_pending"
 
-        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 0.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 0.0)
         assert self._host_status(client, headers, host_id) == "contained"
 
     def test_lifting_containment_settles_too(
@@ -2892,13 +2889,13 @@ class TestAnActionThatSettles:
         headers = self._falcon(client)
         host_id = self._a_normal_host(client, headers)
 
-        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         self._act(client, headers, host_id, "contain")
         self._act(client, headers, host_id, "lift_containment")
         assert self._host_status(client, headers, host_id) == (
             "lift_containment_pending")
 
-        monkeypatch.setattr(host_queries, "_SETTLE_SECONDS", 0.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 0.0)
         assert self._host_status(client, headers, host_id) == "normal"
 
     def _agent(self, client: TestClient) -> str:
@@ -2913,7 +2910,7 @@ class TestAnActionThatSettles:
         # Hold the window open rather than racing it: a loaded runner spent
         # more than the settle second between the write and the read, and
         # read back an action that had already finished.
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         action = client.post("/kibana/api/endpoint/action/isolate",
                              headers=self.KBN,
                              json={"endpoint_ids": [agent], "comment": "x"}).json()
@@ -2921,7 +2918,7 @@ class TestAnActionThatSettles:
         assert action["data"]["isCompleted"] is False
         assert "completedAt" not in action["data"]
 
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 0.0)
         settled = client.get(f"/kibana/api/endpoint/action/{action['action']}",
                              headers=self.KBN).json()["data"]
         assert settled["status"] == "successful"
@@ -2936,7 +2933,7 @@ class TestAnActionThatSettles:
         agent = self._agent(client)
         client.post("/kibana/api/endpoint/action/isolate", headers=self.KBN,
                     json={"endpoint_ids": [agent], "comment": "x"})
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 0.0)
         listing = client.get("/kibana/api/endpoint/action", headers=self.KBN).json()
         assert {a["status"] for a in listing["data"]} <= {
             "failed", "pending", "successful"}
@@ -2946,7 +2943,7 @@ class TestAnActionThatSettles:
     ) -> None:
         """`action_status` counted upwards for ever."""
         agent = self._agent(client)
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         client.post("/kibana/api/endpoint/action/isolate", headers=self.KBN,
                     json={"endpoint_ids": [agent], "comment": "x"})
         pending = client.get("/kibana/api/endpoint/action_status",
@@ -2954,7 +2951,7 @@ class TestAnActionThatSettles:
                              params={"agent_ids": agent}).json()["data"][0]
         assert pending["pending_actions"].get("isolate", 0) >= 1
 
-        monkeypatch.setattr(endpoint_commands, "_SETTLE_SECONDS", 0.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 0.0)
         settled = client.get("/kibana/api/endpoint/action_status",
                              headers=self.KBN,
                              params={"agent_ids": agent}).json()["data"][0]

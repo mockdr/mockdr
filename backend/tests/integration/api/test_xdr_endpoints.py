@@ -228,7 +228,7 @@ class TestIsolationSettles:
     def test_isolate_is_pending_then_isolated(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        settle = "application.xdr_endpoints.queries._SETTLE_SECONDS"
+        settle = "application.settling.SETTLE_SECONDS"
         endpoint_id = self._unisolated_id(client)
         client.post(
             f"{XDR_PREFIX}/endpoints/isolate",

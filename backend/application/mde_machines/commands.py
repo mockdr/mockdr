@@ -107,12 +107,12 @@ def _refuse_if_pending(machine_id: str, action_type: str) -> None:
     Raises:
         MachineActionError: ``ActiveRequestAlreadyExists``.
     """
-    from application.mde_machine_actions.queries import _auto_promote  # noqa: PLC0415
+    from application.mde_machine_actions.queries import settled  # noqa: PLC0415
 
     for action in mde_machine_action_repo.list_all():
         if action.machineId != machine_id or action.type != action_type:
             continue
-        if _auto_promote(record_dict(action)).get("status") == "Pending":
+        if getattr(settled(action), "status", None) == "Pending":
             raise MachineActionError("ActiveRequestAlreadyExists", "Action is already in progress")
 
 

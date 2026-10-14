@@ -10,15 +10,13 @@ action now finds the agent in transit, and a read a moment later finds it
 settled, as the Falcon mount's containment does.
 
 The clock is held the way ``test_cs_hosts`` holds containment's: by moving
-``_SETTLE_SECONDS``, so a loaded run cannot spend the second between two
-calls.
+``application.settling.SETTLE_SECONDS``, so a loaded run cannot spend the
+second between two calls.
 """
 from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-
-from application.agents import network
 
 BASE = "/web/api/v2.1"
 S1 = {"Authorization": "ApiToken admin-token-0000-0000-000000000001"}
@@ -46,7 +44,7 @@ class TestInTransit:
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
         action: str, start: str, pending: str,
     ) -> None:
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         agent_id = _agent(client, start)
         resp = client.post(f"{BASE}/agents/actions/{action}", headers=S1,
                            json={"filter": {"ids": [agent_id]}})
@@ -56,7 +54,7 @@ class TestInTransit:
     def test_a_filter_finds_the_agent_in_transit(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         agent_id = _agent(client, "connected")
         client.post(f"{BASE}/agents/actions/disconnect", headers=S1,
                     json={"filter": {"ids": [agent_id]}})
@@ -81,7 +79,7 @@ class TestSettled:
         client.post(f"{BASE}/agents/actions/{action}", headers=S1,
                     json={"filter": {"ids": [agent_id]}})
         # The acknowledgement has arrived: any wait at all is long enough.
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", -1.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", -1.0)
         assert _status(client, agent_id) == final
 
     def test_the_count_sees_the_settled_state(
@@ -92,7 +90,7 @@ class TestSettled:
         agent_id = _agent(client, "connected")
         client.post(f"{BASE}/agents/actions/disconnect", headers=S1,
                     json={"filter": {"ids": [agent_id]}})
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", -1.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", -1.0)
         after = client.get(f"{BASE}/agents/count", headers=S1,
                            params={"networkStatuses": "disconnected"}).json()["data"]["total"]
         assert after == before + 1

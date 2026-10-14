@@ -74,10 +74,10 @@ class TestConnectDisconnect:
         from application.agents import network  # noqa: PLC0415
 
         aid = _first_agent_id()
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         execute_action("connect", {"ids": [aid]})
         assert network.settled(agent_repo.get(aid)).networkStatus == "connecting"
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", -1.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", -1.0)
         assert network.settled(agent_repo.get(aid)).networkStatus == "connected"
 
     def test_disconnect_is_disconnecting_until_acknowledged(
@@ -87,10 +87,10 @@ class TestConnectDisconnect:
         from application.agents import network  # noqa: PLC0415
 
         aid = _first_agent_id()
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", 3600.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", 3600.0)
         execute_action("disconnect", {"ids": [aid]})
         assert network.settled(agent_repo.get(aid)).networkStatus == "disconnecting"
-        monkeypatch.setattr(network, "_SETTLE_SECONDS", -1.0)
+        monkeypatch.setattr("application.settling.SETTLE_SECONDS", -1.0)
         assert network.settled(agent_repo.get(aid)).networkStatus == "disconnected"
 
     def test_disconnect_creates_activity(self) -> None:
