@@ -9,13 +9,16 @@ implements the subset required by SOAR integrations:
 - ``:>=``, ``:<=``, ``:>``, ``:<`` range operators
 - ``'*pattern*'`` wildcard (fnmatch)
 - ``['val1','val2']`` in-list
+- ``:~`` text match (case-insensitive contains), ``:!~`` its negation
+- ``'now-<n>d'`` / ``'now-<n>h'`` relative timestamps in range operators
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 from dataclasses import field as dc_field
-from fnmatch import fnmatch
+from datetime import UTC, datetime, timedelta
+from fnmatch import fnmatch, fnmatchcase
 from typing import Any
 
 from utils.nested import get_nested as _get_nested
@@ -32,7 +35,7 @@ class FqlClause:
         field:       Field name the clause targets, e.g. ``"hostname"``.
         operator:    One of ``"eq"``, ``"neq"``, ``"gte"``, ``"lte"``,
                      ``"gt"``, ``"lt"``, ``"in"``, ``"nin"``, ``"wildcard"``,
-                     ``"not_wildcard"``.
+                     ``"not_wildcard"``, ``"text"``, ``"not_text"``.
         values:      List of values for the clause (single-element for
                      scalar operators, multi-element for ``"in"`` /
                      ``"nin"`` / ``"or"``).
@@ -54,7 +57,7 @@ class FqlClause:
 # Groups: 1=field, 2=operator chars (e.g. ":!", ":>="), 3=value portion.
 _TERM_RE = re.compile(
     r"([A-Za-z_][A-Za-z0-9_.]*)"   # field name
-    r":(!=?|>=?|<=?|!>|!<|)"       # operator (may be empty = plain equals)
+    r":(!~|~|!=?|>=?|<=?|!>|!<|)"  # operator (may be empty = plain equals)
     r"(.+)"                         # value portion (quoted, bracketed, or bare)
 )
 
@@ -82,6 +85,10 @@ def _classify_operator(op_chars: str, value: str) -> str:
         # classified as `in`, so a query for the hosts *outside* a set
         # answered with exactly the hosts inside it.
         return "nin" if op_chars in ("!", "!=") else "in"
+    if op_chars == "~":
+        return "text"
+    if op_chars == "!~":
+        return "not_text"
     if op_chars == "!" or op_chars == "!=":
         return "neq"
     if op_chars == ">=":
@@ -333,6 +340,12 @@ def _match_clause(record: object, clause: FqlClause) -> bool:
     if clause.operator == "not_wildcard":
         return all(not fnmatch(c, v) for c in candidates for v in clause.values)
 
+    if clause.operator == "text":
+        return any(_text_match(c, v) for c in candidates for v in clause.values)
+
+    if clause.operator == "not_text":
+        return all(not _text_match(c, v) for c in candidates for v in clause.values)
+
     if clause.operator == "in":
         return any(c in clause.values for c in candidates)
 
@@ -347,6 +360,24 @@ def _match_clause(record: object, clause: FqlClause) -> bool:
         return True
 
     return False
+
+
+def _text_match(candidate: str, value: str) -> bool:
+    """Falcon's ``~``: a case-insensitive text match.
+
+    CrowdStrike's own FQL guides in falcon-mcp describe it as "text match
+    (case insensitive)" (``resources/hosts.py``, ``resources/detections.py``,
+    with ``!~`` as "not text match") and "contains match, case insensitive"
+    (``resources/correlation_rules.py``); PSFalcon's Filtering-Results page
+    lists ``~`` as "Case insensitive" and pairs it with a trailing star,
+    ``name:~'value*'``. The operator was not in the term grammar at all, so
+    ``hostname:~'server'`` was refused as an invalid expression. A value
+    carrying a star is matched as a pattern, otherwise as a substring.
+    """
+    text, wanted = candidate.lower(), value.lower()
+    if "*" in wanted or "?" in wanted:
+        return fnmatchcase(text, wanted)
+    return wanted in text
 
 
 def _candidate_values(field_val: Any) -> list[str]:
@@ -379,6 +410,19 @@ def _compare_range(field_val: Any, target: str, op: str) -> bool:
     if field_val is None:
         return False
 
+    moment = _relative_moment(target)
+    if moment is not None:
+        recorded = _as_datetime(field_val)
+        if recorded is None:
+            return False
+        if op == "gte":
+            return recorded >= moment
+        if op == "lte":
+            return recorded <= moment
+        if op == "gt":
+            return recorded > moment
+        return recorded < moment
+
     # Try numeric comparison.
     try:
         fv = float(str(field_val))
@@ -402,6 +446,36 @@ def _compare_range(field_val: Any, target: str, op: str) -> bool:
     if op == "gt":
         return fs > target
     return fs < target
+
+
+#: ``now-24h``, ``now-7d``: the relative form Falcon's timestamp filters take.
+#: CrowdStrike's falcon-mcp FQL guides document it for alerts
+#: (``timestamp:>'now-24h'``, "Relative dates supported ... (lowercase
+#: 'now', quoted)", ``resources/detections.py``) and hosts
+#: (``last_seen:>'now-7d'``, ``last_seen:>'now-1h'``, ``resources/hosts.py``),
+#: with days and hours as the units ("'now-Nd', 'now-Nh'",
+#: ``resources/intel.py``). Compared as a string, ``'now-24h'`` sorts after
+#: every ISO timestamp, so ``>`` matched nothing and ``<`` everything.
+_RELATIVE_RE = re.compile(r"^now-(\d+)([dh])$")
+_UNITS = {"d": "days", "h": "hours"}
+
+
+def _relative_moment(target: str) -> datetime | None:
+    """The instant ``now-<n><unit>`` names, or None if *target* is not one."""
+    m = _RELATIVE_RE.match(target.strip())
+    if not m:
+        return None
+    return datetime.now(UTC) - timedelta(**{_UNITS[m.group(2)]: int(m.group(1))})
+
+
+def _as_datetime(value: Any) -> datetime | None:  # noqa: ANN401 - any record value
+    """A record's timestamp as an aware datetime, or None if it is not one."""
+    text = str(value).strip()
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def apply_fql(records: list, fql: str) -> list:
