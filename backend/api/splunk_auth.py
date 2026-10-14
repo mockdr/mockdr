@@ -38,8 +38,17 @@ from utils.splunk.response import build_splunk_error
 
 _SPLUNK_SESSION_COLLECTION = "splunk_sessions"
 
-# Session expiry in seconds (default 8 hours, configurable via env var)
-_SESSION_TTL_SECONDS = int(os.environ.get("SPLUNK_SESSION_TTL_SECONDS", str(8 * 3600)))
+#: How long a session key may go unused before splunkd forgets it.
+#:
+#: server.conf `[general] sessionTimeout`: "The amount of time before a user
+#: session times out", default one hour (Splunk 10.4 server.conf.spec) — a
+#: timeout of *idle* time, "the maximum idle time in the interaction"
+#: (Admin Manual, "Configure user session timeouts"), which every use
+#: restarts. The mock expired a key eight hours after login however busy it
+#: was, so a SOAR poller that logs in once and polls every minute was
+#: refused mid-run where splunkd keeps its session alive, while one that sat
+#: idle for seven hours was still let in.
+_SESSION_TTL_SECONDS = int(os.environ.get("SPLUNK_SESSION_TTL_SECONDS", "3600"))
 
 
 def create_session(username: str) -> str:
@@ -62,20 +71,40 @@ def create_session(username: str) -> str:
 def _resolve_session(session_key: str) -> str | None:
     """Return the username for a valid session key, or None.
 
-    Checks session age against ``_SESSION_TTL_SECONDS``. Expired sessions
-    are deleted and treated as invalid.
+    A session idle for longer than ``_SESSION_TTL_SECONDS`` is deleted and
+    treated as invalid; any other use restarts its idle clock.
     """
     record = store.get(_SPLUNK_SESSION_COLLECTION, session_key)
     if not record:
         return None
 
-    created_at = record.get("created_at")
-    if created_at is not None and (time.time() - created_at) > _SESSION_TTL_SECONDS:
-        # Session has expired — remove it and reject
+    now = time.time()
+    if session_expired(record, now):
         store.delete(_SPLUNK_SESSION_COLLECTION, session_key)
         return None
-
+    # A use restarts the idle clock. Written into the live record rather than
+    # saved, so a busy poller is not a store write — and a persistence
+    # flush — per request; the next save carries it.
+    record["last_used"] = now
     return cast(str, record["username"])
+
+
+def session_expired(record: dict, now: float) -> bool:
+    """Whether a session has been idle longer than ``sessionTimeout``."""
+    last = record.get("last_used", record.get("created_at"))
+    return last is not None and (now - float(last)) > _SESSION_TTL_SECONDS
+
+
+def reap_sessions(now: float | None = None) -> int:
+    """Forget every session idle past its timeout; how many were forgotten."""
+    moment = time.time() if now is None else now
+    idle = [
+        key for key, record in store.get_all_with_keys(_SPLUNK_SESSION_COLLECTION).items()
+        if isinstance(record, dict) and session_expired(record, moment)
+    ]
+    for key in idle:
+        store.delete(_SPLUNK_SESSION_COLLECTION, key)
+    return len(idle)
 
 
 # ── Public dependencies ──────────────────────────────────────────────────

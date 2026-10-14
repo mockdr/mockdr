@@ -33,7 +33,8 @@ All three auth schemes are supported:
   `analyst`, `viewer`) stored in the `splunk_users` collection.
 - **Bearer sessions** are created via `POST /services/auth/login` and stored
   in the `splunk_sessions` collection with a configurable TTL
-  (`SPLUNK_SESSION_TTL_SECONDS`, default 8 hours).
+  (`SPLUNK_SESSION_TTL_SECONDS`, default one hour of idle time, as
+  splunkd's `sessionTimeout`; every use restarts it).
 - **HEC tokens** are stored in the `splunk_hec_tokens` collection and
   validated by a separate `require_hec_auth` dependency.
 

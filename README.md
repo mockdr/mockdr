@@ -708,7 +708,7 @@ All data is **in-memory** by default -- mutations survive until server restart o
 | `MOCKDR_SPLUNK_HEC_QUERY_STRING_AUTH` | `false`                 | Whether HEC honours its token as `?token=`, mirroring `inputs.conf`'s `allowQueryStringAuth`. Off by default because that is splunkd's default: a valid token sent this way is refused with `400 {"code": 16}` until the setting is on |
 | `MOCKDR_MAX_BODY_BYTES` | `16777216` (16 MiB)                        | Largest request body accepted; a larger one answers `413` before any byte is read, as a reverse proxy in front of the real products would |
 | `MOCKDR_PUBLIC`      | `false`                                       | Set `true` on an instance anyone can reach (the Render blueprint does). Refuses the recording proxy, outbound webhooks, `POST /_dev/import`, `POST /_dev/rate-limit` and `POST /_dev/fault-injection` with `403`, and makes no outbound request at all; the mocked APIs, `/_dev/reset` and scenarios work as usual. See [SECURITY.md](SECURITY.md#running-a-shared-or-public-instance) |
-| `SPLUNK_SESSION_TTL_SECONDS` | `28800`                               | Lifetime of a Splunk session key from `/services/auth/login` |
+| `SPLUNK_SESSION_TTL_SECONDS` | `3600`                                | How long a Splunk session key from `/services/auth/login` may go unused before it is refused — splunkd's `sessionTimeout`, an idle timeout every use restarts |
 | `ES_ADMIN_PASSWORD`, `ES_ANALYST_PASSWORD`, `ES_VIEWER_PASSWORD` | `mock-elastic-password`, `mock-analyst-password`, `mock-viewer-password` | Passwords of the three Elasticsearch users; the only credentials that can be changed without editing a seeder |
 
 ## Middleware Stack
