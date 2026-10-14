@@ -186,14 +186,21 @@ def fill(path, mount):
 
 #: Routes whose whole purpose is to answer whatever they are given, so a
 #: "refusal" from them is the upstream's and not this mount's.
-_PASSTHROUGH = re.compile(r"/console/proxy|/oauth2/|/token$|/_bulk|/_msearch")
+_PASSTHROUGH = re.compile(r"/console/proxy|/token$|/_bulk|/_msearch")
+
+#: The Entra authority's own routes — token, discovery document, key set.
+#: They are login.microsoftonline.com's, not the API's, and refuse in OAuth's
+#: flat `{error, error_description, error_codes}` shape rather than the API's
+#: `error.code` envelope; tests/integration/api/test_entra_token_endpoints.py
+#: holds them to that shape.
+_ENTRA_AUTHORITY = re.compile(r"/oauth2/|/v2\.0/\.well-known/|/discovery/v2\.0/keys$")
 
 
 def sweep():
     """Every route, with the refusals a client actually meets."""
     for path, operations in app.openapi()["paths"].items():
         mount = path.split("/")[1]
-        if mount not in AUTH or _PASSTHROUGH.search(path):
+        if mount not in AUTH or _PASSTHROUGH.search(path) or _ENTRA_AUTHORITY.search(path):
             continue
         headers = AUTH[mount]
         url = fill(path, mount)
