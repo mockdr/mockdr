@@ -7,6 +7,13 @@ Elastic Security uses two distinct response formats:
 """
 from __future__ import annotations
 
+#: The release this mock's Elasticsearch and Kibana behaviour is measured
+#: against — `conformance/compose.yml` runs exactly these images. The banner
+#: said 8.12.0 while every measurement was on 8.15.0, so a client gating a
+#: feature on the version read the wrong one.
+ES_VERSION = "8.15.0"
+KIBANA_VERSION = "8.15.0"
+
 
 def build_es_search_response(
     hits: list[dict],

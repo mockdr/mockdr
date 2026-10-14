@@ -26,6 +26,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from repository.store import store
 from utils.es_response import (
     ES_WWW_AUTHENTICATE,
+    KIBANA_VERSION,
     build_es_auth_error,
     build_es_error_response,
     build_kbn_error_response,
@@ -343,8 +344,9 @@ async def require_kbn_xsrf(request: Request) -> None:
     if request.method.upper() in ("GET", "HEAD", "OPTIONS"):
         return
 
-    xsrf = request.headers.get("kbn-xsrf") or request.headers.get("kbn-version")
-    if not xsrf:
+    # Presence is the test, not a value: `XSRF_HEADER in request.headers`
+    # (lifecycle_handlers.ts, kibana v8.15.0), so an empty header passes.
+    if "kbn-xsrf" not in request.headers and "kbn-version" not in request.headers:
         # Always Kibana's Boom envelope, never the Security Solution one.
         # The xsrf check is a platform pre-handler that fires before the
         # request is routed, so it has no idea which plugin owns the path —
@@ -356,3 +358,36 @@ async def require_kbn_xsrf(request: Request) -> None:
                 400, "Request must contain a kbn-xsrf header.",
             ),
         )
+
+
+async def refuse_stale_kbn_version(request: Request) -> None:
+    """Refuse a `kbn-version` that is not this Kibana's own, on every verb.
+
+    `createVersionCheckPostAuthHandler` (core-http-server-internal, kibana
+    v8.15.0), registered whenever `server.versioned.strictClientVersionCheck`
+    is on — its default. The header is how Kibana's browser client says which
+    build it is, and a mismatch is refused with the expected and received
+    versions as `attributes`. mockdr took any value, so a client sending the
+    version of a Kibana it was not talking to never found out.
+
+    It runs after authentication, as a post-auth handler does: a request whose
+    credentials fail is left for the route's own 401.
+
+    Raises:
+        HTTPException: 400 naming both versions.
+    """
+    got = request.headers.get("kbn-version")
+    if got is None or got == KIBANA_VERSION:
+        return
+    try:
+        await require_es_auth(request, request.headers.get("authorization"))
+    except HTTPException:
+        return
+    detail = build_kbn_error_response(
+        400,
+        'Browser client is out of date, please refresh the page ("kbn-version" '
+        f'header was "{got}" but should be "{KIBANA_VERSION}")',
+    )
+    raise HTTPException(status_code=400, detail={
+        **detail, "attributes": {"expected": KIBANA_VERSION, "got": got},
+    })

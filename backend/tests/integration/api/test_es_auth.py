@@ -361,12 +361,48 @@ class TestErrorEnvelopeConformance:
         """Kibana's guard passes when either header is present."""
         resp = client.post(
             "/kibana/api/cases",
-            headers={**ES_BASIC_AUTH, "kbn-version": "8.19.0"},
+            headers={**ES_BASIC_AUTH, "kbn-version": "8.15.0"},
             json={"title": "x", "description": "y", "tags": [], "owner": "securitySolution",
                   "connector": {"id": "none", "name": "none", "type": ".none", "fields": None},
                   "settings": {"syncAlerts": True}},
         )
         assert resp.status_code != 400
+
+    def test_an_empty_kbn_xsrf_still_satisfies_the_check(self, client: TestClient) -> None:
+        """Kibana tests the header's presence, not its value (lifecycle_handlers.ts)."""
+        resp = client.post(
+            "/kibana/api/detection_engine/signals/search",
+            headers={**ES_BASIC_AUTH, "kbn-xsrf": ""}, json={"size": 1},
+        )
+        assert resp.status_code == 200
+
+    def test_a_kbn_version_that_is_not_this_kibanas_is_refused(
+        self, client: TestClient,
+    ) -> None:
+        """A stale browser build is refused on every verb, with both versions.
+
+        `createVersionCheckPostAuthHandler` (kibana v8.15.0), on by default
+        through `server.versioned.strictClientVersionCheck`. mockdr took any
+        value — and answered this test's earlier `8.19.0` as if it matched.
+        """
+        for method in ("GET", "POST"):
+            resp = client.request(method, "/kibana/api/cases/_find" if method == "GET"
+                                  else "/kibana/api/detection_engine/signals/search",
+                                  headers={**ES_BASIC_AUTH, "kbn-version": "8.19.0"},
+                                  json=None if method == "GET" else {"size": 1})
+            assert resp.status_code == 400, method
+            assert resp.json() == {
+                "statusCode": 400, "error": "Bad Request",
+                "message": 'Browser client is out of date, please refresh the page '
+                           '("kbn-version" header was "8.19.0" but should be "8.15.0")',
+                "attributes": {"expected": "8.15.0", "got": "8.19.0"},
+            }
+
+    def test_an_unauthenticated_stale_version_is_still_the_401(
+        self, client: TestClient,
+    ) -> None:
+        resp = client.get("/kibana/api/cases/_find", headers={"kbn-version": "1.0.0"})
+        assert resp.status_code == 401
 
     def test_missing_xsrf_is_400_with_boom_envelope(self, client: TestClient) -> None:
         resp = client.post(

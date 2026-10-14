@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 from main import app
 
 AUTH = {"Authorization": "Basic " + base64.b64encode(b"elastic:mock-elastic-password").decode()}
+XSRF = {**AUTH, "kbn-xsrf": "true"}
 
 
 @pytest.fixture(scope="module")
@@ -176,7 +177,7 @@ class TestTheRestOfThePlatform:
                           params={"id": "nope"}).json() == {}
 
     def test_the_console_proxy_reaches_elasticsearch(self, client: TestClient) -> None:
-        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+        response = client.post("/kibana/api/console/proxy", headers=XSRF,
                                params={"path": "/.siem-signals-default/_count",
                                        "method": "GET"})
         assert response.status_code == 200
@@ -185,7 +186,7 @@ class TestTheRestOfThePlatform:
         assert '"count" : ' in response.text
 
     def test_and_relays_what_elasticsearch_said(self, client: TestClient) -> None:
-        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+        response = client.post("/kibana/api/console/proxy", headers=XSRF,
                                params={"path": "/no-such-index/_search",
                                        "method": "GET"})
         # The proxy answers 200 whatever Elasticsearch said; the error is in
@@ -194,7 +195,20 @@ class TestTheRestOfThePlatform:
         assert "index_not_found_exception" in response.text
 
     def test_the_proxy_needs_a_path(self, client: TestClient) -> None:
-        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+        response = client.post("/kibana/api/console/proxy", headers=XSRF,
                                params={"method": "GET"})
         assert response.status_code == 400
         assert "query.path" in response.json()["message"]
+
+    def test_the_proxy_needs_kbn_xsrf(self, client: TestClient) -> None:
+        """It was served without; Kibana refuses it before the handler runs.
+
+        The console's proxy route sets no `xsrfRequired: false`
+        (routes/api/console/proxy/index.ts, kibana v8.15.0) and the default
+        `server.xsrf.allowlist` is empty, so the post-auth xsrf handler
+        answers first — even ahead of the missing `path`.
+        """
+        response = client.post("/kibana/api/console/proxy", headers=AUTH,
+                               params={"method": "GET"})
+        assert response.status_code == 400
+        assert response.json()["message"] == "Request must contain a kbn-xsrf header."

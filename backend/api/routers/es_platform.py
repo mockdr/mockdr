@@ -17,10 +17,10 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 
-from api.es_auth import optional_es_auth, require_es_auth
+from api.es_auth import optional_es_auth, require_es_auth, require_kbn_xsrf
 from application.es_endpoints import queries as endpoint_queries
 from config import APP_VERSION
-from utils.es_response import build_kbn_error_response
+from utils.es_response import KIBANA_VERSION, build_kbn_error_response
 from utils.kibana_query import (
     EXCESS,
     INVALID_KEYS,
@@ -31,7 +31,7 @@ from utils.kibana_query import (
 
 router = APIRouter(tags=["Kibana Platform"])
 
-_KIBANA_VERSION = "8.12.0"
+_KIBANA_VERSION = KIBANA_VERSION
 
 
 @router.get("/api/status", dependencies=[refuses_unknown("v8format")])
@@ -49,7 +49,7 @@ async def kibana_status(request: Request) -> dict:
         "uuid": "mockdr-0000-0000-0000-000000000001",
         "version": {
             "number": _KIBANA_VERSION,
-            "build_hash": "a1b2c3d4e5f6",
+            "build_hash": "8aa0b59da12c996e3048d8875446667ee6e15c7f",  # the v8.15.0 tag
             "build_number": 68900,
             "build_snapshot": False,
             # "traditional" is what a self-managed Kibana 8 reports; the
@@ -361,6 +361,11 @@ async def console_proxy(
     path: str | None = Query(default=None),
     method: str = Query(default="GET"),
     _: dict = Depends(require_es_auth),
+    # The proxy route does not opt out of the xsrf check (console plugin,
+    # routes/api/console/proxy/index.ts at v8.15.0, sets no `xsrfRequired`)
+    # and the default `server.xsrf.allowlist` is empty, so it needs the
+    # header — checked after authentication, where Kibana checks it.
+    __: None = Depends(require_kbn_xsrf),
 ) -> Response:
     """Talk to Elasticsearch through Kibana, the way the console does.
 

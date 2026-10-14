@@ -22,6 +22,7 @@ from api.middleware.compression import CompressionMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.es_content_type import ElasticContentTypeMiddleware
+from api.middleware.kibana_space import KibanaSpaceMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
@@ -351,6 +352,7 @@ from utils.es_response import (
     build_es_index_not_found,
     build_kbn_error_response,
 )
+from api.es_auth import refuse_stale_kbn_version
 from utils.kibana_content_type import refuse_unreadable_content_type
 from utils.kibana_repeated_query import refuse_repeated_query_members
 from utils.logging import setup_logging
@@ -455,6 +457,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(KibanaApiVersionMiddleware)
 # Before routing: the cluster refuses the header without looking at the body.
 app.add_middleware(ElasticContentTypeMiddleware)
+# Before routing and before everything that reads a Kibana path: the spaces
+# plugin strips `/s/{space}` on request, ahead of every other handler.
+app.add_middleware(KibanaSpaceMiddleware)
 # Before routing, and before the namespace rewrite reads the path.
 app.add_middleware(TrailingSlashMiddleware)
 app.add_middleware(RateLimitMiddleware)
@@ -1132,6 +1137,8 @@ for _es_module in [
     app.include_router(
         _es_module.router, prefix=KBN_PREFIX,
         dependencies=[
+            # A post-auth handler, ahead of Hapi's payload parsing.
+            Depends(refuse_stale_kbn_version),
             Depends(refuse_unreadable_content_type),
             Depends(refuse_repeated_query_members),
         ],

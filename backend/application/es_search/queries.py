@@ -39,7 +39,7 @@ from utils.es_query import (
     validate_search_body,
     wrap_as_hits,
 )
-from utils.es_response import build_es_index_not_found, build_es_search_response
+from utils.es_response import ES_VERSION, build_es_index_not_found, build_es_search_response
 from utils.id_gen import new_hex
 from utils.nested import get_nested
 from utils.serde import record_dict
@@ -1810,14 +1810,17 @@ def cluster_info() -> dict:
         "name": "mock-es-node-01",
         "cluster_name": "mockdr-elastic",
         "cluster_uuid": "mock-cluster-uuid-0001",
+        # 8.15.0 as its banner reads: the build is the v8.15.0 tag, and
+        # Lucene the 9.11.1 that `build-tools-internal/version.properties`
+        # pins at that tag. The date is the tagged commit's.
         "version": {
-            "number": "8.12.0",
+            "number": ES_VERSION,
             "build_flavor": "default",
             "build_type": "docker",
-            "build_hash": "abc123mock",
-            "build_date": "2024-01-01T00:00:00.000Z",
+            "build_hash": "1a77947f34deddb41af25e6f0ddb8e830159c179",
+            "build_date": "2024-08-02T21:47:14.000Z",
             "build_snapshot": False,
-            "lucene_version": "9.9.1",
+            "lucene_version": "9.11.1",
             "minimum_wire_compatibility_version": "7.17.0",
             "minimum_index_compatibility_version": "7.0.0",
         },

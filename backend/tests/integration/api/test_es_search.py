@@ -26,7 +26,10 @@ class TestClusterInfo:
         assert body["name"] == "mock-es-node-01"
         assert body["cluster_name"] == "mockdr-elastic"
         assert "version" in body
-        assert body["version"]["number"] == "8.12.0"
+        # The release every behaviour here is measured on (conformance runs
+        # the 8.15.0 image); the banner said 8.12.0 with Lucene 9.9.1.
+        assert body["version"]["number"] == "8.15.0"
+        assert body["version"]["lucene_version"] == "9.11.1"
         assert body["tagline"] == "You Know, for Search"
 
     def test_cluster_info_version_fields(self, client: TestClient) -> None:

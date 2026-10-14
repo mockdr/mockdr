@@ -2906,10 +2906,26 @@ probes:
     endpoint: kibana
     why: >
       The console proxy needs a path, and says so the way its schema does.
+      With `kbn-xsrf`: without it the post-auth xsrf handler answers first,
+      on both sides, and the schema is never reached — the two 400s only
+      differ in `message`, which is not compared.
     request:
       method: POST
       path: /api/console/proxy
       query: {method: 'GET'}
+      headers: {kbn-xsrf: "true"}
+      auth: basic
+
+  - id: kbn-console-proxy-without-xsrf
+    endpoint: kibana
+    why: >
+      The proxy route sets no `xsrfRequired: false` (console plugin at
+      v8.15.0) and the default allowlist is empty, so it needs the header.
+      mockdr served it without.
+    request:
+      method: POST
+      path: /api/console/proxy
+      query: {method: 'GET', path: '/_cluster/health'}
       auth: basic
 
   - id: es-cat-indices-text
