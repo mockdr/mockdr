@@ -166,3 +166,22 @@ def require_list(body: object, key: str) -> list:
             detail=build_cs_error_response(400, f"{key} must be an array"),
         )
     return value
+
+
+def query_ids(values: list[str] | None) -> list[str]:
+    """The ids a Falcon query string carries, however it spells them.
+
+    Falcon declares every ``ids`` query parameter as an array with
+    ``collectionFormat: multi`` — gofalcon serialises it as
+    ``?ids=a&ids=b&ids=c`` (``swag.JoinByFormat(idsIC, "multi")`` in, for
+    one, ``falcon/client/hosts/get_device_details_v2_parameters.go``). The
+    routes declared ``ids`` as a single string, so FastAPI kept only the
+    last repetition: three ids asked for, one entity answered, and a 200
+    that looked complete. Each repetition is now read, and a repetition
+    that is itself comma-separated is still split, because the mock has
+    always accepted that spelling and clients written against it send it.
+    """
+    out: list[str] = []
+    for value in values or []:
+        out.extend(part.strip() for part in str(value).split(",") if part.strip())
+    return out

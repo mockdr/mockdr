@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_iocs import commands as ioc_commands
 from application.cs_iocs import queries as ioc_queries
+from utils.cs_response import query_ids
 
 router = APIRouter(tags=["CrowdStrike IOCs"])
 
@@ -28,11 +29,11 @@ def search_iocs(
 
 @router.get("/iocs/entities/indicators/v1")
 def get_iocs(
-    ids: str = Query(...),
+    ids: list[str] = Query(...),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
-    """Return full IOC entities for the given comma-separated IDs."""
-    id_list: list[str] = [i.strip() for i in ids.split(",") if i.strip()]
+    """Return full IOC entities for the given IDs (repeated ``ids``, or comma-separated)."""
+    id_list: list[str] = query_ids(ids)
     return ioc_queries.get_ioc_entities(id_list)
 
 
@@ -71,9 +72,9 @@ def update_ioc(
 
 @router.delete("/iocs/entities/indicators/v1")
 def delete_iocs(
-    ids: str = Query(...),
+    ids: list[str] = Query(...),
     _: dict = Depends(require_cs_write),
 ) -> dict:
-    """Delete custom IOCs by comma-separated IDs."""
-    id_list: list[str] = [i.strip() for i in ids.split(",") if i.strip()]
+    """Delete custom IOCs by IDs (repeated ``ids`` parameters, or comma-separated)."""
+    id_list: list[str] = query_ids(ids)
     return ioc_commands.delete_iocs(id_list)

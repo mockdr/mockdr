@@ -11,7 +11,7 @@ from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_host_groups import commands as group_commands
 from application.cs_host_groups import queries as group_queries
 from utils.cs_fql import FqlError, parse_fql
-from utils.cs_response import build_cs_error_response, require_list
+from utils.cs_response import build_cs_error_response, query_ids, require_list
 
 router = APIRouter(tags=["CrowdStrike Host Groups"])
 
@@ -46,11 +46,11 @@ def query_host_groups(
 
 @router.get("/devices/entities/host-groups/v1")
 def get_host_groups(
-    ids: str = Query(...),
+    ids: list[str] = Query(...),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
-    """Return full host group entities for the given comma-separated IDs."""
-    id_list: list[str] = [i.strip() for i in ids.split(",") if i.strip()]
+    """Return full host group entities for the given IDs (repeated ``ids``, or CSV)."""
+    id_list: list[str] = query_ids(ids)
     return group_queries.get_host_group_entities(id_list)
 
 
@@ -107,11 +107,11 @@ def update_host_groups(
 
 @router.delete("/devices/entities/host-groups/v1")
 def delete_host_groups(
-    ids: str = Query(...),
+    ids: list[str] = Query(...),
     _: dict = Depends(require_cs_write),
 ) -> dict:
-    """Delete host groups by comma-separated IDs."""
-    id_list: list[str] = [i.strip() for i in ids.split(",") if i.strip()]
+    """Delete host groups by IDs (repeated ``ids`` parameters, or comma-separated)."""
+    id_list: list[str] = query_ids(ids)
     return group_commands.delete_host_groups(id_list)
 
 

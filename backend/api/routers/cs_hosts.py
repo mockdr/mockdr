@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from api.cs_auth import require_cs_auth, require_cs_write
 from application.cs_hosts import commands as host_commands
 from application.cs_hosts import queries as host_queries
-from utils.cs_response import build_cs_error_response, require_list
+from utils.cs_response import build_cs_error_response, query_ids, require_list
 
 router = APIRouter(tags=["CrowdStrike Hosts"])
 
@@ -80,7 +80,7 @@ def query_hidden_devices(
 
 @router.get("/devices/entities/devices/v2")
 def get_hosts_by_query(
-    ids: str = Query(...),
+    ids: list[str] = Query(...),
     _: dict = Depends(require_cs_auth),
 ) -> dict:
     """Return full host entities for the ids named in the query string.
@@ -91,7 +91,7 @@ def get_hosts_by_query(
     the same entities from the same query — the ids just arrive by a
     different door.
     """
-    id_list: list[str] = [i.strip() for i in ids.split(",") if i.strip()]
+    id_list: list[str] = query_ids(ids)
     return host_queries.get_host_entities(id_list)
 
 
