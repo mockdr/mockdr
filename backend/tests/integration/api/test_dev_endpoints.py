@@ -57,11 +57,24 @@ class TestScenario:
         assert body["data"]["scenario"] == "apt_campaign"
         assert "affected" in body["data"]
 
-    def test_unknown_scenario_returns_error(self, client: TestClient, auth_headers: dict) -> None:
+    def test_unknown_scenario_is_refused(self, client: TestClient, auth_headers: dict) -> None:
+        """A misspelt scenario must not read as one that ran.
+
+        It answered 200 with the error inside ``data``; MockdrClient.scenario
+        raises only on a 4xx, so a typo in a test's setup passed silently.
+        """
         resp = client.post(f"{BASE}/_dev/scenario", headers=auth_headers,
                           json={"scenario": "not_a_real_scenario"})
-        assert resp.status_code == 200
-        assert "error" in resp.json()["data"]
+        assert resp.status_code == 400
+        assert "not_a_real_scenario" in resp.text
+
+    def test_unknown_scenario_changes_nothing(self, client: TestClient,
+                                              auth_headers: dict) -> None:
+        before = client.get(f"{BASE}/_dev/stats", headers=auth_headers).json()
+        client.post(f"{BASE}/_dev/scenario", headers=auth_headers,
+                    json={"scenario": "not_a_real_scenario"})
+        after = client.get(f"{BASE}/_dev/stats", headers=auth_headers).json()
+        assert after == before
 
 
 class TestTokens:

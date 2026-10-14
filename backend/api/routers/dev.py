@@ -58,8 +58,18 @@ def reset() -> dict:
 
 @router.post("/_dev/scenario")
 def trigger_scenario(body: DevScenarioBody) -> dict:
-    """Trigger a named simulation scenario affecting agents and threats."""
-    return dev_commands.trigger_scenario(body.scenario)
+    """Trigger a named simulation scenario affecting agents and threats.
+
+    An unknown name is a 400. It answered 200 with the error tucked inside
+    ``data``, so a misspelt scenario looked like one that ran: the client in
+    ``mockdr.testing`` raises on a 4xx and returned the error as a result, and
+    a setup guide shipped a scenario that has never existed.
+    """
+    result = dev_commands.trigger_scenario(body.scenario)
+    error = result.get("data", {}).get("error")
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return result
 
 
 @router.get("/_dev/tokens")
