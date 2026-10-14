@@ -121,4 +121,5 @@ def select_alert_ids(raw_filter: dict) -> list[str]:
         alert_repo.list_all(), raw_filter,
         FILTER_SPECS + DOCUMENTED_FILTERS.get("/cloud-detection/alerts", []),
         id_field="alertInfo.alertId",
+        no_op_members=("tenant",),
     )

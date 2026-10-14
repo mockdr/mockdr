@@ -35,6 +35,7 @@ def select_ids(
     *,
     id_field: str = "id",
     ids_members: tuple[str, ...] = ("ids",),
+    no_op_members: tuple[str, ...] = (),
 ) -> list[str]:
     """The ids of the records *raw_filter* selects.
 
@@ -45,6 +46,9 @@ def select_ids(
         specs:       The filter specs the collection's GET applies.
         id_field:    The record field the ids name (a dotted path is followed).
         ids_members: The members that name records outright.
+        no_op_members: Members the route accepts and that select nothing more
+                     (``tenant``: mockdr seeds one tenant). A filter of these
+                     alone selects nothing, as it did when only ``ids`` was read.
 
     Returns:
         The selected ids; a member in *ids_members* wins over the rest.
@@ -61,6 +65,9 @@ def select_ids(
         # answers every record for that: a delete would take the collection.
         msg = "The filter names no member with a value to select on."
         raise UnselectableFilterError(msg)
+    params = {k: v for k, v in params.items() if k not in no_op_members}
+    if not params:
+        return []
     refuse_unknown_members(params, {spec.param for spec in specs} | set(ids_members))
     rows = [r if isinstance(r, dict) else record_dict(r) for r in records]
     return [str(get_nested(r, id_field)) for r in apply_filters(rows, params, specs)]

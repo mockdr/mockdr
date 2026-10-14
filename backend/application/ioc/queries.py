@@ -48,4 +48,5 @@ def select_ioc_ids(raw_filter: dict) -> list[str]:
         ioc_repo.list_all(), raw_filter,
         FILTER_SPECS + DOCUMENTED_FILTERS.get("/threat-intelligence/iocs", []),
         id_field="uuid", ids_members=("uuids", "ids"),
+        no_op_members=("tenant",),
     )

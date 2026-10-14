@@ -144,6 +144,16 @@ class TestABulkWriteSelectsWhatTheGetWould:
         assert resp.status_code == 400
         assert len(client.get(f"{BASE}/users", headers=auth_headers).json()["data"]) == before
 
+    def test_tenant_alone_still_selects_nothing(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """`tenant` is a member these routes take; alone it narrowed to nothing, as before."""
+        resp = client.post(f"{BASE}/cloud-detection/alerts/incident", headers=auth_headers,
+                           json={"data": {"incidentStatus": "RESOLVED"},
+                                 "filter": {"tenant": True}})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["affected"] == 0
+
     def test_an_alert_verdict_by_site(self, client: TestClient, auth_headers: dict) -> None:
         alert = client.get(f"{BASE}/cloud-detection/alerts", headers=auth_headers,
                            params={"limit": 1}).json()["data"][0]

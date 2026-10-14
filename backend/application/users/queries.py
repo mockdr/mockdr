@@ -78,4 +78,5 @@ def select_user_ids(raw_filter: dict) -> list[str]:
     return select_ids(
         user_repo.list_all(), raw_filter,
         FILTER_SPECS + DOCUMENTED_FILTERS.get("/users", []),
+        no_op_members=("tenant",),
     )
