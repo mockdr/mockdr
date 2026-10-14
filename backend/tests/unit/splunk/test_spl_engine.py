@@ -95,6 +95,43 @@ class TestSearchClause:
         assert run("search definitely_not_present")[0] == []
 
 
+class TestCaseAndWildcardsBelongToTheCommand:
+    """`search` folds case and globs; `where` does neither.
+
+    A search-clause field value matches regardless of case, and `CASE()` is
+    how a search asks for case to count (search command reference, 10.0).
+    `where` is an eval expression, which "is case-sensitive", and takes a
+    wildcard only through `like()` (where command reference, 10.0). The mock
+    compared case in a search and globbed `*` in a where.
+    """
+
+    def test_search_ignores_case(self) -> None:
+        assert len(run("search host=ALPHA")[0]) == 2
+        assert len(run("search * | search host=Beta")[0]) == 1
+
+    def test_search_wildcards_ignore_case(self) -> None:
+        assert len(run("search host=ALPH*")[0]) == 2
+
+    def test_case_makes_case_count(self) -> None:
+        assert run("search host=CASE(ALPHA)")[0] == []
+        assert len(run("search host=CASE(alpha)")[0]) == 2
+
+    def test_search_inequality_ignores_case_too(self) -> None:
+        assert len(run("search host!=ALPHA")[0]) == 1
+
+    def test_where_is_case_sensitive(self) -> None:
+        assert run('search * | where host="ALPHA"')[0] == []
+        assert len(run('search * | where host="alpha"')[0]) == 2
+
+    def test_where_has_no_asterisk_wildcard(self) -> None:
+        assert run('search * | where host="alph*"')[0] == []
+        assert len(run('search * | where like(host, "alph%")')[0]) == 2
+
+    def test_eval_comparison_is_case_sensitive(self) -> None:
+        rows, _ = run('search * | eval m=if(host=="ALPHA", 1, 0) | where m=1')
+        assert rows == []
+
+
 class TestStats:
     """``stats`` aggregates instead of passing rows through."""
 

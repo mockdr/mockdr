@@ -21,7 +21,7 @@ import operator
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from fnmatch import fnmatch
+from fnmatch import fnmatch, fnmatchcase
 from typing import Any
 
 from utils.splunk.spl_functions import (
@@ -385,6 +385,14 @@ class _Parser:
 
             if self._mode == "search":
                 if self._in_value:
+                    if token.text.upper() == "CASE" and nxt is not None and nxt.text == "(":
+                        # `host=CASE(WEB01)`: the one directive a search
+                        # value takes, which makes case count.
+                        self._next()
+                        value = self._next()
+                        self._expect(")")
+                        text = _unquote(value.text) if value.kind == "string" else value.text
+                        return FuncCall("case", (Literal(text),))
                     # `sourcetype=access_combined` — the right side names the
                     # value, not another term to look for in the event text.
                     return Literal(token.text)
@@ -532,11 +540,13 @@ _COMPARATORS: dict[str, Callable[[Any, Any], bool]] = {
 }
 
 
-def _compare(op: str, left: Any, right: Any) -> bool:
+def _compare(
+    op: str, left: Any, right: Any, *, search: bool = False, sensitive: bool = False,
+) -> bool:
     if op in ("=", "=="):
-        return _matches(left, right)
+        return _matches(left, right, search=search, sensitive=sensitive)
     if op == "!=":
-        return not _matches(left, right)
+        return not _matches(left, right, search=search, sensitive=sensitive)
 
     # A relational comparison against a missing field is false in Splunk.
     # Falling through to string comparison made `where missing > 900000` true,
@@ -554,17 +564,31 @@ def _compare(op: str, left: Any, right: Any) -> bool:
     return _COMPARATORS[op](str(left), str(right))
 
 
-def _matches(left: Any, right: Any) -> bool:
-    """Equality, honouring ``*`` wildcards and numeric equivalence."""
+def _matches(left: Any, right: Any, *, search: bool = False, sensitive: bool = False) -> bool:
+    """Equality, the way the command it is written in reads it.
+
+    In a ``search`` clause a field value matches without regard to case and
+    ``*`` is a wildcard — ``host=WEB01`` finds ``web01``, and ``CASE(...)``
+    is how a search asks for case to count (search command reference,
+    10.0). In ``where`` and ``eval`` "the <eval-expression> is
+    case-sensitive", and a wildcard exists only through ``like()`` (where
+    command reference, 10.0). mockdr had both the wrong way round for half
+    of it: ``*`` was a wildcard in ``where`` too, and a search compared case.
+    Numbers compare as numbers in all three.
+    """
     if left is None:
         return right is None
     pattern = str(right)
     value = str(left)
-    if "*" in pattern:
-        return fnmatch(value.lower(), pattern.lower())
+    if search and "*" in pattern:
+        if sensitive:
+            return fnmatchcase(value, pattern)
+        return fnmatchcase(value.lower(), pattern.lower())
     left_num, right_num = _numeric(left), _numeric(right)
     if left_num is not None and right_num is not None:
         return left_num == right_num
+    if search and not sensitive:
+        return value.lower() == pattern.lower()
     return value == pattern
 
 
@@ -714,10 +738,17 @@ def evaluate(node: Node | None, row: dict, *, mode: str = "where") -> Any:  # no
         return any(_truthy(r) for r in results)
 
     if isinstance(node, Compare):
+        right_node, sensitive = node.right, False
+        if (mode == "search" and isinstance(right_node, FuncCall)
+                and right_node.name.lower() == "case" and len(right_node.args) == 1):
+            # `field=CASE(Value)`: the search directive that makes case count.
+            right_node, sensitive = right_node.args[0], True
         return _compare(
             node.op,
             evaluate(node.left, row, mode="eval"),
-            evaluate(node.right, row, mode="eval"),
+            evaluate(right_node, row, mode="eval"),
+            search=mode == "search",
+            sensitive=sensitive,
         )
 
     if isinstance(node, BinOp):

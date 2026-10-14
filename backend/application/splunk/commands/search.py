@@ -456,15 +456,21 @@ def _query_events(parsed: SPLQuery) -> list[dict]:
     earliest = resolve_relative_time(parsed.earliest_time, now) if parsed.earliest_time else 0.0
     latest = resolve_relative_time(parsed.latest_time, now) if parsed.latest_time else 0.0
 
+    # A search-clause field value matches regardless of case — `host=WEB01`
+    # finds `web01` (search command reference: CASE() is the opt-in to case
+    # sensitivity). These four were compared exactly and selected nothing.
+    def differs(selected: str, held: str) -> bool:
+        return bool(selected) and selected.lower() != (held or "").lower()
+
     filtered = []
     for event in all_events:
-        if parsed.index and event.index != parsed.index:
+        if differs(parsed.index, event.index):
             continue
-        if parsed.sourcetype and event.sourcetype != parsed.sourcetype:
+        if differs(parsed.sourcetype, event.sourcetype):
             continue
-        if parsed.source and event.source != parsed.source:
+        if differs(parsed.source, event.source):
             continue
-        if parsed.host and event.host != parsed.host:
+        if differs(parsed.host, event.host):
             continue
         if earliest and event.time < earliest:
             continue

@@ -328,7 +328,9 @@ def _parse_search_clause(clause: str, result: SPLQuery) -> None:
                 negated = False
                 continue
             if key in _BUILTIN_SEARCH_FIELDS:
-                if hoistable and "*" not in value:
+                # `host=CASE(WEB01)` is a directive, not a value to select by:
+                # the expression below applies it.
+                if hoistable and "*" not in value and "(" not in value:
                     _assign_builtin(key, value, result)
             else:
                 result.field_filters[match.group(1)] = value

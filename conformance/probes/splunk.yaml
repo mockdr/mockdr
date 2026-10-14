@@ -3567,3 +3567,81 @@ probes:
       path: /servicesNS/nobody/search/storage/collections/config/no-such-collection
       query: {output_mode: json}
       auth: basic
+
+  # ── Case and wildcards belong to the command ────────────────────────────
+  #
+  # A search-clause field value matches regardless of case, and CASE() makes
+  # case count (search command reference, 10.0); `where` is an eval
+  # expression, case-sensitive, with no `*` wildcard outside like() (where
+  # command reference, 10.0). `host` is used because it is indexed metadata,
+  # untouched by the lazy field extraction this mock does not model.
+  - id: spl-search-value-ignores-case
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      `host=SRV-1` finds the events of `srv-1`. mockdr compared case and
+      found none.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} host=SRV-1 | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-search-value-case-directive
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      `CASE()` makes the comparison case-sensitive again: `CASE(SRV-1)`
+      finds nothing where `CASE(srv-1)` would find two.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} host=CASE(SRV-1) | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-where-is-case-sensitive
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      An eval expression compares case. `where host="SRV-1"` keeps nothing.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | where host="SRV-1" | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-where-has-no-asterisk-wildcard
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      `*` is a character in `where`; only like() and `%` glob. mockdr globbed
+      it and kept every `srv-` event.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | where host="srv-*" | stats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  # ── A search that does not start with `search` or `|` ───────────────────
+  - id: spl-rest-search-without-the-search-command
+    endpoint: management
+    why: >
+      Over REST the `search` parameter is the SPL itself, and only Splunk Web
+      prepends the implicit `search` command — so `index=main | head 1` is
+      said to fail as "Unknown search command 'index'" (community reports
+      only; no reference states it). mockdr accepts it. Unmeasured: this
+      probe exists to settle it, and mockdr is unchanged until it has.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=index=main | head 1&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
