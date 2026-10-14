@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from application.graph.security.queries import hunting_window
 from domain.sentinel.alert import SentinelAlert
 from domain.sentinel.incident import SentinelIncident
 from repository.sentinel.alert_repo import sentinel_alert_repo
@@ -125,16 +126,23 @@ def table_names() -> tuple[str, ...]:
     return ("SecurityIncident", "SecurityAlert", *_ADVERTISED)
 
 
-def query_logs(kql: str) -> dict:
+def query_logs(kql: str, timespan: str | None = None) -> dict:
     """Execute a KQL query against the mock Log Analytics tables.
 
     Args:
-        kql: KQL query string.
+        kql:      KQL query string.
+        timespan: The request body's ``timespan``, an ISO 8601 duration or
+                  interval, or None for no window.
 
     Returns:
         Log Analytics response dict with tables/columns/rows.
+
+    Raises:
+        InvalidTimespanError: If ``timespan`` is not an ISO 8601 duration or
+            interval.
     """
     parsed = parse_kql(kql)
+    window = hunting_window(timespan) if timespan is not None else None
     rows: list[dict] = []
 
     # The table is resolved before an unreadable clause is refused: a query
@@ -146,6 +154,15 @@ def query_logs(kql: str) -> dict:
 
     if parsed.unsupported:
         raise UnsupportedKqlError(parsed.unsupported)
+
+    # The body's `timespan` "is applied in addition to any that are specified
+    # in the query expression" (Log Analytics Query API, Execute Query). It
+    # was read by nothing, so every query saw the workspace's whole history
+    # -- and azure-monitor-query's `query_workspace` sends one on every call
+    # (`timespan` is a required argument of it).
+    if window is not None:
+        start, end = window[0].timestamp(), window[1].timestamp()
+        rows = [r for r in rows if start <= _parse_time(r.get("TimeGenerated", "")) <= end]
 
     # Apply where clauses
     for field_name, op, value in parsed.where_clauses:

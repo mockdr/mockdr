@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.sentinel_auth import require_log_analytics_auth
+from application.graph.security.queries import InvalidTimespanError
 from application.sentinel.queries.log_analytics import UnknownTableError, query_logs
 from utils.sentinel.kql_parser import UnsupportedKqlError
 from utils.sentinel.response import build_log_analytics_error
@@ -33,8 +34,20 @@ async def run_query(
             status_code=400,
             detail=build_log_analytics_error("SyntaxError", "query is required"),
         )
+    timespan = body.get("timespan")
+    if timespan is not None and not isinstance(timespan, str):
+        raise HTTPException(
+            status_code=400,
+            detail=build_log_analytics_error(
+                "BadArgumentError", "timespan must be an ISO 8601 duration or interval"),
+        )
     try:
-        return query_logs(kql)
+        return query_logs(kql, timespan)
+    except InvalidTimespanError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=build_log_analytics_error("BadArgumentError", str(exc)),
+        ) from exc
     except UnsupportedKqlError as exc:
         # A clause this parser cannot evaluate.  Dropping it answered 200
         # with rows that do not match what was asked — `contains 'zzzzz'`
