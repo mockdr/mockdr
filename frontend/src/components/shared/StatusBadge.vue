@@ -10,6 +10,9 @@ type StatusMap = Record<string, BadgeInfo>
 const AGENT_STATUS: StatusMap = {
   connected:      { label: 'Online',       cls: 'bg-s1-success/15 text-s1-success' },
   disconnected:   { label: 'Disconnected', cls: 'bg-s1-danger/15 text-s1-danger' },
+  // In transit until the agent acknowledges a connect / disconnect.
+  connecting:     { label: 'Connecting',    cls: 'bg-s1-warning/15 text-s1-warning' },
+  disconnecting:  { label: 'Disconnecting', cls: 'bg-s1-warning/15 text-s1-warning' },
   not_applicable: { label: 'N/A',          cls: 'bg-s1-muted/15 text-s1-muted' },
 }
 

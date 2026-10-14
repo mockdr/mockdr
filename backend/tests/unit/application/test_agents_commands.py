@@ -67,15 +67,31 @@ class TestUnknownAction:
 class TestConnectDisconnect:
     """Tests for connect and disconnect actions."""
 
-    def test_connect_sets_connected(self) -> None:
-        aid = _first_agent_id()
-        execute_action("connect", {"ids": [aid]})
-        assert agent_repo.get(aid).networkStatus == "connected"
+    def test_connect_is_connecting_until_acknowledged(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The swagger's ``connecting``, then ``connected`` once the agent answers."""
+        from application.agents import network  # noqa: PLC0415
 
-    def test_disconnect_sets_disconnected(self) -> None:
         aid = _first_agent_id()
+        monkeypatch.setattr(network, "_SETTLE_SECONDS", 3600.0)
+        execute_action("connect", {"ids": [aid]})
+        assert network.settled(agent_repo.get(aid)).networkStatus == "connecting"
+        monkeypatch.setattr(network, "_SETTLE_SECONDS", -1.0)
+        assert network.settled(agent_repo.get(aid)).networkStatus == "connected"
+
+    def test_disconnect_is_disconnecting_until_acknowledged(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The swagger's ``disconnecting``, then ``disconnected``."""
+        from application.agents import network  # noqa: PLC0415
+
+        aid = _first_agent_id()
+        monkeypatch.setattr(network, "_SETTLE_SECONDS", 3600.0)
         execute_action("disconnect", {"ids": [aid]})
-        assert agent_repo.get(aid).networkStatus == "disconnected"
+        assert network.settled(agent_repo.get(aid)).networkStatus == "disconnecting"
+        monkeypatch.setattr(network, "_SETTLE_SECONDS", -1.0)
+        assert network.settled(agent_repo.get(aid)).networkStatus == "disconnected"
 
     def test_disconnect_creates_activity(self) -> None:
         before = len(activity_repo.list_all())

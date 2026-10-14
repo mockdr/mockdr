@@ -1,5 +1,6 @@
 import json
 
+from application.agents.network import settle_all
 from application.documented_filters import DOCUMENTED_FILTERS
 from infrastructure.process_gen import generate_processes_for_agent
 from repository.agent_repo import agent_repo
@@ -80,7 +81,7 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
     into dicts. Converting the whole collection first cost 2 400 conversions
     to serve 100 rows at forty times the default seed.
     """
-    records = _apply_tag_filters(agent_repo.list_all(), params)
+    records = _apply_tag_filters(settle_all(agent_repo.list_all()), params)
     filtered = apply_filters(
         records,
         params,
@@ -97,7 +98,7 @@ def list_agents(params: dict, cursor: str | None, limit: int) -> dict:
 
 def count_agents(params: dict) -> dict:
     """Return the count of agents matching the given filter parameters."""
-    records = _apply_tag_filters(agent_repo.list_all(), params)
+    records = _apply_tag_filters(settle_all(agent_repo.list_all()), params)
     filtered = apply_filters(
         records,
         params,

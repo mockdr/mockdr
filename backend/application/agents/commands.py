@@ -5,6 +5,8 @@ import zipfile
 from typing import cast
 
 from application import bridge
+from application.agents import network
+from application.agents.network import PENDING_FOR
 from application.agents.queries import FILTER_SPECS as AGENT_FILTER_SPECS
 from application.documented_filters import DOCUMENTED_FILTERS
 from application.webhooks import commands as webhook_commands
@@ -150,10 +152,13 @@ def execute_action(action: str, body: dict, actor_user_id: str | None = None) ->
         if not agent:
             continue
 
-        if action == "connect":
-            agent.networkStatus = "connected"
-        elif action == "disconnect":
-            agent.networkStatus = "disconnected"
+        if action in PENDING_FOR:
+            # In transit until the agent acknowledges; a read a moment later
+            # finds it settled (application/agents/network.py). This went
+            # straight to the final state, so `connecting` and
+            # `disconnecting` — two of the four values the swagger
+            # enumerates — never occurred.
+            network.begin(agent, action)
             # NOTE: AGENT_INFECTED event is not fired here because no action currently
             # sets agent.infected = True via execute_action. Add firing here when
             # such an action is introduced.

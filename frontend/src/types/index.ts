@@ -93,7 +93,7 @@ export interface Agent {
   /** Management-facing IP — use instead of the stripped localIp field. */
   lastIpToMgmt: string
   domain: string | null
-  networkStatus: 'connected' | 'disconnected' | 'not_applicable'
+  networkStatus: 'connected' | 'disconnected' | 'connecting' | 'disconnecting' | 'not_applicable'
   networkQuarantineEnabled: boolean
   networkInterfaces: NetworkInterface[]
   locationEnabled: boolean
