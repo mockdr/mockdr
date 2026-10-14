@@ -25,6 +25,18 @@ def client_tenant(client_id: str) -> tuple[str, str]:
     return "", ""
 
 
+def hosted_tenants() -> list[tuple[str, str]]:
+    """The tenants this directory's registered clients belong to.
+
+    Returns:
+        ``(tenant_id, tenant_domain)`` of each registered client.
+    """
+    return [
+        (c.get("tenant_id", ""), c.get("tenant_domain", ""))
+        for c in store.get_all(_OAUTH_CLIENTS_COLLECTION)
+    ]
+
+
 def token_exchange(client_id: str, client_secret: str, scope: str) -> dict | None:
     """Exchange client credentials for an access token.
 

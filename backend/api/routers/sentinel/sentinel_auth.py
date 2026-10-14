@@ -1,9 +1,10 @@
 """Sentinel OAuth2 authentication router."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Request
 
-from application.sentinel.commands.auth import client_tenant, token_exchange
+from application.sentinel.commands.auth import client_tenant, hosted_tenants, token_exchange
+from utils.entra_discovery import empty_key_set, openid_configuration, refuse_unhosted_tenant
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
@@ -51,6 +52,34 @@ async def oauth2_token_for_tenant(
         Token response — see :func:`_issue_token`.
     """
     return _issue_token(tenant_id, client_id, client_secret, grant_type, scope)
+
+
+# ---------------------------------------------------------------------------
+# OpenID Connect discovery
+# ---------------------------------------------------------------------------
+
+@router.get("/{tenant_id}/v2.0/.well-known/openid-configuration")
+async def openid_configuration_document(tenant_id: str, request: Request) -> dict:
+    """The authority's discovery document, which MSAL reads before the token call.
+
+    azure-identity's ``ClientSecretCredential`` -- the credential the Azure
+    management SDKs (``azure-mgmt-securityinsight``) and ``azure-monitor-query``
+    are built to take -- hands its authority to MSAL, and MSAL fetches
+    ``{authority}/{tenant}/v2.0/.well-known/openid-configuration`` before it
+    sends anything else (``msal/authority.py``, ``tenant_discovery``). Graph
+    and Defender served the document; this directory did not, so pointing the
+    credential at ``/sentinel`` failed with "Unable to get authority
+    configuration" before a single ARM call. See :mod:`utils.entra_discovery`.
+    """
+    refuse_unhosted_tenant(tenant_id, hosted_tenants())
+    return openid_configuration(request, "/sentinel", tenant_id)
+
+
+@router.get("/{tenant_id}/discovery/v2.0/keys")
+async def signing_keys(tenant_id: str) -> dict:
+    """The key set ``jwks_uri`` names -- empty, as Sentinel mock tokens are opaque."""
+    refuse_unhosted_tenant(tenant_id, hosted_tenants())
+    return empty_key_set()
 
 
 def _issue_token(
