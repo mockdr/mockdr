@@ -589,7 +589,7 @@ jobs:
   audits:
     needs: [backend-quality]
     steps:
-      - python scripts/<each of them>.py       # 32 gates; the map is scripts/README.md
+      - python scripts/<each of them>.py       # the count and the map: scripts/README.md
 ```
 
 The audits job is the one that grows. Listing a handful of its scripts here

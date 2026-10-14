@@ -224,6 +224,15 @@ jobs:
       - name: Time runs forwards in every record
         run: python scripts/causality_audit.py
 
+      # The README is the first client the mock has. 2.6.0 changed token
+      # scopes, defaults and status codes, and the curl lines written before
+      # it kept printing the old behaviour: the Defender, Sentinel and Graph
+      # token examples were all refused for want of a `scope`, and the
+      # SPL examples searched fields no event carries. Every curl, SPL and
+      # KQL block is run in-process; a block that cannot be says why.
+      - name: Every example the documentation prints still works
+        run: python scripts/doc_examples.py
+
       # data/ is gitignored, so without this the spec is absent and every
       # check that reads it quietly checks less — the same reason the
       # field-drift job fetches it. It sits here rather than further down

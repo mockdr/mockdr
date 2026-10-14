@@ -38,6 +38,7 @@ Every script prints what it is for at the top of its file; this is the map.
 | `frontend_param_drift.py` | Ask whether the query parameters the console sends are ones a route reads. |
 | `frontend_value_drift.py` | Ask whether the values the console compares against ever actually occur — a branch on a string no answer carries never runs. |
 | `frontend_fixture_drift.py` | Do the frontend's captured fixtures still match what the mock answers? |
+| `doc_examples.py` | Runs the examples the documentation prints: every curl block in the README, the guides under `docs/`, `toolkit/SETUP_GUIDE.md` and the rest, through a small shell that understands the subset they use (assignments, `$(...)`, `| jq -r .path`); every `spl` block through Splunk's export endpoint and every `kql` block through Log Analytics. A request must answer below 400 unless the doc announces the status (`# → 403`), and a documented value (`# hits.total.value: 0`) must be the one answered. A block that cannot run here carries `<!-- doc-examples: skip <reason> -->`, one that goes on from the block before it `<!-- doc-examples: continue -->`; an unmarked one that cannot run is a failure. In-process by default; `--base-url http://127.0.0.1:8104` sends the same requests to a live instance, `--show` prints every exchange. Exit 1 on any. |
 | `schema_drift.py <vendor>` | Compare responses with the vendored references (`data/vendor-specs/`); prints drift and unjudged routes. CI runs all six mounts: `crowdstrike`, `mde`, `xdr`, `sentinel`, `graph`, `sentinelone`. |
 
 ## Run periodically, not per push
@@ -98,7 +99,7 @@ Run them from the repository root with the backend's interpreter:
    wait for and this step does not pretend there is. `ci.sh` stands in its
    place, and since it now reads its audit list out of `ci.yml` rather than
    carrying a copy, it runs the same checks: both quality gates, the
-   browser suite, all thirty-four audit invocations, the Docker build and
+   browser suite, all thirty-five audit invocations, the Docker build and
    its smoke test. What it does *not* cover, and what therefore does not run
    for a release made this way: the Trivy container scan, the SBOM, and
    gitleaks — the last only because it is not installed here. Turning the
