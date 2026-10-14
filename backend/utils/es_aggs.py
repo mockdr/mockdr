@@ -329,17 +329,67 @@ def _terms(body: dict, sub: dict, records: list[dict], ctx: _Context, depth: int
         for key in keys:
             groups.setdefault(key, []).append(record)
 
-    ordered = sorted(groups.items(), key=lambda kv: (-len(kv[1]), str(kv[0])))
-    kept = [(k, v) for k, v in ordered if len(v) >= min_doc_count]
+    kept = [(k, v) for k, v in groups.items() if len(v) >= min_doc_count]
     buckets = [
         _with_sub({"key": key, "doc_count": len(members)}, sub, members, ctx, depth)
-        for key, members in kept[:size]
+        for key, members in kept
     ]
+    buckets = _ordered_buckets(buckets, body.get("order"))
     return {
         "doc_count_error_upper_bound": 0,
-        "sum_other_doc_count": sum(len(v) for _, v in kept[size:]),
-        "buckets": buckets,
+        "sum_other_doc_count": sum(b["doc_count"] for b in buckets[size:]),
+        "buckets": buckets[:size],
     }
+
+
+def _ordered_buckets(buckets: list[dict], order: Any) -> list[dict]:
+    """Sort `terms` buckets the way its `order` says.
+
+    `order` was ignored: every answer came back `_count desc`, so
+    `{"_count": "asc"}` — the rare-values query — returned the most common
+    terms, and `{"_key": "asc"}` an alphabetical list in another order. It
+    takes one `{path: direction}` or a list of them; a path is `_count`,
+    `_key` or a metric sub-aggregation (`name`, or `name.stat` for a
+    multi-value one). Unless `_key` is already among them, `_key asc` breaks
+    the ties, which is also how the default `_count desc` reads
+    (search-aggregations-bucket-terms-aggregation.html#search-aggregations-
+    bucket-terms-aggregation-order, 8.15; `InternalOrder.compound`).
+    """
+    criteria: list[tuple[str, bool]] = []
+    for entry in (order if isinstance(order, list) else [order] if order else []):
+        if isinstance(entry, dict):
+            criteria += [(str(path), str(way).lower() == "desc")
+                         for path, way in entry.items()]
+    if not criteria:
+        criteria = [("_count", True)]
+    if not any(path == "_key" for path, _ in criteria):
+        criteria.append(("_key", False))
+    ordered = list(buckets)
+    # Stable sorts from the last criterion to the first.
+    for path, descending in reversed(criteria):
+        present = [b for b in ordered if _order_value(b, path) is not None]
+        absent = [b for b in ordered if _order_value(b, path) is None]
+        present.sort(key=lambda b, p=path: _order_value(b, p), reverse=descending)
+        ordered = present + absent
+    return ordered
+
+
+def _order_value(bucket: dict, path: str) -> Any:
+    """The value one ordering path reads from a bucket; None if it has none."""
+    if path == "_count":
+        return bucket["doc_count"]
+    if path in ("_key", "_term"):
+        key = bucket["key"]
+        # Numbers order as numbers, everything else as its text.
+        return (0, float(key), "") if isinstance(key, (int, float)) else (1, 0.0, str(key))
+    name, _, stat = path.partition(".")
+    result = bucket.get(name)
+    if not isinstance(result, dict):
+        return None
+    if "doc_count" in result and not stat:
+        return result["doc_count"]
+    value = result.get(stat or "value")
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _date_histogram(
@@ -500,21 +550,20 @@ def _metric(agg_type: str, body: dict, records: list[dict], ctx: _Context) -> di
     field = body.get("field", "")
     refuse_text_field(ctx, field)
 
+    # Every value a document holds counts, an array's members each on its own:
+    # `value_count` "counts the number of values" and `cardinality` the
+    # distinct ones (search-aggregations-metrics-*.html, 8.15), and the
+    # numeric metrics read every point. An array was one value here — or,
+    # for the numeric ones, none at all.
+    values = [v for r in records for v in _values_of(r, field)]
     if agg_type == "value_count":
-        return {"value": sum(1 for r in records if get_nested(r, field) is not None)}
+        return {"value": len(values)}
     if agg_type == "cardinality":
-        seen = {
-            str(get_nested(r, field))
-            for r in records
-            if get_nested(r, field) is not None
-        }
-        return {"value": len(seen)}
+        return {"value": len({str(v) for v in values})}
     if agg_type == "top_hits":
         return _top_hits(body, records, ctx)
 
-    numbers = [
-        n for n in (_as_float(get_nested(r, field)) for r in records) if n is not None
-    ]
+    numbers = [n for n in (_as_float(v) for v in values) if n is not None]
     # Every numeric metric is a double in Elasticsearch, so an average that
     # happens to divide evenly still comes back as `30.0`. Rendering it as
     # `30` made the mock's JSON a different document from the real one, and
@@ -685,6 +734,15 @@ def _top_hits(body: dict, records: list[dict], ctx: _Context) -> dict:
             "hits": hits,
         },
     }
+
+
+def _values_of(record: dict, field: str) -> list[Any]:
+    """Every non-null value *record* holds for *field*, array members each."""
+    value = get_nested(record, field)
+    if value is None:
+        return []
+    members = value if isinstance(value, (list, tuple)) else [value]
+    return [m for m in members if m is not None]
 
 
 def _as_float(value: Any) -> float | None:
