@@ -1059,14 +1059,17 @@ Use mockdr as a service in your CI pipeline:
 
 ```yaml
 - uses: mockdr/mockdr@main
+  id: mockdr
   with:
     port: 5001
-    api-token: admin-token-0000-0000-000000000001
 
-- run: pytest --base-url http://localhost:5001
+- run: pytest
+  env:
+    MOCKDR_URL: ${{ steps.mockdr.outputs.base-url }}
+    S1_TOKEN: ${{ steps.mockdr.outputs.api-token }}
 ```
 
-The action starts the server, waits for it to be healthy, and exposes `base-url` and `api-token` outputs. All eight vendor mocks are available on the same port.
+The action starts the server, waits for it to be healthy, and exposes `base-url` (the root) and `api-token` outputs, plus one base URL per vendor: `s1-base-url`, `cs-base-url`, `mde-base-url`, `es-base-url`, `kibana-base-url`, `xdr-base-url`, `splunk-base-url`, `sentinel-base-url` and `graph-base-url`. All eight vendor mocks are available on the same port.
 
 ## Docker
 

@@ -22,7 +22,7 @@ inputs:
     required: false
     default: '20'
   api-token:
-    description: 'Default SentinelOne admin API token'
+    description: 'SentinelOne API token handed back as the api-token output. The mock accepts its fixed seeded tokens only; this does not add one.'
     required: false
     default: 'admin-token-0000-0000-000000000001'
 
@@ -54,6 +54,9 @@ outputs:
   sentinel-base-url:
     description: 'Microsoft Sentinel API base URL'
     value: ${{ steps.start.outputs.sentinel-base-url }}
+  graph-base-url:
+    description: 'Microsoft Graph API base URL'
+    value: ${{ steps.start.outputs.graph-base-url }}
   api-token:
     description: 'SentinelOne API token for authentication'
     value: ${{ inputs.api-token }}
@@ -82,13 +85,14 @@ runs:
         PYTHONPATH=. nohup python -m uvicorn main:app --host 0.0.0.0 --port ${{ inputs.port }} --no-server-header &
         echo "base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
         echo "s1-base-url=http://localhost:${{ inputs.port }}/web/api/v2.1" >> "$GITHUB_OUTPUT"
-        echo "cs-base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
-        echo "mde-base-url=http://localhost:${{ inputs.port }}" >> "$GITHUB_OUTPUT"
+        echo "cs-base-url=http://localhost:${{ inputs.port }}/cs" >> "$GITHUB_OUTPUT"
+        echo "mde-base-url=http://localhost:${{ inputs.port }}/mde" >> "$GITHUB_OUTPUT"
         echo "es-base-url=http://localhost:${{ inputs.port }}/elastic" >> "$GITHUB_OUTPUT"
         echo "kibana-base-url=http://localhost:${{ inputs.port }}/kibana" >> "$GITHUB_OUTPUT"
         echo "xdr-base-url=http://localhost:${{ inputs.port }}/xdr/public_api/v1" >> "$GITHUB_OUTPUT"
         echo "splunk-base-url=http://localhost:${{ inputs.port }}/splunk" >> "$GITHUB_OUTPUT"
         echo "sentinel-base-url=http://localhost:${{ inputs.port }}/sentinel" >> "$GITHUB_OUTPUT"
+        echo "graph-base-url=http://localhost:${{ inputs.port }}/graph" >> "$GITHUB_OUTPUT"
 
     - name: Wait for server
       shell: bash
