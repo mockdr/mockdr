@@ -23,6 +23,7 @@ from api.middleware.arm_headers import ArmRequestHeadersMiddleware
 from api.middleware.audit import RequestAuditMiddleware
 from api.middleware.body_limit import BodyLimitMiddleware
 from api.middleware.compression import CompressionMiddleware
+from api.middleware.connection_close import ConnectionCloseMiddleware
 from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.es_content_type import ElasticContentTypeMiddleware
@@ -496,6 +497,9 @@ app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
 app.add_middleware(CompressionMiddleware)  # each product's own gzip policy
 app.add_middleware(BodyLimitMiddleware)    # outermost: 413 before any body is read
 app.add_middleware(MetricsMiddleware)         # outermost — runs first, captures all timings
+# Outside even the metrics, so a 413 from the body limit says it too: RFC 9112
+# §9.6's `close` echo, which uvicorn's httptools protocol does not send.
+app.add_middleware(ConnectionCloseMiddleware)
 
 
 @app.exception_handler(HTTPException)
