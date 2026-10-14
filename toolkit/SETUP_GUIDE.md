@@ -515,12 +515,13 @@ curl -X POST http://localhost:8001/web/api/v2.1/_dev/import \
   -d @snapshot.json
 ```
 
-### 5. Use the Postman collection
-Import `postman_collection.json` from this directory for the SentinelOne API,
-or `postman/mockdr.postman_collection.json` at the repository root for all
-eight vendors (a Bruno collection of the same lives in `bruno/mockdr`). Each
-comes with pre-configured auth and example request bodies; set the base URL
-variables if your mock runs on a different host/port.
+### 5. Use the Postman or Bruno collection
+Import `postman/mockdr.postman_collection.json` from the repository root, or
+open `bruno/mockdr` in Bruno: every vendor, with example request bodies.
+Each collection fetches its own tokens and hands the ids it lists or creates
+to the requests after it, so a whole-collection run needs nothing but the
+base URL variables (`s1_base_url`, `cs_base_url`, …), which default to
+`http://localhost:8001`.
 
 ### 6. Simulate rate limiting
 ```bash

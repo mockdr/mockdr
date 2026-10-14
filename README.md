@@ -1053,6 +1053,15 @@ frontend/                      # Vue 3 + TypeScript — vue-tsc strict, ESLint z
 
 See [TESTING.md](TESTING.md) for the full test standard.
 
+## Postman and Bruno
+
+`postman/mockdr.postman_collection.json` and the Bruno collection in
+`bruno/mockdr` cover all eight vendors. Each fetches its own tokens and hands
+the ids it lists or creates to the requests after it, so a whole-collection
+run needs only the base URL variables (`s1_base_url`, `cs_base_url`, …,
+default `http://localhost:8001`) and leaves the mock as it found it.
+`scripts/run_collections.py --base-url <mock>` runs both with their CLIs.
+
 ## GitHub Action
 
 Use mockdr as a service in your CI pipeline:

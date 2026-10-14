@@ -53,6 +53,7 @@ Every script prints what it is for at the top of its file; this is the map.
 |---|---|
 | `load_test.py` | Concurrent stress test — reads, writes, a mix, and reads while `/_dev/reset` runs every 100 ms (a torn read — 401, 404, an empty list — counts as an error); exit 0 iff p99 < 500 ms and errors < 1 %. Also a weekly CI job (`conformance.yml`). |
 | `soak_test.py` | A long day of client traffic in-process — token fetches, polls, searches, actions, HEC acks, scrolls across all eight mounts — with the clock moved forward per request (default 50,000 requests ≈ 42 simulated hours, about four minutes). Samples every store collection, the module-level caches and RSS; exit 1 if anything still grows linearly in the second half that is not bounded by a documented cap or lifetime. |
+| `run_collections.py --base-url <mock>` | Runs the Postman collection with newman and the Bruno one with `bru`, both fetched by `npx` (network the first time, nothing installed globally), from nothing but the base URLs, against a running mock. Exit 1 on any answer of 400 or above that is not listed in the script as expected. Needs a live server, so it is not in CI. |
 | `../conformance/` | Splunk / Elasticsearch / Kibana against the real products; also a weekly/on-demand CI workflow (`conformance.yml`). |
 
 ## Run when a vendor reference changes
