@@ -24,6 +24,8 @@ CAPS: dict[str, int] = {
     "mde_oauth_tokens": 5_000,
     "graph_oauth_tokens": 5_000,
     "sentinel_oauth_tokens": 5_000,
+    "es_tokens": 5_000,
+    "es_refresh_tokens": 5_000,
 }
 
 
@@ -92,6 +94,8 @@ class InMemoryStore:
             "es_exception_items": {},
             "es_action_responses": {},
             "es_api_keys": {},
+            "es_tokens": {},           # keyed by access token string
+            "es_refresh_tokens": {},   # keyed by refresh token string
             # ── Microsoft Defender for Endpoint collections ────────────────
             "mde_oauth_clients": {},
             "mde_oauth_tokens": {},   # keyed by access token string

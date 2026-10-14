@@ -112,58 +112,160 @@ class TestEsApiKeyAuth:
 
 
 class TestEsTokenEndpoint:
-    """Tests for POST /elastic/_security/oauth2/token."""
+    """POST /elastic/_security/oauth2/token, as the get-token reference has it.
+
+    The token was a bare uuid that the Bearer check then refused, issued to
+    anyone without asking who was calling, valid for an hour, and with no
+    refresh token or `authentication` member. Elasticsearch requires an
+    authenticated caller, issues a token that works as `Authorization:
+    Bearer`, lets it live 20 minutes, and answers a `refresh_token` for the
+    password grant only (security-api-get-token.html, 8.15;
+    TransportCreateTokenAction and TokenService at v8.15.0).
+    """
+
+    URL = "/elastic/_security/oauth2/token"
+    PASSWORD = {"grant_type": "password", "username": "elastic",
+                "password": "mock-elastic-password"}
 
     def test_valid_credentials_return_200(self, client: TestClient) -> None:
-        """Valid username/password should return an access token."""
-        resp = client.post("/elastic/_security/oauth2/token", json={
-            "grant_type": "password",
-            "username": "elastic",
-            "password": "mock-elastic-password",
-        })
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json=self.PASSWORD)
         assert resp.status_code == 200
 
-    def test_token_response_has_correct_fields(self, client: TestClient) -> None:
-        """Token response must include access_token, type, and expires_in."""
-        resp = client.post("/elastic/_security/oauth2/token", json={
-            "grant_type": "password",
-            "username": "elastic",
-            "password": "mock-elastic-password",
-        })
-        body = resp.json()
-        assert "access_token" in body
-        assert isinstance(body["access_token"], str)
-        assert len(body["access_token"]) > 0
+    def test_the_endpoint_is_not_anonymous(self, client: TestClient) -> None:
+        resp = client.post(self.URL, json=self.PASSWORD)
+        assert resp.status_code == 401
+        assert resp.json()["error"]["type"] == "security_exception"
+
+    def test_password_grant_answers_the_whole_document(self, client: TestClient) -> None:
+        body = client.post(self.URL, headers=ES_BASIC_AUTH, json=self.PASSWORD).json()
+        assert set(body) == {"access_token", "type", "expires_in",
+                             "refresh_token", "authentication"}
         assert body["type"] == "Bearer"
-        assert body["expires_in"] == 3600
+        assert body["expires_in"] == 1200
+        assert body["authentication"]["username"] == "elastic"
+        assert body["authentication"]["authentication_type"] == "realm"
+
+    def test_client_credentials_answer_no_refresh_token(self, client: TestClient) -> None:
+        body = client.post(self.URL, headers=ES_ANALYST_AUTH,
+                           json={"grant_type": "client_credentials"}).json()
+        assert "refresh_token" not in body
+        assert body["authentication"]["username"] == "analyst"
+
+    def test_the_token_works_as_a_bearer(self, client: TestClient) -> None:
+        token = client.post(self.URL, headers=ES_BASIC_AUTH,
+                            json=self.PASSWORD).json()["access_token"]
+        resp = client.get("/elastic/_cluster/health",
+                          headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 200, resp.text
+
+    def test_a_bearer_keeps_its_users_role(self, client: TestClient) -> None:
+        token = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "password", "username": "viewer",
+            "password": "mock-viewer-password"}).json()["access_token"]
+        resp = client.post("/kibana/api/detection_engine/rules", headers={
+            "Authorization": f"Bearer {token}", "kbn-xsrf": "true"},
+            json={"name": "x", "type": "query", "risk_score": 1, "severity": "low"})
+        assert resp.status_code == 403
 
     def test_invalid_credentials_return_401(self, client: TestClient) -> None:
-        """Wrong password should return 401."""
-        resp = client.post("/elastic/_security/oauth2/token", json={
-            "grant_type": "password",
-            "username": "elastic",
-            "password": "wrong-password",
-        })
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            **self.PASSWORD, "password": "wrong-password"})
         assert resp.status_code == 401
+        assert resp.json()["error"]["reason"] == (
+            "unable to authenticate user [elastic] for action "
+            "[cluster:admin/xpack/security/token/create]")
 
     def test_unknown_user_return_401(self, client: TestClient) -> None:
-        """Non-existent username should return 401."""
-        resp = client.post("/elastic/_security/oauth2/token", json={
-            "grant_type": "password",
-            "username": "nobody",
-            "password": "anything",
-        })
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "password", "username": "nobody", "password": "anything"})
         assert resp.status_code == 401
 
     def test_analyst_token_return_200(self, client: TestClient) -> None:
-        """Analyst user should obtain a token successfully."""
-        resp = client.post("/elastic/_security/oauth2/token", json={
-            "grant_type": "password",
-            "username": "analyst",
-            "password": "mock-analyst-password",
-        })
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "password", "username": "analyst",
+            "password": "mock-analyst-password"})
         assert resp.status_code == 200
         assert "access_token" in resp.json()
+
+    def test_an_unknown_grant_type_is_oauths_own_error(self, client: TestClient) -> None:
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={"grant_type": "magic"})
+        assert resp.status_code == 400
+        assert resp.json() == {
+            "error": "unsupported_grant_type",
+            "error_description": "Validation Failed: 1: grant_type only supports the "
+                                 "values: [password, _kerberos, refresh_token, "
+                                 "client_credentials];",
+        }
+
+    def test_a_password_grant_without_its_password(self, client: TestClient) -> None:
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "password", "username": "elastic"})
+        assert resp.status_code == 400
+        assert resp.json() == {"error": "invalid_request",
+                               "error_description": "Validation Failed: 1: password is missing;"}
+
+
+class TestEsTokenRefreshAndInvalidation:
+    """The refresh grant and `DELETE /_security/oauth2/token`, neither of which existed.
+
+    A refresh token can be used once; a second refresh inside 30 seconds
+    answers the same pair (`checkMultipleRefreshes`). Invalidation answers
+    the counts of `TokensInvalidationResult`, and 404 with every count at
+    zero for a token nobody holds (invalidate-tokens reference, 8.15).
+    """
+
+    URL = "/elastic/_security/oauth2/token"
+
+    def _pair(self, client: TestClient) -> dict:
+        return client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "password", "username": "elastic",
+            "password": "mock-elastic-password"}).json()
+
+    def test_a_refresh_answers_a_new_pair(self, client: TestClient) -> None:
+        first = self._pair(client)
+        second = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "refresh_token", "refresh_token": first["refresh_token"]}).json()
+        assert second["access_token"] != first["access_token"]
+        assert second["refresh_token"] != first["refresh_token"]
+        again = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "refresh_token", "refresh_token": first["refresh_token"]}).json()
+        assert again == second
+
+    def test_an_unknown_refresh_token_is_an_invalid_grant(self, client: TestClient) -> None:
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "refresh_token", "refresh_token": "nope"})
+        assert resp.status_code == 400
+        assert resp.json() == {"error": "invalid_grant",
+                               "error_description": "could not refresh the requested token"}
+
+    def test_an_invalidated_token_stops_working(self, client: TestClient) -> None:
+        token = self._pair(client)["access_token"]
+        resp = client.request("DELETE", self.URL, headers=ES_BASIC_AUTH,
+                              json={"token": token})
+        assert resp.status_code == 200
+        assert resp.json() == {"invalidated_tokens": 1,
+                               "previously_invalidated_tokens": 0, "error_count": 0}
+        again = client.request("DELETE", self.URL, headers=ES_BASIC_AUTH,
+                               json={"token": token})
+        assert again.json()["previously_invalidated_tokens"] == 1
+        bearer = client.get("/elastic/_cluster/health",
+                            headers={"Authorization": f"Bearer {token}"})
+        assert bearer.status_code == 401
+
+    def test_a_token_nobody_holds_is_404(self, client: TestClient) -> None:
+        resp = client.request("DELETE", self.URL, headers=ES_BASIC_AUTH,
+                              json={"token": "never-issued"})
+        assert resp.status_code == 404
+        assert resp.json()["invalidated_tokens"] == 0
+
+    def test_an_invalidated_refresh_token_cannot_refresh(self, client: TestClient) -> None:
+        refresh = self._pair(client)["refresh_token"]
+        client.request("DELETE", self.URL, headers=ES_BASIC_AUTH,
+                       json={"refresh_token": refresh})
+        resp = client.post(self.URL, headers=ES_BASIC_AUTH, json={
+            "grant_type": "refresh_token", "refresh_token": refresh})
+        assert resp.json() == {"error": "invalid_grant",
+                               "error_description": "token has been invalidated"}
 
 
 class TestEsRbac:

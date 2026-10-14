@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import hmac
 import os
+import time
 
 from fastapi import Depends, Header, HTTPException, Request
 
@@ -149,6 +150,19 @@ def _decode_api_key(header_value: str) -> dict | None:
     return {"user": key_id, "role": record.get("role", "viewer")}
 
 
+def token_user(access_token: str) -> dict | None:
+    """The caller an OAuth2 access token stands for, or None for nobody.
+
+    An expired or invalidated token is no token at all, as on the cluster.
+    """
+    record = store.get("es_tokens", access_token)
+    if record is None or record.get("invalidated"):
+        return None
+    if float(record.get("expires_at", 0)) <= time.time():
+        return None
+    return {"user": record["user"], "role": record["role"]}
+
+
 # ── Public dependencies ──────────────────────────────────────────────────────
 
 def _attempted_user(authorization: str | None) -> str:
@@ -251,17 +265,16 @@ async def require_es_auth(
     elif lower.startswith("apikey "):
         result = _decode_api_key(authorization[7:])
     elif lower.startswith("bearer "):
-        token_value = authorization[7:]
-        # Bearer tokens must use full id:key format for validation
-        if ":" not in token_value:
-            result = None
-        else:
+        token_value = authorization[7:].strip()
+        # An access token from `POST /_security/oauth2/token` is presented
+        # exactly like this (security-api-get-token.html, 8.15). The endpoint
+        # used to issue tokens this check then refused.
+        result = token_user(token_value)
+        if result is None and ":" in token_value:
             key_id, api_key = token_value.split(":", 1)
             record = store.get("es_api_keys", key_id)
             if record is not None and hmac.compare_digest(record.get("api_key", ""), api_key):
                 result = {"user": record.get("name", key_id), "role": record.get("role", "viewer")}
-            else:
-                result = None
     else:
         result = None
 

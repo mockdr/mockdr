@@ -281,6 +281,8 @@ _RAW_COLLECTIONS = {
     "cs_oauth_tokens",
     # Elastic Security
     "es_api_keys",
+    "es_tokens",
+    "es_refresh_tokens",
     # The management console's own settings, which `PUT /system/configuration`
     # changes: a console that forgot them on restart would answer a client
     # its own change had never happened.
