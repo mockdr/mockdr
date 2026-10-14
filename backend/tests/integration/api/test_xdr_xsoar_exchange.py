@@ -76,3 +76,37 @@ class TestExtraDataHostIpIsAString:
         stored = xdr_alert_repo.get(alert["alert_id"])
         assert stored is not None
         assert alert["host_ip"] == (", ".join(stored.host_ip) or None)
+
+
+class TestDistributionVersionsPerPlatform:
+    """``xdr-get-distribution-versions`` tables one list per platform.
+
+    Cortex answers ``{"windows": [...], "linux": [...], "macos": [...]}``
+    and nothing else (XSOAR test_data ``get_distribution_versions.json``);
+    the CoreIRApiModule's ``get_distribution_versions_command`` iterates the
+    reply's keys and tables each value as a list of versions. The mock sent
+    the three platforms empty beside an invented ``data`` list -- every
+    version labelled ``windows`` -- and ``total_count``/``result_count``
+    integers, and the command raised ``object of type 'int' has no len()``.
+    """
+
+    def test_the_reply_is_three_lists_of_versions(self, client: TestClient) -> None:
+        response = client.post(f"{XDR}/distributions/get_versions/",
+                               headers=_xsoar_headers(), json={})
+        assert response.status_code == 200, response.text
+        reply = response.json()["reply"]
+        assert set(reply) == {"windows", "linux", "macos"}
+        for versions in reply.values():
+            assert isinstance(versions, list)
+            assert all(isinstance(v, str) and v.count(".") == 3 for v in versions)
+        assert all(reply.values()), "every seeded platform offers a version"
+
+    def test_each_platform_offers_its_own_distributions_versions(
+        self, client: TestClient,
+    ) -> None:
+        from repository.xdr_distribution_repo import xdr_distribution_repo
+
+        reply = client.post(f"{XDR}/distributions/get_versions/",
+                            headers=_xsoar_headers(), json={}).json()["reply"]
+        for dist in xdr_distribution_repo.list_all():
+            assert dist.agent_version in reply[dist.platform]
