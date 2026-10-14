@@ -3,6 +3,8 @@ import json
 
 from fastapi.testclient import TestClient
 
+from tests.clock import Clock
+
 SPLUNK_PREFIX = "/splunk"
 HEC_TOKEN = "11111111-1111-1111-1111-111111111111"
 
@@ -146,3 +148,50 @@ class TestHecAck:
         assert acks[str(issued)] is True
         # An id this channel was never given must not come back acknowledged.
         assert acks["9999"] is False
+
+    def test_an_ack_answered_true_is_forgotten(self, client: TestClient) -> None:
+        """HEC deletes an ackID's status once a client has seen it true.
+
+        "If you query the same ackID again, HEC returns false" (Splunk, "About
+        HTTP Event Collector Indexer Acknowledgment"). The mock kept every id
+        it issued for the life of the process.
+        """
+        channel = {"X-Splunk-Request-Channel": "forgetful-channel"}
+        issued = client.post(
+            f"{SPLUNK_PREFIX}/services/collector/event", json={"event": "x"},
+            params={"useACK": "true"}, headers={**_hec_auth(), **channel},
+        ).json()["ackId"]
+
+        def ask() -> bool:
+            return bool(client.post(
+                f"{SPLUNK_PREFIX}/services/collector/ack", json={"acks": [issued]},
+                headers={**_hec_auth(), **channel},
+            ).json()["acks"][str(issued)])
+
+        assert ask() is True
+        assert ask() is False
+
+    def test_an_idle_channel_is_forgotten(self, client: TestClient, clock: Clock) -> None:
+        """inputs.conf ``maxIdleTime = 600`` with ``ackIdleCleanup = true``.
+
+        A forwarder that opens a channel per batch left one entry per batch
+        for the life of the process.
+        """
+        from api.routers.splunk import splunk_hec
+
+        splunk_hec.reset_ack_state()  # earlier tests' channels live outside the store
+        for n in range(3):
+            client.post(
+                f"{SPLUNK_PREFIX}/services/collector/event", json={"event": n},
+                params={"useACK": "true"},
+                headers={**_hec_auth(), "X-Splunk-Request-Channel": f"batch-{n}"},
+            )
+        clock.advance(300)
+        client.post(
+            f"{SPLUNK_PREFIX}/services/collector/ack", json={"acks": [5]},
+            headers={**_hec_auth(), "X-Splunk-Request-Channel": "batch-0"},
+        )
+        clock.advance(301)
+
+        assert splunk_hec.reap_idle_channels() == 2
+        assert set(splunk_hec._ISSUED_ACKS) == {"batch-0"}

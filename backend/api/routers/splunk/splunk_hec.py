@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import itertools
+import time
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -28,6 +29,16 @@ router = APIRouter(tags=["Splunk HEC"])
 # reason a forwarder sets useACK at all — could not be exercised.
 _ACK_COUNTERS: dict[str, itertools.count] = {}
 _ISSUED_ACKS: dict[str, set[int]] = {}
+#: When each channel was last used, to forget idle ones.
+_CHANNEL_SEEN: dict[str, float] = {}
+
+#: inputs.conf ``[http] maxIdleTime`` with ``ackIdleCleanup = true``, both
+#: defaults: "the server removes the ACK channels that are idle for
+#: 'maxIdleTime' seconds", 600 (Splunk 10.4 inputs.conf.spec). A forwarder
+#: that opens a new channel per batch — many do, the channel being any GUID
+#: the client makes up — left one entry here per batch for the life of the
+#: process.
+_CHANNEL_MAX_IDLE_SECONDS = 600
 
 
 def reset_ack_state() -> None:
@@ -42,12 +53,28 @@ def reset_ack_state() -> None:
     """
     _ACK_COUNTERS.clear()
     _ISSUED_ACKS.clear()
+    _CHANNEL_SEEN.clear()
+
+
+def reap_idle_channels(now: float | None = None) -> int:
+    """Forget every ack channel idle past ``maxIdleTime``; how many were forgotten."""
+    moment = time.time() if now is None else now
+    idle = [
+        channel for channel, seen in list(_CHANNEL_SEEN.items())
+        if moment - seen > _CHANNEL_MAX_IDLE_SECONDS
+    ]
+    for channel in idle:
+        _CHANNEL_SEEN.pop(channel, None)
+        _ACK_COUNTERS.pop(channel, None)
+        _ISSUED_ACKS.pop(channel, None)
+    return len(idle)
 
 
 def _next_ack(channel: str) -> int:
     counter = _ACK_COUNTERS.setdefault(channel, itertools.count())
     ack_id: int = next(counter)
     _ISSUED_ACKS.setdefault(channel, set()).add(ack_id)
+    _CHANNEL_SEEN[channel] = time.time()
     return ack_id
 
 
@@ -176,10 +203,18 @@ def hec_ack(
         return _error_response(HecError(*NO_CHANNEL))
 
     issued = _ISSUED_ACKS.get(x_splunk_request_channel, set())
+    if x_splunk_request_channel in _CHANNEL_SEEN:
+        _CHANNEL_SEEN[x_splunk_request_channel] = time.time()
     acks = body.get("acks", [])
     # Only ids this channel was actually given can be acknowledged; every id
     # used to come back True, including ones never issued.
-    return {"acks": {str(ack_id): ack_id in issued for ack_id in acks}}
+    answer = {str(ack_id): ack_id in issued for ack_id in acks}
+    # "Once a client retrieves a true status for an ackID, HEC deletes that
+    # ackID status information", so asking again answers false (Splunk,
+    # "About HTTP Event Collector Indexer Acknowledgment"). The mock kept
+    # every id it ever issued, answering true for ever.
+    issued.difference_update(ack_id for ack_id in acks if isinstance(ack_id, int))
+    return {"acks": answer}
 
 
 # ── The simple receiver ──────────────────────────────────────────────────────
