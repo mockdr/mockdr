@@ -711,8 +711,11 @@ async def es_mget_all(
 
 @router.post("/_bulk", operation_id="es_bulk")
 @router.put("/_bulk", operation_id="es_bulk_put")
+@router.post("/{index:esindex}/_bulk", operation_id="es_bulk_index")
+@router.put("/{index:esindex}/_bulk", operation_id="es_bulk_index_put")
 async def es_bulk(
     request: Request,
+    index: str = "",
     refresh: str | None = Query(default=None),
     _: dict = Depends(require_es_write),
 ) -> dict:
@@ -728,6 +731,12 @@ async def es_bulk(
     `update` of something absent created it — and `errors` was reported as
     `false` throughout, which is the one field a client checks. Bulk is how
     everything is written at scale, and none of it was.
+
+    `/{index}/_bulk` names the index every action without its own `_index`
+    writes to (BulkRequestParser's `defaultIndex`). The whole body is parsed
+    and validated before anything is written, as `BulkRequest.validate()`
+    does: an action that ends up with no index at all fails the request with
+    `action_request_validation_exception`, and nothing in it is applied.
     """
     raw = (await request.body()).decode("utf-8", errors="replace")
     lines = [line for line in raw.split("\n") if line.strip()]
@@ -735,11 +744,7 @@ async def es_bulk(
         raise HTTPException(status_code=400, detail=build_es_error_response(
             400, "parse_exception", "request body is required",
         ))
-    items: list[dict] = []
-    # `_bulk` obeys the same near-real-time rule as a single write: nothing
-    # it indexes is searchable until a refresh, and nothing it deletes stops
-    # being searchable until one.  Measured on 8.15.
-    forced = _makes_visible(refresh)
+    actions: list[tuple[str, dict, dict]] = []
     i = 0
     while i < len(lines):
         try:
@@ -768,15 +773,53 @@ async def es_bulk(
                     raise HTTPException(status_code=400, detail=build_es_error_response(
                         400, "x_content_parse_exception", _jackson_message(lines[i], exc, i + 1),
                     )) from exc
-        index = str(meta.get("_index") or "")
-        doc_id = str(meta.get("_id") or new_hex()[:20])
-        items.append({verb: _bulk_action(verb, index, doc_id, doc,
-                                         refresh=forced)})
+        actions.append((verb, meta, doc))
         i += 1
-    errors = any(
-        int(next(iter(item.values())).get("status", 200)) >= 400 for item in items
-    )
+
+    problems = [
+        problem for verb, meta, _doc in actions
+        for problem in _bulk_validation_errors(verb, meta, index)
+    ]
+    if problems:
+        raise HTTPException(status_code=400, detail=build_es_error_response(
+            400, "action_request_validation_exception",
+            "Validation Failed: " + "".join(
+                f"{n}: {problem};" for n, problem in enumerate(problems, 1)
+            ),
+        ))
+
+    items: list[dict] = []
+    # `_bulk` obeys the same near-real-time rule as a single write: nothing
+    # it indexes is searchable until a refresh, and nothing it deletes stops
+    # being searchable until one.  Measured on 8.15.
+    forced = _makes_visible(refresh)
+    for verb, meta, doc in actions:
+        target = str(meta.get("_index") or index)
+        doc_id = str(meta.get("_id") or new_hex()[:20])
+        items.append({verb: _bulk_action(verb, target, doc_id, doc,
+                                         refresh=forced)})
+    # Only an item that carries an `error` is a failure. A delete that found
+    # nothing answers 404 with `result: not_found` and no error object, and
+    # the bulk reference's own example (docs-bulk.html, 8.15) shows exactly
+    # that item beside `"errors": false`.
+    errors = any("error" in next(iter(item.values())) for item in items)
     return {"errors": errors, "took": 1, "items": items}
+
+
+def _bulk_validation_errors(verb: str, meta: dict, default_index: str) -> list[str]:
+    """What `validate()` says about one bulk action, in its order.
+
+    Every write request first checks it has an index (ReplicationRequest,
+    InstanceShardOperationRequest); a delete or an update then needs an id,
+    where an index or create may leave it to be generated (DeleteRequest,
+    UpdateRequest, IndexRequest at v8.15.0).
+    """
+    problems: list[str] = []
+    if not (meta.get("_index") or default_index):
+        problems.append("index is missing")
+    if verb in ("delete", "update") and not meta.get("_id"):
+        problems.append("id is missing")
+    return problems
 
 
 def _bulk_item_error(index: str, doc_id: str, status: int,
