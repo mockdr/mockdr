@@ -24,6 +24,7 @@ def insert_parsed_alerts(alerts: list[dict]) -> dict:
         alert_id = alert_data.get("alert_id", str(uuid.uuid4()))
         alert = XdrAlert(
             alert_id=alert_id,
+            internal_id=next_internal_id(),
             severity=alert_data.get("severity", "medium"),
             name=alert_data.get("product", "External Alert"),
             description=alert_data.get("alert_name", ""),
@@ -88,6 +89,7 @@ def insert_cef_alerts(alerts: list[dict]) -> dict:
         alert_id = str(uuid.uuid4())
         alert = XdrAlert(
             alert_id=alert_id,
+            internal_id=next_internal_id(),
             severity=alert_data.get("severity", "medium"),
             name=alert_data.get("name", "CEF Alert"),
             description=alert_data.get("cef_version", ""),
@@ -107,3 +109,13 @@ def _epoch_ms() -> int:
     from datetime import UTC, datetime
 
     return int(datetime.now(UTC).timestamp() * 1000)
+
+
+def next_internal_id() -> int:
+    """The next free ``internal_id``: one above the highest any alert holds.
+
+    An inserted alert had none at all, and answered ``"internal_id": ""``
+    where every other alert answers an integer.
+    """
+    held = [a.internal_id for a in xdr_alert_repo.list_all() if isinstance(a.internal_id, int)]
+    return max(held, default=0) + 1

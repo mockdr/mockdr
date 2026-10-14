@@ -67,12 +67,11 @@ def alert_fields(record: dict) -> dict:
     are ``SEARCH_FIELD``s in ``init_filter_args_options``, ``agent_hostname``
     is the "Host Name" column of ``xdr-get-alerts``.
     """
-    internal = str(record.get("internal_id") or "")
     endpoint = xdr_endpoint_repo.get(str(record.get("endpoint_id") or ""))
     timestamp = record.get("detection_timestamp")
     action = str(record.get("alert_action_status") or "")
     return {
-        "internal_id": int(internal) if internal.isdigit() else internal,
+        "internal_id": record.get("internal_id"),
         "external_id": record.get("alert_id"),
         "alert_source": _SOURCE_CODES.get(str(record.get("source")), record.get("source")),
         "matching_status": "MATCHED",
@@ -174,9 +173,8 @@ def get_original_alerts(alert_ids: list[str]) -> dict:
         if not alert:
             continue
         record = record_dict(alert)
-        internal = str(record.get("internal_id") or "")
         rows.append({
-            "internal_id": int(internal) if internal.isdigit() else internal,
+            "internal_id": record.get("internal_id"),
             "original_alert_json": json.dumps(record, default=str),
         })
 

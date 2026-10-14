@@ -10,7 +10,10 @@ class XdrAlert:
     """
 
     alert_id: str
-    internal_id: str = ""
+    #: An integer, as Cortex answers it (XSOAR's recorded replies:
+    #: ``"internal_id": 33333`` in get_alerts_by_filter_data, ``333`` in
+    #: get_original_alerts).
+    internal_id: int = 0
     severity: str = "medium"  # low / medium / high / critical
     category: str = ""
     action: str = ""

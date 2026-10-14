@@ -61,7 +61,10 @@ def seed_xdr_alerts(
 
         xdr_alert_repo.save(XdrAlert(
             alert_id=aid,
-            internal_id=xdr_id("INT"),
+            # The same sixteen draws as the "INT_<hex>" string this was, so no
+            # other seeded value moves; seven hex digits keep it inside a
+            # JavaScript number.
+            internal_id=int(xdr_id("INT")[4:11], 16),
             severity=severity,
             category=random.choice(XDR_ALERT_CATEGORIES),
             action=action,

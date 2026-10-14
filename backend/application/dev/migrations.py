@@ -58,6 +58,19 @@ def _threat(record: dict) -> bool:
     return True
 
 
+def _xdr_alert(record: dict) -> bool:
+    """2.6 seeded ``internal_id`` as an ``INT_<hex>`` string; Cortex sends an integer."""
+    old = record.get("internal_id")
+    if not isinstance(old, str):
+        return False
+    hex_part = old[4:11] if old.startswith("INT_") else ""
+    try:
+        record["internal_id"] = int(hex_part, 16) if hex_part else int(old or 0)
+    except ValueError:
+        record["internal_id"] = 0
+    return True
+
+
 def _xql_query(record: dict) -> bool:
     new = _XQL_STATUS.get(str(record.get("status", "")))
     if new is None:
@@ -70,6 +83,7 @@ _RULES = {
     "xdr_endpoints": _xdr_endpoint,
     "threats": _threat,
     "xdr_xql_queries": _xql_query,
+    "xdr_alerts": _xdr_alert,
 }
 
 
