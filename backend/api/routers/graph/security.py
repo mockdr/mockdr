@@ -112,11 +112,12 @@ async def get_incident(
 # the official Graph SDKs are generated from that OpenAPI, so an SDK client
 # sends the qualified segment and nothing else.
 
-@router.post("/v1.0/security/runHuntingQuery", dependencies=[Depends(require_graph_write)])
-@router.post(
-    "/v1.0/security/microsoft.graph.security.runHuntingQuery",
-    dependencies=[Depends(require_graph_write)],
-)
+#
+# A hunt reads: its least-privileged permission is `ThreatHunting.Read.All`,
+# so a reader may run one. It used to demand a writer.
+
+@router.post("/v1.0/security/runHuntingQuery")
+@router.post("/v1.0/security/microsoft.graph.security.runHuntingQuery")
 async def run_hunting_query(
     body: dict = Body(...),
     _: dict = Depends(require_graph_feature("security/runHuntingQuery")),

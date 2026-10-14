@@ -154,12 +154,35 @@ class TestGraphHunting:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert "Schema" in body
-        assert "Results" in body
-        assert "Stats" in body
-        assert isinstance(body["Schema"], list)
-        assert isinstance(body["Results"], list)
-        assert len(body["Results"]) >= 1
+        assert isinstance(body["schema"], list)
+        assert isinstance(body["results"], list)
+        assert len(body["results"]) >= 1
+
+    def test_hunting_answers_in_graphs_envelope_not_defenders(
+        self, client: TestClient, graph_admin_headers: dict,
+    ) -> None:
+        """A `huntingQueryResults`: camelCase `schema` of `{name, type}`, no `Stats`.
+
+        The route handed back Defender's `Schema`/`Results` verbatim, which a
+        Graph SDK reads as an empty result. Shape per the runHuntingQuery
+        reference, Example 1.
+        """
+        body = client.post(
+            "/graph/v1.0/security/runHuntingQuery",
+            json={"Query": "DeviceInfo | project Timestamp, DeviceName | take 1"},
+            headers=graph_admin_headers,
+        ).json()
+
+        assert set(body) == {"@odata.context", "schema", "results"}
+        assert body["@odata.context"].endswith(
+            "$metadata#microsoft.graph.security.huntingQueryResults",
+        )
+        assert body["schema"] == [
+            {"name": "Timestamp", "type": "DateTime"},
+            {"name": "DeviceName", "type": "String"},
+        ]
+        # The rows keep the table's own column names.
+        assert set(body["results"][0]) == {"Timestamp", "DeviceName"}
 
     def test_the_qualified_spelling_is_the_same_endpoint(
         self, client: TestClient, graph_admin_headers: dict,
@@ -181,7 +204,7 @@ class TestGraphHunting:
             json=body, headers=graph_admin_headers,
         )
         assert qualified.status_code == plain.status_code == 200
-        assert qualified.json()["Schema"] == plain.json()["Schema"]
+        assert qualified.json()["schema"] == plain.json()["schema"]
 
     def test_the_qualified_spelling_is_gated_the_same_way(
         self, client: TestClient, graph_p1_headers: dict,
@@ -193,6 +216,32 @@ class TestGraphHunting:
             headers=graph_p1_headers,
         )
         assert resp.status_code == 403
+
+    def test_device_network_events_is_a_table(self, client: TestClient) -> None:
+        """mockdr/mockdr#51: the reporter's query, with the reporter's client.
+
+        `DeviceNetworkEvents | take 1` answered 400 "a recognized table name
+        is expected" to a plan 2 token.
+        """
+        token = client.post(
+            "/graph/oauth2/v2.0/token",
+            data={
+                "client_id": "graph-mock-security-client",
+                "client_secret": "graph-mock-security-secret",
+                "grant_type": "client_credentials",
+                "scope": "https://graph.microsoft.com/.default",
+            },
+        ).json()["access_token"]
+
+        resp = client.post(
+            "/graph/v1.0/security/runHuntingQuery",
+            json={"Query": "DeviceNetworkEvents | take 1"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert resp.status_code == 200, resp.text
+        [row] = resp.json()["results"]
+        assert row["RemoteUrl"] or row["RemoteIP"]
 
     def test_plan1_cannot_hunt(
         self, client: TestClient, graph_p1_headers: dict,

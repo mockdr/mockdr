@@ -4056,7 +4056,7 @@ class TestGraphHuntsTheSameDataDefenderDoes:
         graph = self._hunt(client, "graph", kql)
         mde = self._hunt(client, "mde", kql)
         assert graph.status_code == mde.status_code == 200
-        assert len(graph.json()["Results"]) == len(mde.json()["Results"])
+        assert len(graph.json()["results"]) == len(mde.json()["Results"])
 
     def test_a_where_that_excludes_everything_returns_nothing(
         self, client: TestClient,
@@ -4064,8 +4064,8 @@ class TestGraphHuntsTheSameDataDefenderDoes:
         """It used to return three rows."""
         body = self._hunt(
             client, "graph", "AlertInfo | where Severity == 'zzz-nothing'").json()
-        assert body["Results"] == []
-        assert body["Schema"], "a filtered-out query still has a schema"
+        assert body["results"] == []
+        assert body["schema"], "a filtered-out query still has a schema"
 
     def test_a_table_this_install_does_not_have(
         self, client: TestClient,
@@ -4078,7 +4078,7 @@ class TestGraphHuntsTheSameDataDefenderDoes:
         self, client: TestClient,
     ) -> None:
         """The canned rows named devices no machine here matched."""
-        row = self._hunt(client, "graph", "DeviceInfo | take 1").json()["Results"][0]
+        row = self._hunt(client, "graph", "DeviceInfo | take 1").json()["results"][0]
         machine = client.get(f"/mde/api/machines/{row['DeviceId']}",
                              headers=self._headers(client, "mde"))
         assert machine.status_code == 200

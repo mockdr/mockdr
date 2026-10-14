@@ -191,18 +191,33 @@ def run_hunting_query(body: dict) -> dict:
     device ids in them that this install does not have — so a hunter who
     followed a result to `managedDevices/{id}` got a 404 for a device the
     hunt had just reported. It runs the same evaluator over the same tables
-    now, and answers in the envelope this mount already answered in.
+    now.
+
+    The rows are Defender's; the envelope is Graph's. Graph answers a
+    ``microsoft.graph.security.huntingQueryResults`` — ``schema`` of
+    ``{name, type}`` and ``results``, camelCase, with no ``Stats`` — and
+    this route used to hand back Defender's ``Schema``/``Results`` verbatim,
+    which a Graph SDK deserialises as an empty result.
 
     Args:
         body: Request body containing ``Query`` (a KQL string).
 
     Returns:
-        Hunting response with ``Schema``, ``Results`` and ``Stats``.
+        A ``huntingQueryResults`` with ``@odata.context``, ``schema`` and
+        ``results``.
 
     Raises:
         KqlError: If the query cannot be parsed or names an unknown table.
     """
-    return run_hunt(body)
+    hunt = run_hunt(body)
+    return {
+        "@odata.context": (
+            "https://graph.microsoft.com/v1.0/$metadata"
+            "#microsoft.graph.security.huntingQueryResults"
+        ),
+        "schema": [{"name": c["Name"], "type": c["Type"]} for c in hunt["Schema"]],
+        "results": hunt["Results"],
+    }
 
 
 
