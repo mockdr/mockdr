@@ -151,6 +151,17 @@ def create_search_job(
         parsed.from_search_string = False
 
     events, results, messages = _execute_query(parsed)
+    scanned = len(events)
+    if not _transforms(parsed) and not _generates_its_own_rows(parsed):
+        # "eventCount: The number of events returned by the search" (REST
+        # reference, search/jobs/{search_id}). A search with no transforming
+        # command returns events -- the rows its streaming commands left --
+        # and the reference's own example of one has eventCount equal to
+        # resultCount (287 and 287). `| head 25` over 529 matches reported
+        # eventCount 529 and served all 529 from /events. A transforming
+        # search keeps the events it consumed: the reference's `| chart ...
+        # | head 5` answers eventCount 1363, resultCount 4.
+        events = results
     # splunkd marks a search that could not run FAILED; a client polling
     # dispatchState saw DONE here and concluded the empty result set was the
     # answer. The job entry repeats the FATAL line as an ERROR — the results
@@ -172,7 +183,9 @@ def create_search_job(
         # the pipeline produced. A transforming search makes them differ.
         event_count=len(events),
         result_count=len(results),
-        scan_count=len(events),
+        # "The number of events that are scanned or read off disk": what the
+        # search terms matched, before any command narrowed it.
+        scan_count=scanned,
         results=results,
         events=events,
         messages=messages,
@@ -291,6 +304,18 @@ def delete_search_job(sid: str) -> bool:
 #: Commands that produce their own rows rather than reading events. A search
 #: that starts with one matches nothing, however many events the index holds.
 _GENERATING_COMMANDS = frozenset({"makeresults"})
+
+
+#: The transforming commands this executor implements: each turns events into
+#: a table of results ("Command types", Splunk Search Manual -- stats,
+#: timechart, top and rare among them). Every other command streams events
+#: or reorders them.
+_TRANSFORMING_COMMANDS = frozenset({"stats", "timechart", "top", "rare"})
+
+
+def _transforms(parsed: SPLQuery) -> bool:
+    """Whether the pipeline contains a transforming command."""
+    return any(c.name in _TRANSFORMING_COMMANDS for c in parsed.commands)
 
 
 def _generates_its_own_rows(parsed: SPLQuery) -> bool:
