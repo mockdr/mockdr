@@ -122,3 +122,22 @@ async def run_periodically(interval: float | None = None) -> None:
             continue
         if any(freed.values()):
             logger.debug("housekeeping freed %s", freed)
+
+
+async def reseed_periodically(interval: float) -> None:
+    """Re-seed every *interval* seconds until cancelled (``MOCKDR_RESEED_INTERVAL``).
+
+    Exactly ``/_dev/reset``: the data set back to the seed, dated from now,
+    with issued credentials kept. See ``config.RESEED_INTERVAL_SECONDS``
+    for why a long-running instance needs it.
+    """
+    from application.dev.commands import reset
+
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            reset()
+        except Exception:  # a failed re-seed must not end the loop
+            logger.exception("scheduled re-seed failed")
+            continue
+        logger.info("re-seeded (MOCKDR_RESEED_INTERVAL=%ss)", interval)

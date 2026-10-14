@@ -379,6 +379,31 @@ The server sweeps every minute; `/_dev/reset` sweeps before it carries
 issued credentials over. A client that relies on a token, job or scroll
 outliving what the product allows will see the product's refusal here too.
 
+An action settles on the device's time, too: a containment, isolation,
+connect/disconnect, Defender or Elastic response action completes about a
+second after it was asked for, whoever reads it and whenever — so Splunk,
+searched without ever asking the vendor's own API, shows the settled state,
+dated when it settled.
+
+**The seed ages.** Every seeded record is dated relative to the moment it was
+seeded, and stays where it was put: same seed, same clock, same answer. A
+tenant's data ages too — but a real tenant keeps receiving new data, and the
+mock does not. Measured with the clock moved forward:
+
+| Instance age | What a client sees |
+| --- | --- |
+| 1 day | Splunk `earliest=-24h` counts 0 of 170 events; Falcon `last_seen:>'now-1d'` 0 hosts |
+| 7 days | every 7-day window is empty (Splunk, Falcon alerts) |
+| 31 days | Graph and Defender hunting's default 30-day `Timespan` returns no rows |
+| 181 days | the seeded SentinelOne API tokens (180 days) have expired: every S1 call is `401` |
+
+`POST /_dev/reset` re-dates everything to now. For an instance that has to
+keep looking current — a shared demo, a long-lived staging mock — set
+`MOCKDR_RESEED_INTERVAL` (e.g. `12h`, as `render.yaml` does) and the server
+does that reset on a schedule. It is the same reset: issued tokens and
+sessions survive, what clients wrote does not, and a request served during
+it sees the old data set or the new one, never half of each.
+
 ## API Coverage
 
 ### SentinelOne (prefix: `/web/api/v2.1`)
@@ -721,6 +746,7 @@ All data is **in-memory** by default -- mutations survive until server restart o
 | `SEED_COUNT_THREATS` | 30                                            | S1 threats to seed                                                                                 |
 | `SEED_COUNT_ALERTS`  | 20                                            | S1 alerts to seed                                                                                  |
 | `MOCKDR_PERSIST`     | (none)                                        | File path for JSON state persistence across restarts                                               |
+| `MOCKDR_RESEED_INTERVAL` | (off)                                     | Re-seed this often (`90`, `90s`, `15m`, `12h`, `1d`), exactly as `POST /_dev/reset` does. Seed data is dated from when it was seeded, so a long-running instance ages (one day in, every "last 24 hours" view is empty); set this for a demo or shared instance. Issued tokens survive it; client writes do not. See [A long-running instance](#a-long-running-instance) |
 | `CORS_ORIGINS`       | `http://localhost:3000,http://localhost:8001,http://localhost:5001` | Comma-separated allowed CORS origins                                                               |
 | `MOCKDR_STRICT_TENANT` | `true`                                      | Require the tenant in an Entra token URL (`/{tenant}/oauth2/v2.0/token`) to match the mock tenant; set `false` to accept any tenant |
 | `MOCKDR_SPLUNK_DISPATCH_SECONDS` | `0`                             | How long a Splunk search job takes to reach `DONE`. `0` completes immediately and keeps responses deterministic; set e.g. `5` to make `QUEUED` → `PARSING` → `RUNNING` → `FINALIZING` observable, so a client's `isDone` polling loop is actually exercised |

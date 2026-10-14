@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import collections
 import threading
+import time
 from typing import Any
 
 #: Collections written per request, and the most records each keeps.
@@ -232,6 +233,9 @@ class InMemoryStore:
         self._request_log_order: list[str] = []  # newest-first ordered IDs, max 500
         self._webhook_sink_order: list[str] = []  # newest-first ordered IDs, max 500
         self._on_mutate: Any = None  # Optional callback after mutations
+        #: When the data set was last seeded; what seed-relative values that
+        #: are computed rather than stored (process start times) date from.
+        self.seeded_at: float = time.time()
 
     # ── helpers ────────────────────────────────────────────────────────────────
 

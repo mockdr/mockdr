@@ -9,11 +9,14 @@ from __future__ import annotations
 import hashlib
 import time
 
+from repository.store import store
 from utils.cs_response import build_cs_entity_response
 
-#: Processes are dated within the last thirty days of this install's clock,
-#: so a time-bounded query sees them.
-_EPOCH_START = int(time.time()) - 30 * 86400
+#: Processes are dated within the thirty days before the data set was
+#: seeded, like every other seeded record, so a time-bounded query sees them.
+#: Anchored to the process's import time, they stayed put through every
+#: re-seed while the rest of the estate moved to the new "now".
+_WINDOW_SECONDS = 30 * 86400
 
 _PROCESS_NAMES: list[str] = [
     "svchost.exe", "lsass.exe", "csrss.exe", "explorer.exe",
@@ -44,7 +47,7 @@ def _mock_process(pid: str) -> dict:
     # the timestamps, whose format nothing vendored here records; a member
     # a generated SDK declares and a response omits is not drift, an
     # invented one is.
-    started = _EPOCH_START + h % (30 * 86400)
+    started = int(store.seeded_at) - _WINDOW_SECONDS + h % _WINDOW_SECONDS
     return {
         "process_id": pid,
         "device_id": device_id,

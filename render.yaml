@@ -20,3 +20,9 @@ services:
         value: "30"
       - key: SEED_COUNT_ALERTS
         value: "20"
+      # Seed data is dated from the moment it was seeded; a demo that stays
+      # up for days would show an empty "last 24 hours" after one. Re-seeding
+      # twice a day keeps every 24-hour window populated. See README, "A
+      # long-running instance".
+      - key: MOCKDR_RESEED_INTERVAL
+        value: "12h"

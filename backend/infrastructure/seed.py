@@ -6,6 +6,7 @@ this module is responsible only for ordering, wiring, and deterministic RNG
 initialisation.
 """
 import random
+import time
 
 from faker import Faker
 
@@ -126,6 +127,7 @@ def generate_all() -> None:
     id_gen.reseed(SEED)
 
     store.clear_all()
+    store.seeded_at = time.time()
     reset_registry()
     # The first run of a scenario after a re-seed picks the same targets.
     reset_scenario_runs()

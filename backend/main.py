@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.routing import Match
 from starlette.types import Scope
 
+import config
 from api import spa
 from api.auth import require_admin, require_auth
 from api.documented_body import require_documented_body
@@ -389,13 +390,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         seed.generate_all()
     # Expired tokens, reaped jobs, idle sessions: what the products forget,
     # forgotten on their schedule rather than kept for the life of the process.
-    sweeper = asyncio.create_task(housekeeping.run_periodically())
+    tasks = [asyncio.create_task(housekeeping.run_periodically())]
+    if config.RESEED_INTERVAL_SECONDS > 0:
+        # Seed data is dated relative to when it was seeded; see config.
+        tasks.append(asyncio.create_task(
+            housekeeping.reseed_periodically(config.RESEED_INTERVAL_SECONDS),
+        ))
     try:
         yield
     finally:
-        sweeper.cancel()
-        with suppress(asyncio.CancelledError):
-            await sweeper
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with suppress(asyncio.CancelledError):
+                await task
     if pm is not None:
         pm.flush()
 

@@ -379,19 +379,30 @@ def reset() -> dict:
     """
     from api.middleware.fault_injection import reset_fault_config
     from api.routers.splunk.splunk_hec import reset_ack_state
+    from application.playbook.executor import stop as stop_playbook
     from application.webhooks.delivery_log import clear as clear_delivery_log
     from infrastructure.housekeeping import sweep
     from infrastructure.seed import generate_all
 
-    # Carried across, issued credentials would otherwise outlive their own
-    # expiry by as many resets as a test suite runs: forget the spent ones
-    # first, on the products' schedule (see `infrastructure.housekeeping`).
-    sweep()
-    issued = {name: store.get_all_with_keys(name) for name in _PRESERVED_ACROSS_RESET}
-    generate_all()
-    for name, entries in issued.items():
-        for key, record in entries.items():
-            store.save(name, key, record)
+    # Stopped before the store is locked: a step under way holds the
+    # playbook's step lock while it waits for the store, and `stop` waits
+    # for the step.
+    stop_playbook()
+    # One store-wide critical section, so a request served during the reset
+    # sees the old data set or the new one — not a cleared store (404s, empty
+    # lists) or a half-seeded one. It used to see either: a scheduled
+    # re-seed (MOCKDR_RESEED_INTERVAL) under live traffic made that a matter
+    # of when, not whether.
+    with store._lock:
+        # Carried across, issued credentials would otherwise outlive their
+        # own expiry by as many resets as a test suite runs: forget the spent
+        # ones first, on the products' schedule (`infrastructure.housekeeping`).
+        sweep()
+        issued = {name: store.get_all_with_keys(name) for name in _PRESERVED_ACROSS_RESET}
+        generate_all()
+        for name, entries in issued.items():
+            for key, record in entries.items():
+                store.save(name, key, record)
     # Two pieces of state the store does not hold and `generate_all` cannot
     # reach, both of which the API serves back: HEC's per-channel ack ids and
     # the webhook delivery log.  A reset that leaves them is a reset that

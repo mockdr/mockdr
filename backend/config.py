@@ -33,6 +33,31 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost
 
 PERSIST_PATH = os.getenv("MOCKDR_PERSIST", "")
 
+
+def _duration_seconds(text: str) -> float:
+    """``90``, ``90s``, ``15m``, ``12h`` or ``1d`` in seconds; 0 for empty or unreadable."""
+    value = text.strip().lower()
+    units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    scale = units.get(value[-1:], 1) if value else 1
+    number = value[:-1] if value[-1:] in units else value
+    try:
+        return max(float(number) * scale, 0.0)
+    except ValueError:
+        return 0.0
+
+
+# Re-seed the data set this often (e.g. `12h`), as `/_dev/reset` does: off
+# by default. Seed records are dated relative to the moment they were
+# seeded, so an instance that runs for days ages like a tenant nobody
+# writes to: one day in, `earliest=-24h` finds nothing; after a week every
+# 7-day window is empty; after 30 days Graph hunting's default `Timespan`
+# returns no rows; after 180 days the seeded SentinelOne API tokens expire.
+# A real tenant keeps receiving new data and the mock does not, so a public
+# demo or a long-lived shared instance should set this. Issued tokens and
+# sessions survive it, as they survive `/_dev/reset`; what clients wrote
+# does not.
+RESEED_INTERVAL_SECONDS = _duration_seconds(os.getenv("MOCKDR_RESEED_INTERVAL", ""))
+
 # How long a Splunk search job takes to reach DONE, in seconds.
 #
 # The search itself runs synchronously, so results are ready immediately and
