@@ -24,6 +24,7 @@ from api.middleware.elastic_headers import ElasticHeadersMiddleware
 from api.middleware.elastic_shaping import ElasticShapingMiddleware
 from api.middleware.es_content_type import ElasticContentTypeMiddleware
 from api.middleware.fault_injection import FaultInjectionMiddleware
+from api.middleware.graph_request_id import GraphRequestIdMiddleware
 from api.middleware.head_method import ES_HEAD_PATHS, HeadMethodMiddleware
 from api.middleware.json_charset import JsonCharsetMiddleware
 from api.middleware.kibana_api_version import KibanaApiVersionMiddleware
@@ -466,6 +467,8 @@ app.add_middleware(KibanaSpaceMiddleware)
 # Before routing, and before the namespace rewrite reads the path.
 app.add_middleware(TrailingSlashMiddleware)
 app.add_middleware(RateLimitMiddleware)
+# Outside the rate limiter and the OData check, so their refusals carry the ids too.
+app.add_middleware(GraphRequestIdMiddleware)  # request-id / client-request-id on Graph
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(HeadMethodMiddleware)   # HEAD -> GET, body stripped
 # Compression sits outside everything that rewrites a body, and outside the

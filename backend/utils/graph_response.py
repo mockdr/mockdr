@@ -8,9 +8,17 @@ Graph uses OData v4 conventions:
 from __future__ import annotations
 
 import uuid
+from contextvars import ContextVar
 
 from utils.dt import utc_now
 from utils.odata_paging import SKIP, page_link
+
+#: (request-id, client-request-id) of the Graph request being served, set by
+#: ``api/middleware/graph_request_id.py`` so an error body names the ids the
+#: response headers carry.
+graph_request_ids: ContextVar[tuple[str, str] | None] = ContextVar(
+    "graph_request_ids", default=None,
+)
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -82,14 +90,19 @@ def build_graph_error_response(code: str, message: str) -> dict:
     Returns:
         Graph error envelope dict.
     """
+    # The ids of the request being answered, which its headers carry too; two
+    # fresh GUIDs here meant `client-request-id` was never the one the caller
+    # sent. Outside a Graph request there is nothing to echo.
+    request_id, client_request_id = graph_request_ids.get() or (
+        str(uuid.uuid4()), str(uuid.uuid4()))
     return {
         "error": {
             "code": code,
             "message": message,
             "innerError": {
                 "date": utc_now(),
-                "request-id": str(uuid.uuid4()),
-                "client-request-id": str(uuid.uuid4()),
+                "request-id": request_id,
+                "client-request-id": client_request_id,
             },
         },
     }
