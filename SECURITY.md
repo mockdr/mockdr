@@ -45,7 +45,7 @@ The Render blueprint (`render.yaml`) sets it. In public mode:
 |---|---|
 | `POST /_dev/proxy/config` with a mode other than `off` | Record mode forwards *anonymous* requests to an upstream the caller names, with the configured credentials attached — an open proxy into the host's network |
 | `POST /_dev/webhooks` | A subscription makes the mock POST to a caller-chosen URL on every matching event any visitor causes |
-| `POST /_dev/import` | Replaces the whole store, including the tokens every visitor signs in with |
+| `POST /_dev/import` | Replaces the whole store every visitor reads, and adds whatever API tokens the snapshot carries (the tokens already issued are kept) |
 | `POST /_dev/rate-limit`, `POST /_dev/fault-injection` | Throttle or fail every visitor's requests |
 
 and no outbound request is made at all: an existing webhook subscription

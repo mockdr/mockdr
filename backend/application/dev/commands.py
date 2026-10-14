@@ -578,8 +578,32 @@ def import_state(snapshot: dict) -> dict:
         return _import_state_locked(snapshot)
 
 
+#: Credentials kept across ``/_dev/import`` as well: the S1 API tokens (whose
+#: records carry their own role) beside the issued tokens a reset keeps. An
+#: import replaced them with whatever the snapshot carried -- nothing, for a
+#: partial one -- and since ``/_dev/reset`` and ``/_dev/import`` themselves
+#: need an admin token, the instance locked everyone out until a restart.
+_PRESERVED_ACROSS_IMPORT: tuple[str, ...] = ("api_tokens", *_PRESERVED_ACROSS_RESET)
+
+
 def _import_state_locked(snapshot: dict) -> dict:
-    """``import_state``'s body; the caller holds the store lock."""
+    """``import_state``'s body; the caller holds the store lock.
+
+    The credentials in ``_PRESERVED_ACROSS_IMPORT`` survive: a snapshot's own
+    are loaded, and every one this instance issued that the snapshot does not
+    carry is put back beside them.
+    """
+    issued = {name: store.get_all_with_keys(name) for name in _PRESERVED_ACROSS_IMPORT}
+    result = _load_snapshot(snapshot)
+    for name, entries in issued.items():
+        for key, record in entries.items():
+            if store.get(name, key) is None:
+                store.save(name, key, record)
+    return result
+
+
+def _load_snapshot(snapshot: dict) -> dict:
+    """Clear the store and load *snapshot* into it."""
     store.clear_all()
     total = 0
     skipped = 0
