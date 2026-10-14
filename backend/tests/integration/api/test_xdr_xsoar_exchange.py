@@ -78,6 +78,103 @@ class TestExtraDataHostIpIsAString:
         assert alert["host_ip"] == (", ".join(stored.host_ip) or None)
 
 
+def _filter_data(client: TestClient, filter_data: dict):  # type: ignore[no-untyped-def]
+    return client.post(f"{XDR}/alerts/get_alerts_by_filter_data/", headers=_xsoar_headers(),
+                       json={"request_data": {"filter_data": filter_data}})
+
+
+class TestAlertsByFilterData:
+    """``xdr-get-alerts`` asks with ``filter_data`` and reads ``alert_fields``.
+
+    The integration's ``get_alerts_by_filter_command`` builds
+    ``{"filter": {"AND": [...]}, "sort": [{"FIELD", "ORDER"}], "paging":
+    {"from", "to"}}`` and reads each alert from ``alert["alert_fields"]``
+    (the recorded reply, XSOAR test_data ``get_alerts_by_filter_results.json``).
+    The route read only the public ``filters`` form: the command's filter,
+    sort and paging were ignored and every item's ``alert_fields`` was the
+    recorded template, blank -- the command listed forty alerts with no
+    name, no severity and no id.
+    """
+
+    #: What the command sends for ``severity=high limit=5``.
+    HIGH = {
+        "sort": [{"FIELD": "source_insert_ts", "ORDER": "DESC"}],
+        "paging": {"from": 0, "to": 5},
+        "filter": {"AND": [{"OR": [{"SEARCH_FIELD": "severity", "SEARCH_TYPE": "EQ",
+                                    "SEARCH_VALUE": "SEV_040_HIGH"}]}]},
+    }
+
+    def test_the_filter_sort_and_paging_apply(self, client: TestClient) -> None:
+        response = _filter_data(client, self.HIGH)
+        assert response.status_code == 200, response.text
+        reply = response.json()["reply"]
+        fields = [a["alert_fields"] for a in reply["alerts"]]
+        assert reply["result_count"] == len(fields)
+        assert 0 < len(fields) <= 5
+        assert {f["severity"] for f in fields} == {"SEV_040_HIGH"}
+        stamps = [f["source_insert_ts"] for f in fields]
+        assert stamps == sorted(stamps, reverse=True)
+
+    def test_alert_fields_carry_the_alert(self, client: TestClient) -> None:
+        from repository.xdr_alert_repo import xdr_alert_repo
+
+        fields = _filter_data(client, self.HIGH).json()["reply"]["alerts"][0]["alert_fields"]
+        stored = xdr_alert_repo.get(fields["external_id"])
+        assert stored is not None
+        assert fields["alert_name"] == stored.name
+        assert fields["agent_id"] == stored.endpoint_id
+        assert fields["agent_ip_addresses"] == stored.host_ip
+        assert fields["source_insert_ts"] == stored.detection_timestamp
+        assert fields["internal_id"] == stored.internal_id
+
+    def test_paging_walks_the_whole_set_once(self, client: TestClient) -> None:
+        from repository.xdr_alert_repo import xdr_alert_repo
+
+        total = len(xdr_alert_repo.list_all())
+        seen: list[str] = []
+        start = 0
+        while start <= total:
+            page = _filter_data(client, {
+                "sort": [{"FIELD": "internal_id", "ORDER": "ASC"}],
+                "paging": {"from": start, "to": start + 7}, "filter": {"AND": []},
+            }).json()["reply"]["alerts"]
+            if not page:
+                break
+            seen += [a["alert_fields"]["internal_id"] for a in page]
+            start += 7
+        assert sorted(seen) == seen
+        assert len(seen) == len(set(seen)) == total
+
+    def test_contains_and_relative_time(self, client: TestClient) -> None:
+        name = _filter_data(client, self.HIGH).json()["reply"]["alerts"][0]["alert_fields"]["alert_name"]
+        found = _filter_data(client, {"paging": {"from": 0, "to": 100}, "filter": {"AND": [
+            {"SEARCH_FIELD": "alert_name", "SEARCH_TYPE": "CONTAINS", "SEARCH_VALUE": name[2:8]},
+            {"SEARCH_FIELD": "source_insert_ts", "SEARCH_TYPE": "RELATIVE_TIMESTAMP",
+             "SEARCH_VALUE": str(400 * 86_400_000)},
+        ]}}).json()["reply"]["alerts"]
+        assert found
+        assert all(name[2:8].lower() in a["alert_fields"]["alert_name"].lower() for a in found)
+        none = _filter_data(client, {"filter": {"AND": [
+            {"SEARCH_FIELD": "source_insert_ts", "SEARCH_TYPE": "RELATIVE_TIMESTAMP",
+             "SEARCH_VALUE": "1"}]}}).json()["reply"]["alerts"]
+        assert none == []
+
+    def test_an_unknown_search_type_is_refused(self, client: TestClient) -> None:
+        response = _filter_data(client, {"filter": {"AND": [
+            {"SEARCH_FIELD": "severity", "SEARCH_TYPE": "LIKE", "SEARCH_VALUE": "x"}]}})
+        assert response.status_code == 400
+
+    def test_the_filters_form_still_answers_the_stored_fields(self, client: TestClient) -> None:
+        response = client.post(f"{XDR}/alerts/get_alerts_by_filter_data/",
+                               headers=_xsoar_headers(),
+                               json={"request_data": {"filters": [
+                                   {"field": "severity", "operator": "in", "value": ["high"]}]}})
+        assert response.status_code == 200, response.text
+        alerts = response.json()["reply"]["alerts"]
+        assert alerts and all(a["severity"] == "high" for a in alerts)
+        assert all(a["alert_fields"]["severity"] == "SEV_040_HIGH" for a in alerts)
+
+
 class TestDistributionVersionsPerPlatform:
     """``xdr-get-distribution-versions`` tables one list per platform.
 
