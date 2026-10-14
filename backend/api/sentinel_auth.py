@@ -25,7 +25,9 @@ from utils.bearer_challenge import bearer_challenge
 from utils.sentinel.response import build_arm_error
 
 _SENTINEL_TOKEN_COLLECTION = "sentinel_oauth_tokens"
-_TOKEN_TTL = 3600  # 1 hour
+#: `expires_in` of an Entra v2 token for ARM and Log Analytics, in seconds.
+TOKEN_TTL_SECONDS = 3600
+_TOKEN_TTL = TOKEN_TTL_SECONDS
 
 
 #: The audiences Azure Resource Manager accepts, as its refusal lists them.

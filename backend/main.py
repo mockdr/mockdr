@@ -1,6 +1,7 @@
+import asyncio
 import re
 from collections.abc import AsyncGenerator, Mapping
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from functools import lru_cache
 from json import JSONDecodeError
 
@@ -345,7 +346,7 @@ from application.es_search.queries import (
 from application.sentinel.commands.edr_bridge import register_sentinel_bridge
 from application.splunk.commands.edr_bridge import register_bridge as register_splunk_bridge
 from config import API_PREFIX, APP_VERSION, CORS_ORIGINS, PERSIST_PATH
-from infrastructure import seed
+from infrastructure import housekeeping, seed
 from utils.cs_fql import FqlError
 from utils.entra_token_errors import AADSTS_MISSING_PARAMETER, build_token_error
 from utils.es_aggs import ESAggregationError
@@ -386,7 +387,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         store._on_mutate = notify_mutation
     else:
         seed.generate_all()
-    yield
+    # Expired tokens, reaped jobs, idle sessions: what the products forget,
+    # forgotten on their schedule rather than kept for the life of the process.
+    sweeper = asyncio.create_task(housekeeping.run_periodically())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweeper
     if pm is not None:
         pm.flush()
 

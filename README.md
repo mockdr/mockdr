@@ -360,6 +360,25 @@ epoch milliseconds a dated `__between` documents.
 If you are upgrading from 2.3.x and a request that used to succeed now
 answers `400`, read the `detail`: it names the parameter and what it wanted.
 
+### A long-running instance
+
+Tests meet a seed seconds old; an integration or the public demo meets one
+hours or days old. What the products hand out per request, they forget on
+their own schedule, and so does the mock — whether or not anyone asks again:
+
+| What | Forgotten | Source |
+| --- | --- | --- |
+| Splunk search job | `ttl` (600 s, a week after `save`) after it completed or was last read | limits.conf `[search] ttl` |
+| Splunk session key | after an hour unused (`SPLUNK_SESSION_TTL_SECONDS`) | server.conf `sessionTimeout` |
+| HEC ack id / ack channel | once answered `true` / after 600 s idle | HEC indexer acknowledgment; inputs.conf `maxIdleTime` |
+| Elasticsearch scroll / point in time | its `scroll` / `keep_alive` after its last use | "Paginate search results" |
+| Elasticsearch token pair | access token refused after 20 min, refresh after 24 h, both deleted after 24 h | `TokenService`, `ExpiredTokenRemover` |
+| Falcon, Defender, Graph, Sentinel token | refused at `expires_in`; deleted a day later | the token's own expiry |
+
+The server sweeps every minute; `/_dev/reset` sweeps before it carries
+issued credentials over. A client that relies on a token, job or scroll
+outliving what the product allows will see the product's refusal here too.
+
 ## API Coverage
 
 ### SentinelOne (prefix: `/web/api/v2.1`)
@@ -690,7 +709,7 @@ search index=sentinelone OR index=crowdstrike OR index=msdefender
 
 All data is **in-memory** by default -- mutations survive until server restart or `/_dev/reset`.
 
-**What `/_dev/reset` resets:** every vendor's data back to the seed, HEC acknowledgement ids, the webhook delivery log and fault injection (back to off); a running playbook is cancelled first, so none of its steps lands in the fresh data. What it keeps: OAuth bearer tokens (CrowdStrike, Defender, Graph, Sentinel) and Splunk session keys already issued, so an SDK that caches its token (falconpy, MSAL, splunklib) keeps working across a reset between tests; and the rate-limit and proxy configuration and the Prometheus counters. A server restart without `MOCKDR_PERSIST` starts with no tokens issued.
+**What `/_dev/reset` resets:** every vendor's data back to the seed, HEC acknowledgement ids, the webhook delivery log and fault injection (back to off); a running playbook is cancelled first, so none of its steps lands in the fresh data. What it keeps: OAuth bearer tokens (CrowdStrike, Defender, Graph, Sentinel), Elasticsearch token pairs and Splunk session keys already issued and still live, so an SDK that caches its token (falconpy, MSAL, splunklib, elasticsearch-py) keeps working across a reset between tests — the spent ones are forgotten first, as the housekeeping sweep forgets them (see [A long-running instance](#a-long-running-instance)); and the rate-limit and proxy configuration and the Prometheus counters. A server restart without `MOCKDR_PERSIST` starts with no tokens issued.
 
 **Optional persistence:** set `MOCKDR_PERSIST=/path/to/state.json` to save state across restarts. The server debounces writes (2 s) and uses atomic file replacement to prevent corruption. The snapshot records the version that wrote it; loading one from another release logs which, and a snapshot whose records no longer parse is moved to `state.json.corrupt` and the server seeds fresh rather than serve a hollowed-out store. In Docker the path must be on a writable volume — the compose file runs the container `read_only`.
 

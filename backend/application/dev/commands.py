@@ -356,6 +356,12 @@ _PRESERVED_ACROSS_RESET: tuple[str, ...] = (
     "graph_oauth_tokens",
     "sentinel_oauth_tokens",
     "splunk_sessions",
+    # The Elasticsearch token service's pairs (2.6.0): elasticsearch-py and
+    # Kibana's own clients cache the access token for its twenty minutes
+    # and refresh with the refresh token, so a reset that dropped them
+    # refused the next call the way the four above once did.
+    "es_tokens",
+    "es_refresh_tokens",
 )
 
 
@@ -371,8 +377,13 @@ def reset() -> dict:
     from api.middleware.fault_injection import reset_fault_config
     from api.routers.splunk.splunk_hec import reset_ack_state
     from application.webhooks.delivery_log import clear as clear_delivery_log
+    from infrastructure.housekeeping import sweep
     from infrastructure.seed import generate_all
 
+    # Carried across, issued credentials would otherwise outlive their own
+    # expiry by as many resets as a test suite runs: forget the spent ones
+    # first, on the products' schedule (see `infrastructure.housekeeping`).
+    sweep()
     issued = {name: store.get_all_with_keys(name) for name in _PRESERVED_ACROSS_RESET}
     generate_all()
     for name, entries in issued.items():
