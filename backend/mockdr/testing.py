@@ -181,8 +181,8 @@ class MockdrClient:
         """Reset all data to the initial deterministic seed state.
 
         Tokens and Splunk sessions already issued stay valid, so a vendor SDK
-        that caches its token keeps working; a running playbook is
-        cancelled.
+        that caches its token keeps working; fault injection is turned off
+        and a running playbook is cancelled.
 
         Returns:
             Reset confirmation dict from the ``/_dev/reset`` endpoint.

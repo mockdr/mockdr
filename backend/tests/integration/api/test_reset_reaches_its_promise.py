@@ -236,3 +236,32 @@ class TestResetKeepsIssuedCredentials:
         assert client.get(
             "/cs/devices/queries/devices/v1", headers=headers).status_code == 401
 
+
+class TestResetTurnsFaultInjectionOff:
+    """Fault injection is a test's chaos, not the product's — a reset ends it.
+
+    It lived outside the store and the reset never touched it, so a test
+    that set `errorRate: 1.0` and reset afterwards left every later test in
+    the same server answering with injected 500s.
+    """
+
+    def test_injected_errors_stop_after_a_reset(self, client: TestClient) -> None:
+        from api.middleware.fault_injection import get_fault_config, reset_fault_config
+
+        try:
+            set_resp = client.post(
+                "/web/api/v2.1/_dev/fault-injection", headers=ADMIN,
+                json={"errorRate": 1.0, "errorStatus": 503},
+            )
+            assert set_resp.status_code == 200
+            assert client.get(
+                "/web/api/v2.1/agents", headers=ADMIN).status_code == 503
+
+            assert client.post(
+                "/web/api/v2.1/_dev/reset", headers=ADMIN).status_code == 200
+
+            assert get_fault_config().error_rate == 0.0
+            assert client.get(
+                "/web/api/v2.1/agents", headers=ADMIN).status_code == 200
+        finally:
+            reset_fault_config()

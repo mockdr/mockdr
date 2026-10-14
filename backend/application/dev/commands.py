@@ -360,11 +360,12 @@ def reset() -> dict:
     """Re-seed all in-memory repositories with the deterministic initial data set.
 
     Issued OAuth tokens and Splunk sessions survive (see
-    ``_PRESERVED_ACROSS_RESET``).
+    ``_PRESERVED_ACROSS_RESET``); fault injection goes back to off.
 
     Returns:
         Dict with ``data.status`` confirming the reset.
     """
+    from api.middleware.fault_injection import reset_fault_config
     from api.routers.splunk.splunk_hec import reset_ack_state
     from application.webhooks.delivery_log import clear as clear_delivery_log
     from infrastructure.seed import generate_all
@@ -380,6 +381,11 @@ def reset() -> dict:
     # answers 200 and hands the caller the previous scenario.
     reset_ack_state()
     clear_delivery_log()
+    # Fault injection is a test's chaos for the case it is testing, not a
+    # property of the simulated product: a test that set `error_rate=0.5`
+    # and reset afterwards left every later test answering half its requests
+    # with 500s.
+    reset_fault_config()
     # Deliberately *not* reset: the rate-limit and proxy configuration, which
     # are simulation settings a user set on purpose rather than data, and the
     # Prometheus counters, which are monotonic by definition.
