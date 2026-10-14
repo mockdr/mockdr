@@ -166,14 +166,17 @@ class MockdrClient:
 
         Args:
             name: Scenario key.  One of: ``mass_infection``,
-                ``agent_offline``, ``quiet_day``, ``apt_campaign``.
+                ``agent_offline``, ``quiet_day``, ``apt_campaign``
+                (SentinelOne), ``compliance_drift``, ``mfa_gap``,
+                ``risky_signin_wave``, ``license_exhaustion`` (Graph).
 
         Returns:
             Scenario result dict from the ``/_dev/scenario`` endpoint.
 
         Raises:
             httpx.HTTPStatusError: When the server returns a 4xx or 5xx
-                status code.
+                status code -- including a 400 for a name that is not a
+                scenario.
         """
         return self.post("/_dev/scenario", json={"scenario": name})
 

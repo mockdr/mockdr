@@ -5,8 +5,8 @@ These tests exercise :class:`mockdr.testing.MockdrClient` and
 ``httpx.MockTransport`` — no real server is started.
 
 The :func:`mockdr.testing.mockdr_server` fixture is not covered here because
-it requires a live uvicorn process; it is exercised implicitly by every
-integration test that depends on it.
+it requires a live uvicorn process; it is exercised over TCP by
+``tests/integration/api/test_public_testing_fixture.py``.
 """
 from __future__ import annotations
 
