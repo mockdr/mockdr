@@ -49,15 +49,19 @@ KNOWN_EXCEPTIONS: dict[str, set[str]] = {
     },
     # productId not applicable in our seed data
     "firewall": {"productId"},
-    # Mock adds agentRealtimeInfo for integration compatibility (not in spec for alerts)
+    # agentRealtimeInfo is in every recorded reply (demisto/content
+    # SentinelOneEventCollector test_data/alerts.json, elastic/integrations
+    # sentinel_one alert captures) with these members, and not in the spec.
     "alerts": {
-        "agentRealtimeInfo.accountId",
-        "agentRealtimeInfo.agentComputerName",
-        "agentRealtimeInfo.agentVersion",
+        "agentRealtimeInfo",
         "agentRealtimeInfo.id",
+        "agentRealtimeInfo.infected",
+        "agentRealtimeInfo.isActive",
+        "agentRealtimeInfo.isDecommissioned",
+        "agentRealtimeInfo.machineType",
+        "agentRealtimeInfo.name",
         "agentRealtimeInfo.os",
-        "agentRealtimeInfo.siteId",
-        "agentRealtimeInfo.siteName",
+        "agentRealtimeInfo.uuid",
     },
 }
 

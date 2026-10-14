@@ -1,5 +1,6 @@
 
 from application.documented_filters import DOCUMENTED_FILTERS
+from repository.agent_repo import agent_repo
 from repository.alert_repo import alert_repo
 from utils.filter_selection import select_ids
 from utils.filtering import FilterSpec, apply_filters, apply_query_options
@@ -46,13 +47,46 @@ def list_alerts(params: dict, cursor: str | None, limit: int) -> dict:
     filtered.sort(key=lambda a: get_nested(a, "alertInfo.createdAt") or "", reverse=True)
     filtered = apply_query_options(filtered, params)
     page, next_cursor, total = paginate(filtered, cursor, limit, ALERT_CURSOR)
-    return build_list_response(
-        [record_dict(a) for a in page],
+    records = [record_dict(a) for a in page]
+    response = build_list_response(
+        records,
         next_cursor,
         total,
         definition="v2_1.alerts.schemas_AlertInformationSchema_many_200",
         strict=True,
     )
+    for item, record in zip(response["data"], records, strict=True):
+        item["agentRealtimeInfo"] = _agent_realtime_info(record)
+    return response
+
+
+def _agent_realtime_info(record: dict) -> dict:
+    """The alert's agent as it is now, in the members real replies carry.
+
+    The 2.1 swagger's AlertInformationSchema has no ``agentRealtimeInfo``,
+    so the strict shaping above dropped it -- and XSOAR's SentinelOne-V2
+    reads it unguarded (``get_alerts``: ``agent_realtime_info.get("name")``),
+    so ``sentinelone-get-alerts`` raised AttributeError on every page.
+    Recorded replies of ``/cloud-detection/alerts`` carry it with exactly
+    these members: demisto/content's SentinelOneEventCollector
+    ``test_data/alerts.json`` and the captures in elastic/integrations'
+    ``sentinel_one`` alert pipeline tests (``id``, ``infected``,
+    ``isActive``, ``isDecommissioned``, ``machineType``, ``name``, ``os``,
+    ``uuid``).
+    """
+    stored = record.get("agentRealtimeInfo") or {}
+    agent = agent_repo.get(str(stored.get("id") or ""))
+    if agent is None:
+        return {
+            "id": stored.get("id"), "infected": None, "isActive": None,
+            "isDecommissioned": None, "machineType": None,
+            "name": stored.get("agentComputerName"), "os": stored.get("os"), "uuid": None,
+        }
+    return {
+        "id": agent.id, "infected": agent.infected, "isActive": agent.isActive,
+        "isDecommissioned": agent.isDecommissioned, "machineType": agent.machineType,
+        "name": agent.computerName, "os": agent.osType, "uuid": agent.uuid,
+    }
 
 
 #: The swagger's own filters for GET /cloud-detection/rules. `status` and

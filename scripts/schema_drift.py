@@ -800,6 +800,19 @@ PLATFORMS = {
         # "Relevant only for FAILED and FAILED_CLIENT DV errors" — the
         # swagger's own words for this member.
         "conditional": ("data.responseError",),
+        # Members real replies carry that the swagger omits, by recording.
+        # The alert's agent is in every recorded /cloud-detection/alerts
+        # reply -- demisto/content SentinelOneEventCollector test_data/
+        # alerts.json, elastic/integrations sentinel_one alert pipeline
+        # captures -- and XSOAR's SentinelOne-V2 reads it unguarded.
+        "beyond_spec": {
+            "GET /cloud-detection/alerts": {
+                f"data[*].agentRealtimeInfo{member}" for member in (
+                    "", ".id", ".infected", ".isActive", ".isDecommissioned",
+                    ".machineType", ".name", ".os", ".uuid",
+                )
+            },
+        },
         "spec_prefix": "/web/api/v2.1",
         "params": {},
         "fill": {},
@@ -1328,6 +1341,7 @@ def main(platform: str) -> int:
         if not declared:
             continue
         key = f"{method} {route}"
+        declared |= set(cfg.get("beyond_spec", {}).get(key, ()))
         if key in cfg.get("skip", {}):
             print(f"  -  {method} {route}: {cfg['skip'][key]} (skipped)")
             continue
