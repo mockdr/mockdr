@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from utils.filtering import FilterSpec, apply_filters
+from utils.nested import get_nested
 from utils.serde import record_dict
 
 
@@ -42,7 +43,7 @@ def select_ids(
         raw_filter:  The body's ``filter`` object; callers refuse an empty one
                      in their own words before calling.
         specs:       The filter specs the collection's GET applies.
-        id_field:    The record field the ids name.
+        id_field:    The record field the ids name (a dotted path is followed).
         ids_members: The members that name records outright.
 
     Returns:
@@ -60,7 +61,17 @@ def select_ids(
         # answers every record for that: a delete would take the collection.
         msg = "The filter names no member with a value to select on."
         raise UnselectableFilterError(msg)
-    known = {spec.param for spec in specs} | set(ids_members)
+    refuse_unknown_members(params, {spec.param for spec in specs} | set(ids_members))
+    rows = [r if isinstance(r, dict) else record_dict(r) for r in records]
+    return [str(get_nested(r, id_field)) for r in apply_filters(rows, params, specs)]
+
+
+def refuse_unknown_members(params: dict, known: set[str]) -> None:
+    """Refuse a filter naming a member outside *known*, in one wording for every route.
+
+    Raises:
+        UnselectableFilterError: Naming each unknown member.
+    """
     unknown = sorted(set(params) - known)
     if unknown:
         msg = (
@@ -68,5 +79,3 @@ def select_ids(
             f"this endpoint cannot select on: {', '.join(unknown)}."
         )
         raise UnselectableFilterError(msg)
-    rows = [r if isinstance(r, dict) else record_dict(r) for r in records]
-    return [str(r.get(id_field)) for r in apply_filters(rows, params, specs)]

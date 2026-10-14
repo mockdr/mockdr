@@ -2,6 +2,7 @@
 from application.documented_filters import DOCUMENTED_FILTERS
 from config import DEFAULT_PAGE_SIZE
 from repository.threat_repo import threat_repo
+from utils import filter_selection
 from utils.filtering import (
     FilterSpec,
     apply_filters,
@@ -90,8 +91,9 @@ def _as_incident_status(params: dict) -> dict:
     return rest
 
 
-class UnselectableFilterError(ValueError):
-    """A threat action's filter names a member this mock cannot select on."""
+#: A threat action's filter names a member this mock cannot select on --
+#: the same refusal every bulk write gives (utils.filter_selection).
+UnselectableFilterError = filter_selection.UnselectableFilterError
 
 
 #: Members of a threat action's filter that select nothing by design: the
@@ -129,14 +131,8 @@ def resolve_threat_ids(filter_obj: dict | None, *, empty_selects_all: bool) -> l
     if not params:
         return [t.id for t in threat_repo.list_all()] if empty_selects_all else []
     specs = FILTER_SPECS + DOCUMENTED_FILTERS.get("/threats", [])
-    known = {spec.param for spec in specs} | {"resolved"} | _NO_OP_FILTER_MEMBERS
-    unknown = sorted(set(params) - known)
-    if unknown:
-        msg = (
-            f"The filter names {'members' if len(unknown) > 1 else 'a member'} "
-            f"this endpoint cannot select on: {', '.join(unknown)}."
-        )
-        raise UnselectableFilterError(msg)
+    filter_selection.refuse_unknown_members(
+        params, {spec.param for spec in specs} | {"resolved"} | _NO_OP_FILTER_MEMBERS)
     params = _as_incident_status(
         {k: v for k, v in params.items() if k not in _NO_OP_FILTER_MEMBERS})
     matched = apply_filters(threat_repo.list_all(), params, specs)
