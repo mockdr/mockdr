@@ -9,6 +9,7 @@ from utils.graph_odata import (
     apply_odata_orderby,
     apply_odata_search,
     apply_odata_select,
+    require_advanced_query,
     select_fields,
 )
 from utils.graph_response import build_graph_list_response
@@ -41,6 +42,10 @@ def list_users(
     Returns:
         OData list response dict.
     """
+    require_advanced_query(
+        filter_str=filter_str, orderby=orderby, search=search,
+        count_param=count_param, consistency_level=consistency_level,
+    )
     records = [record_dict(u) for u in graph_user_repo.list_all()]
 
     if filter_str:

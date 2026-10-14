@@ -31,6 +31,7 @@ __all__ = [
     "apply_graph_filter",
     "apply_odata_count",
     "apply_odata_search",
+    "require_advanced_query",
 ]
 
 def select_fields(record: dict | None, select: str | None) -> dict | None:
@@ -170,13 +171,24 @@ def apply_odata_count(
     records: list[dict],
     count_param: bool | str | None,
     consistency_level: str | None = None,
+    *,
+    refuse_without_header: bool = False,
 ) -> int | None:
     """Return the total count if ``$count=true`` and ConsistencyLevel allows it.
 
+    On directory objects Graph counts only in an advanced query, and without
+    the header it "silently ignores the $count query parameter (?$count=true)"
+    (https://learn.microsoft.com/en-us/graph/aad-advanced-queries#error-handling-for-advanced-queries-on-directory-objects).
+    The mock answered 400 there instead, on the stated belief that Graph
+    rejects it; the documented answer is a 200 without ``@odata.count``.
+
     Args:
-        records:           All records (pre-filter).
-        count_param:       Value of the ``$count`` query parameter.
-        consistency_level: Value of the ``ConsistencyLevel`` header.
+        records:               All records (pre-filter).
+        count_param:           Value of the ``$count`` query parameter.
+        consistency_level:     Value of the ``ConsistencyLevel`` header.
+        refuse_without_header: Keep the earlier 400 for a route whose product
+                               behaviour has not been measured (Intune's
+                               managedDevices), rather than change it unseen.
 
     Returns:
         Total count, or ``None`` if ``$count`` is not requested or the header
@@ -188,10 +200,9 @@ def apply_odata_count(
     if not count_requested:
         return None
 
-    # Graph rejects $count on directory objects unless the caller opts into
-    # eventual consistency. Answering anyway would let an integration ship a
-    # request that real Graph refuses.
-    if not consistency_level or consistency_level.lower() != "eventual":
+    if not _is_eventual(consistency_level):
+        if not refuse_without_header:
+            return None
         raise HTTPException(
             status_code=400,
             detail=build_graph_error_response(
@@ -202,6 +213,76 @@ def apply_odata_count(
         )
 
     return len(records)
+
+
+def _is_eventual(consistency_level: str | None) -> bool:
+    """Whether the caller opted into eventual consistency."""
+    return (consistency_level or "").strip().lower() == "eventual"
+
+
+#: Filter operators that directory objects serve only in an advanced query
+#: (https://learn.microsoft.com/en-us/graph/aad-advanced-queries#query-scenarios-that-require-advanced-query-capabilities:
+#: "Use of $filter with the endsWith operator", "with ne and not operators").
+_ADVANCED_OPERATOR = re.compile(r"\b(endsWith)\s*\(|\s(ne)\s|\b(not)\b", re.IGNORECASE)
+_QUOTED = re.compile(r"'(?:[^']|'')*'")
+
+
+def require_advanced_query(
+    *,
+    filter_str: str | None,
+    orderby: str | None,
+    search: str | None,
+    count_param: bool | str | None,
+    consistency_level: str | None,
+) -> None:
+    """Refuse a directory query that needs the advanced query parameters.
+
+    "The requestor must set the ConsistencyLevel header to eventual and,
+    except for $search, use the $count query parameter"; without them "the
+    request returns an error"
+    (https://learn.microsoft.com/en-us/graph/aad-advanced-queries). The mock
+    checked the header only for ``$count`` and served ``$search``,
+    ``endsWith``, ``ne``, ``not`` and ``$filter`` with ``$orderby`` to any
+    caller -- so an integration could ship a query production refuses.
+
+    The ``$search`` and ``endsWith`` messages are the documented ones; ``ne``
+    and ``not`` take the ``endsWith`` wording with their own operator, and
+    ``$filter`` with ``$orderby`` a message of the same family, as the docs
+    record neither verbatim.
+
+    Raises:
+        HTTPException: 400 ``Request_UnsupportedQuery``.
+    """
+    eventual = _is_eventual(consistency_level)
+    if search and search.strip() and not eventual:
+        raise HTTPException(status_code=400, detail=build_graph_error_response(
+            "Request_UnsupportedQuery",
+            "Request with $search query parameter only works through MSGraph with a "
+            "special request header: 'ConsistencyLevel: eventual'",
+        ))
+    counted = str(count_param).lower() in ("true", "1") if count_param else False
+    if eventual and counted:
+        return
+    if not filter_str or not filter_str.strip():
+        return
+    match = _ADVANCED_OPERATOR.search(_QUOTED.sub("''", filter_str))
+    if match:
+        operator = next(group for group in match.groups() if group)
+        raise HTTPException(status_code=400, detail=build_graph_error_response(
+            "Request_UnsupportedQuery",
+            f"Operator '{operator}' is not supported because the required parameters "
+            f"might be missing. Try adding $count=true query parameter and "
+            f"ConsistencyLevel:eventual header. Refer to "
+            f"https://aka.ms/graph-docs/advanced-queries for more information",
+        ))
+    if orderby and orderby.strip():
+        raise HTTPException(status_code=400, detail=build_graph_error_response(
+            "Request_UnsupportedQuery",
+            "Sorting and filtering in the same query is not supported because the "
+            "required parameters might be missing. Try adding $count=true query "
+            "parameter and ConsistencyLevel:eventual header. Refer to "
+            "https://aka.ms/graph-docs/advanced-queries for more information",
+        ))
 
 
 # ---------------------------------------------------------------------------

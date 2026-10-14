@@ -6,9 +6,11 @@ from repository.graph.user_repo import graph_user_repo
 from repository.store import store
 from utils.graph_odata import (
     apply_graph_filter,
+    apply_odata_count,
     apply_odata_orderby,
     apply_odata_search,
     apply_odata_select,
+    require_advanced_query,
     select_fields,
 )
 from utils.graph_response import build_graph_list_response, graph_page
@@ -23,6 +25,8 @@ def list_groups(
     orderby: str | None = None,
     select: str | None = None,
     search: str | None = None,
+    count_param: bool | str | None = None,
+    consistency_level: str | None = None,
 ) -> dict:
     """Return groups with OData query support.
 
@@ -33,10 +37,17 @@ def list_groups(
         orderby:    OData ``$orderby`` expression.
         select:     Comma-separated field list (``$select``).
         search:     OData ``$search`` expression.
+        count_param:       Value of ``$count``, which group-list documents and
+                           the route did not take.
+        consistency_level: Value of the ``ConsistencyLevel`` header.
 
     Returns:
         OData list response dict.
     """
+    require_advanced_query(
+        filter_str=filter_str, orderby=orderby, search=search,
+        count_param=count_param, consistency_level=consistency_level,
+    )
     records = [record_dict(g) for g in graph_group_repo.list_all()]
 
     if filter_str:
@@ -47,6 +58,7 @@ def list_groups(
         )
 
     records = apply_odata_orderby(records, orderby)
+    count = apply_odata_count(records, count_param, consistency_level)
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)
@@ -59,6 +71,7 @@ def list_groups(
         value=page,
         context="https://graph.microsoft.com/v1.0/$metadata#groups",
         next_link=next_link,
+        count=count,
     )
 
 

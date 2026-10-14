@@ -45,7 +45,9 @@ def list_managed_devices(
         records = apply_graph_filter(records, filter_str)
 
     records = apply_odata_orderby(records, orderby)
-    count = apply_odata_count(records, count_param, consistency_level)
+    count = apply_odata_count(
+        records, count_param, consistency_level, refuse_without_header=True,
+    )
     total = len(records)
     page = records[skip : skip + top]
     page = apply_odata_select(page, select)

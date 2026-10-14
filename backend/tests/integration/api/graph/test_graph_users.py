@@ -117,10 +117,12 @@ class TestGraphUsers:
         # Use the first name as a search term
         search_term = first_user["displayName"].split()[0]
 
+        # $search on directory objects needs ConsistencyLevel: eventual
+        # (https://learn.microsoft.com/en-us/graph/api/user-list?view=graph-rest-1.0).
         resp = client.get(
             "/graph/v1.0/users",
             params={"$search": f'"{search_term}"'},
-            headers=graph_admin_headers,
+            headers={**graph_admin_headers, "ConsistencyLevel": "eventual"},
         )
         assert resp.status_code == 200
         assert len(resp.json()["value"]) >= 1

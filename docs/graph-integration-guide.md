@@ -163,8 +163,13 @@ All list endpoints support standard OData query parameters:
 | `$top` | `?$top=10` | Page size (max 999) |
 | `$skip` | `?$skip=20` | Offset pagination, where the API documents it (security, Intune, mail). Directory objects (users, groups, applications, service principals, directory roles, administrative units, organization) refuse it with `400 Request_BadRequest` and page by `$skiptoken`, as Graph does |
 | `$orderby` | `?$orderby=createdDateTime desc` | Sort results |
-| `$search` | `?$search="displayName:John"` | Full-text search |
-| `$count` | `?$count=true` | Include total count (requires `ConsistencyLevel: eventual` header) |
+| `$search` | `?$search="displayName:John"` | Full-text search. On users and groups it needs the `ConsistencyLevel: eventual` header, or Graph answers `400 Request_UnsupportedQuery` |
+| `$count` | `?$count=true` | Include total count. On directory objects it needs `ConsistencyLevel: eventual`; without it the parameter is silently ignored, as Graph documents |
+
+Directory queries that Graph serves only as [advanced queries](https://learn.microsoft.com/en-us/graph/aad-advanced-queries)
+-- `$filter` with `endsWith`, `ne` or `not`, and `$filter` with `$orderby` on
+users and groups -- need both `ConsistencyLevel: eventual` and `$count=true`;
+without them the mock answers `400 Request_UnsupportedQuery` like Graph.
 
 ### $count Example
 

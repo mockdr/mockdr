@@ -1,7 +1,7 @@
 """Microsoft Graph Groups endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from api.graph_auth import require_graph_auth
 from application.graph.groups import queries as group_queries
@@ -13,18 +13,21 @@ router = APIRouter(tags=["Graph Groups"])
 
 @router.get("/v1.0/groups")
 async def list_groups(
+    request: Request,
     filter_str: str = Query(None, alias="$filter"),
     top: int = Query(100, alias="$top", ge=1, le=999),
     skip: int = Depends(directory_page_offset),
     orderby: str = Query(None, alias="$orderby"),
     select: str = Query(None, alias="$select"),
     search: str = Query(None, alias="$search"),
+    count: bool = Query(False, alias="$count"),
     _: dict = Depends(require_graph_auth),
 ) -> dict:
     """List groups with OData query parameters."""
     return group_queries.list_groups(
         filter_str=filter_str, top=top, skip=skip,
         orderby=orderby, select=select, search=search,
+        count_param=count, consistency_level=request.headers.get("consistencylevel"),
     )
 
 
