@@ -503,6 +503,9 @@ PLATFORMS = {
         "default_body": {},
         "requests": {
             "POST /devices/entities/devices/v2": {"json": {"ids": "{device_ids}"}},
+            # gofalcon sends these ids as repeated parameters (collectionFormat
+            # multi); a list placeholder goes on the wire the same way.
+            "GET /devices/entities/devices/v2": {"params": {"ids": "{device_ids}"}},
             "GET /devices/entities/host-groups/v1": {"params": {"ids": "{group_ids}"}},
             "GET /devices/combined/host-group-members/v1": {"params": {"id": "{group_ids}"}},
             "POST /alerts/entities/alerts/v2": {"json": {"composite_ids": "{alert_ids}"}},
