@@ -6,7 +6,7 @@ from api.dto.requests import BulkDeleteBody
 from application.documented_filters import DOCUMENTED_FILTERS
 from application.exclusions import commands as exclusion_commands
 from application.exclusions import queries as exclusion_queries
-from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from repository.blocklist_repo import blocklist_repo
 from repository.exclusion_repo import exclusion_repo
 from utils.documented_params import documented_openapi, documented_params
@@ -77,7 +77,7 @@ def list_exclusions(
     includeParents: bool = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -174,7 +174,7 @@ def list_blocklist(
     types: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

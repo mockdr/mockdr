@@ -203,9 +203,11 @@ def paginate(
 
     Returns:
         ``(page, next_cursor, total)`` where *next_cursor* is ``None`` on the
-        last page and *total* is the full item count before slicing.
+        last page and *total* is the full item count before slicing — and
+        before any ``skip``, when *items* went through
+        ``apply_query_options`` (``utils.filtering.Skipped``).
     """
-    total = len(items)
+    total = int(getattr(items, "matched", len(items)))
 
     if spec is not None:
         # ── keyset mode ──────────────────────────────────────────────────────
@@ -221,7 +223,7 @@ def paginate(
                 start = resumed
 
         page = items[start : start + limit]
-        if page and (start + len(page)) < total:
+        if page and (start + len(page)) < len(items):
             next_cursor: str | None = _encode_keyset(page[-1], spec)
         else:
             next_cursor = None
@@ -229,7 +231,7 @@ def paginate(
         # ── legacy offset mode ───────────────────────────────────────────────
         offset = _decode_offset(cursor) if cursor else 0
         page = items[offset : offset + limit]
-        next_cursor = _encode_offset(offset + limit) if (offset + limit) < total else None
+        next_cursor = _encode_offset(offset + limit) if (offset + limit) < len(items) else None
 
     return page, next_cursor, total
 

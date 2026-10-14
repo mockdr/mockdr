@@ -7,7 +7,7 @@ from api.auth import require_auth, require_write
 from api.dto.common import FilterBody
 from application.threats import commands as threat_commands
 from application.threats import queries as threat_queries
-from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Threats"])
@@ -48,7 +48,7 @@ def list_threats(
     createdAt__lte: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -64,7 +64,7 @@ def list_threats(
 @router.get("/threats/{threat_id}/timeline")
 def get_timeline(
     threat_id: str,
-    skip: int = Query(0, ge=0),
+    skip: int = Query(0, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -84,7 +84,7 @@ def get_timeline(
 @router.get("/threats/{threat_id}/notes")
 def get_notes(
     threat_id: str,
-    skip: int = Query(0, ge=0),
+    skip: int = Query(0, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

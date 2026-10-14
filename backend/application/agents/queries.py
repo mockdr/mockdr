@@ -133,7 +133,7 @@ def list_passphrases(params: dict, cursor: str | None, limit: int) -> dict:
         }
         for r in filtered
     ]
-    page, next_cursor, total = paginate(passphrases, cursor, limit)
+    page, next_cursor, total = paginate(filtered.carry(passphrases), cursor, limit)
     return build_list_response(
         page,
         next_cursor,

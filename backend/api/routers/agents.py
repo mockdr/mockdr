@@ -8,7 +8,7 @@ from api.dto.requests import FetchFilesBody, RemoteScriptBody
 from application.agents import commands as agent_commands
 from application.agents import queries as agent_queries
 from application.tags import queries as tag_queries
-from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
 from utils.pagination import build_list_response
 from utils.s1_fixtures import restrict_item
@@ -53,7 +53,7 @@ def list_tags(
     scopePath: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -74,7 +74,7 @@ def list_passphrases(
     groupIds: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -95,7 +95,7 @@ def list_installed_applications(
     agentIsDecommissioned: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -201,7 +201,7 @@ def list_agents(
     tagsData: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

@@ -78,7 +78,67 @@ class TestSkip:
     def test_skip_beyond_the_end_returns_nothing(
         self, client: TestClient, auth_headers: dict,
     ) -> None:
-        assert _data(client, auth_headers, "/agents", skip=9999, limit=100) == []
+        # Past the 60 seeded agents but inside the documented 0-1000. This
+        # asked for skip=9999 and expected 200 []; the swagger bounds skip at
+        # 1000, and past it a request is refused (see below).
+        assert _data(client, auth_headers, "/agents", skip=1000, limit=100) == []
+
+    def test_skip_does_not_shrink_the_total(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """``totalItems`` is the "Total number of items found matching your query".
+
+        The offset was applied first and the total counted from what was left,
+        so ``skip=50`` over 60 agents answered ``totalItems: 10``.
+        """
+        everything = client.get(f"{PREFIX}/agents", headers=auth_headers,
+                                params={"limit": 100}).json()["pagination"]["totalItems"]
+        body = client.get(f"{PREFIX}/agents", headers=auth_headers,
+                          params={"skip": 50, "limit": 100}).json()
+        assert body["pagination"]["totalItems"] == everything == 60
+        assert len(body["data"]) == 10
+        assert body["pagination"]["nextCursor"] is None
+
+    def test_skip_keeps_the_total_on_threats_too(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        everything = client.get(f"{PREFIX}/threats", headers=auth_headers,
+                                params={"limit": 100}).json()["pagination"]["totalItems"]
+        skipped = client.get(f"{PREFIX}/threats", headers=auth_headers,
+                             params={"skip": 5, "limit": 3}).json()
+        assert skipped["pagination"]["totalItems"] == everything
+        # A cursor still follows the shorter page: 3 of the remaining rows.
+        assert skipped["pagination"]["nextCursor"] is not None
+
+    def test_skip_keeps_the_total_where_records_are_reshaped(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        """Passphrases are rebuilt from the agents; the total survives that."""
+        body = client.get(f"{PREFIX}/agents/passphrases", headers=auth_headers,
+                          params={"skip": 50, "limit": 100}).json()
+        assert body["pagination"]["totalItems"] == 60
+        assert len(body["data"]) == 10
+
+    @pytest.mark.parametrize("path", [
+        "/agents", "/threats", "/activities", "/sites", "/groups", "/users",
+        "/exclusions", "/restrictions", "/threat-intelligence/iocs",
+        "/device-control", "/firewall-control", "/cloud-detection/alerts",
+        "/cloud-detection/rules", "/agents/tags", "/agents/passphrases",
+        "/installed-applications",
+    ])
+    def test_skip_past_the_documented_maximum_is_refused(
+        self, client: TestClient, auth_headers: dict, path: str,
+    ) -> None:
+        """``skip``: "(0-1000). To iterate over more than 1000 items, use cursor"."""
+        resp = client.get(f"{PREFIX}{path}", headers=auth_headers, params={"skip": 1001})
+        assert resp.status_code == 400
+        assert resp.json()["errors"][0]["code"] == 4000010
+
+    def test_a_negative_skip_is_refused(
+        self, client: TestClient, auth_headers: dict,
+    ) -> None:
+        resp = client.get(f"{PREFIX}/agents", headers=auth_headers, params={"skip": -1})
+        assert resp.status_code == 400
 
     def test_skip_zero_is_a_no_op(self, client: TestClient, auth_headers: dict) -> None:
         everything = _data(client, auth_headers, "/agents", limit=100)

@@ -13,6 +13,11 @@ APP_VERSION = "2.5.0"
 API_PREFIX = "/web/api/v2.1"
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 1000
+#: `skip` is documented "(0-1000). To iterate over more than 1000 items, use
+#: `cursor`" with `maximum: 1000` on every list route this mock serves that
+#: takes it (data/swagger_2_1.json); past that a client is meant to page by
+#: cursor. Enforced the way `limit`'s documented maximum is, as a 400.
+MAX_SKIP = 1000
 DV_FINISH_DELAY_SECONDS = 2
 
 SEED_COUNT_AGENTS = int(os.getenv("SEED_COUNT_AGENTS", "60"))

@@ -6,7 +6,7 @@ from api.dto.common import FilterBody
 from api.dto.requests import StarRuleCreateBody
 from application.alerts import commands as alert_commands
 from application.alerts import queries as alert_queries
-from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
 from utils.pagination import build_list_response, paginate
 from utils.vendor_errors import build_vendor_error
@@ -46,7 +46,7 @@ def list_alerts(
     createdAt__lte: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
@@ -86,7 +86,7 @@ def list_star_rules(
     queryType: str = Query(None),  # noqa: N803 - the vendor's own name
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

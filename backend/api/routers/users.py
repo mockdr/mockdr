@@ -5,7 +5,7 @@ from api.auth import require_admin, require_auth
 from api.dto.requests import UserBulkDeleteBody, UserCreateBody, UserUpdateBody
 from application.users import commands as user_commands
 from application.users import queries as user_queries
-from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Users"])
@@ -20,7 +20,7 @@ def list_users(
     email: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:

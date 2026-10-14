@@ -373,7 +373,7 @@ def _compare_dt(field_val: Any, target: datetime, op: str) -> bool:
 
 def apply_query_options(
     records: list, params: dict, specs: list[FilterSpec] | None = None,
-) -> list:
+) -> "Skipped":
     """Apply the sorting and offset options every S1 list endpoint accepts.
 
     ``sortBy``, ``sortOrder`` and ``skip`` are documented on every list
@@ -389,7 +389,8 @@ def apply_query_options(
                  documented `sortBy` needs.
 
     Returns:
-        The records, sorted and offset as requested.
+        The records, sorted and offset as requested, as a :class:`Skipped`
+        list that remembers how many matched before the offset.
     """
     sort_by = str(params.get("sortBy") or "").strip()
     if sort_by:
@@ -397,10 +398,34 @@ def apply_query_options(
         field = _sort_path(records, sort_by, specs or [])
         records = sorted(records, key=_sort_key(field), reverse=descending)
 
+    matched = len(records)
     skip = _as_int(params.get("skip"))
     if skip > 0:
         records = records[skip:]
-    return records
+    return Skipped(records, matched)
+
+
+class Skipped(list):
+    """Records after ``skip``, remembering how many matched before it.
+
+    The swagger defines ``pagination.totalItems`` as the "Total number of
+    items found matching your query", and ``skip`` only says where the page
+    starts. The offset was applied here and the total counted afterwards
+    from what was left, so ``skip=50`` over 60 agents answered
+    ``totalItems: 10`` — a client that sizes its walk by the total stopped
+    early, and one that compares it with the filter's count saw the
+    collection shrink. :func:`utils.pagination.paginate` reads ``matched``
+    as the total.
+    """
+
+    def __init__(self, records: list, matched: int) -> None:
+        """Keep *records* and the count of everything that matched."""
+        super().__init__(records)
+        self.matched = matched
+
+    def carry(self, records: list) -> "Skipped":
+        """The same total for a list derived one-for-one from these records."""
+        return Skipped(records, self.matched)
 
 
 def _sort_path(records: list, name: str, specs: list[FilterSpec]) -> str:

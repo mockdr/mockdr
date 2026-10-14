@@ -9,7 +9,7 @@ from api.dto.requests import (
 )
 from application.device_control import commands as dc_commands
 from application.device_control import queries as dc_queries
-from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SKIP
 from utils.documented_params import documented_openapi, documented_params
 
 router = APIRouter(tags=["Device Control"])
@@ -64,7 +64,7 @@ def list_device_control_rules(
     statuses: str = Query(None),
     sortBy: str = Query(None),
     sortOrder: str = Query(None),
-    skip: int = Query(None),
+    skip: int = Query(None, ge=0, le=MAX_SKIP),
     cursor: str = Query(None),
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> dict:
