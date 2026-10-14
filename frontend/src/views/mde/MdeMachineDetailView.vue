@@ -14,6 +14,7 @@ const machine = ref<MdeMachine | null>(null)
 const alerts = ref<MdeAlert[]>([])
 const loading = ref(true)
 const actionLoading = ref(false)
+const actionError = ref<string | null>(null)
 const activeTab = ref('overview')
 
 const TABS = [
@@ -42,6 +43,7 @@ function severityBadgeClass(severity: string): string {
 async function performAction(action: 'isolate' | 'unisolate' | 'quickScan' | 'fullScan'): Promise<void> {
   if (!machine.value) return
   actionLoading.value = true
+  actionError.value = null
   try {
     if (action === 'isolate') {
       await mdeMachinesApi.isolate(id, 'Isolated from detail view')
@@ -53,6 +55,12 @@ async function performAction(action: 'isolate' | 'unisolate' | 'quickScan' | 'fu
     // Refresh
     const res = await mdeMachinesApi.get(id)
     machine.value = res
+  } catch (e: unknown) {
+    // Defender refuses a second action of a kind while one is pending
+    // (ActiveRequestAlreadyExists); say so rather than fail silently.
+    const vendor = (e as { response?: { data?: { error?: { message?: string } } } })
+      .response?.data?.error?.message
+    actionError.value = vendor ?? (e instanceof Error ? e.message : 'Action failed')
   } finally {
     actionLoading.value = false
   }
@@ -79,6 +87,8 @@ onMounted(async () => {
     <button @click="router.push('/defender/machines')" class="btn-ghost flex items-center gap-2 mb-4 -ml-2">
       <ArrowLeft class="w-4 h-4" /> MDE Machines
     </button>
+
+    <div v-if="actionError" class="error-banner mb-4" role="alert">{{ actionError }}</div>
 
     <div v-if="loading" class="card p-6"><LoadingSkeleton :rows="8" /></div>
 

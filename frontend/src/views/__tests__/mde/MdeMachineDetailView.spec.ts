@@ -264,6 +264,19 @@ describe('MdeMachineDetailView', () => {
     expect(mdeMachinesApi.scanAction).toHaveBeenCalledWith('test-machine-id', 'Full')
   })
 
+  // A refused action is shown, in Defender's words, not swallowed.
+  it('performAction shows the vendor message when Defender refuses', async () => {
+    vi.mocked(mdeMachinesApi.scanAction).mockRejectedValueOnce({
+      response: { data: { error: { code: 'ActiveRequestAlreadyExists', message: 'Action is already in progress' } } },
+    })
+    const wrapper = mount(MdeMachineDetailView, { global: { plugins: [router], stubs: STUBS } })
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { performAction: (action: 'isolate' | 'unisolate' | 'quickScan' | 'fullScan') => Promise<void> }
+    await vm.performAction('fullScan')
+    await flushPromises()
+    expect(wrapper.find('[role="alert"]').text()).toBe('Action is already in progress')
+  })
+
   // performAction does nothing when machine is null
   it('performAction does nothing when machine is null', async () => {
     vi.mocked(mdeMachinesApi.get).mockResolvedValueOnce(null as unknown as ReturnType<typeof mdeMachinesApi.get> extends Promise<infer T> ? T : never)

@@ -40,8 +40,13 @@ for (const [list, buttons] of PAGES) {
     page.on('response', async (response) => {
       if (response.request().method() === 'GET') return
       if (response.status() < 400 || response.url().includes('/token')) return
+      const body = await response.text()
+      // Pressing Quick Scan then Full Scan starts a second scan while the
+      // first is pending, which Defender refuses by design. That is the
+      // product's answer to the timing, not a body the console got wrong.
+      if (body.includes('"ActiveRequestAlreadyExists"')) return
       refused.push(`${response.status()} ${response.request().method()} `
-        + `${new URL(response.url()).pathname} :: ${(await response.text()).slice(0, 140)}`)
+        + `${new URL(response.url()).pathname} :: ${body.slice(0, 140)}`)
     })
 
     await page.goto('/login')
