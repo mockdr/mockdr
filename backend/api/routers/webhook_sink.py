@@ -30,7 +30,12 @@ async def receive_webhook(request: Request) -> dict:
     if len(raw) > _MAX_BODY_BYTES:
         raise HTTPException(status_code=413, detail="Request body too large (max 1 MiB)")
     import json
-    body = json.loads(raw)
+    try:
+        body = json.loads(raw)
+    except RecursionError as exc:
+        # The sink is unauthenticated: a body of nested brackets reached
+        # Python's recursion limit and answered 500 to anyone who asked.
+        raise HTTPException(status_code=400, detail="Request body is nested too deeply") from exc
     event_type = request.headers.get("X-S1-Webhook-Event", "")
     # The sink is public (it receives what the mock's own webhooks send), and
     # its entries are read by admins; a credential a sender attached must not

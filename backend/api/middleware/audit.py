@@ -17,6 +17,11 @@ _SKIP_PATH_SUFFIX = "/_dev/requests"
 #: truncates would otherwise sit in the log in full, one field over.
 _CREDENTIAL_PARAMS = frozenset({
     "token", "access_token", "api_key", "apikey", "key", "password", "secret",
+    # OAuth credentials a client can send in the query of a token request;
+    # the audit log is readable by every holder of the documented admin
+    # token, so a real client secret pointed at the mock by mistake would
+    # otherwise sit there in full.
+    "client_secret", "refresh_token", "client_assertion", "code", "passwd",
 })
 
 

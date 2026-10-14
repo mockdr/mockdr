@@ -11,6 +11,7 @@ import re
 import secrets
 from collections.abc import Mapping
 from fnmatch import fnmatch
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -36,6 +37,23 @@ from utils.id_gen import new_hex
 _register_convertors()
 
 router = APIRouter(tags=["ES Search"])
+
+
+def _json_loads(text: str | bytes) -> Any:  # noqa: ANN401 - what json.loads returns
+    """``json.loads``, with a too-deep document refused as a decode error.
+
+    Python's parser gives out about a thousand levels down with a
+    RecursionError, which none of the handlers here caught: one NDJSON line
+    of brackets answered 500. Elasticsearch's parser has a nesting limit of
+    its own (Jackson's ``maxNestingDepth``, 1,000) and refuses the body as
+    unparseable, which is what the decode-error paths already say.
+    """
+    try:
+        return json.loads(text)
+    except RecursionError as exc:
+        doc = text if isinstance(text, str) else text.decode("utf-8", "replace")
+        msg = "Document nesting depth exceeds the maximum allowed (1000)"
+        raise json.JSONDecodeError(msg, doc, 0) from exc
 
 #: What each of these routes accepts, measured one parameter at a time on
 #: 8.15 against the cluster's own oracle: it calls an unrecognised parameter
@@ -544,7 +562,7 @@ def _body_or_source(body: dict, source: str | None) -> dict:
     if not source:
         return body
     try:
-        parsed = json.loads(source)
+        parsed = _json_loads(source)
     except ValueError as exc:
         raise ESQueryError(f"Failed to parse request body: {exc}") from exc
     return parsed if isinstance(parsed, dict) else {}
@@ -686,7 +704,7 @@ async def _mget_body(request: Request) -> dict:
             400, "parse_exception", "request body or source parameter is required",
         ))
     try:
-        body = json.loads(raw or request.query_params.get("source") or "{}")
+        body = _json_loads(raw or request.query_params.get("source") or "{}")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=build_es_error_response(
             400, "parse_exception", "request body is required",
@@ -748,7 +766,7 @@ async def es_bulk(
     i = 0
     while i < len(lines):
         try:
-            action = json.loads(lines[i])
+            action = _json_loads(lines[i])
         except json.JSONDecodeError as exc:
             detail = _bulk_parse_error(lines[i], exc, i + 1)
             raise HTTPException(status_code=400, detail=detail) from exc
@@ -768,7 +786,7 @@ async def es_bulk(
             i += 1
             if i < len(lines):
                 try:
-                    doc = json.loads(lines[i])
+                    doc = _json_loads(lines[i])
                 except json.JSONDecodeError as exc:
                     raise HTTPException(status_code=400, detail=build_es_error_response(
                         400, "x_content_parse_exception", _jackson_message(lines[i], exc, i + 1),
@@ -1357,8 +1375,8 @@ async def msearch(request: Request, index: str = "", _: dict = Depends(require_e
     responses: list[dict] = []
     for i in range(0, len(lines) - 1, 2):
         try:
-            header = json.loads(lines[i])
-            body = json.loads(lines[i + 1])
+            header = _json_loads(lines[i])
+            body = _json_loads(lines[i + 1])
         except json.JSONDecodeError as exc:
             raise ESQueryError(f"Failed to parse request body: {exc}") from exc
         target = str(header.get("index") or index or "_all")
@@ -1603,7 +1621,7 @@ async def validate_query(
     body: dict | None = None
     if raw.strip():
         try:
-            parsed = json.loads(raw)
+            parsed = _json_loads(raw)
         except ValueError:
             return {"valid": False}
         if not isinstance(parsed, dict):
