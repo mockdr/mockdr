@@ -28,8 +28,9 @@ class TestKVStoreCollections:
             json={"name": "test_collection"},
             headers=_auth(),
         )
-        assert resp.status_code == 200
-        assert resp.json()["name"] == "test_collection"
+        # 201 and the feed around the new entry, as splunkd answers it.
+        assert resp.status_code == 201
+        assert resp.json()["entry"][0]["name"] == "test_collection"
 
     def test_delete_collection(self, client: TestClient) -> None:
         # Create first

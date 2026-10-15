@@ -21,6 +21,18 @@ _KV_ACL = {
     "can_share_user": False,
 }
 
+#: A collection made over REST belongs to the user who made it, and splunkd
+#: reports it as it reports any user's knowledge object: authored and owned
+#: by that user, re-shareable down to user level, removable, and writable by
+#: admin and power. One defined in a .conf file is ``nobody``'s and none of
+#: that (measured on splunkd 10.4.2: a collection POSTed as admin, beside the
+#: shipped ones in the same listing).
+_USER_KV_ACL = {
+    "can_share_user": True,
+    "removable": True,
+    "perms": {"read": ["*"], "write": ["admin", "power"]},
+}
+
 
 def get_collection_config(name: str, app: str | None = "search") -> dict | None:
     """One collection's configuration, addressed by name.
@@ -30,14 +42,13 @@ def get_collection_config(name: str, app: str | None = "search") -> dict | None:
     collection it had just created met the catch-all's 400 about a missing
     target name, where splunkd answers the entry or a 404 naming it.
     """
-    listing = list_collections(app)
-    entries = [e for e in listing.get("entry", []) if e.get("name") == name]
-    if not entries:
+    found = collection_envelope(name, app)
+    if found is None:
         return None
     # A single read names what the collection accepts; the listing does not.
     # The wildcards are the two families a schema is written in — measured on
     # 10.4.2, and the first `fields` block here with a non-empty one.
-    entry = {**entries[0], "fields": {
+    found["entry"] = [{**found["entry"][0], "fields": {
         "required": [],
         "optional": [
             "enforceTypes", "profilingEnabled", "profilingThresholdMs",
@@ -45,10 +56,36 @@ def get_collection_config(name: str, app: str | None = "search") -> dict | None:
             "replication_dump_strategy",
         ],
         "wildcard": ["accelerated_fields\\..*", "field\\..*"],
-    }}
-    return {**listing, "entry": [entry], "paging": {
+    }}]
+    return found
+
+
+def collection_envelope(name: str, app: str | None = "search") -> dict | None:
+    """The feed splunkd answers a collection's creation with: its one entry.
+
+    It is the collections' own envelope — their top-level links, ``paging``
+    of one — and the entry carries no ``fields`` block, which only a read by
+    name adds (measured on splunkd 10.4.2).
+    """
+    listing = list_collections(app)
+    entries = [e for e in listing.get("entry", []) if e.get("name") == name]
+    if not entries:
+        return None
+    return {**listing, "entry": entries[:1], "paging": {
         **(listing.get("paging") or {}), "total": 1,
     }}
+
+
+def empty_collections_envelope() -> dict:
+    """What deleting a collection answers: the envelope with no entry at all.
+
+    Not the collections that remain, as a lookup definition's delete answers,
+    but an empty ``entry`` and a ``paging.total`` of 0 (measured on splunkd
+    10.4.2).
+    """
+    return build_splunk_envelope(
+        [], links=fixture_top_links("kv_config"), collection="storage/collections/config",
+    )
 
 
 def list_collections(app: str | None = "search") -> dict:
@@ -74,16 +111,20 @@ def list_collections(app: str | None = "search") -> dict:
         # Entity.path does) asked /servicesNS/nobody/system/.../data/<name>
         # and was answered 404.
         content["eai:appName"] = coll.app
+        owner = coll.owner or "nobody"
         entries.append(
             build_splunk_entry(
                 coll.name,
                 complete(content, "kv_config"),
                 collection="storage/collections/config",
-                links=("_reload", "alternate", "disable", "edit", "list"),
+                # A removable collection offers `remove` too.
+                links=("_reload", "alternate", "disable", "edit", "list",
+                       *(("remove",) if owner != "nobody" else ())),
                 fields=False,
+                author=owner,
                 acl_extra={
-                    **_KV_ACL, "app": coll.app, "owner": coll.owner or "nobody",
-                    "sharing": "app",
+                    **_KV_ACL, "app": coll.app, "owner": owner, "sharing": "app",
+                    **(_USER_KV_ACL if owner != "nobody" else {}),
                 },
             )
         )

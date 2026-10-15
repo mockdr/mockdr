@@ -192,6 +192,7 @@ def build_splunk_entry(
     acl_extra: dict | None = None,
     acl: dict | None = None,
     published: str | None = None,
+    author: str = "nobody",
 ) -> dict:
     """Build a single Splunk ``entry`` object.
 
@@ -225,6 +226,9 @@ def build_splunk_entry(
         acl_extra:  Members merged over the default ACL.
         acl:        A complete ACL, for collections whose members differ (jobs).
         published:  Creation timestamp; only jobs carry one.
+        author:     Who made the entity: splunkd names the user who created
+                    an object over REST, and ``nobody`` for one a .conf file
+                    defines.
 
     Returns:
         A dict matching the Splunk entry structure.
@@ -253,7 +257,7 @@ def build_splunk_entry(
         },
         # `_parse_atom_metadata` hoists these into Entity.access / Entity.fields;
         # Splunk's own reference says they apply to all endpoints.
-        "author": "nobody",
+        "author": author,
         "acl": entry_acl,
         "content": content,
     }

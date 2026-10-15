@@ -21,7 +21,9 @@ from application.splunk.commands.kvstore import (
     update_record,
 )
 from application.splunk.queries.kvstore import (
+    collection_envelope,
     collection_exists,
+    empty_collections_envelope,
     get_collection_config,
     get_record,
     get_records,
@@ -114,8 +116,15 @@ async def create_kv_collection(
     request: Request,
     output_mode: str = "json",
     current_user: dict = Depends(require_splunk_admin),
-) -> dict:
-    """Create a KV Store collection."""
+) -> JSONResponse:
+    """Create a KV Store collection: 201 and the collection's feed.
+
+    splunkd answers with the standard envelope around the new entry, owned
+    by the user who made it, and refuses a name already taken with 409.
+    mockdr answered 200 with ``{"name": …}`` and silently replaced an
+    existing collection — records and all — with an empty one (measured on
+    splunkd 10.4.2).
+    """
     body = await parse_body(request)
     name = body.get("name", "")
     if not name:
@@ -123,8 +132,21 @@ async def create_kv_collection(
             {"type": "ERROR",
              "text": 'Cannot perform action "POST" without a target name to act on.'},
         ]})
-    coll = create_collection(name, app, owner)
-    return {"name": coll.name}
+    if collection_exists(name, app):
+        raise HTTPException(status_code=409, detail={"messages": [
+            {"type": "ERROR", "text": f"An object with name={name} already exists"},
+        ]})
+    # The schema rides along as dotted keys, as the entry reports it back.
+    field_types = {k[len("field."):]: str(v) for k, v in body.items()
+                   if k.startswith("field.") and len(k) > len("field.")}
+    accelerated = {k[len("accelerated_fields."):]: str(v) for k, v in body.items()
+                   if k.startswith("accelerated_fields.")
+                   and len(k) > len("accelerated_fields.")}
+    create_collection(
+        name, app, str(current_user.get("username") or owner),
+        field_types=field_types, accelerated_fields=accelerated,
+    )
+    return JSONResponse(status_code=201, content=collection_envelope(name, app))
 
 
 @router.delete("/servicesNS/{owner}/{app}/storage/collections/config/{name}")
@@ -134,12 +156,17 @@ def delete_kv_collection(
     name: str,
     current_user: dict = Depends(require_splunk_admin),
 ) -> dict:
-    """Delete a KV Store collection."""
+    """Delete a KV Store collection; the answer is the envelope, emptied.
+
+    splunkd answers the collections' feed with no entry in it, and a name it
+    does not have with 404 ``Could not find object id=<name>`` (measured on
+    splunkd 10.4.2).
+    """
     if not delete_collection(name, app):
         raise HTTPException(status_code=404, detail={"messages": [
-            {"type": "ERROR", "text": f"An object with name={name} does not exist"},
+            {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
-    return {"messages": [{"type": "INFO", "text": f"Collection '{name}' deleted"}]}
+    return empty_collections_envelope()
 
 
 # ── Collection data ────────────────────────────────────────────────────────

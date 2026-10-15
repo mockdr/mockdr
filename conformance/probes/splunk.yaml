@@ -3813,10 +3813,9 @@ probes:
   - id: spl-lookup-setup-collection
     endpoint: management
     why: >
-      Setup for the lookup probes below: the KV Store collection. mockdr
-      answers this create with 200 and `{"name": …}` where splunkd is
-      expected to answer 201 and the entry — a difference that predates
-      these probes.
+      Setup for the lookup probes below, and a comparison in its own right:
+      the KV Store collection, created. splunkd answers 201 and the feed
+      around the new entry; mockdr answered 200 and `{"name": …}`.
     request:
       method: POST
       path: /servicesNS/nobody/search/storage/collections/config

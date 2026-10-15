@@ -17,6 +17,7 @@ def create_collection(
     app: str = "search",
     owner: str = "nobody",
     field_types: dict[str, str] | None = None,
+    accelerated_fields: dict | None = None,
 ) -> KVCollection:
     """Create a new KV Store collection.
 
@@ -25,6 +26,7 @@ def create_collection(
         app:         Splunk app context.
         owner:       Collection owner.
         field_types: Optional field type definitions.
+        accelerated_fields: Optional acceleration specs, by name.
 
     Returns:
         The created KVCollection.
@@ -34,6 +36,7 @@ def create_collection(
         app=app,
         owner=owner,
         field_types=field_types or {},
+        accelerated_fields=accelerated_fields or {},
     )
     kv_collection_repo.save(coll)
     return coll
