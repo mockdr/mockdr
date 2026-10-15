@@ -65,3 +65,23 @@ High-severity EDR events generate ES notable events in `index=notable`:
 | Cortex XDR | all incidents | `Cortex XDR - Incident Created` |
 
 Each notable includes all fields required by XSOAR SplunkPy: `event_id`, `rule_name`, `rule_title`, `security_domain`, `severity`, `urgency`, `status`, `status_label`, `owner`, `src`, `dest`, `user`, `description`, `drilldown_search`, `time`, `_time`, `info_min_time`, `info_max_time`.
+
+## CIM Data Models (`tstats`)
+
+The same events fill the CIM data models `| tstats … from datamodel=` reads.
+Which sourcetype feeds which dataset, and how each CIM field is read off the
+event, is one registry: `backend/utils/splunk/spl_datamodels.py`. In short:
+
+| Dataset | SentinelOne threats | CrowdStrike detections | Defender alerts | Elastic alerts | Cortex XDR alerts |
+|---|---|---|---|---|---|
+| `Endpoint.Processes` | ✓ | ✓ | | ✓ | |
+| `Endpoint.Filesystem` | ✓ | ✓ | | ✓ | |
+| `Malware.Malware_Attacks` | ✓ | ✓ | ✓ | | category `Malware` |
+| `Intrusion_Detection.IDS_Attacks` | | | | ✓ | ✓ |
+
+`dest` is the host the detection is on (`agentRealtimeInfo.agentComputerName`,
+`event.Hostname`, `computerDnsName`, `hostname`, `host_name`); `action` is
+`blocked` where the product stopped it (a mitigated SentinelOne threat, a
+CrowdStrike kill/quarantine/block disposition, a Cortex `prevented` alert) and
+`allowed` otherwise. `Network_Traffic` and `Authentication` hold events that
+carry their CIM tags themselves.

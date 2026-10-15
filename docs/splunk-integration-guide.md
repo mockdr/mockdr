@@ -109,7 +109,7 @@ search index=<index> sourcetype=<sourcetype> <field>=<value>
 | makeresults format=csv|json data="<inline rows>"
 | search <expr>            | where <expr>
 | eval <field>=<expr>      | fields [+|-] <field> ...
-| table <field|pattern> ...  | rename <old> as <new>
+| table <field|pattern> ...  | rename <old> as <new>   (`*` wildcards)
 | head <N>                 | tail <N>
 | sort [-]<field>, ...     | dedup <field> ...
 | stats <func>(<field>) [as <name>] [by <field>]
@@ -126,8 +126,19 @@ search index=<index> sourcetype=<sourcetype> <field>=<value>
       types: num, auto, none, rmunit, rmcomma, dur2sec, ctime, mktime, memk
 | rex field=<field> "<regex>"   | regex <field>="<regex>"
 | fillnull [value=<v>] [<field> ...]
+| inputlookup [append=<bool>] [start=<n>] [max=<n>] <lookup> [where <expr>]
+| lookup <lookup> <field> [AS <field>] ... [OUTPUT|OUTPUTNEW <field> [AS <field>] ...]
+| tstats [prestats=<bool>] [summariesonly=<bool>] [fillnull_value=<v>] <func>(<field>) ...
+      [from datamodel=<model>[.<dataset>]] [where <expr>] [by <field> ... [span=<span>]]
+| chart [limit=<n>] [useother=<bool>] [usenull=<bool>] <func>(<field>) ...
+      [over <field> [by <field>] | by <field>[, <field>]]
+| append [maxout=<n>] [ <subsearch> ]
+| join [type=inner|outer|left] [max=<n>] [overwrite=<bool>] [<field> ...] [ <subsearch> ]
 `notable`   (macro → search index=notable)
+`drop_dm_object_name(<dataset>)`   (CIM macro → rename <dataset>.* AS *)
 ```
+
+`transaction` and `iplocation` are refused as unknown commands.
 
 Time modifiers: `earliest=-24h`, `latest=now`, `earliest=-7d@d`
 
@@ -141,6 +152,69 @@ in Splunk:
 search index=crowdstrike metadata.eventType=EppDetectionSummaryEvent
   | where 'event.Severity'>=70 | stats count by event.SeverityName
 ```
+
+### Lookups and data models
+
+`lookup` and `inputlookup` resolve a name through a lookup definition, as
+splunkd does (`GET /services/data/transforms/lookups` lists them). Seeded:
+
+| Definition | App | Table |
+|---|---|---|
+| `ip_intel`, `file_intel` | `SA-ThreatIntelligence` | KV Store collections; `file_intel` holds the SHA-256 of every malicious SentinelOne threat |
+| `incident_review_lookup` | `SA-ThreatIntelligence` | KV Store collection |
+| `splunk_xsoar_users` | `search` | KV Store collection (XSOAR's user mapping) |
+| `mockdr_assets` | `SA-IdentityManagement` | `mockdr_assets.csv`: one asset per SentinelOne agent (`nt_host`, `ip`, `mac`, `dns`, `owner`, …) |
+| `mockdr_identities` | `SA-IdentityManagement` | `mockdr_identities.csv`: the agents' last users and the console users |
+
+A lookup of your own: create the KV Store collection, insert records, then
+`POST /servicesNS/nobody/search/data/transforms/lookups` with `name`,
+`external_type=kvstore`, `collection` and `fields_list`. Matching follows
+transforms.conf's defaults — case-sensitive, up to 1000 matches per value
+(several become a multivalue); `OUTPUT` overwrites and clears on a miss,
+`OUTPUTNEW` only fills what a row lacks.
+
+```spl
+| inputlookup mockdr_assets where category=server | table nt_host ip owner
+```
+
+`tstats` without `from` reads the index's own fields — `index`,
+`sourcetype`, `source`, `host`, `_time` — so a field extracted at search
+time groups nothing. With `from datamodel=` it reads a CIM data model
+(`GET /services/datamodel/model`), fields prefixed with the dataset name:
+
+| Data model | Dataset | Filled from |
+|---|---|---|
+| `Endpoint` | `Processes` | CrowdStrike detections, SentinelOne threats, Elastic alerts |
+| `Endpoint` | `Filesystem` | SentinelOne threats, CrowdStrike detections, Elastic alerts |
+| `Malware` | `Malware_Attacks` | SentinelOne threats, CrowdStrike detections, Defender alerts, Cortex XDR malware alerts |
+| `Intrusion_Detection` | `IDS_Attacks` | Cortex XDR alerts, Elastic alerts |
+| `Network_Traffic` | `All_Traffic` | events carrying `tag=network` and `tag=communicate` |
+| `Authentication` | `Authentication` | events carrying `tag=authentication` |
+
+The CIM's `drop_dm_object_name` macro strips the dataset prefix, as ES
+content uses it:
+
+```spl
+| tstats count from datamodel=Endpoint.Processes where Processes.process_name=*.exe by Processes.dest Processes.process_name
+  | `drop_dm_object_name(Processes)` | sort -count | head 5
+```
+
+Any event that carries a dataset's CIM tags in a `tag` field (sent through
+HEC, say) joins the dataset with its fields read as they are named. Every
+model is accelerated with a complete summary, so `summariesonly=true`
+changes nothing. A correlation search in the ES shape, enriched from the
+threat-intel collection:
+
+```spl
+| tstats summariesonly=true count from datamodel=Endpoint.Filesystem by Filesystem.dest Filesystem.file_hash
+  | lookup file_intel file_hash AS Filesystem.file_hash OUTPUT threat_key description
+  | search threat_key=*
+```
+
+Rows-producing commands stop at limits.conf's `maxresultrows` (50,000):
+`inputlookup` (also the KV Store's `max_rows_per_query`), the groups
+`tstats` and `chart` produce, and `append`'s `maxout`. Subsearches nest at
+most four deep.
 
 ### eval functions
 
