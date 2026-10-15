@@ -601,12 +601,31 @@ _AGG_RE = re.compile(
 )
 
 
+#: The prefix KQL names an unaliased aggregation's column with, where it is
+#: not the function's own name: ``make_set(x)`` is ``set_x``, not
+#: ``make_set_x`` (the summarize operator reference's examples).
+_DEFAULT_PREFIX = {"make_set": "set", "make_list": "list", "take_any": "any", "any": "any"}
+
+
+def _default_name(function: str, column: str) -> str:
+    """The column KQL gives an aggregation nobody named.
+
+    ``sum(x)`` is ``sum_x`` and ``count()`` is ``count_`` — with the trailing
+    underscore, as ``countif(x > 0)`` is ``countif_`` in the summarize
+    operator reference (https://learn.microsoft.com/en-us/kusto/query/
+    summarize-operator). The evaluator named it ``count``, so a hunting query
+    copied from Defender that reads ``count_`` found no such column.
+    """
+    prefix = _DEFAULT_PREFIX.get(function, function)
+    return f"{prefix}_{column}" if column else f"{prefix}_"
+
+
 def _parse_aggregations(text: str) -> list[tuple[str, str, str]]:
     aggregations: list[tuple[str, str, str]] = []
     for match in _AGG_RE.finditer(text):
         function = match.group("func").lower()
         column = (match.group("column") or "").strip()
-        default = f"{function}_{column}" if column else function
+        default = _default_name(function, column)
         aggregations.append((match.group("alias") or default, function, column))
     return aggregations or [("count_", "count", "")]
 
@@ -625,7 +644,10 @@ def _aggregate(function: str, column: str, rows: list[Row]) -> Any:
 
     numbers = [n for n in (as_float(r.get(column)) for r in rows) if n is not None]
     if not numbers:
-        return 0
+        # Only the counting and summing aggregates default to 0; every other
+        # one is null over nothing (the reference's "Default values of
+        # aggregations" table). A max over a group with no numbers was 0.
+        return 0 if function == "sum" else None
     if function == "sum":
         return _shrink(sum(numbers))
     if function == "avg":

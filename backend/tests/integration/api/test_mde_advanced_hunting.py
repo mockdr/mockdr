@@ -141,7 +141,7 @@ class TestSummarize:
         rows = _rows(client, mde_headers, "DeviceInfo | summarize count() by OSPlatform")
         total = len(_rows(client, mde_headers, "DeviceInfo"))
 
-        assert sum(r["count"] for r in rows) == total
+        assert sum(r["count_"] for r in rows) == total
 
     def test_named_aggregation(self, client: TestClient, mde_headers: dict) -> None:
         rows = _rows(
