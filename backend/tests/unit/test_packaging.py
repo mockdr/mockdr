@@ -106,3 +106,21 @@ def test_an_install_resolves_the_web_stack_requirements_pins(package: str) -> No
     ]
     assert pinned, f"requirements.txt pins no {package}"
     assert pinned[0] in declared
+
+
+def test_an_install_resolves_the_signing_library_requirements_pin() -> None:
+    """The library the Microsoft mounts sign their tokens with is pinned in both.
+
+    `cryptography` mints the JWT access tokens of /graph, /mde and /sentinel
+    (utils/entra_access_token.py) and is imported when the app starts, so an
+    install from pyproject without it could not serve a route, and one that
+    resolved another release than requirements.txt would run code pip-audit
+    never saw.
+    """
+    declared = CONFIG["project"]["dependencies"]
+    pinned = [
+        line.strip() for line in (BACKEND / "requirements.txt").read_text().splitlines()
+        if line.strip().startswith("cryptography==")
+    ]
+    assert pinned, "requirements.txt pins no cryptography"
+    assert pinned[0] in declared

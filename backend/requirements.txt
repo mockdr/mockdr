@@ -8,3 +8,5 @@ faker==40.36.0
 python-multipart==0.0.32
 aiofiles==25.1.0
 httpx==0.28.1
+# Signs the Microsoft mounts' JWT access tokens (utils/entra_access_token.py).
+cryptography==50.0.2
