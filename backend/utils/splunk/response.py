@@ -49,6 +49,7 @@ _NAMESPACES: dict[str, tuple[str, str]] = {
     "data/lookup-table-files": ("nobody", "search"),
     "data/props/extractions": ("nobody", "system"),
     "data/transforms/lookups": ("nobody", "system"),
+    "datamodel/model": ("nobody", "Splunk_SA_CIM"),
     "saved/eventtypes": ("nobody", "search"),
     "saved/searches": ("nobody", "search"),
     "saved/sourcetypes": ("nobody", "system"),
@@ -60,7 +61,8 @@ _NAMESPACES: dict[str, tuple[str, str]] = {
 #: object — an index, a monitored file — carries none of the four.
 _SHAREABLE: frozenset[str] = frozenset({
     "admin/macros", "apps/local", "data/inputs/http", "data/lookup-table-files",
-    "data/props/extractions", "data/transforms/lookups", "saved/eventtypes",
+    "data/props/extractions", "data/transforms/lookups", "datamodel/model",
+    "saved/eventtypes",
     "saved/searches", "saved/sourcetypes",
 })
 

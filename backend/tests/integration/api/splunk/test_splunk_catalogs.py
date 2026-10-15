@@ -148,9 +148,27 @@ class TestKnowledgeObjects:
         assert "KV_MODE" in body["entry"][0]["content"]
 
     @pytest.mark.parametrize("path", [
-        "/splunk/services/saved/eventtypes",
         "/splunk/services/data/transforms/lookups",
         "/splunk/services/data/lookup-table-files",
+    ])
+    def test_the_lookup_collections_list_the_seeded_lookups(
+        self, client: TestClient, path: str,
+    ) -> None:
+        """Both were empty; the seed defines lookups and CSV files now."""
+        body = client.get(path, headers=AUTH, params=JSON).json()
+        assert body["entry"]
+        assert set(body["links"]) == {"_acl", "_reload", "create"}
+
+    def test_a_lookup_file_says_where_it_lives(self, client: TestClient) -> None:
+        body = client.get("/splunk/services/data/lookup-table-files",
+                          headers=AUTH, params=JSON).json()
+        entry = next(e for e in body["entry"] if e["name"] == "mockdr_assets.csv")
+        assert entry["content"]["eai:data"].endswith(
+            "/SA-IdentityManagement/lookups/mockdr_assets.csv")
+        assert entry["acl"]["app"] == "SA-IdentityManagement"
+
+    @pytest.mark.parametrize("path", [
+        "/splunk/services/saved/eventtypes",
         "/splunk/services/data/inputs/monitor",
         "/splunk/services/data/inputs/tcp/raw",
         "/splunk/services/data/props/extractions",

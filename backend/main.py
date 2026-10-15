@@ -326,6 +326,9 @@ from api.routers.splunk import (
     splunk_inputs as splunk_inputs_router,
 )
 from api.routers.splunk import (
+    splunk_knowledge as splunk_knowledge_router,
+)
+from api.routers.splunk import (
     splunk_kvstore as splunk_kvstore_router,
 )
 from api.routers.splunk import (
@@ -1244,6 +1247,7 @@ for _splunk_module in [
     splunk_alerts_router,
     splunk_catalog_router,
     splunk_catalogs_router,
+    splunk_knowledge_router,
     splunk_inputs_router,
 ]:
     app.include_router(_splunk_module.router, prefix=SPLUNK_PREFIX)

@@ -8,7 +8,7 @@ content packs enumerate.
 
 Where mockdr has the thing, it serves it: an index per index, a source type
 per sourcetype its events carry, and the ``notable`` macro its own SPL
-understands. Where it has none — no lookups, no monitored files — it serves
+understands. Where it has none — no event types, no monitored files — it serves
 an *empty collection* rather than a 404, which is the difference between
 "this deployment has none" and "this endpoint does not exist".
 
@@ -231,18 +231,6 @@ def sourcetypes(_user: dict = Depends(require_splunk_auth)) -> dict:
 def eventtypes(_user: dict = Depends(require_splunk_auth)) -> dict:
     """Event types, of which this deployment defines none."""
     return _collection([], "saved/eventtypes", _knowledge_links("saved/eventtypes"))
-
-
-@router.get("/services/data/transforms/lookups")
-def lookup_transforms(_user: dict = Depends(require_splunk_auth)) -> dict:
-    """Lookup definitions, of which this deployment has none."""
-    return _collection([], "data/transforms/lookups", _knowledge_links("data/transforms/lookups"))
-
-
-@router.get("/services/data/lookup-table-files")
-def lookup_files(_user: dict = Depends(require_splunk_auth)) -> dict:
-    """Lookup table files, of which this deployment has none."""
-    return _collection([], "data/lookup-table-files", _knowledge_links("data/lookup-table-files"))
 
 
 #: The input kinds this deployment serves, as ``data/inputs`` lists them: a
