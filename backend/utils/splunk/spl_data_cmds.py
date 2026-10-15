@@ -59,6 +59,7 @@ from utils.splunk.spl_sources import (
     EventSelector,
     LookupTable,
     SearchSources,
+    report,
 )
 
 Rows = list[dict[str, Any]]
@@ -126,17 +127,28 @@ _INPUTLOOKUP_OPTIONS = frozenset({"append", "strict", "start", "max"})
 _WHERE_RE = re.compile(r"\s(?i:where)\s")
 
 
-def _missing_table(name: str) -> ValueError:
-    """What splunkd says when ``inputlookup`` names no table it has.
+def _missing_table(name: str, *, strict: bool) -> None:
+    """What splunkd does when ``inputlookup`` names no table it has.
 
-    A name ending in ``.csv`` is a file that is not there; anything else
-    needed a lookup definition that does not exist.
+    It is not a failure of the search: the command yields no rows, the
+    commands after it run, and the answer carries ``ERROR`` messages — "requires
+    a .csv or KV store lookup definition", and for a name that is not a .csv
+    file "is invalid" after it. ``strict=true`` makes it FATAL, with the one
+    message that applies: "is invalid" for a name, "requires …" for a .csv
+    file. Measured on splunkd 10.4.2; mockdr failed the search, FATAL, in a
+    wording of its own for the .csv case.
+
+    Raises:
+        ValueError: Under ``strict``.
     """
-    if name.lower().endswith(".csv"):
-        return ValueError(f"The lookup table '{name}' does not exist or is not available.")
-    return ValueError(
-        f"The lookup table '{name}' requires a .csv or KV store lookup definition.",
-    )
+    requires = f"The lookup table '{name}' requires a .csv or KV store lookup definition."
+    invalid = f"The lookup table '{name}' is invalid."
+    is_file = name.lower().endswith(".csv")
+    if strict:
+        raise ValueError(requires if is_file else invalid)
+    report("ERROR", requires)
+    if not is_file:
+        report("ERROR", invalid)
 
 
 def inputlookup_appends(arg: str) -> bool:
@@ -181,14 +193,14 @@ def cmd_inputlookup(rows: Rows, command: SPLCommand) -> Rows:
         raise ValueError(msg)
 
     append = _boolean_option("append", options["append"]) if "append" in options else False
-    if "strict" in options:
-        _boolean_option("strict", options["strict"])
+    strict = _boolean_option("strict", options["strict"]) if "strict" in options else False
     start = _count_option("start", options.get("start", "0"))
     limit = _count_option("max", options["max"]) if "max" in options else MAX_RESULT_ROWS
 
     table = _sources().lookup(name)
     if table is None:
-        raise _missing_table(name)
+        _missing_table(name, strict=strict)
+        return rows if append else []
 
     found = table.rows
     if where_text.strip():
@@ -288,8 +300,11 @@ def cmd_lookup(rows: Rows, command: SPLCommand) -> Rows:
     if not inputs:
         msg = "Must specify one or more lookup fields."
         raise ValueError(msg)
-    if any(source not in table.fields for source, _ in inputs):
-        msg = "Could not find all of the specified lookup fields in the lookup table."
+    # Each refusal names the first field the table lacks, and the table by the
+    # name the search gave (measured on splunkd 10.4.2).
+    missing = next((source for source, _ in inputs if source not in table.fields), None)
+    if missing is not None:
+        msg = f"Cannot find the source field '{missing}' in the lookup table '{name}'."
         raise ValueError(msg)
     if mode and not output_tokens:
         msg = f"Must specify one or more destination fields after {mode}."
@@ -298,8 +313,9 @@ def cmd_lookup(rows: Rows, command: SPLCommand) -> Rows:
     outputs = _pairs(output_tokens) if mode else [
         (f, f) for f in table.fields if f not in match_fields
     ]
-    if any(source not in table.fields for source, _ in outputs):
-        msg = "Could not find all of the specified destination fields in the lookup table."
+    missing = next((source for source, _ in outputs if source not in table.fields), None)
+    if missing is not None:
+        msg = f"Cannot find the destination field '{missing}' in the lookup table '{name}'."
         raise ValueError(msg)
 
     index = _match_index(table, [source for source, _ in inputs])
@@ -814,6 +830,12 @@ def run_subsearch(spl: str) -> Rows:
     fatal = next((m for m in messages if m.get("type") == "FATAL"), None)
     if fatal is not None:
         raise SubsearchFailedError(fatal["text"])
+    # An error the subsearch survived is the search's too: `append [|
+    # inputlookup <missing>]` answers the main rows with the subsearch's two
+    # ERROR messages beside them (measured on splunkd 10.4.2).
+    for message in messages:
+        if message.get("type") == "ERROR":
+            report("ERROR", message["text"])
     return found
 
 

@@ -40,7 +40,13 @@ from utils.splunk.spl_parser import (
     parse_sort_keys,
 )
 from utils.splunk.spl_regex import REGEX, REX, compile_client_regex
-from utils.splunk.spl_sources import SOURCES, SUBSEARCH_COUNT, TIME_WINDOW, SearchSources
+from utils.splunk.spl_sources import (
+    MESSAGES,
+    SOURCES,
+    SUBSEARCH_COUNT,
+    TIME_WINDOW,
+    SearchSources,
+)
 
 __all__ = [
     "aggregation_aliases",
@@ -138,6 +144,7 @@ def execute_pipeline(
     budget = MV_BUDGET.set(MAX_MV_TOTAL)
     bound = SOURCES.set(sources)
     window = TIME_WINDOW.set(time_window)
+    reported = MESSAGES.set(messages)
     # The outermost search starts the count its subsearches share.
     counted = SUBSEARCH_COUNT.set([0]) if SUBSEARCH_COUNT.get() is None else None
     try:
@@ -145,6 +152,7 @@ def execute_pipeline(
     finally:
         if counted is not None:
             SUBSEARCH_COUNT.reset(counted)
+        MESSAGES.reset(reported)
         TIME_WINDOW.reset(window)
         SOURCES.reset(bound)
         MV_BUDGET.reset(budget)

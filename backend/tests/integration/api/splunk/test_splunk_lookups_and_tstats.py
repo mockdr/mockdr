@@ -140,10 +140,12 @@ class TestALookupOfYourOwn:
         assert client.delete(f"{TRANSFORMS}/owners_lookup", params={"output_mode": "json"},
                              headers=AUTH).status_code == 200
         body = oneshot(client, "| inputlookup owners_lookup")
-        assert body["messages"][0]["text"] == (
-            "Error in 'inputlookup' command: The lookup table 'owners_lookup' requires "
-            "a .csv or KV store lookup definition."
-        )
+        assert body["results"] == []
+        assert body["messages"][0] == {
+            "type": "ERROR",
+            "text": "The lookup table 'owners_lookup' requires a .csv or KV store "
+                    "lookup definition.",
+        }
 
     def test_the_xsoar_user_mapping_reads_back(self, client: TestClient) -> None:
         client.post(

@@ -79,3 +79,21 @@ SUBSEARCH_DEPTH: ContextVar[int] = ContextVar("spl_subsearch_depth", default=0)
 SUBSEARCH_COUNT: ContextVar[list[int] | None] = ContextVar(
     "spl_subsearch_count", default=None,
 )
+
+#: The messages of the search being executed, which a command adds to when
+#: it reports an error the search survives; None outside a search.
+MESSAGES: ContextVar[list[dict[str, str]] | None] = ContextVar(
+    "spl_messages", default=None,
+)
+
+
+def report(level: str, text: str) -> None:
+    """Add a message to the running search without stopping it.
+
+    splunkd reports some failures as an ``ERROR`` beside the results rather
+    than as the ``FATAL`` that ends a search: ``inputlookup`` of a table there
+    is none of yields no rows and says why, and the commands after it run.
+    """
+    messages = MESSAGES.get()
+    if messages is not None:
+        messages.append({"type": level, "text": text})

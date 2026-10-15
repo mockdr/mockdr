@@ -11,7 +11,7 @@ takes up to 1000 matches per value and writes several as a multivalue;
 ``OUTPUTNEW`` writes only what a row lacks. The refusals are splunkd's own
 lines for a table it does not have and for a field the table does not hold.
 """
-from tests.unit.splunk.sources import FakeSources, failure, out
+from tests.unit.splunk.sources import FakeSources, failure, out, run
 from utils.splunk.spl_data_cmds import MAX_RESULT_ROWS
 from utils.splunk.spl_exec import execute_pipeline
 from utils.splunk.spl_parser import parse_spl
@@ -76,17 +76,51 @@ class TestInputlookup:
             "command of a search."
         )
 
-    def test_a_name_with_no_definition_is_refused(self) -> None:
-        assert failure("| inputlookup nosuch", SOURCES) == (
-            "Error in 'inputlookup' command: The lookup table 'nosuch' requires "
+    # A table there is none of does not fail the search: the command yields
+    # no rows, the commands after it run, and two ERROR messages say why —
+    # one for a .csv name. `strict=true` makes it FATAL, with one message.
+    # Measured on splunkd 10.4.2 via the conformance stack; mockdr failed
+    # the search, FATAL, and worded the .csv case its own way.
+
+    def test_a_name_with_no_definition_is_an_error_the_search_survives(self) -> None:
+        rows, messages = run("| inputlookup nosuch | eval y=1", SOURCES)
+        assert rows == []
+        assert messages == [
+            {"type": "ERROR", "text": "The lookup table 'nosuch' requires a .csv or "
+                                      "KV store lookup definition."},
+            {"type": "ERROR", "text": "The lookup table 'nosuch' is invalid."},
+        ]
+
+    def test_a_csv_file_that_is_not_there_says_so_once(self) -> None:
+        rows, messages = run("| inputlookup nosuch.csv | stats count", SOURCES)
+        assert rows == [{"count": 0}]
+        assert messages == [
+            {"type": "ERROR", "text": "The lookup table 'nosuch.csv' requires a .csv "
+                                      "or KV store lookup definition."},
+        ]
+
+    def test_with_append_the_rows_there_stay(self) -> None:
+        rows, messages = run(EVENTS + "| inputlookup append=t nosuch", SOURCES)
+        assert len(rows) == 3
+        assert [m["type"] for m in messages] == ["ERROR", "ERROR"]
+
+    def test_strict_makes_it_fatal(self) -> None:
+        assert failure("| inputlookup strict=t nosuch", SOURCES) == (
+            "Error in 'inputlookup' command: The lookup table 'nosuch' is invalid."
+        )
+        assert failure("| inputlookup strict=t nosuch.csv", SOURCES) == (
+            "Error in 'inputlookup' command: The lookup table 'nosuch.csv' requires "
             "a .csv or KV store lookup definition."
         )
 
-    def test_a_csv_file_that_is_not_there_is_refused(self) -> None:
-        assert failure("| inputlookup nosuch.csv", SOURCES) == (
-            "Error in 'inputlookup' command: The lookup table 'nosuch.csv' does "
-            "not exist or is not available."
-        )
+    def test_a_subsearchs_error_is_the_searchs(self) -> None:
+        rows, messages = run(
+            "| makeresults | append [| inputlookup nosuch]", SOURCES)
+        assert len(rows) == 1
+        assert [m["text"] for m in messages] == [
+            "The lookup table 'nosuch' requires a .csv or KV store lookup definition.",
+            "The lookup table 'nosuch' is invalid.",
+        ]
 
     def test_an_option_value_is_checked(self) -> None:
         assert failure("| inputlookup max=-1 assets", SOURCES) == (
@@ -207,16 +241,26 @@ class TestLookup:
             "'nosuch, ip, OUTPUT, x'. See search.log for more details."
         )
 
+    # Each refusal names the first field the table lacks and the table by the
+    # name the search gave (measured on splunkd 10.4.2 via the conformance
+    # stack; mockdr named neither).
+
     def test_a_match_field_the_table_lacks_is_refused(self) -> None:
-        assert failure(EVENTS + "| lookup ip_intel addr", SOURCES) == (
-            "Error in 'lookup' command: Could not find all of the specified "
-            "lookup fields in the lookup table."
+        assert failure(EVENTS + "| lookup ip_intel ip addr port", SOURCES) == (
+            "Error in 'lookup' command: Cannot find the source field 'addr' in "
+            "the lookup table 'ip_intel'."
         )
 
     def test_an_output_field_the_table_lacks_is_refused(self) -> None:
-        assert failure(EVENTS + "| lookup ip_intel ip OUTPUT nosuch", SOURCES) == (
-            "Error in 'lookup' command: Could not find all of the specified "
-            "destination fields in the lookup table."
+        assert failure(EVENTS + "| lookup ip_intel ip OUTPUT weight nosuch x", SOURCES) == (
+            "Error in 'lookup' command: Cannot find the destination field 'nosuch' "
+            "in the lookup table 'ip_intel'."
+        )
+
+    def test_a_csv_table_is_named_as_the_search_named_it(self) -> None:
+        assert failure(EVENTS + "| lookup assets.csv addr AS ip", SOURCES) == (
+            "Error in 'lookup' command: Cannot find the source field 'addr' in "
+            "the lookup table 'assets.csv'."
         )
 
     def test_a_lookup_with_no_fields_is_refused(self) -> None:
