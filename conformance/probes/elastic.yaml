@@ -1139,7 +1139,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"gte": "2026-08-03T00:00:00.000Z||-1d"}}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"gte": "2026-08-03T00:00:00.000Z||-1d"}}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -1152,7 +1152,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"gte": "2026-08-03T09:00:00.000Z||/d"}}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"gte": "2026-08-03T09:00:00.000Z||/d"}}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -1165,7 +1165,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"lt": "2026-08-03T09:00:00.000Z||/d"}}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"lt": "2026-08-03T09:00:00.000Z||/d"}}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -1178,7 +1178,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"lte": "2026-08-03T09:00:00.000Z||/d"}}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"range": {"@timestamp": {"lte": "2026-08-03T09:00:00.000Z||/d"}}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -1191,7 +1191,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"query_string": {"query": "@timestamp:[2026-08-02T00:00:00.000Z TO 2026-08-11T00:00:00.000Z]"}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"query_string": {"query": "@timestamp:[2026-08-02T00:00:00.000Z TO 2026-08-11T00:00:00.000Z]"}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -1204,7 +1204,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"query_string": {"query": "host:srv-2"}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"query_string": {"query": "host:srv-2"}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2218,7 +2218,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"prefix": {"host": "srv-"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"prefix": {"host": "srv-"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2231,7 +2231,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"prefix": {"message": "log"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"prefix": {"message": "log"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2244,7 +2244,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"regexp": {"host": "srv"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"regexp": {"host": "srv"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2257,7 +2257,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"regexp": {"host": "srv-[0-9]"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"regexp": {"host": "srv-[0-9]"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2270,7 +2270,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"regexp": {"message": "login"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"regexp": {"message": "login"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2283,7 +2283,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"wildcard": {"host": "SRV-*"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"wildcard": {"host": "SRV-*"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2296,7 +2296,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"wildcard": {"host": {"value": "SRV-*", "case_insensitive": true}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"wildcard": {"host": {"value": "SRV-*", "case_insensitive": true}}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2309,7 +2309,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"fuzzy": {"host": {"value": "srx"}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"fuzzy": {"host": {"value": "srx"}}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2322,7 +2322,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"fuzzy": {"host": {"value": "srv-9", "fuzziness": 1}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"fuzzy": {"host": {"value": "srv-9", "fuzziness": 1}}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2335,7 +2335,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"ids": {"values": ["a", "c"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"ids": {"values": ["a", "c"]}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2348,7 +2348,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"multi_match": {"query": "login", "fields": ["message", "host"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"multi_match": {"query": "login", "fields": ["message", "host"]}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2361,7 +2361,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"multi_match": {"query": "failed login", "fields": ["message"], "type": "phrase"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"multi_match": {"query": "failed login", "fields": ["message"], "type": "phrase"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2374,7 +2374,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"simple_query_string": {"query": "login | malware", "fields": ["message"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"simple_query_string": {"query": "login | malware", "fields": ["message"]}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2387,7 +2387,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"simple_query_string": {"query": "login -alice", "fields": ["message"]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"simple_query_string": {"query": "login -alice", "fields": ["message"]}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2400,7 +2400,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"match_phrase_prefix": {"message": "failed log"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"match_phrase_prefix": {"message": "failed log"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2413,7 +2413,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"match_bool_prefix": {"message": "log"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"match_bool_prefix": {"message": "log"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2426,7 +2426,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"match": {"message": {"query": "login failed malware", "minimum_should_match": "70%"}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"match": {"message": {"query": "login failed malware", "minimum_should_match": "70%"}}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2439,7 +2439,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"constant_score": {"filter": {"term": {"host": "srv-1"}}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"constant_score": {"filter": {"term": {"host": "srv-1"}}}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2452,7 +2452,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"dis_max": {"queries": [{"term": {"host": "srv-1"}}, {"term": {"host": "srv-2"}}]}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"dis_max": {"queries": [{"term": {"host": "srv-1"}}, {"term": {"host": "srv-2"}}]}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2465,7 +2465,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"terms_set": {"tags": {"terms": ["auth", "linux"], "minimum_should_match_script": {"source": "2"}}}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"terms_set": {"tags": {"terms": ["auth", "linux"], "minimum_should_match_script": {"source": "2"}}}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -2478,7 +2478,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"query": {"exists": {"field": "tags"}}, "size": 20, "sort": [{"name": "asc"}], "_source": ["name"]}'
+      content: '{"query": {"exists": {"field": "tags"}}, "size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"]}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -5173,7 +5173,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"term": {"tags": "linux"}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"term": {"tags": "linux"}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -5185,7 +5185,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"terms": {"tags": ["edr"]}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"terms": {"tags": ["edr"]}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -5199,7 +5199,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"bool": {"filter": {"exists": {"field": "host"}}, "should": [{"term": {"host": "srv-1"}}, {"term": {"tags": "linux"}}, {"term": {"tags": "auth"}}], "minimum_should_match": "2"}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"bool": {"filter": {"exists": {"field": "host"}}, "should": [{"term": {"host": "srv-1"}}, {"term": {"tags": "linux"}}, {"term": {"tags": "auth"}}], "minimum_should_match": "2"}}}'
       headers: {Content-Type: application/json}
       auth: basic
 
@@ -5211,7 +5211,7 @@ probes:
     request:
       method: POST
       path: /${seed_index}/_search
-      content: '{"size": 20, "sort": [{"name": "asc"}], "_source": ["name"], "query": {"bool": {"should": [{"term": {"host": "srv-1"}}, {"term": {"tags": "linux"}}, {"term": {"tags": "auth"}}], "minimum_should_match": "2<-25%"}}}'
+      content: '{"size": 20, "sort": [{"name": "asc"}, {"sev": "asc"}], "_source": ["name"], "query": {"bool": {"should": [{"term": {"host": "srv-1"}}, {"term": {"tags": "linux"}}, {"term": {"tags": "auth"}}], "minimum_should_match": "2<-25%"}}}'
       headers: {Content-Type: application/json}
       auth: basic
 

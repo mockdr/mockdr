@@ -119,7 +119,7 @@ Run them from the repository root with the backend's interpreter:
 
 1. `ci.sh` green locally (the CI mirror).
 2. `schema_drift.py` for the six spec-judged platforms: 0 drift, unjudged routes listed and explained.
-3. The conformance harness: Splunk 0 findings, Elasticsearch + Kibana 0 findings (ignore the first run on a fresh stack — `store.size` is `null` on a just-created index and the KV store answers 503 while initialising).
+3. The conformance harness **with `--seeded`** (`python -m harness.runner probes/<platform>.yaml --seeded`, as `conformance.yml` runs it): Splunk 0 findings, Elasticsearch + Kibana 0 findings, and no `skipped …: needs both targets seeded alike` notes — without the flag every value-comparing probe is skipped and "0 findings" measures only the skeletons (2.4.0 to 2.7.0 were released that way). Ignore the first run on a fresh stack — `store.size` is `null` on a just-created index and the KV store answers 503 while initialising.
 4. `load_test.py` passes, and `sdk_smoke.py` passes for all nine vendors (over TLS, so none is skipped).
 5. Version in `backend/config.py`, `backend/pyproject.toml`, `frontend/package.json`; a `## [x.y.z]` section in CHANGELOG.md (`tests/unit/test_version.py` checks all four).
 6. Push, then tag `vX.Y.Z` — never before the checks above are green.
