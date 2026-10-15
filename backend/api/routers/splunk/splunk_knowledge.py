@@ -68,7 +68,10 @@ async def create_lookup_definition(
 ) -> JSONResponse:
     """Define a lookup over a KV Store collection or a CSV file; 201 with the entry."""
     try:
-        definition = create_definition(await parse_body(request), app, owner)
+        definition = create_definition(
+            await parse_body(request), app, owner,
+            creator=str(_user.get("username") or owner),
+        )
     except LookupDefinitionError as exc:
         return JSONResponse(status_code=exc.status, content={"messages": [
             {"type": "ERROR", "text": str(exc)},

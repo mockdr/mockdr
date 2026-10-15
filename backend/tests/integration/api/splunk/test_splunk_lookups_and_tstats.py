@@ -69,7 +69,7 @@ class TestLookupDefinitions:
         assert "/servicesNS/nobody/SA-ThreatIntelligence/" in entry["id"]
         content = entry["content"]
         assert (content["collection"], content["external_type"], content["type"]) == (
-            "ip_intel", "kvstore", "external")
+            "ip_intel", "kvstore", "kvstore")
         assert content["fields_list"].startswith("_key,")
         assert "external_cmd" not in content
 

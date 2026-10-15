@@ -35,6 +35,14 @@ class LookupDefinition:
     default_match: str = ""
     case_sensitive_match: bool = True
 
+    #: The optional settings the stanza spells out, as splunkd reports them
+    #: back: only what was given, never the defaults above.
+    explicit: dict[str, object] = field(default_factory=dict)
+
+    #: The user who created the definition over REST; empty for one a .conf
+    #: file ships, which is ``nobody``'s.
+    creator: str = ""
+
     @property
     def id(self) -> str:
         """Primary identifier expected by ``Repository[T]``."""

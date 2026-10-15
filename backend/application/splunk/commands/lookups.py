@@ -33,8 +33,13 @@ def _count(name: str, raw: str) -> int:
     return int(text)
 
 
-def create_definition(params: dict[str, str], app: str, owner: str) -> LookupDefinition:
+def create_definition(
+    params: dict[str, str], app: str, owner: str, creator: str = "",
+) -> LookupDefinition:
     """Define a lookup from the parameters splunkd takes for one.
+
+    *creator* is the user making the request: splunkd reports the
+    definition as theirs, while *owner* is the namespace it is stored under.
 
     Raises:
         LookupDefinitionError: Without a name (400), with a name already
@@ -60,15 +65,24 @@ def create_definition(params: dict[str, str], app: str, owner: str) -> LookupDef
         name=name, app=app, owner=owner,
         collection=collection, filename=filename,
         fields_list=[f.strip() for f in params.get("fields_list", "").split(",") if f.strip()],
+        creator=creator,
     )
+    # Each setting given is reported back as splunkd reports it: the flag and
+    # the default as the text they were given, the two counts as integers
+    # (measured on splunkd 10.4.2).
     if "case_sensitive_match" in params:
         definition.case_sensitive_match = _flag(params["case_sensitive_match"])
+        definition.explicit["case_sensitive_match"] = params["case_sensitive_match"].strip()
     if "max_matches" in params:
-        definition.max_matches = max(1, min(_count("max_matches", params["max_matches"]), 1000))
+        given = _count("max_matches", params["max_matches"])
+        definition.max_matches = max(1, min(given, 1000))
+        definition.explicit["max_matches"] = given
     if "min_matches" in params:
         definition.min_matches = _count("min_matches", params["min_matches"])
+        definition.explicit["min_matches"] = definition.min_matches
     if "default_match" in params:
         definition.default_match = params["default_match"]
+        definition.explicit["default_match"] = params["default_match"]
     lookup_definition_repo.save(definition)
     return definition
 
