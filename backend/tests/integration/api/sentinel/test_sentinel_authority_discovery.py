@@ -39,7 +39,9 @@ class TestDiscovery:
             f"https://mock.example/sentinel/{tenant}/oauth2/v2.0/token"
         )
         assert body["issuer"] == f"https://mock.example/sentinel/{tenant}/v2.0"
-        assert client.get(urlsplit(body["jwks_uri"]).path).json() == {"keys": []}
+        keys = client.get(body["jwks_uri"]).json()["keys"]
+        assert [(k["kty"], k["use"], k["issuer"]) for k in keys] == [
+            ("RSA", "sig", body["issuer"])]
 
         issued = client.post(urlsplit(body["token_endpoint"]).path, data={
             "client_id": "sentinel-mock-client-id",

@@ -29,8 +29,13 @@ from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
 
+from utils.entra_access_token import signing_key_set
 from utils.entra_client_auth import resolve_client_credentials
-from utils.entra_discovery import empty_key_set, openid_configuration, refuse_unhosted_tenant
+from utils.entra_discovery import (
+    discovery_issuer,
+    openid_configuration,
+    refuse_unhosted_tenant,
+)
 from utils.entra_tenant import tenant_rejection_message, tenant_segment_matches
 from utils.entra_token_errors import (
     AADSTS_INVALID_CLIENT,
@@ -198,9 +203,13 @@ def entra_authority_router(directory: EntraDirectory, tag: str) -> APIRouter:
         return openid_configuration(request, directory.mount, tenant_id)
 
     @router.get("/{tenant_id}/discovery/v2.0/keys")
-    async def signing_keys(tenant_id: str) -> dict:
-        """The key set ``jwks_uri`` names -- empty, as the mock's tokens are opaque."""
+    async def signing_keys(tenant_id: str, request: Request) -> dict:
+        """The key set ``jwks_uri`` names: the public key the mount's tokens verify with.
+
+        See :func:`utils.entra_access_token.signing_key_set`; each key names
+        the discovery document's ``issuer``.
+        """
         refuse_unhosted_tenant(tenant_id, directory.hosted_tenants())
-        return empty_key_set()
+        return signing_key_set(discovery_issuer(request, directory.mount, tenant_id))
 
     return router

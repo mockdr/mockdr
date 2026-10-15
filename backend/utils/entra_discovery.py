@@ -16,8 +16,13 @@ back at the mount's own tenant-scoped token route. The field names and the
 fixed values (``subject_types_supported``, the signing algorithm, the auth
 methods) are those of ``login.microsoftonline.com``'s own document.
 
-Tokens stay opaque: ``jwks_uri`` answers an empty key set, because there is
-no signature for a client to check.
+``jwks_uri`` serves the public half of the key the mount's tokens are
+signed with (:mod:`utils.entra_access_token`), each key naming this
+document's ``issuer`` as Entra's keys document does. The tokens themselves
+are v1.0 tokens, issued by ``https://sts.windows.net/{tid}/`` -- the
+resources the mock fronts accept v1.0, and Entra's v2.0 document names the
+v2.0 issuer of its ID tokens whatever version its access tokens are. Both
+sign with RS256, the one ``id_token_signing_alg_values_supported`` lists.
 
 A tenant the mount does not host is refused on both routes the way Entra
 refuses it, ``400 invalid_tenant`` with ``AADSTS90002``; the multi-tenant
@@ -73,8 +78,6 @@ def openid_configuration(request: Request, mount: str, tenant: str) -> dict:
     """
     base = str(request.base_url).rstrip("/")
     authority = f"{base}{mount}/{tenant}"
-    # Entra's multi-tenant documents leave the issuer's tenant as a template.
-    issuer_tenant = "{tenantid}" if tenant.casefold() in ENTRA_TENANT_ALIASES else tenant
     return {
         "token_endpoint": f"{authority}/oauth2/v2.0/token",
         "token_endpoint_auth_methods_supported": [
@@ -86,7 +89,7 @@ def openid_configuration(request: Request, mount: str, tenant: str) -> dict:
         "id_token_signing_alg_values_supported": ["RS256"],
         "response_types_supported": ["code", "id_token", "code id_token", "id_token token"],
         "scopes_supported": ["openid", "profile", "email", "offline_access"],
-        "issuer": f"{base}{mount}/{issuer_tenant}/v2.0",
+        "issuer": discovery_issuer(request, mount, tenant),
         "request_uri_parameter_supported": False,
         "authorization_endpoint": f"{authority}/oauth2/v2.0/authorize",
         "device_authorization_endpoint": f"{authority}/oauth2/v2.0/devicecode",
@@ -101,6 +104,12 @@ def openid_configuration(request: Request, mount: str, tenant: str) -> dict:
     }
 
 
-def empty_key_set() -> dict:
-    """The JSON Web Key Set behind ``jwks_uri``: none, as tokens are opaque."""
-    return {"keys": []}
+def discovery_issuer(request: Request, mount: str, tenant: str) -> str:
+    """The ``issuer`` of the discovery document for ``tenant`` on ``mount``.
+
+    Entra's multi-tenant documents leave the issuer's tenant as a template,
+    ``{tenantid}``.
+    """
+    base = str(request.base_url).rstrip("/")
+    issuer_tenant = "{tenantid}" if tenant.casefold() in ENTRA_TENANT_ALIASES else tenant
+    return f"{base}{mount}/{issuer_tenant}/v2.0"

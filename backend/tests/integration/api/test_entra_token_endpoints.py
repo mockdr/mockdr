@@ -26,7 +26,6 @@ mounts got wrong:
 from __future__ import annotations
 
 import base64
-from urllib.parse import urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -147,7 +146,9 @@ class TestDiscovery:
         assert body["token_endpoint"] == f"http://mock.example{mount}/{tenant}/oauth2/v2.0/token"
         assert "client_secret_basic" in body["token_endpoint_auth_methods_supported"]
         assert body["issuer"] == f"http://mock.example{mount}/{tenant}/v2.0"
-        assert client.get(urlsplit(body["jwks_uri"]).path).json() == {"keys": []}
+        keys = client.get(body["jwks_uri"]).json()["keys"]
+        assert [(k["kty"], k["use"], k["issuer"]) for k in keys] == [
+            ("RSA", "sig", body["issuer"])]
 
         # What MSAL does next: POST to the token_endpoint it just read.
         issued = client.post(body["token_endpoint"], headers=_basic(cid, secret),

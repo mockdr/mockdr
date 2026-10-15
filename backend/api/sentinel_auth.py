@@ -12,7 +12,6 @@ Pre-seeded credentials:
 from __future__ import annotations
 
 import re
-import secrets
 import time
 from datetime import UTC, date, datetime
 from typing import cast
@@ -22,6 +21,7 @@ from starlette.requests import Request
 
 from repository.store import store
 from utils.bearer_challenge import bearer_challenge
+from utils.entra_access_token import mint_access_token
 from utils.sentinel.response import build_arm_error
 
 _SENTINEL_TOKEN_COLLECTION = "sentinel_oauth_tokens"
@@ -65,7 +65,7 @@ def audience_of(scope: str) -> str:
 
 
 def create_sentinel_token(
-    client_id: str, scope: str = "https://management.azure.com/.default",
+    client_id: str, scope: str = "https://management.azure.com/.default", tenant_id: str = "",
 ) -> dict:
     """Create a new OAuth2 access token for the given client.
 
@@ -80,19 +80,33 @@ def create_sentinel_token(
     ARM one. The mock accepted any token anywhere, so a client that asked
     for the wrong scope passed here and failed against Azure.
 
+    The token is a signed v1.0 JWT whose ``aud`` is that resource
+    (:mod:`utils.entra_access_token`). It carries no ``roles``: both APIs
+    authorize an application by Azure RBAC (:mod:`utils.entra_app_roles`).
+
     Args:
         client_id: The authenticated client ID.
         scope:     The scope the token request named.
+        tenant_id: The client's tenant, the token's ``tid``.
 
     Returns:
         Token response dict with ``access_token``, ``token_type``,
         ``expires_in`` and ``ext_expires_in``.
     """
-    access_token = secrets.token_hex(32)
+    created_at = time.time()
+    audience = audience_of(scope)
+    access_token = mint_access_token(
+        tenant_id=tenant_id,
+        client_id=client_id,
+        audience=audience,
+        roles=[],
+        issued_at=datetime.fromtimestamp(created_at, UTC),
+        lifetime_seconds=_TOKEN_TTL,
+    )
     store.save(_SENTINEL_TOKEN_COLLECTION, access_token, {
         "client_id": client_id,
-        "created_at": time.time(),
-        "audience": audience_of(scope),
+        "created_at": created_at,
+        "audience": audience,
     })
     return {
         "access_token": access_token,

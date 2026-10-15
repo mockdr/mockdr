@@ -50,4 +50,4 @@ def find_client(client_id: str) -> SentinelClient | None:
 
 def mint_token(client: Any, client_id: str, scope: str) -> dict:  # noqa: ANN401 - registered client
     """Issue a token for the resource *scope* names; see :func:`create_sentinel_token`."""
-    return create_sentinel_token(client_id, scope)
+    return create_sentinel_token(client_id, scope, client.tenant_id)

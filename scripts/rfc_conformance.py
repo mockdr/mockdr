@@ -20,9 +20,10 @@ What is in play here, by measurement rather than by assumption:
 * **RFC 8259** JSON — every mount answers it.
 
 Not in play, and so not checked: ranges (§14, no mount serves a partial
-representation), cookies (RFC 6265, nothing sets one), JWT (RFC 7519, every
-token this mock issues is opaque), and HTTP/2 or /3, which the ASGI server
-answers, not the app.
+representation), cookies (RFC 6265, nothing sets one), JWT (RFC 7519: the
+Microsoft mounts' tokens are JWTs, and the backend suite decodes and
+verifies them against each mount's key set), and HTTP/2 or /3, which the
+ASGI server answers, not the app.
 
 **Where a product breaks the RFC, the simulation follows the product.** A
 mock that is more conformant than the thing it stands in for tests clients
