@@ -6,6 +6,7 @@ from domain.splunk.kv_collection import KVCollection
 from domain.splunk.saved_search import SavedSearch
 from domain.splunk.splunk_index import SplunkIndex
 from domain.splunk.splunk_user import SplunkUser
+from infrastructure.seeders.splunk.lookup_seeder import seed_lookups
 from repository.splunk.hec_token_repo import hec_token_repo
 from repository.splunk.kv_collection_repo import kv_collection_repo
 from repository.splunk.saved_search_repo import saved_search_repo
@@ -95,6 +96,7 @@ def seed_splunk_infrastructure() -> None:
     _seed_hec_tokens()
     _seed_saved_searches()
     _seed_kv_collections()
+    seed_lookups()
 
 
 def _seed_indexes() -> None:

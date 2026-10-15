@@ -104,6 +104,7 @@ from domain.sentinel.watchlist import SentinelWatchlist
 from domain.site import Site
 from domain.splunk.hec_token import HecToken
 from domain.splunk.kv_collection import KVCollection
+from domain.splunk.lookup import LookupDefinition, LookupFile
 from domain.splunk.notable_event import NotableEvent
 from domain.splunk.saved_search import SavedSearch
 from domain.splunk.search_job import SearchJob
@@ -252,6 +253,8 @@ _TYPED_COLLECTIONS: dict[str, type] = {
     "splunk_hec_tokens": HecToken,
     "splunk_indexes": SplunkIndex,
     "splunk_kv_collections": KVCollection,
+    "splunk_lookup_definitions": LookupDefinition,
+    "splunk_lookup_files": LookupFile,
     "splunk_notables": NotableEvent,
     "splunk_saved_searches": SavedSearch,
     "splunk_users": SplunkUser,

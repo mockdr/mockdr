@@ -40,6 +40,7 @@ from utils.splunk.spl_parser import (
     parse_sort_keys,
 )
 from utils.splunk.spl_regex import REGEX, REX, compile_client_regex
+from utils.splunk.spl_sources import SOURCES, SUBSEARCH_COUNT, TIME_WINDOW, SearchSources
 
 __all__ = [
     "aggregation_aliases",
@@ -73,6 +74,11 @@ def _command_label(name: str) -> str:
 
 def _failure_text(command: SPLCommand, exc: Exception) -> str:
     """Word a command failure the way splunkd words it."""
+    from utils.splunk.spl_data_cmds import SubsearchFailedError
+
+    if isinstance(exc, SubsearchFailedError):
+        # A subsearch's failure is reported in its own words.
+        return str(exc)
     if isinstance(exc, OptionError):
         return f"Error in '{exc.subject}': {exc}" if exc.subject else str(exc)
     subject = _command_label(command.name)
@@ -95,8 +101,22 @@ def _failure_text(command: SPLCommand, exc: Exception) -> str:
     return f"Error in {subject}: {exc}"
 
 
-def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, str]]]:
+def execute_pipeline(
+    rows: Rows,
+    query: SPLQuery,
+    sources: SearchSources | None = None,
+    time_window: tuple[float, float] = (0.0, 0.0),
+) -> tuple[Rows, list[dict[str, str]]]:
     """Run *query*'s commands over *rows*, in order.
+
+    Args:
+        rows:        The events the search clause selected.
+        query:       The parsed search.
+        sources:     What ``lookup``, ``inputlookup``, ``tstats`` and
+                     ``append`` read; without it they fail as a search with
+                     no data would.
+        time_window: The dispatch window as epoch seconds (0 for open), which
+                     a command that reads the index itself honours.
 
     Returns:
         The resulting rows and any messages produced along the way, each with
@@ -116,9 +136,17 @@ def execute_pipeline(rows: Rows, query: SPLQuery) -> tuple[Rows, list[dict[str, 
         {"type": "WARN", "text": text} for text in query.errors
     ]
     budget = MV_BUDGET.set(MAX_MV_TOTAL)
+    bound = SOURCES.set(sources)
+    window = TIME_WINDOW.set(time_window)
+    # The outermost search starts the count its subsearches share.
+    counted = SUBSEARCH_COUNT.set([0]) if SUBSEARCH_COUNT.get() is None else None
     try:
         return _run_commands(rows, query, messages)
     finally:
+        if counted is not None:
+            SUBSEARCH_COUNT.reset(counted)
+        TIME_WINDOW.reset(window)
+        SOURCES.reset(bound)
         MV_BUDGET.reset(budget)
 
 
@@ -132,15 +160,13 @@ def _run_commands(
         rows = [r for r in rows if evaluate(query.search_expr, r, mode="search")]
 
     for position, command in enumerate(query.commands):
-        if command.name == "makeresults" and (
-            position or query.search_expr is not None
-        ):
+        if _must_lead(command) and (position or query.search_expr is not None):
             # A generating command produces the rows; it cannot follow rows
             # that already exist.
             messages.append({
                 "type": "FATAL",
                 "text": (
-                    "Error in 'makeresults' command: This command must be "
+                    f"Error in '{command.name}' command: This command must be "
                     "the first command of a search."
                 ),
             })
@@ -148,7 +174,7 @@ def _run_commands(
         if not command.arg.strip() and command.name in _NO_ARGUMENT:
             messages.append({"type": "FATAL", "text": _NO_ARGUMENT[command.name]})
             return [], messages
-        handler = _HANDLERS.get(command.name)
+        handler = _HANDLERS.get(command.name) or _data_handlers().get(command.name)
         if handler is None:  # pragma: no cover - parser filters these out
             messages.append({
                 "type": "FATAL", "text": f"Unknown search command '{command.name}'.",
@@ -167,6 +193,37 @@ def _run_commands(
             messages.append({"type": "FATAL", "text": _failure_text(command, exc)})
             return [], messages
     return rows, messages
+
+
+def _data_handlers() -> dict[str, Callable[[Rows, SPLCommand], Rows]]:
+    """The commands that read lookups, the index or a subsearch.
+
+    They live in their own module, which builds on this one's helpers, so it
+    is imported when a search first needs it rather than at the top.
+    """
+    from utils.splunk.spl_data_cmds import HANDLERS
+
+    return HANDLERS
+
+
+def _must_lead(command: SPLCommand) -> bool:
+    """Whether *command* generates rows and so must begin the search.
+
+    ``inputlookup append=true`` and ``tstats prestats=true append=true`` add
+    to the rows already there instead, and may come later.
+    """
+    if command.name == "makeresults":
+        return True
+    from utils.splunk.spl_data_cmds import inputlookup_appends, tstats_appends
+
+    if command.name == "inputlookup":
+        return not inputlookup_appends(command.arg)
+    if command.name == "tstats":
+        try:
+            return not tstats_appends(command.arg)
+        except ValueError:
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------

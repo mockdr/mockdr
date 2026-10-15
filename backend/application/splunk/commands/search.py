@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 
+from application.splunk.queries.lookups import resolve_lookup
 from domain.splunk.search_job import SearchJob
 from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.search_job_repo import search_job_repo
@@ -22,6 +23,7 @@ from utils.splunk.spl_parser import (
     parse_spl,
     resolve_relative_time,
 )
+from utils.splunk.spl_sources import EventSelector, LookupTable
 
 #: What splunkd says about a `latest_time` it will not take — the same line
 #: whether the value is unreadable or merely not after `earliest_time`.
@@ -303,14 +305,16 @@ def delete_search_job(sid: str) -> bool:
 
 #: Commands that produce their own rows rather than reading events. A search
 #: that starts with one matches nothing, however many events the index holds.
-_GENERATING_COMMANDS = frozenset({"makeresults"})
+_GENERATING_COMMANDS = frozenset({"makeresults", "inputlookup", "tstats"})
 
 
 #: The transforming commands this executor implements: each turns events into
 #: a table of results ("Command types", Splunk Search Manual -- stats,
 #: timechart, top and rare among them). Every other command streams events
 #: or reorders them.
-_TRANSFORMING_COMMANDS = frozenset({"stats", "timechart", "top", "rare"})
+_TRANSFORMING_COMMANDS = frozenset({
+    "stats", "timechart", "top", "rare", "chart", "tstats",
+})
 
 
 def _transforms(parsed: SPLQuery) -> bool:
@@ -322,6 +326,50 @@ def _generates_its_own_rows(parsed: SPLQuery) -> bool:
     """Whether the search begins with a generating command."""
     first = parsed.commands[0].name if parsed.commands else ""
     return first in _GENERATING_COMMANDS and parsed.search_expr is None
+
+
+class StoreSources:
+    """What a search reads beyond its own events: lookups, the index, subsearches.
+
+    A subsearch runs over the outer search's time range unless it names its
+    own, as splunkd runs one (Search Manual, "About subsearches").
+    """
+
+    def __init__(self, earliest_time: str = "", latest_time: str = "") -> None:
+        """Remember the outer search's time range, for its subsearches."""
+        self.earliest_time = earliest_time
+        self.latest_time = latest_time
+
+    def lookup(self, name: str) -> LookupTable | None:
+        """The table a lookup name resolves to."""
+        return resolve_lookup(name)
+
+    def events(self, selector: EventSelector) -> list[dict]:
+        """Indexed events, as the search clause reads them."""
+        return _select_events(selector)
+
+    def subsearch(self, spl: str) -> tuple[list[dict], list[dict]]:
+        """Run a subsearch and return its rows and messages."""
+        parsed = parse_spl(spl)
+        if parsed.unknown_command:
+            return [], [{
+                "type": "FATAL",
+                "text": f"Unknown search command '{parsed.unknown_command}'.",
+            }]
+        if not parsed.earliest_time and not parsed.latest_time:
+            parsed.earliest_time = self.earliest_time
+            parsed.latest_time = self.latest_time
+        _events, results, messages = _execute_query(parsed)
+        return results, messages
+
+
+def _window(parsed: SPLQuery) -> tuple[float, float]:
+    """The search's time range as epoch seconds, 0 for an open end."""
+    now = current_time()
+    return (
+        resolve_relative_time(parsed.earliest_time, now) if parsed.earliest_time else 0.0,
+        resolve_relative_time(parsed.latest_time, now) if parsed.latest_time else 0.0,
+    )
 
 
 def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]]:
@@ -363,7 +411,11 @@ def _execute_query(parsed: SPLQuery) -> tuple[list[dict], list[dict], list[dict]
     else:
         events = _query_events(parsed)
 
-    results, pipeline_messages = execute_pipeline(events, parsed)
+    results, pipeline_messages = execute_pipeline(
+        events, parsed,
+        sources=StoreSources(parsed.earliest_time, parsed.latest_time),
+        time_window=_window(parsed),
+    )
     messages = time_messages + pipeline_messages
     if any(m["type"] == "FATAL" for m in pipeline_messages):
         # A search that could not run reports no events either, the way a
@@ -379,7 +431,8 @@ _TOP_SPECIALS = {"count": "count", "percent": "percent"}
 #: The commands that build a row rather than passing one along. After one of
 #: these the column order is theirs; without one it is alphabetical.
 _ORDERING_COMMANDS = frozenset({
-    "table", "fields", "stats", "timechart", "top", "rare",
+    "table", "fields", "stats", "timechart", "top", "rare", "chart", "tstats",
+    "inputlookup",
 })
 
 
@@ -454,9 +507,12 @@ def _declared_columns(parsed: SPLQuery, present: list[str]) -> list[str]:
 def _last_group_by(parsed: SPLQuery) -> list[str]:
     """The by-fields of the last grouping command, in the order given."""
     for command in reversed(parsed.commands):
-        if command.name in ("stats", "timechart"):
-            _, by_fields = split_by(command.arg)
+        if command.name in ("stats", "timechart", "tstats"):
+            _, by_fields = split_by(re.sub(r"(?i)\bspan\s*=\s*\S+", " ", command.arg))
             return ["_time"] if command.name == "timechart" and not by_fields else by_fields
+        if command.name == "chart":
+            over = re.search(r"(?i)\b(?:over|by)\s+([^\s,]+)", command.arg)
+            return [over.group(1).strip('"')] if over else []
     return []
 
 
@@ -506,12 +562,18 @@ def _time_term_messages(parsed: SPLQuery) -> tuple[list[dict], bool]:
 
 def _query_events(parsed: SPLQuery) -> list[dict]:
     """Query events from the event store."""
-    all_events = splunk_event_repo.list_all()
+    earliest, latest = _window(parsed)
+    return _select_events(EventSelector(
+        index=parsed.index, sourcetype=parsed.sourcetype,
+        source=parsed.source, host=parsed.host,
+        earliest=earliest, latest=latest,
+    ))
 
-    # Time filtering
-    now = current_time()
-    earliest = resolve_relative_time(parsed.earliest_time, now) if parsed.earliest_time else 0.0
-    latest = resolve_relative_time(parsed.latest_time, now) if parsed.latest_time else 0.0
+
+def _select_events(parsed: EventSelector) -> list[dict]:
+    """The indexed events a selector chooses, newest first."""
+    all_events = splunk_event_repo.list_all()
+    earliest, latest = parsed.earliest, parsed.latest
 
     # A search-clause field value matches regardless of case — `host=WEB01`
     # finds `web01` (search command reference: CASE() is the opt-in to case

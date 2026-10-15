@@ -147,6 +147,8 @@ class InMemoryStore:
             "splunk_notables": {},
             "splunk_hec_tokens": {},
             "splunk_kv_collections": {},
+            "splunk_lookup_definitions": {},
+            "splunk_lookup_files": {},
             "splunk_indexes": {},
             "splunk_users": {},
             "splunk_sessions": {},
