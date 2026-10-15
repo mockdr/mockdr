@@ -4,6 +4,121 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.8.0] - 2026-10-15
+
+The gaps 2.7.0 left on the table, in the order they cost users the most: the
+conformance harness now compares *values* against the real products at every
+release, the Microsoft mounts issue the JWTs connectors decode, and the SPL
+commands Splunk ES correlation searches are built from exist.
+
+### Upgrading from 2.7
+
+- **Tokens on `/graph`, `/mde` and `/sentinel` are JWTs** (RS256, Entra v1.0
+  app-only claims) instead of opaque strings. Response fields and `expires_in`
+  are unchanged; a client that stored the token as an opaque string is
+  unaffected. The signing key lives for the process — a token persisted across
+  a restart is still accepted but no longer verifies against the new key.
+- **New runtime dependency:** `cryptography==50.0.2`, pinned in
+  `requirements.txt` and `pyproject.toml`.
+- **KQL default column names** follow KQL: `summarize count()` is `count_`
+  (was `count`), `make_set(x)` is `set_x`, `make_list(x)` `list_x`,
+  `take_any(x)` `any_x`; `min`/`max`/`avg` over no numbers are null, not 0.
+- **SPL:** `inputlookup`, `lookup`, `tstats`, `chart`, `append` and `join` run
+  where they used to be refused as unknown commands.
+
+### Added
+
+- **JWT access tokens** with `aud`, `iss`/`idp`, `iat`/`nbf`/`exp`, `tid`,
+  `appid`, `appidacr`, `idtyp`, `oid`/`sub` (a stable per-client service
+  principal id), `uti`, `ver` and a `kid`/`x5t` header. `roles` lists each
+  seeded client's application permissions by the APIs' own names
+  (`SecurityAlert.ReadWrite.All`, `ThreatHunting.Read.All`, `Machine.Isolate`,
+  …); ARM and Log Analytics tokens carry none, as Azure RBAC authorizes them.
+  The discovery document's `jwks_uri` serves the verifying key in Entra's
+  keys-document shape. Connectors that decode `exp`, `tid`, `roles` or `oid`
+  work against the mock as they do against Azure.
+- **Splunk: the SPL commands ES correlation searches are built from.**
+  `lookup`/`inputlookup` resolve names through lookup definitions with
+  transforms.conf's matching defaults; `tstats` reads indexed fields or a CIM
+  data model (`Endpoint.Processes`/`Filesystem`, `Malware`,
+  `Intrusion_Detection`, `Network_Traffic`, `Authentication`) filled from the
+  EDR bridge's events, with `by _time span=`, `fillnull_value`, `prestats` and
+  `nodename`; `chart` pivots with `limit`/`OTHER`/`NULL`; `append` and `join`
+  run subsearches. The CIM macro `drop_dm_object_name(1)` expands, and
+  `rename` takes `*` wildcards. `transaction` and `iplocation` are still
+  refused.
+- **Splunk: lookup definitions and data models over REST** —
+  `data/transforms/lookups` (list, read, create, delete), `data/lookup-table-files`,
+  `datamodel/model`. Seeded: `splunk_xsoar_users`, `incident_review_lookup`,
+  `ip_intel`, `file_intel` (every malicious SentinelOne hash), and
+  `mockdr_assets`/`mockdr_identities` derived from the SentinelOne fleet.
+- **Release tooling:** gitleaks and Trivy run in `ci.sh` where installed (they
+  now are on the release machine); the release checklist requires the
+  conformance harness `--seeded`.
+
+### Fixed
+
+**The conformance harness compared skeletons, not values, at release.** The
+checklist ran it without `--seeded`, so every probe that compares answers
+against the real products — 184 for Elasticsearch, 47 for Splunk — was
+skipped, and "0 findings" from 2.4.0 to 2.7.0 measured shapes only. The
+disabled CI workflow always passed the flag; the checklist that stands in for
+it now requires it. Seeded for the first time, the 231 probes found one
+disagreement, and it was a probe's own: a sort that tied after an earlier
+probe renamed two documents. The 31 seeded searches that sort on `name` now
+break ties on a unique field.
+
+**KQL named an unnamed aggregation `count` where KQL says `count_`**, so a
+Defender hunting query reading `count_` found nothing; `make_set`,
+`make_list` and `take_any` had the same defect, and an empty `max` was 0.
+
+**What real splunkd answered, once the new probes ran seeded** (measured on
+splunkd 10.4.2):
+
+- Creating a KV Store collection answers 201 and the collection's feed, owned
+  by the creating user, instead of 200 `{"name": …}`; a name already taken is
+  409 instead of silently emptying the collection; `field.*` and
+  `accelerated_fields.*` are kept. Deleting answers the feed with no entry,
+  and `Could not find object id=<name>` for a name there is none of.
+- A kvstore lookup definition is `type: kvstore` (was `external`); a definition
+  created over REST is its creator's and offers `move`/`remove`, a shipped one
+  does not; a read by name carries the `fields` block.
+- `inputlookup` of a missing table no longer fails the search: it yields no
+  rows with splunkd's ERROR messages (FATAL only under `strict=true`).
+  `lookup` names the missing source or destination field and the table.
+- tstats columns carry no `groupby_rank`; chart's split columns carry
+  `data_source`, `splitby_field`, `splitby_value` and `splitby_special`; NULL
+  is never folded into OTHER and comes last; a row without chart's row field
+  makes no column; the description follows `rename`, and a later `table`
+  drops it.
+
+### Security
+
+- **The Docker image carried the developer's virtualenv.** `.dockerignore`'s
+  patterns anchored at the context root, so `COPY backend/` brought
+  `backend/.venv` along — 259 MB of dev tools and their dependencies. Trivy,
+  run at release for the first time, found four advisories in them (msgpack
+  GHSA-6v7p-g79w-8964, high; setuptools CVE-2025-47273; urllib3
+  CVE-2026-97687 and CVE-2026-97689), none in anything the mock runs. The
+  image drops from 897 MB to 244 MB and scans clean. Images built from
+  earlier releases carry the same tools; rebuild.
+- The new row-producing SPL commands stop at limits.conf's `maxresultrows`
+  (50,000) — `inputlookup`, `tstats` and `chart` groups, `append`'s `maxout`,
+  `join`'s subsearch. Subsearches nest at most four deep and number at most
+  sixteen per search, `append`/`join` leave at most 100,000 rows, and macro
+  expansion is a single pass.
+- The JWT signing key is never written: not to `MOCKDR_PERSIST`, not to
+  `/_dev/export`.
+
+### Not changed, and why
+
+CrowdStrike tokens stay opaque: no vendor source documents a JWT format or
+claim set for them. `transaction` (too large to get right) and `iplocation`
+(needs a GeoIP database) remain refused. The mock serves no v1.0 discovery or
+keys route. Measured on splunkd and not yet probed, so left for a later
+release: `timechart`'s field metadata (`_time` ranked, `_span`, split-column
+metadata, empty cells as 0) and the `type` splunkd gives evaluated fields.
+
 ## [2.7.0] - 2026-10-14
 
 2.6.0 checked the mock against the vendors' documentation. This release checks

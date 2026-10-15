@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mockdr"
-version = "2.7.0"
+version = "2.8.0"
 description = "Full-fidelity multi-EDR mock server (SentinelOne, CrowdStrike, MDE, Elastic Security, Cortex XDR, Splunk) for SOAR/SIEM integration testing"
 requires-python = ">=3.11"
 license = "LicenseRef-BSL-1.1"

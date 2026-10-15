@@ -8,7 +8,7 @@ import os
 #:
 #: Note this is *mockdr's* version, not the version of any API it mocks — the
 #: SentinelOne surface stays pinned at v2.1 via ``API_PREFIX``.
-APP_VERSION = "2.7.0"
+APP_VERSION = "2.8.0"
 
 API_PREFIX = "/web/api/v2.1"
 #: `limit` defaults to 10 on every SentinelOne list route the mock serves —
