@@ -67,7 +67,8 @@ same Entra flow against the same tenant.
   `https://<mock>/graph/<tenant>` as the authority in MSAL Python
   (`instance_discovery=False`) and `authority="https://<mock>/graph"` with
   `disable_instance_discovery=True` in azure-identity, since both otherwise
-  ask login.microsoftonline.com about the host. Tokens are opaque, not JWTs.
+  ask login.microsoftonline.com about the host. The document's `jwks_uri`
+  serves the key the tokens are signed with (see "The access token" below).
 - **The authority must be https.** MSAL Python refuses to build an http one
   ("should consist of an https url") and azure-identity refuses it ("must be
   a TLS protected (https) URL"); msgraph-sdk will not send a token over http
@@ -76,6 +77,72 @@ same Entra flow against the same tenant.
   which the Azure SDKs insist on" — and have the client trust the
   certificate (`SSL_CERT_FILE` for httpx and aiohttp, `REQUESTS_CA_BUNDLE`
   for requests).
+
+### The access token
+
+The access token is a signed JWT, as Entra's are
+([access token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference)),
+so a connector that decodes it -- for `exp`, `tid`, `roles`, `appid` or `oid` --
+reads what it would read from Azure. It is a **v1.0** token on all three mounts:
+Graph, WindowsDefenderATP, Azure Resource Manager and Log Analytics accept v1.0,
+and Entra issues the version the resource asks for whichever endpoint the client
+called ([access tokens](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens),
+"Token ownership").
+
+| Claim | Value |
+| --- | --- |
+| header | `{"typ": "JWT", "alg": "RS256", "x5t": <kid>, "kid": <kid>}` |
+| `aud` | the resource the scope named, `/.default` removed: `https://graph.microsoft.com`, `https://api.securitycenter.microsoft.com` (or whichever Defender identifier was asked for), `https://management.azure.com/`, `https://api.loganalytics.io` |
+| `iss`, `idp` | `https://sts.windows.net/{tid}/` (the v1.0 issuer) |
+| `iat`, `nbf` | five minutes before issue, as Entra backdates them |
+| `exp` | issue time + `expires_in` (3599 on `/graph` and `/mde`, 3600 on `/sentinel`) |
+| `appid` | the client ID; `appidacr` is `"1"` (client secret) |
+| `idtyp` | `"app"` |
+| `oid`, `sub` | the client's service principal: a GUID derived from tenant and client ID, the same in every process and after every reset |
+| `roles` | the client's application permissions (below); absent on ARM and Log Analytics tokens |
+| `tid` | the client's tenant |
+| `uti` | a per-token identifier |
+| `ver` | `"1.0"` |
+
+**`roles`.** The seeded clients have no consent record, so their permissions
+are derived from what the mock already lets each one do -- its role (who may
+write) and, on Graph, its plan (what the feature gates open):
+
+| Mount | Client | `roles` |
+| --- | --- | --- |
+| `/graph` | every client | `Application.Read.All`, `AuditLog.Read.All`, `Device.Read.All`, `Directory.Read.All`, `Group.Read.All`, `Mail.Read`, `Policy.Read.All`, `User.Read.All` |
+| | plan2, defender_for_business | + `SecurityAlert.Read.All`, `SecurityIncident.Read.All`, `DeviceManagementManagedDevices.Read.All` |
+| | plan2 | + `ThreatHunting.Read.All`, `SecurityEvents.Read.All`, `IdentityRiskyUser.Read.All`, `AttackSimulation.Read.All` |
+| | contributor, owner | `ReadWrite` in place of `Read` for mail, alerts, incidents, risky users and managed devices, + `DeviceManagementManagedDevices.PrivilegedOperations.All` where managed devices are open |
+| | owner | `ReadWrite.All` for applications, directory, groups and users, + `Policy.ReadWrite.ConditionalAccess` |
+| `/mde` | viewer | `AdvancedQuery.Read.All`, `Alert.Read.All`, `File.Read.All`, `Ip.Read.All`, `Machine.Read.All`, `Score.Read.All`, `SecurityRecommendation.Read.All`, `Software.Read.All`, `URL.Read.All`, `User.Read.All`, `Vulnerability.Read.All` |
+| | analyst | the viewer's with `Alert.ReadWrite.All`, + `Machine.CollectForensics`, `Machine.Isolate`, `Machine.RestrictExecution`, `Machine.Scan`, `Machine.StopAndQuarantine`, `Ti.ReadWrite.All` |
+| | admin | the analyst's with `Machine.ReadWrite.All`, + `Machine.LiveResponse`, `Machine.Offboard` |
+| `/sentinel` | any | none: ARM and Log Analytics authorize an application by Azure RBAC |
+
+The names are the APIs' own (the Graph permissions reference; each Defender API
+page's Permissions table). The claim describes the client and decides nothing:
+the mounts still authorize by the role and plan stored with the token, so
+`POST /_dev/graph/plan` changes what a token may do but not the `roles` it was
+minted with.
+
+**The signing key** is RSA-2048 in a self-signed certificate, generated when
+the process mints its first token and kept until it exits. It is never written
+anywhere -- not to `MOCKDR_PERSIST`, not to `/_dev/export`. Its public half is
+served at `/{mount}/{tenant}/discovery/v2.0/keys` in Entra's keys-document shape
+(`kty`, `use`, `kid`, `x5t`, `n`, `e`, `x5c`, `cloud_instance_name`, `issuer`);
+the one key signs for all three mounts.
+
+The token store, not the signature, decides whether a token is accepted, as
+before: a correctly signed token the mock never issued is refused, and a token
+persisted across a restart is still accepted although it no longer verifies
+against the new process's key -- as a token signed with a key Entra has since
+rolled would not. Two differences from Azure: Graph's real tokens carry a
+`nonce` header that makes them unverifiable outside Graph, and the mock's
+verify like any other; and the issuer of the mock's keys document is the mock's
+own v2.0 discovery issuer, while the tokens name the v1.0
+`https://sts.windows.net/{tid}/` -- the same split Entra's own v2.0 documents
+show.
 
 ### msgraph-sdk
 

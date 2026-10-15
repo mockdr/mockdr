@@ -128,6 +128,8 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/cs/devices/queries/
 
 OAuth2 client credentials flow. POST to `/mde/oauth2/v2.0/token` with `client_id`, `client_secret`, `grant_type=client_credentials` and `scope=https://api.securitycenter.microsoft.com/.default` — Entra requires the scope on this grant, and a request without it is answered `400 invalid_request`. The tenant-scoped URL real Entra uses — `/mde/{tenant}/oauth2/v2.0/token`, with tenant `a1b2c3d4-e5f6-7890-abcd-ef1234567890` or the verified domain `acmecorp.onmicrosoft.com` — is accepted too, so MSAL-shaped clients work unchanged. The same applies to `/graph` and `/sentinel`; see the [Graph integration guide](docs/graph-integration-guide.md) for tenant validation and `MOCKDR_STRICT_TENANT`.
 
+On all three Microsoft mounts the access token is a signed JWT with the claims of an Entra app-only v1.0 token — `aud`, `iss`, `exp` matching `expires_in`, `tid`, `appid`, `oid`/`sub`, `idtyp: "app"`, and `roles` listing the client's application permissions (`Machine.Isolate`, `Alert.ReadWrite.All`, … for the Defender analyst) — and the discovery document's `jwks_uri` serves the key that verifies it. The key is generated per process and never exported; the token store, not the signature, still decides acceptance. Claims, the roles each seeded client carries, and the key's lifetime: [The access token](docs/graph-integration-guide.md#the-access-token).
+
 | Role    | Client ID                 | Client Secret             |
 | ------- | ------------------------- | ------------------------- |
 | Admin   | `mde-mock-admin-client`   | `mde-mock-admin-secret`   |

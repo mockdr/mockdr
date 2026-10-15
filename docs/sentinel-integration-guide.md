@@ -39,6 +39,17 @@ unauthorized_client` (AADSTS700016), a wrong secret `401 invalid_client`
 remembers the resource its scope named, and each API refuses a token for
 another (see below).
 
+The token is a signed v1.0 JWT, as on `/graph` and `/mde`: `aud` is the
+resource the scope named (`https://management.azure.com/` or
+`https://api.loganalytics.io`), `iss` is `https://sts.windows.net/{tid}/`,
+`exp` is issue time plus `expires_in`, and `appid`, `oid`, `sub`, `tid`,
+`idtyp` `"app"` and `ver` `"1.0"` are there. It carries no `roles`: ARM and Log
+Analytics authorize an application by Azure RBAC role assignment. The key it is
+signed with is served at the discovery document's `jwks_uri`
+(`/sentinel/{tenant}/discovery/v2.0/keys`) and lives as long as the process;
+the claims, the key and what still decides acceptance are in the
+[Graph integration guide](graph-integration-guide.md#the-access-token).
+
 ## api-version
 
 Every management-plane request needs `?api-version=`, as Azure Resource Manager
