@@ -3645,3 +3645,340 @@ probes:
       content: 'search=index=main | head 1&output_mode=json&exec_mode=oneshot&count=0'
       headers: {Content-Type: application/x-www-form-urlencoded}
       auth: basic
+
+  # ── tstats, lookup, inputlookup, chart, append (2.8.0) ──────────────────
+  #
+  # The commands Splunk ES correlation searches are built from. A stock
+  # install has no CIM add-on, so the data-model half of tstats can only be
+  # compared on its refusal; the index half and the rest compare rows.
+  #
+  # The lookup probes create their own table on both sides, in order: a KV
+  # Store collection, its records, a lookup definition over it — then search
+  # it, then remove both. A run that stops half-way leaves the collection on
+  # the real side, and the next run's create answers 409 there; drop
+  # `conformance_probe_lookup` by hand if so.
+  - id: spl-tstats-count-by-host
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      The most common tstats outside ES: a count over the index's own
+      fields. mockdr refused tstats as an unknown command.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| tstats count where index=main sourcetype=${sourcetype} by host&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-tstats-search-time-field-groups-nothing
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      `action` is extracted at search time, not indexed, so tstats cannot
+      group by it: no rows, where `stats count by action` has two.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| tstats count where index=main sourcetype=${sourcetype} by action&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-tstats-by-time-span
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      `by _time span=2h` buckets the five hourly events into three; the
+      bucket edges and how `_time` renders are what is compared.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| tstats count where index=main sourcetype=${sourcetype} by _time span=2h&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-tstats-statistics
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      dc, values and earliest/latest over indexed fields, with no by clause.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| tstats dc(host) as hosts values(host) min(_time) max(_time) where index=main sourcetype=${sourcetype}&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-tstats-unknown-data-model
+    endpoint: management
+    why: >
+      A data model the install does not have. The wording (and its
+      `DataModelEvaluator` subject) was not measured when it was written.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| tstats count from datamodel=No_Such_Model_Probe&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-tstats-must-lead
+    endpoint: management
+    why: >
+      tstats generates its rows and must begin the search; the subject of
+      the refusal was not measured.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | tstats count&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-chart-count-over-by
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      srv-3 has no `block` event. Whether that cell is 0 or absent is the
+      question; mockdr writes 0 for a counting statistic.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | chart count over host by action&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-chart-limit-folds-into-other
+    endpoint: management
+    needs_seed: true
+    compare: values
+    why: >
+      With `limit=1` the column with the most events stays and the rest
+      fold into OTHER.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=search index=main sourcetype=${sourcetype} | chart limit=1 count over action by user&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-append-subsearch
+    endpoint: management
+    compare: values
+    why: >
+      The subsearch's rows follow the main search's, in order.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | eval n=1 | append [| makeresults count=2 | eval n=2] | table n&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-inputlookup-no-definition
+    endpoint: management
+    why: >
+      A name that is neither a lookup definition nor a .csv file.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| inputlookup no_such_lookup_probe&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-inputlookup-no-file
+    endpoint: management
+    why: >
+      A .csv file name that is not there: a different refusal from the
+      missing definition.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| inputlookup no_such_lookup_probe.csv&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-cannot-construct
+    endpoint: management
+    why: >
+      `lookup` of a table there is none of quotes its own arguments back.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | lookup no_such_lookup_probe ip OUTPUT owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-setup-collection
+    endpoint: management
+    why: >
+      Setup for the lookup probes below: the KV Store collection. mockdr
+      answers this create with 200 and `{"name": …}` where splunkd is
+      expected to answer 201 and the entry — a difference that predates
+      these probes.
+    request:
+      method: POST
+      path: /servicesNS/nobody/search/storage/collections/config
+      query: {output_mode: json}
+      content: 'name=conformance_probe_lookup'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-setup-records
+    endpoint: management
+    why: >
+      Setup: two records, with keys of their own.
+    request:
+      method: POST
+      path: /servicesNS/nobody/search/storage/collections/data/conformance_probe_lookup/batch_save
+      query: {output_mode: json}
+      content: '[{"_key": "k1", "host": "srv-1", "owner": "alice"}, {"_key": "k2", "host": "srv-2", "owner": "bob"}]'
+      headers: {Content-Type: application/json}
+      auth: basic
+
+  - id: spl-lookup-setup-definition
+    endpoint: management
+    why: >
+      Setup, and a comparison in its own right: a kvstore lookup definition
+      created over REST, and the entry splunkd answers with.
+    request:
+      method: POST
+      path: /servicesNS/nobody/search/data/transforms/lookups
+      query: {output_mode: json}
+      content: 'name=conformance_probe_lookup&external_type=kvstore&collection=conformance_probe_lookup&fields_list=_key,host,owner'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-definition-read-back
+    endpoint: management
+    why: >
+      The definition just created, read back by name.
+    request:
+      method: GET
+      path: /servicesNS/nobody/search/data/transforms/lookups/conformance_probe_lookup
+      query: {output_mode: json}
+      auth: basic
+
+  - id: spl-inputlookup-kvstore
+    endpoint: management
+    why: >
+      The collection read through its definition: the fields of each row,
+      `_key` among them because fields_list names it.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| inputlookup conformance_probe_lookup&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-inputlookup-append-where
+    endpoint: management
+    compare: values
+    why: >
+      `append=true` after rows that exist, and a WHERE clause on the table.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | eval host="first" | inputlookup append=t conformance_probe_lookup where owner=b* | table host owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-output
+    endpoint: management
+    compare: values
+    why: >
+      Each row enriched by its host; srv-9 matches nothing, and SRV-1 does
+      not match srv-1 if matching is case-sensitive, as transforms.conf's
+      default says.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | eval host=split("srv-1,srv-2,srv-9,SRV-1", ",") | mvexpand host | lookup conformance_probe_lookup host OUTPUT owner | table host owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-output-clears-on-a-miss
+    endpoint: management
+    compare: values
+    why: >
+      OUTPUT overwrites: a row that matches nothing loses the owner it had.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | eval host="srv-9", owner="old" | lookup conformance_probe_lookup host OUTPUT owner | table host owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-outputnew-keeps
+    endpoint: management
+    compare: values
+    why: >
+      OUTPUTNEW leaves a field the row already has.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | eval host="srv-1", owner="old" | lookup conformance_probe_lookup host OUTPUTNEW owner | table host owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-field-not-in-table
+    endpoint: management
+    why: >
+      A match field the table does not hold.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | lookup conformance_probe_lookup nosuch OUTPUT owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-lookup-cleanup-definition
+    endpoint: management
+    why: >
+      Cleanup: the definition goes first; the answer is the collection left.
+    request:
+      method: DELETE
+      path: /servicesNS/nobody/search/data/transforms/lookups/conformance_probe_lookup
+      query: {output_mode: json}
+      auth: basic
+    ignore_paths:
+      - $.entry
+      - $.paging.total
+
+  - id: spl-lookup-cleanup-collection
+    endpoint: management
+    why: >
+      Cleanup: the collection.
+    request:
+      method: DELETE
+      path: /servicesNS/nobody/search/storage/collections/config/conformance_probe_lookup
+      query: {output_mode: json}
+      auth: basic
+
+  - id: spl-join-left
+    endpoint: management
+    compare: values
+    why: >
+      A left join keeps the row that matches nothing; the one that matches
+      takes the first of its two subsearch rows (max=1).
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults count=2 | streamstats count | eval host=if(count==1, "srv-1", "srv-9") | join type=left host [| makeresults count=2 | streamstats count | eval host="srv-1", owner=if(count==1, "alice", "bob")] | table host owner&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
+
+  - id: spl-rename-wildcard
+    endpoint: management
+    compare: values
+    why: >
+      `rename a* AS z*` renames every field starting with `a`, the star
+      carrying across. mockdr read `*` as a literal character; the CIM
+      macro drop_dm_object_name expands to exactly this.
+    request:
+      method: POST
+      path: /services/search/jobs
+      content: 'search=| makeresults | eval ab=1, ac=2, d=3 | rename a* AS z* | table zb zc d ab&output_mode=json&exec_mode=oneshot&count=0'
+      headers: {Content-Type: application/x-www-form-urlencoded}
+      auth: basic
