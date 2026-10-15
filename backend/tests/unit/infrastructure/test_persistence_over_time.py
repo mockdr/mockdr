@@ -27,7 +27,11 @@ def test_a_busy_store_is_still_saved(tmp_path: Path) -> None:
     path = tmp_path / "state.json"
     manager = PersistenceManager(path, debounce=0.2, max_delay=0.4)
     try:
-        deadline = time.monotonic() + 1.5
+        # Generous on purpose: a save serialises the whole seeded store, and
+        # on a loaded machine (ci.sh beside a soak run) that alone took more
+        # than the 1.5 s this allowed. The loop leaves as soon as the file
+        # exists; only a store that is never saved — the defect — waits it out.
+        deadline = time.monotonic() + 15
         while time.monotonic() < deadline and not path.exists():
             manager.schedule_save()  # never quiet for the 0.2 s debounce
             time.sleep(0.02)

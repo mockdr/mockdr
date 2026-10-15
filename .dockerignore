@@ -1,14 +1,19 @@
+# Patterns anchor at the context root, so a bare `.venv` matched only
+# ./.venv: `COPY backend/` carried backend/.venv — the developer's whole venv,
+# dev tools and their CVEs included — into the image. `**/` reaches them all.
 .git
 .github
-__pycache__
-node_modules
-.venv
-*.pyc
-.mypy_cache
-.pytest_cache
-.ruff_cache
-htmlcov
-.coverage
+**/__pycache__
+**/node_modules
+**/.venv
+**/*.pyc
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/htmlcov
+**/.coverage
+**/.coverage.*
+**/test-results
 .env
 .env.*
 *.md
