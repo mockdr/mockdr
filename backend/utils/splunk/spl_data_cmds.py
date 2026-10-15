@@ -22,6 +22,7 @@ import math
 import re
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from utils.numbers import as_float
@@ -664,17 +665,25 @@ _CHART_OPTIONS = frozenset({
 _COUNTING = frozenset({"count", "c", "dc", "distinct_count", "estdc"})
 
 
-def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
-    """A statistics table pivoted on two fields.
+@dataclass
+class _ChartSpec:
+    """What a ``chart`` argument asks for, validated."""
 
-    ``chart <stats-func>... [OVER <row-field> [BY <column-field>]]``, or
-    ``BY <row-field>[, <column-field>]``. One output row per value of the
-    row field, in order; one column per value of the column field, named by
-    the value (``"<stat>: <value>"`` when there are several statistics).
-    Past ``limit`` columns (10 by default, 0 for no limit) the smallest are
-    folded into ``OTHER``; a row without the column field counts under
-    ``NULL``. An empty cell of a counting statistic is 0, of any other
-    absent.
+    row_field: str
+    column_field: str
+    aggs: list[tuple[str, str, str]]
+    limit: int
+    use_other: bool
+    use_null: bool
+    other: str
+    null: str
+
+
+def _chart_spec(arg: str) -> _ChartSpec:
+    """Parse and check a ``chart`` argument.
+
+    Raises:
+        ValueError: An argument splunkd refuses, in its words.
     """
     options: dict[str, str] = {}
 
@@ -683,7 +692,7 @@ def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
         return " "
 
     pattern = r"(?i)\b(" + "|".join(sorted(_CHART_OPTIONS)) + r")\s*=\s*(\"[^\"]*\"|\S+)"
-    text = re.sub(pattern, take, command.arg)
+    text = re.sub(pattern, take, arg)
     spans = _keyword_spans(text, ("over", "by"))
     agg_text = text[: spans[0][1]] if spans else text
     parts = {word: text[end:(spans[i + 1][1] if i + 1 < len(spans) else len(text))]
@@ -697,7 +706,6 @@ def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
         column_fields = named[1:]
     if len(column_fields) > 1:
         raise _invalid_argument(column_fields[1])
-    column_field = column_fields[0] if column_fields else ""
 
     aggs = _parse_aggregations(agg_text)
     remainder = agg_text
@@ -718,11 +726,35 @@ def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
     limit_match = re.fullmatch(r"(?i)(?:top|bottom)?(\d+)", limit_raw)
     if not limit_match:
         raise _option_error("limit", "non-negative integer", limit_raw)
-    limit = int(limit_match.group(1))
-    use_other = _boolean_option("useother", options.get("useother", "t"))
-    use_null = _boolean_option("usenull", options.get("usenull", "t"))
-    other = options.get("otherstr", "OTHER")
-    null = options.get("nullstr", "NULL")
+    return _ChartSpec(
+        row_field=row_field,
+        column_field=column_fields[0] if column_fields else "",
+        aggs=aggs,
+        limit=int(limit_match.group(1)),
+        use_other=_boolean_option("useother", options.get("useother", "t")),
+        use_null=_boolean_option("usenull", options.get("usenull", "t")),
+        other=options.get("otherstr", "OTHER"),
+        null=options.get("nullstr", "NULL"),
+    )
+
+
+def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
+    """A statistics table pivoted on two fields.
+
+    ``chart <stats-func>... [OVER <row-field> [BY <column-field>]]``, or
+    ``BY <row-field>[, <column-field>]``. One output row per value of the
+    row field, in order; one column per value of the column field, named by
+    the value (``"<stat>: <value>"`` when there are several statistics).
+    Past ``limit`` columns (10 by default, 0 for no limit) the smallest are
+    folded into ``OTHER``; a row without the column field counts under
+    ``NULL``, which is never folded and comes last, after ``OTHER``. A row
+    without the row field takes no part at all, so a column only it would
+    have had is not there. An empty cell of a counting statistic is 0, of
+    any other absent. (Column order, NULL and the dropped row measured on
+    splunkd 10.4.2.)
+    """
+    spec = _chart_spec(command.arg)
+    row_field, column_field, aggs = spec.row_field, spec.column_field, spec.aggs
 
     groups: OrderedDict[str, Rows] = OrderedDict()
     for row in rows:
@@ -753,20 +785,26 @@ def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
     def column_of(row: dict[str, Any]) -> str | None:
         value = row.get(column_field)
         if value in (None, ""):
-            return null if use_null else None
+            return spec.null if spec.use_null else None
         return str(value)
 
     totals: dict[str, float] = {}
-    for row in rows:
-        column = column_of(row)
-        if column is not None:
+    has_null = False
+    for members in groups.values():
+        for row in members:
+            if row.get(column_field) in (None, ""):
+                has_null = has_null or spec.use_null
+                continue
+            column = str(row[column_field])
             totals[column] = totals.get(column, 0.0) + 1.0
     columns = sorted(totals, key=_sortable)
     folded: set[str] = set()
-    if limit and len(columns) > limit:
-        kept = set(sorted(columns, key=lambda c: (-totals[c], _sortable(c)))[:limit])
+    if spec.limit and len(columns) > spec.limit:
+        kept = set(sorted(columns, key=lambda c: (-totals[c], _sortable(c)))[:spec.limit])
         folded = {c for c in columns if c not in kept}
-        columns = [c for c in columns if c in kept] + ([other] if use_other else [])
+        columns = [c for c in columns if c in kept] + ([spec.other] if spec.use_other else [])
+    if has_null:
+        columns.append(spec.null)
 
     def names(column: str) -> list[tuple[str, str, str]]:
         if len(aggs) == 1:
@@ -777,8 +815,9 @@ def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
     for key in order[:MAX_RESULT_ROWS]:
         members = groups[key]
         record = {row_field: members[0][row_field]}
-        for column in columns:
-            wanted = folded if column == other and folded else {column}
+        for position, column in enumerate(columns):
+            is_null = has_null and position == len(columns) - 1
+            wanted = folded if column == spec.other and folded and not is_null else {column}
             in_cell = [r for r in members if column_of(r) in wanted]
             for func, field, name in names(column):
                 value = _aggregate(func, field, in_cell) if in_cell else (
@@ -788,6 +827,43 @@ def cmd_chart(rows: Rows, command: SPLCommand) -> Rows:
                     record[name] = value
         out.append(record)
     return out
+
+
+def chart_field_metadata(arg: str, names: list[str]) -> dict[str, dict[str, str]]:
+    """What splunkd's ``fields`` block says about each column ``chart`` made.
+
+    The row field is ``groupby_rank`` 0. Each split column names the
+    statistic it holds (``data_source``, the statistic's alias), the field it
+    was split by and the value; ``OTHER`` and ``NULL`` say which special
+    they are. A chart with no split field marks only the row field. Measured
+    on splunkd 10.4.2, which also carries all of it through ``rename``.
+    """
+    try:
+        spec = _chart_spec(arg)
+    except ValueError:
+        return {}
+    meta: dict[str, dict[str, str]] = {}
+    if spec.row_field:
+        meta[spec.row_field] = {"groupby_rank": "0"}
+    if not spec.column_field:
+        return meta
+    aliases = [alias for _f, _fld, alias in spec.aggs]
+    specials = {spec.other: "other", spec.null: "null"}
+    for name in names:
+        if name == spec.row_field:
+            continue
+        source, value = aliases[0], name
+        if len(aliases) > 1:
+            prefix, sep, rest = name.partition(": ")
+            if not sep or prefix not in aliases:
+                continue
+            source, value = prefix, rest
+        entry = {"data_source": source, "splitby_field": spec.column_field,
+                 "splitby_value": value}
+        if value in specials:
+            entry["splitby_special"] = specials[value]
+        meta[name] = entry
+    return meta
 
 
 # ---------------------------------------------------------------------------
@@ -963,6 +1039,7 @@ __all__ = [
     "MAX_SUBSEARCHES",
     "MAX_SUBSEARCH_DEPTH",
     "SubsearchFailedError",
+    "chart_field_metadata",
     "inputlookup_appends",
     "tstats_appends",
 ]

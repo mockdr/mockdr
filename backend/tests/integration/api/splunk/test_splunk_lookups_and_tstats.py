@@ -205,10 +205,11 @@ class TestTstatsThroughTheJobApi:
         content = job(client, "| tstats count where index=* by index")
         assert content["resultCount"] > 1 and content["eventCount"] == 0
 
-    def test_the_by_fields_are_declared_as_groups(self, client: TestClient) -> None:
+    def test_the_by_fields_are_listed_without_a_rank(self, client: TestClient) -> None:
+        """Unlike stats, tstats ranks none of its columns (measured on
+        splunkd 10.4.2 via the conformance stack)."""
         body = oneshot(client, "| tstats count where index=* by index sourcetype")
-        ranks = {f["name"]: f.get("groupby_rank") for f in body["fields"]}
-        assert ranks == {"index": "0", "sourcetype": "1", "count": None}
+        assert body["fields"] == [{"name": "index"}, {"name": "sourcetype"}, {"name": "count"}]
 
     def test_a_missing_data_model_is_a_failed_search(self, client: TestClient) -> None:
         content = job(client, "| tstats count from datamodel=Nope")

@@ -11,6 +11,7 @@ from domain.splunk.search_job import SearchJob
 from repository.splunk.notable_event_repo import notable_event_repo
 from repository.splunk.search_job_repo import search_job_repo
 from repository.splunk.splunk_event_repo import splunk_event_repo
+from utils.splunk.spl_data_cmds import chart_field_metadata
 from utils.splunk.spl_exec import (
     aggregation_aliases,
     execute_pipeline,
@@ -466,14 +467,13 @@ def describe_fields(parsed: SPLQuery, results: list[dict]) -> list[dict]:
             # a plain search. Only a command that constructs the row fixes
             # the order it is written in.
             names = sorted(names)
-    by_fields = _last_group_by(parsed)
+    metadata = _column_metadata(parsed, names)
     created = set(parsed.evals)
 
     described: list[dict] = []
     for name in names:
-        entry: dict = {"name": name}
-        if name in by_fields:
-            entry["groupby_rank"] = str(by_fields.index(name))
+        entry: dict = {"name": name, **metadata.get(name, {})}
+        if "groupby_rank" in entry:
             if name in created:
                 # From a row that carries it, not from the first row: `names`
                 # is the union across every row, and indexing the first with
@@ -504,16 +504,64 @@ def _declared_columns(parsed: SPLQuery, present: list[str]) -> list[str]:
     return []
 
 
-def _last_group_by(parsed: SPLQuery) -> list[str]:
-    """The by-fields of the last grouping command, in the order given."""
-    for command in reversed(parsed.commands):
-        if command.name in ("stats", "timechart", "tstats"):
-            _, by_fields = split_by(re.sub(r"(?i)\bspan\s*=\s*\S+", " ", command.arg))
-            return ["_time"] if command.name == "timechart" and not by_fields else by_fields
-        if command.name == "chart":
-            over = re.search(r"(?i)\b(?:over|by)\s+([^\s,]+)", command.arg)
-            return [over.group(1).strip('"')] if over else []
-    return []
+#: The commands whose output columns splunkd describes: a group-by column
+#: by its rank, a chart's split column by what it holds.
+_GROUPING_COMMANDS = ("stats", "timechart", "tstats", "chart")
+
+
+def _column_metadata(parsed: SPLQuery, names: list[str]) -> dict[str, dict[str, str]]:
+    """What the last grouping command says about each column, by its name now.
+
+    ``stats`` and ``timechart`` rank their group-by columns; ``chart`` ranks
+    its row field and describes each split column (see
+    :func:`~utils.splunk.spl_data_cmds.chart_field_metadata`); ``tstats``
+    describes nothing, its group-by columns included. The description
+    follows a column through ``rename``, and a ``table`` afterwards drops it
+    all. Measured on splunkd 10.4.2: tstats by one field, two and a span;
+    chart with and without a split, with several statistics, OTHER and NULL;
+    each followed by rename, table, fields, eval, sort, where and head.
+    """
+    commands = parsed.commands
+    position = next(
+        (i for i in range(len(commands) - 1, -1, -1)
+         if commands[i].name in _GROUPING_COMMANDS), None,
+    )
+    if position is None:
+        return {}
+    renames: list[dict[str, str]] = []
+    for command in commands[position + 1:]:
+        if command.name == "table":
+            return {}
+        if command.name == "rename":
+            renames.append(_literal_renames(command.arg))
+
+    def original(name: str) -> str:
+        for mapping in reversed(renames):
+            name = {new: old for old, new in mapping.items()}.get(name, name)
+        return name
+
+    originals = {name: original(name) for name in names}
+    grouping = commands[position]
+    if grouping.name == "tstats":
+        return {}
+    if grouping.name == "chart":
+        meta = chart_field_metadata(grouping.arg, list(originals.values()))
+    else:
+        _, by_fields = split_by(re.sub(r"(?i)\bspan\s*=\s*\S+", " ", grouping.arg))
+        if grouping.name == "timechart" and not by_fields:
+            by_fields = ["_time"]
+        meta = {field: {"groupby_rank": str(rank)} for rank, field in enumerate(by_fields)}
+    return {name: meta[old] for name, old in originals.items() if old in meta}
+
+
+def _literal_renames(arg: str) -> dict[str, str]:
+    """The ``old AS new`` pairs of a ``rename`` that name a field outright."""
+    pairs: dict[str, str] = {}
+    for clause in arg.split(","):
+        match = re.match(r'\s*"?([^"]+?)"?\s+as\s+"?([^"]+?)"?\s*$', clause, re.I)
+        if match and "*" not in match.group(1):
+            pairs[match.group(1)] = match.group(2)
+    return pairs
 
 
 def _time_term_messages(parsed: SPLQuery) -> tuple[list[dict], bool]:

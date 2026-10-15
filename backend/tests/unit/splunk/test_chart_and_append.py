@@ -63,20 +63,24 @@ class TestChart:
         assert row["count: allow"] == 1 and row["sum(bytes): block"] == 20
 
     def test_columns_past_the_limit_fold_into_other(self) -> None:
+        # NULL is not one of the columns the limit counts, and is never
+        # folded: it stays a column of its own, after OTHER (measured on
+        # splunkd 10.4.2).
         rows = out(ROWS + "| chart limit=1 count over host by action", NONE)
         assert rows == [
-            {"host": "a", "allow": 1, "OTHER": 1},
-            {"host": "b", "allow": 2, "OTHER": 0},
-            {"host": "c", "allow": 0, "OTHER": 1},
+            {"host": "a", "allow": 1, "OTHER": 1, "NULL": 0},
+            {"host": "b", "allow": 2, "OTHER": 0, "NULL": 0},
+            {"host": "c", "allow": 0, "OTHER": 0, "NULL": 1},
         ]
+        assert list(rows[0]) == ["host", "allow", "OTHER", "NULL"]
 
     def test_useother_false_drops_them(self) -> None:
         rows = out(ROWS + "| chart limit=1 useother=f count over host by action", NONE)
-        assert rows[0] == {"host": "a", "allow": 1}
+        assert rows[0] == {"host": "a", "allow": 1, "NULL": 0}
 
     def test_otherstr_renames_the_fold(self) -> None:
         rows = out(ROWS + "| chart limit=1 otherstr=rest count over host by action", NONE)
-        assert rows[0] == {"host": "a", "allow": 1, "rest": 1}
+        assert rows[0] == {"host": "a", "allow": 1, "rest": 1, "NULL": 0}
 
     def test_limit_takes_topn(self) -> None:
         assert out(ROWS + "| chart limit=top1 count over action by host", NONE) == out(
