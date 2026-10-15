@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from utils.splunk.spl_expr import Node, SPLExprError, parse_search
+from utils.splunk.spl_macros import expand_macros
 
 __all__ = [
     "KNOWN_COMMANDS",
@@ -264,6 +265,7 @@ def parse_spl(query: str) -> SPLQuery:
     if "`notable`" in expanded:
         expanded = expanded.replace("`notable`", "search index=notable")
         result.is_notable = True
+    expanded = expand_macros(expanded)
 
     segments = _split_pipeline(expanded)
     search_clause = segments[0].strip()

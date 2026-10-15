@@ -3,7 +3,7 @@
 An endpoint sweep against 10.4.2 found every one of these answering 404
 here: the health tree a monitor polls, the extended index list an app reads
 sizes from, the licence a client checks before offering a feature, and the
-knowledge objects — macros, event types, source types, lookups — that
+knowledge objects — macros, event types, source types — that
 content packs enumerate.
 
 Where mockdr has the thing, it serves it: an index per index, a source type
@@ -25,14 +25,13 @@ from api.splunk_auth import require_splunk_auth
 from repository.splunk.splunk_event_repo import splunk_event_repo
 from repository.splunk.splunk_index_repo import splunk_index_repo
 from utils.splunk.response import build_splunk_entry, build_splunk_envelope, complete
+from utils.splunk.spl_macros import MACROS, Macro
 
 router = APIRouter(tags=["Splunk Catalogs"])
 
-#: The macro mockdr's SPL knows: `notable` stands for the notable index, and
-#: Splunk ES content is written in terms of it.
-_MACROS = {
-    "notable": "search index=notable",
-}
+#: The macros mockdr's SPL expands (``utils/splunk/spl_macros.py``):
+#: `notable` stands for the notable index, and Splunk ES content is written
+#: in terms of it; `drop_dm_object_name(1)` is the CIM add-on's.
 
 #: What splunkd puts in a macro's content beyond the five every macro
 #: carries. Measured on 10.4.2 across the eight macros a stock install
@@ -46,11 +45,14 @@ _MACROS = {
 _MACRO_OPTIONAL = ("args", "errormsg", "iseval", "validation")
 
 
-def _macro_content(definition: str) -> dict:
-    """A macro's content: the five every macro carries, and nothing else."""
-    content = complete({"definition": definition, "disabled": False}, "macro")
+def _macro_content(macro: Macro) -> dict:
+    """A macro's content: the five every macro carries, and ``args`` if it takes any."""
+    content = complete({"definition": macro.definition, "disabled": False}, "macro")
     for optional in _MACRO_OPTIONAL:
         content.pop(optional, None)
+    content["eai:appName"] = macro.app
+    if macro.args:
+        content["args"] = ",".join(macro.args)
     return content
 
 #: A knowledge object — a macro, an event type, a lookup — carries four more
@@ -157,13 +159,14 @@ def macros(
     entries = [
         build_splunk_entry(
             name,
-            _macro_content(definition),
+            _macro_content(macro),
             collection="admin/macros",
             links=("_reload", "alternate", "disable", "edit", "list"),
             fields=False,
-            acl_extra={"perms": {"read": ["*"], "write": ["admin", "power"]}},
+            acl_extra={"app": macro.app,
+                       "perms": {"read": ["*"], "write": ["admin", "power"]}},
         )
-        for name, definition in sorted(_MACROS.items())
+        for name, macro in sorted(MACROS.items())
     ]
     return _collection(entries, "admin/macros", _knowledge_links("admin/macros"))
 
@@ -182,13 +185,13 @@ def macro(
     just named. splunkd serves it, with the `fields` block a single read
     carries and the listing does not.
     """
-    if name not in _MACROS:
+    if name not in MACROS:
         raise HTTPException(status_code=404, detail={"messages": [
             {"type": "ERROR", "text": f"Could not find object id={name}"},
         ]})
     entry = build_splunk_entry(
         name,
-        _macro_content(_MACROS[name]),
+        _macro_content(MACROS[name]),
         collection="admin/macros",
         links=("_reload", "alternate", "disable", "edit", "list"),
         # Measured on 10.4.2: the definition is required, the rest optional.
@@ -197,7 +200,8 @@ def macro(
             "optional": ["args", "disabled", "errormsg", "iseval", "validation"],
             "wildcard": [],
         },
-        acl_extra={"perms": {"read": ["*"], "write": ["admin", "power"]}},
+        acl_extra={"app": MACROS[name].app,
+                   "perms": {"read": ["*"], "write": ["admin", "power"]}},
     )
     return _collection([entry], "admin/macros", _knowledge_links("admin/macros"))
 

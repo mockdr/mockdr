@@ -167,6 +167,14 @@ class TestKnowledgeObjects:
             "/SA-IdentityManagement/lookups/mockdr_assets.csv")
         assert entry["acl"]["app"] == "SA-IdentityManagement"
 
+    def test_the_cim_macro_is_listed_with_its_argument(self, client: TestClient) -> None:
+        body = client.get("/splunk/services/admin/macros/drop_dm_object_name(1)",
+                          headers=AUTH, params=JSON).json()
+        content = body["entry"][0]["content"]
+        assert (content["definition"], content["args"]) == ("rename $object$.* AS *",
+                                                            "object")
+        assert body["entry"][0]["acl"]["app"] == "Splunk_SA_CIM"
+
     @pytest.mark.parametrize("path", [
         "/splunk/services/saved/eventtypes",
         "/splunk/services/data/inputs/monitor",

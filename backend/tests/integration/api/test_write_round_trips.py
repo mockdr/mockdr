@@ -442,9 +442,10 @@ class TestWhereAnEntryLives:
         assert entry["acl"]["sharing"] == "system"
 
     def test_a_macro_is_a_knowledge_object(self, client: TestClient) -> None:
+        # The first macro by name is the CIM add-on's, in its own app.
         entry = self._entry(client, "admin/macros")
         assert entry["id"].startswith(
-            "https://localhost:8089/servicesNS/nobody/search/admin/macros/")
+            "https://localhost:8089/servicesNS/nobody/Splunk_SA_CIM/admin/macros/")
         # The four members that say who may re-share it.
         assert entry["acl"]["can_change_perms"] is True
         assert entry["acl"]["can_share_app"] is True

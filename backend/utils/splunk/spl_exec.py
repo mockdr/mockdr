@@ -335,17 +335,44 @@ def expand_fields(patterns: list[str], rows: list[dict[str, Any]]) -> list[str]:
 
 
 def _cmd_rename(rows: Rows, command: SPLCommand) -> Rows:
+    """Rename fields; ``*`` in a name matches any run of characters.
+
+    ``rename Processes.* AS *`` drops a data model's dataset prefix, which is
+    what the CIM's ``drop_dm_object_name`` macro expands to: each ``*`` in
+    the new name takes what the matching ``*`` in the old one matched.
+    """
     mapping: dict[str, str] = {}
+    patterns: list[tuple[re.Pattern[str], str]] = []
     for clause in command.arg.split(","):
         match = re.match(r'\s*"?([^"]+?)"?\s+as\s+"?([^"]+?)"?\s*$', clause, re.I)
-        if match:
-            mapping[match.group(1)] = match.group(2)
-    if not mapping:
+        if not match:
+            continue
+        old, new = match.group(1), match.group(2)
+        if "*" in old:
+            # Lazy groups between literal parts: field names are short, and
+            # a name with several stars still matches in one linear pass per
+            # star.
+            regex = "(.*?)".join(re.escape(part) for part in old.split("*"))
+            patterns.append((re.compile(regex + r"\Z", re.DOTALL), new))
+        else:
+            mapping[old] = new
+    if not mapping and not patterns:
         return rows
-    return [
-        {mapping.get(key, key): value for key, value in row.items()}
-        for row in rows
-    ]
+
+    def renamed(key: str) -> str:
+        if key in mapping:
+            return mapping[key]
+        for pattern, new in patterns:
+            found = pattern.match(key)
+            if found:
+                parts = new.split("*")
+                groups = [*found.groups(), *[""] * len(parts)]
+                return parts[0] + "".join(
+                    g + p for g, p in zip(groups, parts[1:], strict=False)
+                )
+        return key
+
+    return [{renamed(key): value for key, value in row.items()} for row in rows]
 
 
 # ---------------------------------------------------------------------------
